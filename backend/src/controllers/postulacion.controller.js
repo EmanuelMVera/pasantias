@@ -3,11 +3,9 @@
 const { Postulacion, Oferta, Usuario, Perfil, Empresa, ActivityLog } = require('../models');
 const { crearNotificacion } = require('../utils/notificador');
 const postulacionService = require('../services/postulacion.service');
+const empresaService     = require('../services/empresa.service');
 
-async function _resolverEmpresa(req) {
-  if (req.empresa) return req.empresa;
-  return Empresa.findOne({ where: { usuarioId: req.usuario.id } });
-}
+const _resolverEmpresa = empresaService.resolverEmpresaDelRequest;
 
 async function logAction(datos) {
   try { await ActivityLog.create(datos); } catch (e) { /* fallo silencioso */ }

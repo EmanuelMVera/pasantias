@@ -2,12 +2,10 @@
 
 const { Oferta, Empresa } = require('../models');
 const { Op } = require('sequelize');
-const ofertaService = require('../services/oferta.service');
+const ofertaService   = require('../services/oferta.service');
+const empresaService  = require('../services/empresa.service');
 
-async function _resolverEmpresa(req) {
-  if (req.empresa) return req.empresa;
-  return Empresa.findOne({ where: { usuarioId: req.usuario.id } });
-}
+const _resolverEmpresa = empresaService.resolverEmpresaDelRequest;
 
 // ── Listar ofertas con filtros ────────────────────────────────────────────────
 

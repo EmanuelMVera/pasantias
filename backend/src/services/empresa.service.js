@@ -1,7 +1,23 @@
 'use strict';
 
-const { Oferta, Postulacion, Perfil, Usuario, EmpresaUsuario, sequelize } = require('../models');
+const { Oferta, Postulacion, Perfil, Usuario, Empresa, EmpresaUsuario, sequelize } = require('../models');
 const { Op } = require('sequelize');
+
+// Resolución canónica de empresa para un request autenticado.
+// Orden: (1) req.empresa inyectado por middleware → (2) membresía activa en
+// empresa_usuarios (cubre reclutador y admin_empresa) → (3) fallback legacy
+// por Empresa.usuarioId para cuentas creadas antes de la feature multi-usuario.
+async function resolverEmpresaDelRequest(req) {
+  if (req.empresa) return req.empresa;
+
+  const membresia = await EmpresaUsuario.findOne({
+    where: { usuarioId: req.usuario.id, activo: true },
+    include: [{ model: Empresa, as: 'empresa' }],
+  });
+  if (membresia?.empresa) return membresia.empresa;
+
+  return Empresa.findOne({ where: { usuarioId: req.usuario.id } });
+}
 
 async function obtenerMetricasDashboard(empresaId) {
   const ofertas = await Oferta.findAll({
@@ -130,6 +146,7 @@ async function obtenerCandidatosConFoto(empresaId, estado) {
 }
 
 module.exports = {
+  resolverEmpresaDelRequest,
   obtenerMetricasDashboard,
   obtenerOfertasConConteo,
   obtenerCandidatosConFoto,

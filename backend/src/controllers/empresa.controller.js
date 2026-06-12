@@ -1,27 +1,15 @@
 'use strict';
 
-const { Empresa } = require('../models');
 const empresaService = require('../services/empresa.service');
 const equipoService  = require('../services/empresaEquipo.service');
 
-// Campos que la empresa puede editar por su cuenta; razonSocial, CUIT y
-// estadoAprobacion son de solo lectura para proteger la integridad del registro.
 const CAMPOS_EDITABLES_EMPRESA = [
   'descripcion', 'rubro', 'sitioWeb', 'telefono', 'direccion', 'ciudad', 'logo',
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function _getEmpresaUsuario(usuarioId) {
-  return Empresa.findOne({ where: { usuarioId } });
-}
-
-// Prioriza req.empresa (inyectado por verifyEmpresaMember); fallback para rutas
-// que no pasan por ese middleware (compatibilidad con cuentas propietarias directas).
-async function _resolverEmpresa(req) {
-  if (req.empresa) return req.empresa;
-  return _getEmpresaUsuario(req.usuario.id);
-}
+const _resolverEmpresa = empresaService.resolverEmpresaDelRequest;
 
 // Maneja errores de service: reenvía HttpError tal cual; 500 para el resto.
 function _handleServiceError(res, error, mensaje500) {
