@@ -1,5 +1,6 @@
 'use strict';
 
+const { Empresa, Oferta } = require('../models');
 const empresaService = require('../services/empresa.service');
 const equipoService  = require('../services/empresaEquipo.service');
 
@@ -196,5 +197,32 @@ exports.getMisSolicitudesReclutador = async (req, res) => {
     return res.json({ success: true, total: solicitudes.length, data: solicitudes });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error al obtener las solicitudes.' });
+  }
+};
+
+// ── Perfil público de empresa ─────────────────────────────────────────────────
+
+exports.getEmpresaPublica = async (req, res) => {
+  try {
+    const empresa = await Empresa.findOne({
+      where: { id: req.params.id, estadoAprobacion: 'aprobada' },
+      attributes: ['id', 'razonSocial', 'rubro', 'descripcion', 'ciudad',
+                   'direccion', 'telefono', 'sitioWeb', 'logo', 'usuarioId'],
+    });
+    if (!empresa) {
+      return res.status(404).json({ success: false, message: 'Empresa no encontrada o no disponible.' });
+    }
+
+    const ofertas = await Oferta.findAll({
+      where: { empresaId: empresa.id, estado: 'activa' },
+      attributes: ['id', 'titulo', 'area', 'modalidad', 'ciudad', 'fechaLimite', 'tipoPuesto'],
+      order: [['createdAt', 'DESC']],
+      limit: 10,
+    });
+
+    return res.json({ success: true, data: { ...empresa.toJSON(), ofertas } });
+  } catch (err) {
+    console.error('[GET /empresas/:id]', err.message);
+    return res.status(500).json({ success: false, message: 'Error al obtener la empresa.' });
   }
 };
