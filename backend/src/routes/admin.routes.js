@@ -23,7 +23,7 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
 const {
-  Usuario, Empresa, Oferta, Postulacion, Notificacion, ActivityLog,
+  Usuario, Perfil, Empresa, Oferta, Postulacion, Notificacion, ActivityLog,
   EmpresaUsuario, SolicitudEmpresa, SolicitudReclutador,
 } = require('../models');
 
@@ -239,6 +239,13 @@ router.post('/usuarios', ...soloAdmin, async (req, res) => {
       telefono: telefono || null, ubicacion: ubicacion || null,
       activo: true, habilitado: true,
     });
+
+    // Alumno/egresado necesitan su fila de Perfil desde el alta (ya no existe
+    // el autorregistro público que la creaba); sin esto, PUT /users/perfil y
+    // la subida de CV/carta quedarían sin efecto (Perfil.update sobre 0 filas).
+    if (['alumno', 'egresado'].includes(rol)) {
+      await Perfil.create({ usuarioId: nuevo.id });
+    }
 
     await logAction({
       usuarioId: req.usuario.id,

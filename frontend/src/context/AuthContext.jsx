@@ -7,7 +7,7 @@
  * Funcionamiento:
  * - Al cargar la app, intenta recuperar la sesión guardada en localStorage
  * - Si hay un token válido, llama a /api/auth/me para obtener el usuario
- * - Expone el usuario, el estado de carga y las funciones login/register/logout
+ * - Expone el usuario, el estado de carga y las funciones login/logout
  *
  * Estructura del objeto usuario:
  * {
@@ -87,18 +87,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * Registra un nuevo usuario y lo deja autenticado automáticamente.
-   * @returns {Object} Respuesta completa de la API
-   */
-  const register = async (formData) => {
-    const { data } = await authService.register(formData);
-    localStorage.setItem('token', data.token);
-    const normalizado = normalizarUsuario(data.usuario);
-    setUsuario(normalizado);
-    return data;
-  };
-
-  /**
    * Cierra la sesión del usuario actual.
    * Elimina el token del localStorage y limpia el estado.
    */
@@ -130,7 +118,6 @@ export const AuthProvider = ({ children }) => {
       usuario,
       loading,
       login,
-      register,
       logout,
       actualizarUsuario,
       // Helpers de rol (evitan repetir usuario?.rol === 'x' en cada componente)

@@ -185,23 +185,21 @@ Si las tres funcionan, ¡el proyecto está corriendo correctamente! ✅
 
 ## 8. Usuarios y accesos
 
-La base de datos empieza vacía. Para crear el primer usuario administrador:
+No existe autorregistro público de alumnos/egresados: el sistema funciona como bolsa de empleo institucional y las cuentas se cargan desde el panel de administración. La base de datos empieza vacía. Para crear el primer usuario administrador:
 
-1. Ir a http://localhost:5173/register
-2. Registrarse como alumno (el registro público solo crea alumnos)
-3. Luego, desde pgAdmin o psql, cambiar el rol a `admin`:
-
-```sql
--- Conectarse a pasantias_db y ejecutar:
-UPDATE usuarios SET rol = 'admin' WHERE email = 'tu@email.com';
+```bash
+cd backend
+npm run db:seed:admin
 ```
+
+Esto crea (si no existe todavía) el usuario `admin@pasantias.com` / `Admin1234!` con rol `admin`. Iniciá sesión con esas credenciales; desde ese panel se pueden cargar el resto de los usuarios `alumno`/`egresado` y gestionar las solicitudes de empresa.
 
 ### Roles disponibles
 
 | Rol | Acceso | Cómo crearlo |
 |---|---|---|
-| `admin` | Panel completo de administración | Cambiar rol manualmente en la BD |
-| `alumno` / `egresado` | Dashboard de alumno, ofertas, perfil | Registro público en `/register` |
+| `admin` | Panel completo de administración | `npm run db:seed:admin` (primer admin) o creado por otro admin |
+| `alumno` / `egresado` | Dashboard de alumno, ofertas, perfil | Alta desde el panel admin (`Admin → Usuarios → Nuevo usuario`, `POST /api/admin/usuarios`) |
 | `empresa` | Panel de empresa, ofertas, equipo | Solicitud en `/registro-empresa` + aprobación del admin |
 | `empresa` (reclutador) | Gestión de candidatos | Solicitud desde panel de empresa + aprobación del admin |
 

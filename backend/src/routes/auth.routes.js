@@ -4,7 +4,6 @@
  * Prefijo de la API: /api/auth
  *
  * Rutas disponibles:
- * - POST /register              → Registra un nuevo usuario
  * - POST /login                 → Inicia sesión y devuelve un JWT
  * - GET  /me                    → Devuelve el usuario autenticado (requiere token)
  * - POST /forgot-password       → Solicita el recupero de contraseña
@@ -17,7 +16,6 @@ const { verifyToken } = require('../middleware/auth.middleware');
 const validate = require('../middleware/validate.middleware');
 const { validateCambiarPassword } = require('../validators/auth.validator');
 const {
-  register,
   login,
   me,
   forgotPassword,
@@ -25,7 +23,6 @@ const {
   cambiarPassword,
 } = require('../controllers/auth.controller');
 
-router.post('/register',             register);
 router.post('/login',                login);
 router.get('/me',          verifyToken, me);
 router.post('/forgot-password',      forgotPassword);

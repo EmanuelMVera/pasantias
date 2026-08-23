@@ -8,7 +8,7 @@
  * - Define todas las rutas de la aplicación y sus protecciones de acceso
  *
  * Tipos de rutas:
- * - Públicas: accesibles sin iniciar sesión (home, login, register)
+ * - Públicas: accesibles sin iniciar sesión (home, login, registro de empresa)
  * - Protegidas: requieren autenticación, con control de roles
  *
  * Roles soportados y redirección raíz:
@@ -25,7 +25,6 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 // Páginas públicas (accesibles sin login)
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/auth/LoginPage';
-import RegisterPage from './pages/auth/RegisterPage';
 import SolicitudEmpresaPage from './pages/auth/SolicitudEmpresaPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
@@ -141,7 +140,6 @@ function AppRoutes() {
 
       {/* ── Rutas públicas (solo para usuarios no autenticados) ── */}
       <Route path="/login"    element={!usuario ? <LoginPage />    : <Navigate to={getRutaInicio(usuario.rol)} replace />} />
-      <Route path="/register" element={!usuario ? <RegisterPage /> : <Navigate to={getRutaInicio(usuario.rol)} replace />} />
       <Route path="/registro-empresa" element={!usuario ? <SolicitudEmpresaPage /> : <Navigate to={getRutaInicio(usuario.rol)} replace />} />
       <Route path="/forgot-password"        element={<ForgotPasswordPage />} />
       <Route path="/reset-password/:token"  element={<ResetPasswordPage />} />

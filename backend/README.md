@@ -71,8 +71,8 @@ Explicación simple:
 - `src/server.js`: inicia el servicio y asegura la conexión a PostgreSQL.
 - `src/app.js`: configura rutas y seguridad básica del servidor.
 - `src/config/database.js`: dice a Sequelize cómo llegar a la base de datos.
-- `src/routes/auth.routes.js`: rutas de autenticación (`/api/auth/login`, `/api/auth/register`).
-- `src/controllers/auth.controller.js`: maneja registro, login, recuperar contraseña.
+- `src/routes/auth.routes.js`: rutas de autenticación (`/api/auth/login`). No hay registro público: los usuarios se cargan desde `/api/admin/usuarios` (alumno/egresado) o vía solicitud de empresa aprobada por el admin.
+- `src/controllers/auth.controller.js`: maneja login, recuperar contraseña.
 - `src/middleware/auth.middleware.js`: comprueba el token JWT y roles de usuario.
 - `src/models/index.js`: une modelos y define relaciones entre tablas.
 - `src/models/*.model.js`: cada archivo define una tabla específica (Usuario, Oferta, etc.).

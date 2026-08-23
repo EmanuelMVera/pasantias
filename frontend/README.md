@@ -71,7 +71,7 @@ Explicación carpeta por carpeta:
 ## 6. Cómo fluye el frontend
 1. Al abrir el proyecto en el navegador, `main.jsx` inicia React y pinta `App`.
 2. `App.jsx` crea rutas con React Router y usa `AuthProvider` para saber si hay usuario activo.
-3. Si el usuario no está logueado, va a `/login` o `/register`.
+3. Si el usuario no está logueado, va a `/login` (no hay registro público de alumno/egresado; solo empresas pueden autogestionar su alta vía `/registro-empresa`, con aprobación del admin).
 4. Después de login, dependiendo del rol, se redirige a `admin`, `empresa` o `alumno`.
 5. Dentro de cada página (por ejemplo `OfertasPage`) se muestran datos y botones.
 6. Si hace falta datos del backend, se llama a `services/api.js` con funciones como `ofertaService.getAll()`.

@@ -2,94 +2,24 @@
  * auth.controller.js — Controlador de autenticación del sistema.
  *
  * Maneja los siguientes flujos:
- * - Registro de nuevos usuarios (alumnos, egresados, empresas y profesores)
  * - Inicio de sesión con email y contraseña
  * - Obtención del perfil del usuario autenticado
  * - Solicitud de recuperación de contraseña (envío de email con token)
  * - Restablecimiento de contraseña usando el token recibido por email
  * - Cambio de contraseña del usuario autenticado
+ *
+ * El alta de usuarios NO se hace por autorregistro: alumnos/egresados se
+ * cargan desde el panel de administración (POST /api/admin/usuarios) y las
+ * empresas ingresan vía /api/solicitudes-empresa con aprobación del admin.
  */
 
-const { Usuario, Perfil, Empresa, EmpresaUsuario, ActivityLog } = require('../models');
+const { Usuario, ActivityLog } = require('../models');
 const authService = require('../services/auth.service');
 
 // Helper para registrar acciones en el log sin interrumpir el flujo principal
 async function logAction(datos) {
   try { await ActivityLog.create(datos); } catch (e) { /* Fallo silencioso */ }
 }
-
-// ── Registro ──────────────────────────────────────────────────────────────────
-/**
- * POST /api/auth/register
- * Registra un nuevo usuario en el sistema.
- *
- * Según el rol:
- * - alumno/egresado/profesor → se crea un Perfil vacío asociado
- * - empresa → se crea una Empresa con estado 'pendiente' (requiere aprobación del admin)
- */
-exports.register = async (req, res) => {
-  try {
-    const { nombre, apellido, email, password, rol, razonSocial, telefono, ubicacion,
-            carrera, legajo, anioEgreso } = req.body;
-
-    // Solo estos roles pueden registrarse públicamente
-    const rolesPermitidos = ['alumno', 'egresado'];
-    if (!rolesPermitidos.includes(rol)) {
-      return res.status(400).json({ success: false, message: 'Rol no válido para registro.' });
-    }
-
-    const existe = await Usuario.findOne({ where: { email } });
-    if (existe) return res.status(400).json({ success: false, message: 'El email ya está registrado.' });
-
-    const hash = await authService.hashPassword(password);
-
-    const nuevoUsuario = await Usuario.create({
-      nombre,
-      apellido,
-      email,
-      password: hash,
-      rol,
-      telefono: telefono || null,
-      ubicacion: ubicacion || null,
-      habilitado: rol === 'empresa' ? false : true,
-    });
-
-    if (['alumno', 'egresado'].includes(rol)) {
-      await Perfil.create({
-        usuarioId:  nuevoUsuario.id,
-        carrera:    carrera    || null,
-        legajo:     legajo     || null,
-        anioEgreso: anioEgreso || null,
-      });
-    } else if (rol === 'empresa') {
-      const empresa = await Empresa.create({ usuarioId: nuevoUsuario.id, razonSocial: razonSocial || '' });
-
-      // Registra automáticamente al creador como admin_empresa del equipo.
-      // Este registro es la base del sistema multi-usuario: sin él el admin
-      // no aparecería en /api/empresas/equipo junto al resto de los miembros.
-      await EmpresaUsuario.create({
-        empresaId: empresa.id,
-        usuarioId: nuevoUsuario.id,
-        rolInterno: 'admin_empresa',
-        activo: true,
-      });
-    }
-
-    const token = authService.generarToken(nuevoUsuario);
-
-    return res.status(201).json({
-      success: true,
-      message: rol === 'empresa'
-        ? 'Cuenta de empresa creada. Aguardá la aprobación del administrador.'
-        : 'Cuenta creada correctamente.',
-      token,
-      usuario: authService.serializarUsuario(nuevoUsuario),
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: 'Error al registrar el usuario.' });
-  }
-};
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 /**
