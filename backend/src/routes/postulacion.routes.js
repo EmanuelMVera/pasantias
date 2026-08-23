@@ -24,6 +24,8 @@ const router = require('express').Router();
 const ctrl = require('../controllers/postulacion.controller');
 const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
 const { verifyEmpresaMember, authorizeEmpresaRoles } = require('../middleware/empresa.middleware');
+const validate = require('../middleware/validate.middleware');
+const { validateUpdateEstado } = require('../validators/postulacion.validator');
 
 // ── Rutas alumno/egresado ─────────────────────────────────────────────────────
 // Solo alumnos y egresados pueden postularse y ver su historial
@@ -46,6 +48,7 @@ router.patch(
   '/:id/estado',
   ...baseMiembroEmpresa,
   authorizeEmpresaRoles('admin_empresa', 'reclutador'),
+  validate(validateUpdateEstado),
   ctrl.updateEstado
 );
 
