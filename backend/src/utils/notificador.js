@@ -25,14 +25,21 @@ const { enviarEmail, htmlNotificacion } = require('./mailer');
 /**
  * Crea una notificación en la base de datos y envía un email al destinatario.
  *
- * @param {object} datos - Campos de Notificacion (usuarioId, titulo, mensaje, tipo, enlace, ...)
+ * `accionURL` es el campo canónico para el link accionable de la notificación.
+ * `enlace` es legacy y se mantiene solo por compatibilidad de lectura; si un
+ * emisor todavía solo completa `enlace`, se usa como fallback para poblar
+ * `accionURL` automáticamente.
+ *
+ * @param {object} datos - Campos de Notificacion (usuarioId, titulo, mensaje, tipo, accionURL, enlace, ...)
  */
 async function crearNotificacion(datos) {
+  const payload = { ...datos, accionURL: datos.accionURL || datos.enlace || null };
+
   // 1. Crear la notificación en BD (siempre, independiente del email)
-  const notif = await Notificacion.create(datos);
+  const notif = await Notificacion.create(payload);
 
   // 2. Enviar email de forma asíncrona (fire-and-forget — no bloquea la respuesta)
-  _enviarEmailNotificacion(datos).catch((err) =>
+  _enviarEmailNotificacion(payload).catch((err) =>
     console.error('[Notificador] Error enviando email:', err.message)
   );
 

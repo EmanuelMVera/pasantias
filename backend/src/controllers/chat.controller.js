@@ -83,6 +83,7 @@ exports.enviarMensaje = async (req, res) => {
         tipo: 'chat',
         prioridad: 'normal',
         enlace: `/chat/${emisorId}`,
+        accionURL: `/chat/${emisorId}`,
       }).catch((err) => console.error('[Chat] Error al notificar mensaje:', err.message));
     }
 
