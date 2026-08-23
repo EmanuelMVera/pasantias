@@ -66,7 +66,7 @@ async function enviarEmail({ to, subject, html }) {
 function htmlNotificacion({ titulo, mensaje, enlace }) {
   const btnHtml = enlace
     ? `<div style="margin-top:24px;text-align:center;">
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}${enlace}"
+        <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}${enlace}"
            style="background:#2563eb;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">
           Ver en SisPasantías →
         </a>
