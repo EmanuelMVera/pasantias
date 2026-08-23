@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { userService } from '../../services/api';
+import { userService, getArchivoUrl } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import styles from './PerfilPage.module.css';
 
@@ -473,7 +473,7 @@ export default function PerfilPage() {
         {perfil?.cvPath && (
           <p>
             CV actual:{' '}
-            <a href={`http://localhost:5000${perfil.cvPath}`} target="_blank" rel="noreferrer">
+            <a href={getArchivoUrl(perfil.cvPath)} target="_blank" rel="noreferrer">
               📄 Ver CV actual
             </a>
           </p>
@@ -505,7 +505,7 @@ export default function PerfilPage() {
         {perfil?.cartaRecomendacion && (
           <p>
             Carta actual:{' '}
-            <a href={`http://localhost:5000${perfil.cartaRecomendacion}`} target="_blank" rel="noreferrer">
+            <a href={getArchivoUrl(perfil.cartaRecomendacion)} target="_blank" rel="noreferrer">
               📄 Ver carta actual
             </a>
           </p>

@@ -12,7 +12,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { postulacionService } from '../../services/api';
+import { postulacionService, getArchivoUrl } from '../../services/api';
 import styles from './PostulantesMiOfertaPage.module.css';
 
 /* ── Configuración de estados ────────────────────────────────────────────────── */
@@ -98,8 +98,6 @@ export default function PostulantesMiOfertaPage() {
   const [error,         setError]         = useState('');
   const [filtro,        setFiltro]        = useState('');
   const [toast,         setToast]         = useState('');
-
-  const BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
   useEffect(() => {
     postulacionService
@@ -225,7 +223,7 @@ export default function PostulantesMiOfertaPage() {
             <div className={styles.listaCards}>
               {filtradas.map(p => {
                 const perfil = p.usuario?.perfil ?? {};
-                const cvUrl  = perfil.cvPath ? `${BASE_URL}${perfil.cvPath}` : null;
+                const cvUrl  = getArchivoUrl(perfil.cvPath);
                 const col    = ESTADO_MAP[p.estado];
                 return (
                   <div key={p.id} className={styles.candidatoCard}>

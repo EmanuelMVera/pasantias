@@ -19,6 +19,16 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// ── Archivos estáticos (CV, cartas de recomendación, etc.) ──────────────────────
+// El backend sirve estos archivos fuera del prefijo /api (ej: /uploads/cv/archivo.pdf),
+// por eso se deriva la misma VITE_API_URL quitándole el sufijo /api.
+const FILES_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
+
+// Arma la URL absoluta de un archivo servido por el backend (ej: perfil.cvPath, perfil.cartaRecomendacion)
+export function getArchivoUrl(path) {
+  return path ? `${FILES_BASE_URL}${path}` : null;
+}
+
 // ── Interceptor de request ────────────────────────────────────────────────────
 // Antes de cada request, adjunta el token JWT del localStorage en el header Authorization
 api.interceptors.request.use((config) => {
