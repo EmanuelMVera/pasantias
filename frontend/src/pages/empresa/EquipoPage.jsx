@@ -259,7 +259,7 @@ function ModalEditarRol({ miembro, onClose, onGuardado }) {
 }
 
 /* ── Tarjeta de miembro ─────────────────────────────────────────────────────── */
-function MiembroCard({ miembro, esPropietario, onToggleActivo }) {
+function MiembroCard({ miembro, esPropietario, onToggleActivo, onEliminar }) {
   const u = miembro.usuario ?? miembro;
   const nombre = `${u.nombre ?? ''} ${u.apellido ?? ''}`.trim() || u.email;
   const inicial = nombre[0]?.toUpperCase() ?? '?';
@@ -291,6 +291,12 @@ function MiembroCard({ miembro, esPropietario, onToggleActivo }) {
             onClick={() => onToggleActivo(miembro)}
           >
             {miembro.activo ? '⏸ Suspender' : '▶ Reactivar'}
+          </button>
+          <button
+            className={`${styles.btnAccion} ${styles.btnDanger}`}
+            onClick={() => onEliminar(miembro)}
+          >
+            🗑️ Quitar del equipo
           </button>
         </div>
       )}
@@ -330,6 +336,7 @@ export default function EquipoPage() {
   const [modalRol,        setModalRol]        = useState(null);
   const [modalPwd,        setModalPwd]        = useState(null);
   const [modalSuspender,  setModalSuspender]  = useState(null); // miembro a suspender/reactivar
+  const [modalEliminar,   setModalEliminar]   = useState(null); // miembro a quitar del equipo
 
   const esPropietario = rolEnEquipo === 'admin_empresa';
   const activos    = equipo.filter(m => m.activo !== false);
@@ -395,15 +402,22 @@ export default function EquipoPage() {
     }
   };
 
-  const handleEliminar = async (miembro) => {
+  const handleEliminar = (miembro) => {
+    // Abre el modal de confirmación en lugar de window.confirm
+    setModalEliminar(miembro);
+  };
+
+  const confirmarEliminar = async () => {
+    const miembro = modalEliminar;
+    if (!miembro) return;
     const nombre = miembro.usuario?.nombre ?? miembro.nombre;
-    if (!window.confirm(`¿Querés quitar a ${nombre} del equipo?`)) return;
+    setModalEliminar(null);
     try {
       await empresaService.eliminarMiembro(miembro.id);
       setEquipo(prev => prev.filter(m => m.id !== miembro.id));
       showToast(`✓ ${nombre} fue quitado del equipo.`);
-    } catch {
-      showToast('✗ Error al eliminar el miembro.');
+    } catch (err) {
+      showToast(err.response?.data?.message ?? '✗ Error al quitar al miembro.');
     }
   };
 
@@ -478,7 +492,7 @@ export default function EquipoPage() {
           <div className={styles.listaCards}>
             {activos.map(m => (
               <MiembroCard key={m.id} miembro={m} esPropietario={esPropietario}
-                onToggleActivo={handleToggleActivo}
+                onToggleActivo={handleToggleActivo} onEliminar={handleEliminar}
               />
             ))}
           </div>
@@ -492,7 +506,7 @@ export default function EquipoPage() {
           <div className={styles.listaCards}>
             {suspendidos.map(m => (
               <MiembroCard key={m.id} miembro={m} esPropietario={esPropietario}
-                onToggleActivo={handleToggleActivo}
+                onToggleActivo={handleToggleActivo} onEliminar={handleEliminar}
               />
             ))}
           </div>
@@ -611,6 +625,64 @@ export default function EquipoPage() {
                 }}
               >
                 {modalSuspender.activo ? '🔒 Sí, suspender' : '🔓 Sí, reactivar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal confirmar quitar del equipo (desvincular) */}
+      {modalEliminar && (
+        <div className={styles.overlay} onClick={() => setModalEliminar(null)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+            <div className={styles.modalHeader}>
+              <h3>🗑️ Quitar del equipo</h3>
+              <button className={styles.modalClose} onClick={() => setModalEliminar(null)}>✕</button>
+            </div>
+
+            <div style={{ textAlign: 'center', padding: '1.5rem 1.5rem 0' }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: '50%', margin: '0 auto 0.75rem',
+                background: '#fee2e2',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '1.8rem',
+              }}>
+                🗑️
+              </div>
+              <p style={{ fontWeight: 600, fontSize: '1rem', marginBottom: '0.25rem' }}>
+                {(modalEliminar.usuario?.nombre ?? modalEliminar.nombre ?? '')} {modalEliminar.usuario?.apellido ?? ''}
+              </p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                {modalEliminar.usuario?.email ?? modalEliminar.email}
+              </p>
+            </div>
+
+            <div style={{
+              margin: '0 1.5rem 1.5rem',
+              padding: '0.9rem 1rem',
+              borderRadius: '8px',
+              background: '#fff7ed',
+              border: '1px solid #fed7aa',
+              fontSize: '0.88rem',
+              color: '#92400e',
+            }}>
+              ⚠️ A diferencia de suspender, para que vuelva a tener acceso vas a tener que
+              solicitar su alta de nuevo desde "Solicitar reclutador". Sus datos y postulaciones
+              gestionadas se conservan.
+            </div>
+
+            <div className={styles.modalActions}>
+              <button className={styles.btnSecondary} onClick={() => setModalEliminar(null)}>Cancelar</button>
+              <button
+                onClick={confirmarEliminar}
+                style={{
+                  background: '#dc2626',
+                  color: '#fff', border: 'none', borderRadius: '8px',
+                  padding: '0.6rem 1.4rem', fontWeight: 600, cursor: 'pointer',
+                  fontSize: '0.9rem',
+                }}
+              >
+                🗑️ Sí, quitar del equipo
               </button>
             </div>
           </div>
