@@ -22,7 +22,7 @@
  * │  Solicitar reclutador      │      ✅       │     ❌     │                    │
  * │  Ver solicitudes equipo    │      ✅       │     ❌     │                    │
  * │  Editar/suspender miembro  │      ✅       │     ❌     │                    │
- * │  Reset password miembro    │      ✅       │     ❌     │                    │
+ * │  Enviar recup. de acceso   │      ✅       │     ❌     │ (EST-10: nunca ve la contraseña) │
  * └─────────────────────────────────────────────────────────────────────────────┘
  *
  * Rutas disponibles:
@@ -41,11 +41,14 @@
  * - POST /equipo/solicitar       → Solicitar reclutador (solo admin_empresa)
  * - PATCH /equipo/:id            → Editar miembro (solo admin_empresa)
  * - DELETE /equipo/:id           → Dar de baja miembro (solo admin_empresa)
+ * - POST  /equipo/:id/recuperacion → Enviar email de recuperación de acceso (solo admin_empresa)
  *
  * Changelog:
  * - v1.0: implementación inicial
  * - v1.5: integración de verifyEmpresaMember y authorizeEmpresaRoles
  * - v2.0: simplificación a admin_empresa/reclutador — migración 010
+ * - v2.1 (EST-10): PATCH /equipo/:id/password (reset directo) reemplazado por
+ *   POST /equipo/:id/recuperacion — el admin ya no puede elegir la contraseña
  */
 
 'use strict';
@@ -97,10 +100,11 @@ router.get('/equipo/solicitudes', ...soloAdmin, ctrl.getMisSolicitudesReclutador
 // El admin es quien crea el usuario al aprobar. La empresa NO crea usuarios directamente.
 router.post('/equipo/solicitar', ...soloAdmin, ctrl.solicitarReclutador);
 
-// PATCH /api/empresas/equipo/:id/password — Resetea la contraseña de un miembro (solo admin_empresa)
-// ⚠️ DEBE ir ANTES de /equipo/:id para que Express no interprete 'password' como un id
-// Body: { password }
-router.patch('/equipo/:id/password', ...soloAdmin, ctrl.resetPasswordMiembro);
+// POST /api/empresas/equipo/:id/recuperacion — Envía email de recuperación de acceso
+// a un miembro (solo admin_empresa). El admin nunca elige ni ve la contraseña — el
+// propio miembro la establece siguiendo el link del email (EST-10).
+// ⚠️ DEBE ir ANTES de /equipo/:id para que Express no interprete 'recuperacion' como un id
+router.post('/equipo/:id/recuperacion', ...soloAdmin, ctrl.enviarRecuperacionMiembro);
 
 // PATCH /api/empresas/equipo/:id — Actualiza rol o estado de un miembro (solo admin_empresa)
 // Body: { rolInterno?, activo? }

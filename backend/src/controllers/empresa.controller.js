@@ -1,6 +1,6 @@
 'use strict';
 
-const { Empresa, Oferta } = require('../models');
+const { Empresa, Oferta, ActivityLog } = require('../models');
 const empresaService = require('../services/empresa.service');
 const equipoService  = require('../services/empresaEquipo.service');
 
@@ -11,6 +11,11 @@ const CAMPOS_EDITABLES_EMPRESA = [
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const _resolverEmpresa = empresaService.resolverEmpresaDelRequest;
+
+// Auditoría best-effort: nunca debe interrumpir el flujo principal si falla.
+async function logAction(datos) {
+  try { await ActivityLog.create(datos); } catch (e) { console.warn('[ActivityLog]', e.message); }
+}
 
 // Maneja errores de service: reenvía HttpError tal cual; 500 para el resto.
 function _handleServiceError(res, error, mensaje500) {
@@ -136,15 +141,29 @@ exports.addMiembro = async (req, res) => {
   }
 };
 
-exports.resetPasswordMiembro = async (req, res) => {
+// EST-10: el admin_empresa nunca elige ni conoce la contraseña de un
+// miembro — solo dispara el envío de un email de recuperación; el propio
+// reclutador establece su contraseña vía /reset-password/:token (público).
+exports.enviarRecuperacionMiembro = async (req, res) => {
   try {
     const empresa = await _resolverEmpresa(req);
     if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
 
-    const { email } = await equipoService.resetearPasswordMiembro(empresa, req.params.id, req.body.password);
-    return res.json({ success: true, message: `Contraseña actualizada para ${email}.` });
+    const { email, usuarioId } = await equipoService.solicitarRecuperacionAcceso(empresa, req.params.id);
+
+    // Auditoría: nunca se registra password ni token, solo a quién se le envió.
+    logAction({
+      usuarioId: req.usuario.id,
+      accion: 'solicitar_recuperacion_miembro',
+      entidad: 'usuario',
+      entidadId: usuarioId,
+      detalle: { miembroId: req.params.id, empresaId: empresa.id, emailDestino: email },
+      ip: req.ip,
+    });
+
+    return res.json({ success: true, message: `Le enviamos un email a ${email} para que establezca su contraseña.` });
   } catch (error) {
-    return _handleServiceError(res, error, 'Error al actualizar la contraseña.');
+    return _handleServiceError(res, error, 'Error al enviar la recuperación de acceso.');
   }
 };
 

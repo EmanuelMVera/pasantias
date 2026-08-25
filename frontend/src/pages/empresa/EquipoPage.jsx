@@ -146,61 +146,6 @@ function ModalSolicitarReclutador({ onClose, onEnviada }) {
   );
 }
 
-/* ── Modal: Cambiar contraseña ──────────────────────────────────────────────── */
-function ModalCambiarPassword({ miembro, onClose, onGuardado }) {
-  const [pwd, setPwd] = useState('');
-  const [mostrar, setMostrar] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (pwd.length < 6) { setError('Mínimo 6 caracteres.'); return; }
-    setLoading(true);
-    try {
-      await empresaService.resetPasswordMiembro(miembro.id, pwd);
-      onGuardado();
-      onClose();
-    } catch (err) {
-      setError(err.response?.data?.message ?? 'Error al cambiar la contraseña.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Modal titulo={`🔑 Cambiar contraseña — ${miembro.usuario?.nombre ?? miembro.nombre}`} onClose={onClose}>
-      <form onSubmit={handleSubmit} className={styles.modalForm}>
-        <div className={styles.fieldGroup}>
-          <label>Nueva contraseña *</label>
-          <div className={styles.passwordField}>
-            <input
-              type={mostrar ? 'text' : 'password'}
-              value={pwd}
-              onChange={e => { setPwd(e.target.value); setError(''); }}
-              placeholder="Mínimo 6 caracteres"
-              autoFocus required
-            />
-            <button type="button" className={styles.togglePwd} onClick={() => setMostrar(p => !p)}>
-              {mostrar ? '🙈' : '👁️'}
-            </button>
-          </div>
-          {pwd.length > 0 && pwd.length < 6 && (
-            <span className={styles.errorMsg}>Debe tener al menos 6 caracteres</span>
-          )}
-        </div>
-        {error && <p className={styles.errorMsg}>{error}</p>}
-        <div className={styles.modalActions}>
-          <button type="button" className={styles.btnSecondary} onClick={onClose}>Cancelar</button>
-          <button type="submit" className={styles.btnPrimary} disabled={loading || pwd.length < 6}>
-            {loading ? 'Guardando...' : '🔑 Cambiar contraseña'}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
 /* ── Modal: Editar rol ──────────────────────────────────────────────────────── */
 // Solo reclutador es asignable manualmente; admin_empresa lo define el flujo de aprobación
 const ROLES = [
@@ -259,7 +204,7 @@ function ModalEditarRol({ miembro, onClose, onGuardado }) {
 }
 
 /* ── Tarjeta de miembro ─────────────────────────────────────────────────────── */
-function MiembroCard({ miembro, esPropietario, onToggleActivo, onEliminar }) {
+function MiembroCard({ miembro, esPropietario, onToggleActivo, onEliminar, onRecuperacion }) {
   const u = miembro.usuario ?? miembro;
   const nombre = `${u.nombre ?? ''} ${u.apellido ?? ''}`.trim() || u.email;
   const inicial = nombre[0]?.toUpperCase() ?? '?';
@@ -291,6 +236,12 @@ function MiembroCard({ miembro, esPropietario, onToggleActivo, onEliminar }) {
             onClick={() => onToggleActivo(miembro)}
           >
             {miembro.activo ? '⏸ Suspender' : '▶ Reactivar'}
+          </button>
+          <button
+            className={styles.btnAccion}
+            onClick={() => onRecuperacion(miembro)}
+          >
+            🔑 Enviar recuperación de acceso
           </button>
           <button
             className={`${styles.btnAccion} ${styles.btnDanger}`}
@@ -334,9 +285,9 @@ export default function EquipoPage() {
 
   const [modalSolicitar,  setModalSolicitar]  = useState(false);
   const [modalRol,        setModalRol]        = useState(null);
-  const [modalPwd,        setModalPwd]        = useState(null);
   const [modalSuspender,  setModalSuspender]  = useState(null); // miembro a suspender/reactivar
   const [modalEliminar,   setModalEliminar]   = useState(null); // miembro a quitar del equipo
+  const [modalRecuperacion, setModalRecuperacion] = useState(null); // miembro a enviarle recuperación de acceso
 
   const esPropietario = rolEnEquipo === 'admin_empresa';
   const activos    = equipo.filter(m => m.activo !== false);
@@ -379,8 +330,20 @@ export default function EquipoPage() {
     showToast('✓ Rol actualizado.');
   };
 
-  const handlePwdGuardada = () => {
-    showToast('✓ Contraseña actualizada.');
+  const handleRecuperacion = (miembro) => {
+    setModalRecuperacion(miembro);
+  };
+
+  const confirmarRecuperacion = async () => {
+    const miembro = modalRecuperacion;
+    if (!miembro) return;
+    setModalRecuperacion(null);
+    try {
+      const { data } = await empresaService.enviarRecuperacionMiembro(miembro.id);
+      showToast(data.message ?? '✓ Email de recuperación enviado.');
+    } catch (err) {
+      showToast(err.response?.data?.message ?? '✗ Error al enviar la recuperación de acceso.');
+    }
   };
 
   const handleToggleActivo = async (miembro) => {
@@ -493,6 +456,7 @@ export default function EquipoPage() {
             {activos.map(m => (
               <MiembroCard key={m.id} miembro={m} esPropietario={esPropietario}
                 onToggleActivo={handleToggleActivo} onEliminar={handleEliminar}
+                onRecuperacion={handleRecuperacion}
               />
             ))}
           </div>
@@ -507,6 +471,7 @@ export default function EquipoPage() {
             {suspendidos.map(m => (
               <MiembroCard key={m.id} miembro={m} esPropietario={esPropietario}
                 onToggleActivo={handleToggleActivo} onEliminar={handleEliminar}
+                onRecuperacion={handleRecuperacion}
               />
             ))}
           </div>
@@ -560,13 +525,6 @@ export default function EquipoPage() {
           miembro={modalRol}
           onClose={() => setModalRol(null)}
           onGuardado={(nuevoRol) => { handleRolGuardado(modalRol.id, nuevoRol); setModalRol(null); }}
-        />
-      )}
-      {modalPwd && (
-        <ModalCambiarPassword
-          miembro={modalPwd}
-          onClose={() => setModalPwd(null)}
-          onGuardado={handlePwdGuardada}
         />
       )}
 
@@ -683,6 +641,63 @@ export default function EquipoPage() {
                 }}
               >
                 🗑️ Sí, quitar del equipo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal confirmar envío de recuperación de acceso (EST-10) */}
+      {modalRecuperacion && (
+        <div className={styles.overlay} onClick={() => setModalRecuperacion(null)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+            <div className={styles.modalHeader}>
+              <h3>🔑 Enviar recuperación de acceso</h3>
+              <button className={styles.modalClose} onClick={() => setModalRecuperacion(null)}>✕</button>
+            </div>
+
+            <div style={{ textAlign: 'center', padding: '1.5rem 1.5rem 0' }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: '50%', margin: '0 auto 0.75rem',
+                background: '#eff6ff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '1.8rem',
+              }}>
+                📧
+              </div>
+              <p style={{ fontWeight: 600, fontSize: '1rem', marginBottom: '0.25rem' }}>
+                {(modalRecuperacion.usuario?.nombre ?? modalRecuperacion.nombre ?? '')} {modalRecuperacion.usuario?.apellido ?? ''}
+              </p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                {modalRecuperacion.usuario?.email ?? modalRecuperacion.email}
+              </p>
+            </div>
+
+            <div style={{
+              margin: '0 1.5rem 1.5rem',
+              padding: '0.9rem 1rem',
+              borderRadius: '8px',
+              background: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              fontSize: '0.88rem',
+              color: '#1e40af',
+            }}>
+              ℹ️ Le vamos a enviar un email con un link para que establezca su propia
+              contraseña. Vos no la vas a ver ni a elegir en ningún momento.
+            </div>
+
+            <div className={styles.modalActions}>
+              <button className={styles.btnSecondary} onClick={() => setModalRecuperacion(null)}>Cancelar</button>
+              <button
+                onClick={confirmarRecuperacion}
+                style={{
+                  background: '#2563eb',
+                  color: '#fff', border: 'none', borderRadius: '8px',
+                  padding: '0.6rem 1.4rem', fontWeight: 600, cursor: 'pointer',
+                  fontSize: '0.9rem',
+                }}
+              >
+                📧 Sí, enviar recuperación
               </button>
             </div>
           </div>

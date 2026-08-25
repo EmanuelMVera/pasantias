@@ -53,6 +53,7 @@ module.exports = (sequelize) => {
         'rechazar_solicitud_empresa',
         'aprobar_solicitud_reclutador',
         'rechazar_solicitud_reclutador',
+        'solicitar_recuperacion_miembro', // EST-10
         'sistema'
       ),
       allowNull: false,

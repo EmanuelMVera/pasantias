@@ -3,6 +3,7 @@
 const bcrypt = require('bcryptjs');
 const { EmpresaUsuario, Usuario, SolicitudReclutador } = require('../models');
 const HttpError = require('../utils/httpError');
+const authService = require('./auth.service');
 
 async function listarEquipo(empresa) {
   const equipo = await EmpresaUsuario.findAll({
@@ -110,11 +111,14 @@ async function agregarMiembro(empresa, adminUsuarioId, { email, rolInterno = 're
   };
 }
 
-async function resetearPasswordMiembro(empresa, miembroId, password) {
-  if (!password || password.length < 6) {
-    throw new HttpError(400, 'La contraseña debe tener al menos 6 caracteres.');
-  }
-
+/**
+ * Dispara un email de recuperación de acceso para un miembro del equipo,
+ * reutilizando el mismo mecanismo de token que el flujo público de
+ * "olvidé mi contraseña" (auth.service.js). El admin_empresa NUNCA elige
+ * ni conoce la contraseña — solo el reclutador la establece, siguiendo el
+ * link del email hasta /reset-password/:token (EST-10).
+ */
+async function solicitarRecuperacionAcceso(empresa, miembroId) {
   const miembro = await EmpresaUsuario.findOne({
     where: { id: miembroId, empresaId: empresa.id },
     include: [{ model: Usuario, as: 'usuario' }],
@@ -123,13 +127,20 @@ async function resetearPasswordMiembro(empresa, miembroId, password) {
   if (!miembro) throw new HttpError(404, 'Miembro no encontrado.');
 
   if (miembro.rolInterno === 'admin_empresa') {
-    throw new HttpError(403, 'No podés cambiar la contraseña del administrador desde el panel de equipo. Usá la opción de perfil personal.');
+    throw new HttpError(403, 'No podés enviarte una recuperación de acceso a vos mismo desde el panel de equipo. Usá la opción "Olvidé mi contraseña" del login.');
   }
 
-  const hash = await bcrypt.hash(password, 12);
-  await miembro.usuario.update({ password: hash, tokenReset: null, tokenResetExpira: null });
+  const token = authService.generarTokenReset();
+  const expira = new Date(Date.now() + 60 * 60 * 1000); // 1 hora, igual que el flujo público
+  await miembro.usuario.update({
+    tokenReset: authService.hashTokenReset(token),
+    tokenResetExpira: expira,
+    tokenResetUsadoEn: null,
+  });
 
-  return { email: miembro.usuario.email };
+  await authService.enviarEmailReset(miembro.usuario.email, token);
+
+  return { email: miembro.usuario.email, usuarioId: miembro.usuario.id };
 }
 
 async function actualizarMiembro(empresa, miembroId, { rolInterno, activo }) {
@@ -222,7 +233,7 @@ async function obtenerSolicitudesReclutador(empresaId) {
 module.exports = {
   listarEquipo,
   agregarMiembro,
-  resetearPasswordMiembro,
+  solicitarRecuperacionAcceso,
   actualizarMiembro,
   desactivarMiembro,
   solicitarReclutador,

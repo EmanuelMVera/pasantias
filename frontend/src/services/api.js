@@ -179,7 +179,9 @@ export const empresaService = {
   getCandidatos:         (params) => api.get('/empresas/candidatos', { params }),
   getEquipo:             () => api.get('/empresas/equipo'),
   editarMiembro:         (id, data) => api.patch(`/empresas/equipo/${id}`, data),
-  resetPasswordMiembro:  (id, password) => api.patch(`/empresas/equipo/${id}/password`, { password }),
+  // EST-10: ya no se manda una contraseña — el admin solo dispara el email
+  // de recuperación; el propio miembro establece su contraseña.
+  enviarRecuperacionMiembro: (id) => api.post(`/empresas/equipo/${id}/recuperacion`),
   eliminarMiembro:       (id) => api.delete(`/empresas/equipo/${id}`),
   // Solicitudes de reclutadores (reemplaza la creación directa)
   solicitarReclutador:        (data) => api.post('/empresas/equipo/solicitar', data),
