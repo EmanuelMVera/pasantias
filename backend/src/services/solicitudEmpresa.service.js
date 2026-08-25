@@ -56,10 +56,16 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip }) {
       habilitado: true,
     }, { transaction: t });
 
+    // empresas.cuit ahora es VARCHAR(11) con CHECK de solo dígitos (EST-08
+    // §4.5). El formulario de solicitud no fuerza ese formato, así que se
+    // normaliza acá; si no quedan exactamente 11 dígitos, se deja null en
+    // vez de bloquear la aprobación — se completa a mano después.
+    const cuitLimpio = (solicitud.cuit || '').replace(/\D/g, '');
+
     nuevaEmpresa = await Empresa.create({
       usuarioId:        nuevoUsuario.id,
       razonSocial:      solicitud.razonSocial,
-      cuit:             solicitud.cuit,
+      cuit:             cuitLimpio.length === 11 ? cuitLimpio : null,
       rubro:            solicitud.rubro,
       sitioWeb:         solicitud.sitioWeb    || null,
       direccion:        solicitud.direccion   || null,
@@ -67,6 +73,8 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip }) {
       telefono:         solicitud.telefono    || null,
       descripcion:      solicitud.descripcion || null,
       estadoAprobacion: 'aprobada',
+      aprobadaPorUsuarioId: adminUsuarioId,
+      aprobadaEn: new Date(),
     }, { transaction: t });
 
     await EmpresaUsuario.create({
@@ -93,7 +101,12 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip }) {
       );
     }
 
-    await solicitud.update({ estado: 'aprobado' }, { transaction: t });
+    await solicitud.update({
+      estado: 'aprobado',
+      revisadaPorUsuarioId: adminUsuarioId,
+      revisadaEn: new Date(),
+      empresaIdCreada: nuevaEmpresa.id,
+    }, { transaction: t });
     await t.commit();
 
     reclutadoresCreados = reclutadoresSolicitud.length;
@@ -164,7 +177,12 @@ async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip }, motivo) {
     throw new HttpError(400, `La solicitud ya fue ${solicitud.estado}.`);
   }
 
-  await solicitud.update({ estado: 'rechazado' });
+  await solicitud.update({
+    estado: 'rechazado',
+    revisadaPorUsuarioId: adminUsuarioId,
+    revisadaEn: new Date(),
+    motivoRechazo: motivo || null,
+  });
 
   await logAction({
     usuarioId: adminUsuarioId,

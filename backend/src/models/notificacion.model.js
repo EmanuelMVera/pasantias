@@ -35,16 +35,22 @@ module.exports = (sequelize) => {
     mensaje: { type: DataTypes.TEXT, allowNull: false },
 
     // Tipo de notificación para filtrado y lógica de negocio
+    // STRING + CHECK (no ENUM de Postgres): ya tiene un valor muerto ('aval',
+    // sin ningún emisor activo en el código) — el mismo problema que dejó
+    // 'profesor'/'propietario'/'gerente'/'viewer' atascados en otros ENUMs.
     tipo: {
-      type: DataTypes.ENUM(
-        'postulacion', // Nueva postulación recibida (dirigida a empresa)
-        'estado',      // Cambio de estado en postulación (dirigida a alumno)
-        'oferta',      // Relacionada a una oferta de trabajo
-        'aval',        // (legacy) aval académico
-        'chat',        // Nuevo mensaje de chat recibido
-        'sistema'      // Mensaje general del sistema
-      ),
+      type: DataTypes.STRING(30),
       defaultValue: 'sistema',
+      validate: {
+        isIn: [[
+          'postulacion', // Nueva postulación recibida (dirigida a empresa)
+          'estado',      // Cambio de estado en postulación (dirigida a alumno)
+          'oferta',      // Relacionada a una oferta de trabajo
+          'aval',        // (legacy) aval académico — sin emisores activos hoy
+          'chat',        // Nuevo mensaje de chat recibido
+          'sistema',     // Mensaje general del sistema
+        ]],
+      },
     },
 
     // Si el usuario ya leyó la notificación (false = nueva, no leída)

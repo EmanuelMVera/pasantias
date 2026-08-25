@@ -43,10 +43,15 @@ module.exports = (sequelize) => {
     // Rol que cumple este usuario dentro del equipo de la empresa
     // admin_empresa: acceso completo (editar empresa, gestionar equipo, ofertas, postulaciones)
     // reclutador:    acceso operativo (ofertas, postulaciones, chat); sin gestión de equipo
+    // STRING + CHECK (no ENUM de Postgres): este campo ya pasó por
+    // propietario/gerente/viewer antes de llegar a admin_empresa/reclutador,
+    // y esos tres valores siguen atascados para siempre en el tipo ENUM
+    // original — la lección exacta que motiva no volver a usar ENUM acá.
     rolInterno: {
-      type: DataTypes.ENUM('admin_empresa', 'reclutador'),
+      type: DataTypes.STRING(20),
       allowNull: false,
       defaultValue: 'reclutador',
+      validate: { isIn: [['admin_empresa', 'reclutador']] },
     },
 
     // Si false, el usuario ya no tiene acceso al panel de la empresa

@@ -129,9 +129,13 @@ module.exports = (sequelize) => {
     // Estado actual de la oferta
     // 'activa' → recibe postulaciones | 'pausada' → inactiva temporalmente
     // 'rechazada' → rechazada por el admin | 'cerrada' → finalizada
+    // STRING + CHECK (no ENUM de Postgres): ya se le agregó 'rechazada' una
+    // vez después de creado el tipo; un conjunto que sigue evolucionando no
+    // debería vivir en un ENUM irreversible.
     estado: {
-      type: DataTypes.ENUM('activa', 'pausada', 'rechazada', 'cerrada'),
+      type: DataTypes.STRING(20),
       defaultValue: 'activa',
+      validate: { isIn: [['activa', 'pausada', 'rechazada', 'cerrada']] },
     },
 
     // Indica si el administrador revisó y aprobó la oferta (visible públicamente)
@@ -143,6 +147,7 @@ module.exports = (sequelize) => {
   }, {
     tableName: 'ofertas', // Nombre exacto de la tabla en PostgreSQL
     timestamps: true,     // Agrega automáticamente createdAt y updatedAt
+    paranoid: true,       // Soft delete — no se pierde el historial de postulaciones
   });
 
   return Oferta;

@@ -3,10 +3,17 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { enviarEmail } = require('../utils/mailer');
 
+// tokenVersion viaja en el payload del JWT: verifyToken la compara contra
+// usuarios.tokenVersion en cada request. Incrementar la columna (cambio de
+// contraseña, "cerrar sesión en todos los dispositivos") invalida de golpe
+// cualquier token viejo, sin necesidad de una tabla de sesiones (EST-08 §5.3).
 const generarToken = (usuario) =>
-  jwt.sign({ id: usuario.id, rol: usuario.rol }, process.env.JWT_SECRET, {
+  jwt.sign({ id: usuario.id, rol: usuario.rol, tokenVersion: usuario.tokenVersion ?? 0 }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   });
+
+// Hash del token de recupero — se persiste esto, nunca el token en claro.
+const hashTokenReset = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
 const serializarUsuario = (usuario) => ({
   id: usuario.id,
@@ -49,5 +56,6 @@ module.exports = {
   hashPassword,
   compararPassword,
   generarTokenReset,
+  hashTokenReset,
   enviarEmailReset,
 };

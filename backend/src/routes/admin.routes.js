@@ -24,7 +24,7 @@ const bcrypt = require('bcryptjs');
 const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
 const {
   Usuario, Perfil, Empresa, Oferta, Postulacion, Notificacion, ActivityLog,
-  EmpresaUsuario, SolicitudEmpresa, SolicitudReclutador,
+  EmpresaUsuario, SolicitudEmpresa, SolicitudReclutador, ConfiguracionInstitucional,
 } = require('../models');
 
 const { sequelize } = require('../models');
@@ -79,7 +79,7 @@ router.get('/dashboard-general', ...soloAdmin, async (req, res) => {
       Oferta.count({ where: { moderada: false } }),
       Postulacion.count(),
       Postulacion.count({ where: { estado: 'contratado' } }),
-      Postulacion.count({ where: { estado: ['entrevista_programada', 'entrevista'] } }),
+      Postulacion.count({ where: { estado: 'entrevista' } }),
       Notificacion.count({ where: { leida: false } }),
     ]);
 
@@ -177,19 +177,23 @@ router.get('/usuarios', ...soloAdmin, async (req, res) => {
       where,
       attributes: { exclude: ['password', 'tokenReset', 'tokenResetExpira'] },
       order: [['createdAt', 'DESC']],
-      // Para usuarios con rol 'empresa' incluimos su membresía y empresa
-      include: [{
-        model: EmpresaUsuario,
-        as: 'membresiasEmpresa',
-        required: false,
-        where: { activo: true },
-        attributes: ['rolInterno'],
-        include: [{
-          model: Empresa,
-          as: 'empresa',
-          attributes: ['id', 'razonSocial'],
-        }],
-      }],
+      // Para usuarios con rol 'empresa' incluimos su membresía y empresa;
+      // para alumno/egresado incluimos el legajo (vive en Perfil).
+      include: [
+        {
+          model: EmpresaUsuario,
+          as: 'membresiasEmpresa',
+          required: false,
+          where: { activo: true },
+          attributes: ['rolInterno'],
+          include: [{
+            model: Empresa,
+            as: 'empresa',
+            attributes: ['id', 'razonSocial'],
+          }],
+        },
+        { model: Perfil, as: 'perfil', required: false, attributes: ['legajo'] },
+      ],
     });
     return res.json({ success: true, total: usuarios.length, data: usuarios });
   } catch (err) {
@@ -219,14 +223,34 @@ router.get('/usuarios/:id', ...soloAdmin, async (req, res) => {
  * Crea un nuevo usuario desde el panel admin.
  * El admin puede asignarle cualquier rol directamente.
  *
- * Body: { nombre, apellido, email, password, rol, telefono?, ubicacion? }
+ * Body: { nombre, apellido, email, password, rol, telefono?, ubicacion?, legajo? }
+ * legajo es obligatorio cuando rol es alumno/egresado (EST-08 §2).
  */
 router.post('/usuarios', ...soloAdmin, async (req, res) => {
   try {
-    const { nombre, apellido, email, password, rol, telefono, ubicacion } = req.body;
+    const { nombre, apellido, email, password, rol, telefono, ubicacion, legajo } = req.body;
 
     if (!nombre || !apellido || !email || !password || !rol) {
       return res.status(400).json({ success: false, message: 'Faltan campos obligatorios (nombre, apellido, email, password, rol).' });
+    }
+
+    let legajoNormalizado = null;
+    if (['alumno', 'egresado'].includes(rol)) {
+      if (!legajo || !legajo.trim()) {
+        return res.status(400).json({ success: false, message: 'El legajo es obligatorio para alumnos y egresados.' });
+      }
+      legajoNormalizado = legajo.trim().toUpperCase();
+
+      const configRegex = await ConfiguracionInstitucional.findOne({ where: { clave: 'legajo.regex' } });
+      const regex = new RegExp(configRegex?.valor || '^[A-Z0-9-]{3,20}$');
+      if (!regex.test(legajoNormalizado)) {
+        return res.status(400).json({ success: false, message: 'El legajo no tiene un formato válido.' });
+      }
+
+      const legajoExistente = await Perfil.findOne({ where: { legajo: legajoNormalizado } });
+      if (legajoExistente) {
+        return res.status(400).json({ success: false, message: 'Ya existe un alumno/egresado con ese legajo.' });
+      }
     }
 
     // Verifica que el email no esté registrado
@@ -243,8 +267,10 @@ router.post('/usuarios', ...soloAdmin, async (req, res) => {
     // Alumno/egresado necesitan su fila de Perfil desde el alta (ya no existe
     // el autorregistro público que la creaba); sin esto, PUT /users/perfil y
     // la subida de CV/carta quedarían sin efecto (Perfil.update sobre 0 filas).
+    // El legajo se carga en esta misma alta — si el Perfil se creara vacío y
+    // se completara después, quedaría una ventana sin legajo (EST-08 §2.2).
     if (['alumno', 'egresado'].includes(rol)) {
-      await Perfil.create({ usuarioId: nuevo.id });
+      await Perfil.create({ usuarioId: nuevo.id, legajo: legajoNormalizado });
     }
 
     await logAction({
@@ -282,7 +308,7 @@ router.put('/usuarios/:id', ...soloAdmin, async (req, res) => {
 
     const {
       nombre, apellido, email, rol, activo,
-      telefono, ubicacion, password,
+      telefono, ubicacion, password, legajo,
     } = req.body;
 
     const updateData = {};
@@ -297,6 +323,23 @@ router.put('/usuarios/:id', ...soloAdmin, async (req, res) => {
 
     const antes = { rol: usuario.rol, activo: usuario.activo };
     await usuario.update(updateData);
+
+    // legajo vive en Perfil, no en Usuario — solo aplica a alumno/egresado
+    if (legajo !== undefined && ['alumno', 'egresado'].includes(usuario.rol)) {
+      const legajoNormalizado = legajo?.trim() ? legajo.trim().toUpperCase() : null;
+      if (legajoNormalizado) {
+        const configRegex = await ConfiguracionInstitucional.findOne({ where: { clave: 'legajo.regex' } });
+        const regex = new RegExp(configRegex?.valor || '^[A-Z0-9-]{3,20}$');
+        if (!regex.test(legajoNormalizado)) {
+          return res.status(400).json({ success: false, message: 'El legajo no tiene un formato válido.' });
+        }
+        const legajoDuplicado = await Perfil.findOne({ where: { legajo: legajoNormalizado, usuarioId: { [Op.ne]: usuario.id } } });
+        if (legajoDuplicado) {
+          return res.status(400).json({ success: false, message: 'Ya existe otro alumno/egresado con ese legajo.' });
+        }
+      }
+      await Perfil.update({ legajo: legajoNormalizado }, { where: { usuarioId: usuario.id } });
+    }
 
     const accion = rol && rol !== antes.rol ? 'cambiar_rol' : 'editar_usuario';
     await logAction({
@@ -386,7 +429,11 @@ router.get('/empresas/pendientes', ...soloAdmin, async (req, res) => {
 router.patch('/empresas/:id/aprobar', ...soloAdmin, async (req, res) => {
   const empresa = await Empresa.findByPk(req.params.id);
   if (!empresa) return res.status(404).json({ success: false, message: 'Empresa no encontrada.' });
-  await empresa.update({ estadoAprobacion: 'aprobada' });
+  await empresa.update({
+    estadoAprobacion: 'aprobada',
+    aprobadaPorUsuarioId: req.usuario.id,
+    aprobadaEn: new Date(),
+  });
   await Usuario.update({ habilitado: true }, { where: { id: empresa.usuarioId } });
   await logAction({ usuarioId: req.usuario.id, accion: 'aprobar_empresa', entidad: 'empresa', entidadId: empresa.id, detalle: { razonSocial: empresa.razonSocial }, ip: req.ip });
   return res.json({ success: true, message: 'Empresa aprobada.' });
@@ -395,7 +442,10 @@ router.patch('/empresas/:id/aprobar', ...soloAdmin, async (req, res) => {
 router.patch('/empresas/:id/rechazar', ...soloAdmin, async (req, res) => {
   const empresa = await Empresa.findByPk(req.params.id);
   if (!empresa) return res.status(404).json({ success: false, message: 'Empresa no encontrada.' });
-  await empresa.update({ estadoAprobacion: 'rechazada' });
+  await empresa.update({
+    estadoAprobacion: 'rechazada',
+    motivoRechazo: req.body?.motivo || null,
+  });
   await logAction({ usuarioId: req.usuario.id, accion: 'rechazar_empresa', entidad: 'empresa', entidadId: empresa.id, detalle: { razonSocial: empresa.razonSocial }, ip: req.ip });
   return res.json({ success: true, message: 'Empresa rechazada.' });
 });

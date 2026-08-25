@@ -132,6 +132,20 @@ module.exports = (sequelize) => {
       defaultValue: [],
     },
 
+    // ── Auditoría de revisión (EST-08 §4.7) ───────────────────────────────
+    revisadaPorUsuarioId: {
+      type: DataTypes.INTEGER, allowNull: true,
+      references: { model: 'usuarios', key: 'id' },
+    },
+    revisadaEn: { type: DataTypes.DATE, allowNull: true },
+    motivoRechazo: { type: DataTypes.TEXT, allowNull: true },
+    // Empresa que nació de esta solicitud al aprobarse — hoy esta tabla es
+    // standalone sin ninguna FK, ese vínculo se perdía por completo.
+    empresaIdCreada: {
+      type: DataTypes.INTEGER, allowNull: true,
+      references: { model: 'empresas', key: 'id' },
+    },
+
   }, {
     tableName: 'solicitudes_empresa',
     timestamps: true,  // Genera createdAt y updatedAt automáticamente

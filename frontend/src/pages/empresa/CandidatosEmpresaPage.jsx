@@ -30,20 +30,16 @@ function MiniAvatar({ fotoSrc, nombre }) {
   );
 }
 
+// EST-08: el backend consolidó los pares legacy/alias
+// (entrevista_programada→entrevista, no_seleccionado→rechazado).
 const ESTADOS_TABS = [
   { value: '',             label: 'Todos' },
   { value: 'en_revision',  label: 'En revisión' },
   { value: 'preseleccionado', label: 'Preseleccionados' },
   { value: 'entrevista',   label: 'Entrevista' },
   { value: 'contratado',   label: 'Contratados' },
-  { value: 'no_seleccionado', label: 'No seleccionados' },
+  { value: 'rechazado',    label: 'No seleccionados' },
 ];
-
-// Incluir alias legacy en el filtro que se envía al backend
-const ESTADO_CON_ALIAS = {
-  entrevista:      ['entrevista', 'entrevista_programada'],
-  no_seleccionado: ['no_seleccionado', 'rechazado'],
-};
 
 function formatFecha(iso) {
   if (!iso) return '—';
@@ -52,8 +48,8 @@ function formatFecha(iso) {
 
 const ESTADO_COLORS = {
   en_revision: '#64748b', preseleccionado: '#2563eb',
-  entrevista: '#7c3aed', entrevista_programada: '#7c3aed',
-  contratado: '#16a34a', no_seleccionado: '#dc2626', rechazado: '#dc2626',
+  entrevista: '#7c3aed',
+  contratado: '#16a34a', rechazado: '#dc2626',
 };
 
 export default function CandidatosEmpresaPage() {

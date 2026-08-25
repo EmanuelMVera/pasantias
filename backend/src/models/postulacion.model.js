@@ -7,22 +7,25 @@
  * - Un mismo usuario no puede postularse dos veces a la misma oferta
  *   (índice único compuesto por usuarioId + ofertaId)
  *
- * Flujo de estados (completo):
+ * Flujo de estados:
  *
  *   en_revision
  *       ↓
  *   preseleccionado
  *       ↓
- *   entrevista_programada  (legacy)
- *   entrevista             (nuevo — alias más corto)
+ *   entrevista
  *       ↓               ↘
- *   contratado         no_seleccionado / rechazado
+ *   contratado         rechazado
  *
- * Los valores legacy (entrevista_programada, no_seleccionado) se mantienen
- * para compatibilidad con registros existentes en la base de datos.
+ * El detalle de quién cambió qué y cuándo vive en
+ * PostulacionHistorialEstado, no en este campo (que solo guarda el
+ * estado actual).
  *
  * Changelog:
  * - v1.2: agregados 'entrevista' y 'rechazado' al ENUM de estado
+ * - v1.3 (EST-08): consolidados los pares legacy/alias
+ *   (entrevista_programada→entrevista, no_seleccionado→rechazado);
+ *   agregado cvArchivoId
  */
 
 'use strict';
@@ -50,18 +53,26 @@ module.exports = (sequelize) => {
     // Texto libre que el alumno puede escribir para presentarse a la empresa
     cartaPresentacion: { type: DataTypes.TEXT, allowNull: true },
 
-    // Estado actual del proceso de selección para esta postulación
+    // Estado actual del proceso de selección para esta postulación.
+    // EST-08 §4.8: se consolidaron los pares legacy/alias
+    // (entrevista_programada→entrevista, no_seleccionado→rechazado) que
+    // convivían desde Etapa 4 — toda query que filtrara por estado tenía
+    // que acordarse de incluir ambos. Los valores legacy se migraron a
+    // los canónicos en la migración correspondiente y ya no se aceptan
+    // acá; el historial de qué pasó y cuándo ahora vive en
+    // PostulacionHistorialEstado, no en el propio valor de este campo.
     estado: {
-      type: DataTypes.ENUM(
-        'en_revision',           // Recién enviada, esperando revisión de la empresa
-        'preseleccionado',       // La empresa mostró interés inicial
-        'entrevista_programada', // [LEGACY] Se agendó una entrevista (mantener por datos existentes)
-        'entrevista',            // [NUEVO] Alias moderno de entrevista_programada
-        'no_seleccionado',       // [LEGACY] El postulante no fue elegido
-        'rechazado',             // [NUEVO] Alias moderno de no_seleccionado
-        'contratado'             // El postulante fue seleccionado para la pasantía
-      ),
+      type: DataTypes.STRING(30),
       defaultValue: 'en_revision',
+      validate: {
+        isIn: [[
+          'en_revision',     // Recién enviada, esperando revisión de la empresa
+          'preseleccionado', // La empresa mostró interés inicial
+          'entrevista',      // Se agendó una entrevista
+          'contratado',      // El postulante fue seleccionado para la pasantía
+          'rechazado',       // El postulante no fue seleccionado
+        ]],
+      },
     },
 
     // Fecha y hora en que se realizó la postulación
@@ -69,6 +80,14 @@ module.exports = (sequelize) => {
 
     // Notas internas de la empresa sobre el candidato (no visibles para el alumno)
     notasEmpresa: { type: DataTypes.TEXT, allowNull: true },
+
+    // Snapshot del archivo de CV usado en el momento de postularse (EST-08
+    // §5.4): si el alumno actualiza su CV después, esta postulación sigue
+    // apuntando al que existía cuando la empresa lo evaluó.
+    cvArchivoId: {
+      type: DataTypes.UUID, allowNull: true,
+      references: { model: 'archivos', key: 'id' },
+    },
 
   }, {
     tableName: 'postulaciones', // Nombre exacto de la tabla en PostgreSQL

@@ -46,7 +46,7 @@ const ESTADOS_POSTULACION = [
   'preseleccionado',
   'entrevista',
   'contratado',
-  'no_seleccionado', 'no_seleccionado',
+  'rechazado', 'rechazado',
 ];
 
 // Áreas de oferta según rubro de la empresa
@@ -180,16 +180,20 @@ async function seedDemo() {
         transaction,
       });
 
+      // Usuario/Empresa/Oferta son `paranoid` (soft delete, EST-08 Fase 1):
+      // { force: true } fuerza el DELETE real acá, porque si no el email/cuit
+      // de los registros "borrados" siguen ocupando el índice UNIQUE y la
+      // próxima corrida del seed chocaría al intentar recrearlos.
       if (empresaIds.length) {
-        await Oferta.destroy({ where: { empresaId: { [Op.in]: empresaIds } }, transaction });
+        await Oferta.destroy({ where: { empresaId: { [Op.in]: empresaIds } }, transaction, force: true });
         await EmpresaUsuario.destroy({ where: { empresaId: { [Op.in]: empresaIds } }, transaction });
-        await Empresa.destroy({ where: { id: { [Op.in]: empresaIds } }, transaction });
+        await Empresa.destroy({ where: { id: { [Op.in]: empresaIds } }, transaction, force: true });
       }
 
       if (userIds.length) {
         await Perfil.destroy({ where: { usuarioId: { [Op.in]: userIds } }, transaction });
         await EmpresaUsuario.destroy({ where: { usuarioId: { [Op.in]: userIds } }, transaction });
-        await Usuario.destroy({ where: { id: { [Op.in]: userIds } }, transaction });
+        await Usuario.destroy({ where: { id: { [Op.in]: userIds } }, transaction, force: true });
       }
     }
 
@@ -220,10 +224,14 @@ async function seedDemo() {
         fotoPerfil: item.responsable.fotoPerfil,
       }, { transaction });
 
+      // empresas.cuit ahora exige exactamente 11 dígitos sin guiones
+      // (EST-08 §4.5) — el JSON demo trae formato "30-30500001-2".
+      const cuitLimpio = (item.cuit || '').replace(/\D/g, '');
+
       const empresa = await Empresa.create({
         usuarioId: owner.id,
         razonSocial: item.razonSocial,
-        cuit: item.cuit,
+        cuit: cuitLimpio.length === 11 ? cuitLimpio : null,
         descripcion: item.descripcion,
         rubro: item.rubro,
         sitioWeb: item.sitioWeb,

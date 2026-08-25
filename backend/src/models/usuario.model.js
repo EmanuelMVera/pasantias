@@ -36,12 +36,19 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING(100),
       allowNull: false,
     },
-    // Email único que se usa para iniciar sesión
+    // Email único que se usa para iniciar sesión.
+    // Se normaliza a minúsculas antes de guardar (set) para que el UNIQUE
+    // de la base (sobre LOWER(email), ver migración) sea efectivo de
+    // verdad: sin esto, "Juan@x.com" y "juan@x.com" serían cuentas
+    // distintas pese al índice case-insensitive.
     email: {
       type: DataTypes.STRING(150),
       allowNull: false,
       unique: true,
-      validate: { isEmail: true }, // Valida que tenga formato de email
+      validate: { isEmail: true },
+      set(value) {
+        this.setDataValue('email', value ? String(value).trim().toLowerCase() : value);
+      },
     },
     // Contraseña almacenada como hash bcrypt (nunca en texto plano)
     password: {
@@ -49,10 +56,14 @@ module.exports = (sequelize) => {
       allowNull: false,
     },
     // Rol del usuario en el sistema — determina sus permisos y flujos de registro
+    // STRING + CHECK (no ENUM de Postgres): los roles ya cambiaron una vez
+    // (existió 'profesor', eliminado) y un ENUM deja valores muertos
+    // irreversibles en el tipo de Postgres cuando eso vuelve a pasar.
     rol: {
-      type: DataTypes.ENUM('alumno', 'egresado', 'empresa', 'admin'),
+      type: DataTypes.STRING(20),
       allowNull: false,
       defaultValue: 'alumno',
+      validate: { isIn: [['alumno', 'egresado', 'empresa', 'admin']] },
     },
     // Si es false la cuenta está desactivada y no puede iniciar sesión
     activo: {
@@ -86,7 +97,9 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING(255),
       allowNull: true,
     },
-    // Token temporal para recuperación de contraseña (generado con crypto)
+    // Hash SHA-256 del token de recuperación (NUNCA el token en claro —
+    // quien lea un backup/dump no puede reusar un reset pendiente).
+    // El token real solo existe en el email enviado al usuario.
     tokenReset: {
       type: DataTypes.STRING,
       allowNull: true,
@@ -96,9 +109,25 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       allowNull: true,
     },
+    // Marca cuándo se usó el token de reset, para que no pueda reusarse
+    // aunque todavía no haya expirado.
+    tokenResetUsadoEn: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    // Se incrementa en cambio de contraseña / "cerrar sesión en todos los
+    // dispositivos". Va en el payload del JWT: un token viejo con una
+    // tokenVersion distinta a la actual se rechaza — es la forma barata
+    // de revocar sesiones sin mantener una tabla de tokens activos.
+    tokenVersion: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
   }, {
     tableName: 'usuarios',  // Nombre exacto de la tabla en PostgreSQL
     timestamps: true,       // Agrega automáticamente createdAt y updatedAt
+    paranoid: true,         // Soft delete (deletedAt) — no se pierde el historial institucional
   });
 
   return Usuario;

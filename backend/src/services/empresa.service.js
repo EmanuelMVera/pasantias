@@ -44,7 +44,7 @@ async function obtenerMetricasDashboard(empresaId) {
     Postulacion.count({ where: wherePost }),
     Postulacion.count({ where: { ...wherePost, estado: 'en_revision' } }),
     Postulacion.count({ where: { ...wherePost, estado: 'preseleccionado' } }),
-    Postulacion.count({ where: { ...wherePost, estado: ['entrevista_programada', 'entrevista'] } }),
+    Postulacion.count({ where: { ...wherePost, estado: 'entrevista' } }),
     Postulacion.count({ where: { ...wherePost, estado: 'contratado' } }),
     EmpresaUsuario.count({ where: { empresaId, activo: true } }),
   ]);

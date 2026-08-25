@@ -98,7 +98,13 @@ exports.forgotPassword = async (req, res) => {
 
     const token = authService.generarTokenReset();
     const expira = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
-    await usuario.update({ tokenReset: token, tokenResetExpira: expira });
+    // Se persiste el HASH del token, nunca el token en claro — el token
+    // real solo viaja en el email que recibe el usuario.
+    await usuario.update({
+      tokenReset: authService.hashTokenReset(token),
+      tokenResetExpira: expira,
+      tokenResetUsadoEn: null,
+    });
 
     await authService.enviarEmailReset(email, token);
 
@@ -133,17 +139,31 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ success: false, message: 'La contraseña debe tener al menos 6 caracteres.' });
     }
 
-    const usuario = await Usuario.findOne({ where: { tokenReset: token } });
+    const tokenHash = authService.hashTokenReset(token);
+    const usuario = await Usuario.findOne({ where: { tokenReset: tokenHash } });
 
     if (!usuario) {
       return res.status(400).json({ success: false, message: 'Token inválido o ya utilizado.' });
+    }
+    if (usuario.tokenResetUsadoEn) {
+      return res.status(400).json({ success: false, message: 'Este token ya fue utilizado. Solicitá uno nuevo.' });
     }
     if (new Date() > new Date(usuario.tokenResetExpira)) {
       return res.status(400).json({ success: false, message: 'El token expiró. Solicitá uno nuevo.' });
     }
 
     const hash = await authService.hashPassword(password);
-    await usuario.update({ password: hash, tokenReset: null, tokenResetExpira: null });
+    // tokenReset/tokenResetExpira se limpian igual que antes; además se
+    // marca tokenResetUsadoEn (por si algo dejara el hash sin limpiar) y
+    // se incrementa tokenVersion para cerrar cualquier sesión que hubiera
+    // quedado abierta con la contraseña vieja.
+    await usuario.update({
+      password: hash,
+      tokenReset: null,
+      tokenResetExpira: null,
+      tokenResetUsadoEn: new Date(),
+      tokenVersion: usuario.tokenVersion + 1,
+    });
 
     return res.json({ success: true, message: 'Contraseña restablecida correctamente. Ya podés iniciar sesión.' });
   } catch (error) {
@@ -172,7 +192,10 @@ exports.cambiarPassword = async (req, res) => {
     }
 
     const hash = await authService.hashPassword(nuevaPassword);
-    await usuario.update({ password: hash });
+    // Incrementa tokenVersion: cualquier JWT emitido antes de este cambio
+    // deja de ser válido (EST-08 §5.3) — es lo que un usuario espera al
+    // cambiar su contraseña después de sospechar que alguien más la tiene.
+    await usuario.update({ password: hash, tokenVersion: usuario.tokenVersion + 1 });
 
     return res.json({ success: true, message: 'Contraseña actualizada correctamente.' });
   } catch (err) {

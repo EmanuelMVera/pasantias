@@ -55,6 +55,7 @@ const FORM_VACIO = {
   nombre: '', apellido: '', email: '',
   password: '', rol: 'alumno',
   telefono: '', ubicacion: '', activo: true,
+  legajo: '',
 };
 
 export default function AdminUsuariosPage() {
@@ -102,7 +103,7 @@ export default function AdminUsuariosPage() {
   const abrirCrear = () => { setForm(FORM_VACIO); setFormError(''); setModal('crear'); };
   const abrirEditar = (u) => {
     setEditando(u);
-    setForm({ nombre: u.nombre, apellido: u.apellido, email: u.email, password: '', rol: u.rol, telefono: u.telefono ?? '', ubicacion: u.ubicacion ?? '', activo: u.activo });
+    setForm({ nombre: u.nombre, apellido: u.apellido, email: u.email, password: '', rol: u.rol, telefono: u.telefono ?? '', ubicacion: u.ubicacion ?? '', activo: u.activo, legajo: u.perfil?.legajo ?? '' });
     setFormError('');
     setModal('editar');
   };
@@ -355,6 +356,19 @@ export default function AdminUsuariosPage() {
                 <label>Ubicación</label>
                 <input name="ubicacion" value={form.ubicacion} onChange={handleChange} placeholder="Ciudad, Provincia" />
               </div>
+
+              {(form.rol === 'alumno' || form.rol === 'egresado') && (
+                <div className="form-group">
+                  <label>Legajo *</label>
+                  <input
+                    name="legajo"
+                    value={form.legajo}
+                    onChange={handleChange}
+                    required
+                    placeholder="Ej: 00457"
+                  />
+                </div>
+              )}
 
               {modal === 'editar' && (
                 <label className={styles.checkboxLabel}>

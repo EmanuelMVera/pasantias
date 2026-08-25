@@ -1,10 +1,9 @@
 'use strict';
 
+// EST-08 Fase 3: se consolidaron los pares legacy/alias
+// (entrevista_programada→entrevista, no_seleccionado→rechazado).
 const ESTADOS_VALIDOS = [
-  'en_revision', 'preseleccionado',
-  'entrevista_programada', 'entrevista',
-  'no_seleccionado', 'rechazado',
-  'contratado',
+  'en_revision', 'preseleccionado', 'entrevista', 'contratado', 'rechazado',
 ];
 
 /**

@@ -8,6 +8,11 @@
     "dev": "nodemon src/server.js",
     "db:seed:admin": "node src/utils/seedAdmin.js",
     "db:seed:demo": "node src/utils/seedDemo.js",
+    "db:migrate": "sequelize-cli db:migrate",
+    "db:migrate:undo": "sequelize-cli db:migrate:undo",
+    "db:migrate:status": "sequelize-cli db:migrate:status",
+    "db:schema:dump": "node src/utils/dumpSchema.js",
+    "db:reset:dev": "node src/utils/resetDev.js",
     "test": "echo \"No tests configured yet\""
   },
   "keywords": [],
@@ -28,6 +33,7 @@
     "sequelize": "^6.37.8"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "nodemon": "^3.1.14",
+    "sequelize-cli": "^6.6.5"
   }
 }

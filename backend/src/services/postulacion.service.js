@@ -98,9 +98,9 @@ async function obtenerMetricasAlumno(usuarioId) {
     Postulacion.count({ where: { usuarioId } }),
     Postulacion.count({ where: { usuarioId, estado: 'en_revision' } }),
     Postulacion.count({ where: { usuarioId, estado: 'preseleccionado' } }),
-    Postulacion.count({ where: { usuarioId, estado: ['entrevista_programada', 'entrevista'] } }),
+    Postulacion.count({ where: { usuarioId, estado: 'entrevista' } }),
     Postulacion.count({ where: { usuarioId, estado: 'contratado' } }),
-    Postulacion.count({ where: { usuarioId, estado: 'no_seleccionado' } }),
+    Postulacion.count({ where: { usuarioId, estado: 'rechazado' } }),
     Notificacion.count({ where: { usuarioId, leida: false } }),
   ]);
 

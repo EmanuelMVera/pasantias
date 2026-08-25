@@ -1,6 +1,6 @@
 'use strict';
 
-const { Postulacion, Oferta, Usuario, Perfil, Empresa, ActivityLog } = require('../models');
+const { Postulacion, Oferta, Usuario, Perfil, Empresa, Archivo, PostulacionHistorialEstado, ActivityLog } = require('../models');
 const { crearNotificacion } = require('../utils/notificador');
 const postulacionService = require('../services/postulacion.service');
 const empresaService     = require('../services/empresa.service');
@@ -20,7 +20,25 @@ exports.postular = async (req, res) => {
 
     const oferta = await postulacionService.validarPostulacion(usuarioId, ofertaId);
 
-    const postulacion = await Postulacion.create({ usuarioId, ofertaId, cartaPresentacion });
+    // Snapshot del CV vigente al momento de postularse (EST-08 §5.4): si el
+    // alumno lo actualiza después, esta postulación sigue apuntando al que
+    // existía cuando la empresa lo evaluó.
+    const cvArchivo = await Archivo.findOne({
+      where: { usuarioPropietarioId: usuarioId, tipo: 'cv' },
+      order: [['createdAt', 'DESC']],
+    });
+
+    const postulacion = await Postulacion.create({
+      usuarioId, ofertaId, cartaPresentacion,
+      cvArchivoId: cvArchivo?.id || null,
+    });
+
+    await PostulacionHistorialEstado.create({
+      postulacionId: postulacion.id,
+      estadoAnterior: null,
+      estadoNuevo: postulacion.estado,
+      cambiadoPorUsuarioId: usuarioId,
+    });
 
     await crearNotificacion({
       usuarioId: oferta.empresa.usuarioId,
@@ -149,18 +167,28 @@ exports.updateEstado = async (req, res) => {
       return res.status(403).json({ success: false, message: 'No tenés permiso para modificar esta postulación.' });
     }
 
+    const estadoAnterior = postulacion.estado;
+
     const updateData = {};
     if (estado) updateData.estado = estado;
     if (notasEmpresa !== undefined) updateData.notasEmpresa = notasEmpresa;
     await postulacion.update(updateData);
 
+    if (estado && estado !== estadoAnterior) {
+      await PostulacionHistorialEstado.create({
+        postulacionId: postulacion.id,
+        estadoAnterior,
+        estadoNuevo: estado,
+        cambiadoPorUsuarioId: req.usuario.id,
+        notaInterna: notasEmpresa || null,
+      });
+    }
+
     const estadoTexto = {
-      preseleccionado:       'Fuiste preseleccionado/a',
-      entrevista_programada: 'Tu entrevista fue programada',
-      entrevista:            'Tu entrevista fue programada',
-      no_seleccionado:       'Tu postulación no fue seleccionada',
-      rechazado:             'Tu postulación no fue seleccionada',
-      contratado:            '¡Felicitaciones! Fuiste seleccionado/a',
+      preseleccionado: 'Fuiste preseleccionado/a',
+      entrevista:      'Tu entrevista fue programada',
+      rechazado:       'Tu postulación no fue seleccionada',
+      contratado:      '¡Felicitaciones! Fuiste seleccionado/a',
     };
 
     if (estado) {

@@ -49,6 +49,13 @@ const verifyToken = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Usuario no encontrado o inactivo.' });
     }
 
+    // Revocación de sesiones (EST-08 §5.3): si tokenVersion cambió desde que
+    // se emitió este JWT (cambio de contraseña, "cerrar sesión en todos los
+    // dispositivos"), el token queda inválido aunque no haya expirado.
+    if ((decoded.tokenVersion ?? 0) !== usuario.tokenVersion) {
+      return res.status(401).json({ success: false, message: 'Tu sesión expiró. Iniciá sesión de nuevo.' });
+    }
+
     // Actualiza la fecha de último acceso de forma no bloqueante.
     // El catch silencioso evita que un error de DB interrumpa la request del usuario.
     usuario.update({ ultimoAcceso: new Date() }).catch((err) =>
@@ -69,12 +76,12 @@ const verifyToken = async (req, res, next) => {
  * Se usa después de verifyToken y recibe una lista de roles válidos.
  *
  * Roles disponibles en el sistema:
- *   'alumno' | 'egresado' | 'empresa' | 'profesor' | 'admin'
+ *   'alumno' | 'egresado' | 'empresa' | 'admin'
  *
  * Ejemplos de uso:
  *   authorizeRoles('admin')                          → solo administradores
  *   authorizeRoles('alumno', 'egresado')             → alumnos y egresados
- *   authorizeRoles('admin', 'profesor', 'empresa')   → múltiples roles
+ *   authorizeRoles('admin', 'empresa')               → múltiples roles
  *
  * @param  {...string} roles - Roles permitidos para la ruta
  */

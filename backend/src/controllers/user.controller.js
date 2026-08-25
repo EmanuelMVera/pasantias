@@ -1,4 +1,28 @@
-const { Perfil, Usuario } = require('../models');
+const crypto = require('crypto');
+const fs = require('fs');
+const { Perfil, Usuario, Archivo } = require('../models');
+
+// Crea la fila de metadata en `archivos` para un archivo recién subido por
+// multer (EST-08 §5.4) — se hace en paralelo a guardar la ruta STRING como
+// siempre, sin romper ninguna lectura existente (expand pattern).
+async function registrarArchivo(req, tipo) {
+  try {
+    const buffer = fs.readFileSync(req.file.path);
+    const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+    await Archivo.create({
+      usuarioPropietarioId: req.usuario.id,
+      tipo,
+      nombreOriginal: req.file.originalname,
+      claveAlmacenamiento: `/uploads/${req.file.filename}`,
+      mimeType: req.file.mimetype,
+      tamanioBytes: req.file.size,
+      hashSha256: hash,
+      backend: 'local',
+    });
+  } catch (err) {
+    console.error('[Archivo] No se pudo registrar metadata:', err.message);
+  }
+}
 
 const getPerfil = async (req, res) => {
   try {
@@ -95,6 +119,7 @@ const uploadCv = async (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, message: 'No se subió ningún archivo.' });
     const cvPath = `/uploads/${req.file.filename}`;
     await Perfil.update({ cvPath }, { where: { usuarioId: req.usuario.id } });
+    await registrarArchivo(req, 'cv');
     return res.json({ success: true, message: 'CV subido correctamente.', cvPath });
   } catch {
     return res.status(500).json({ success: false, message: 'Error al subir el CV.' });
@@ -106,6 +131,7 @@ const uploadCartaRecomendacion = async (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, message: 'No se subió ningún archivo.' });
     const cartaRecomendacion = `/uploads/${req.file.filename}`;
     await Perfil.update({ cartaRecomendacion }, { where: { usuarioId: req.usuario.id } });
+    await registrarArchivo(req, 'carta_recomendacion');
     return res.json({ success: true, message: 'Carta de recomendación subida correctamente.', cartaRecomendacion });
   } catch {
     return res.status(500).json({ success: false, message: 'Error al subir la carta de recomendación.' });

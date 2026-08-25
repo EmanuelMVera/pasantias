@@ -16,30 +16,26 @@ import { postulacionService, getArchivoUrl } from '../../services/api';
 import styles from './PostulantesMiOfertaPage.module.css';
 
 /* ── Configuración de estados ────────────────────────────────────────────────── */
-// ESTADO_MAP: mapa completo incluyendo aliases legacy, para badges y display.
+// EST-08: el backend consolidó los pares legacy/alias
+// (entrevista_programada→entrevista, no_seleccionado→rechazado).
 const ESTADO_MAP = {
-  en_revision:           { label: 'En revisión',    emoji: '📥', color: '#64748b', bg: '#f1f5f9' },
-  preseleccionado:       { label: 'Preseleccionado',emoji: '⭐', color: '#2563eb', bg: '#eff6ff' },
-  entrevista:            { label: 'Entrevista',     emoji: '🎙️', color: '#7c3aed', bg: '#f5f3ff' },
-  entrevista_programada: { label: 'Entrevista',     emoji: '🎙️', color: '#7c3aed', bg: '#f5f3ff' }, // legacy
-  contratado:            { label: 'Contratado',     emoji: '🎉', color: '#16a34a', bg: '#f0fdf4' },
-  no_seleccionado:       { label: 'No seleccionado',emoji: '✕',  color: '#dc2626', bg: '#fef2f2' },
-  rechazado:             { label: 'No seleccionado',emoji: '✕',  color: '#dc2626', bg: '#fef2f2' }, // legacy
+  en_revision:     { label: 'En revisión',     emoji: '📥', color: '#64748b', bg: '#f1f5f9' },
+  preseleccionado: { label: 'Preseleccionado', emoji: '⭐', color: '#2563eb', bg: '#eff6ff' },
+  entrevista:      { label: 'Entrevista',      emoji: '🎙️', color: '#7c3aed', bg: '#f5f3ff' },
+  contratado:      { label: 'Contratado',      emoji: '🎉', color: '#16a34a', bg: '#f0fdf4' },
+  rechazado:       { label: 'No seleccionado', emoji: '✕',  color: '#dc2626', bg: '#fef2f2' },
 };
 
-// ESTADOS_CANONICOS: solo los estados canónicos para filtros y select.
-// Aliases legacy (entrevista_programada, rechazado) quedan en ESTADO_MAP para display
-// pero no aparecen como opciones duplicadas en la UI.
 const ESTADOS_CANONICOS = [
-  { estado: 'en_revision',     aliases: [],                       label: 'En revisión',    emoji: '📥', color: '#64748b', bg: '#f1f5f9' },
-  { estado: 'preseleccionado', aliases: [],                       label: 'Preseleccionado',emoji: '⭐', color: '#2563eb', bg: '#eff6ff' },
-  { estado: 'entrevista',      aliases: ['entrevista_programada'],label: 'Entrevista',     emoji: '🎙️', color: '#7c3aed', bg: '#f5f3ff' },
-  { estado: 'contratado',      aliases: [],                       label: 'Contratado',     emoji: '🎉', color: '#16a34a', bg: '#f0fdf4' },
-  { estado: 'no_seleccionado', aliases: ['rechazado'],            label: 'No seleccionado',emoji: '✕',  color: '#dc2626', bg: '#fef2f2' },
+  { estado: 'en_revision',     aliases: [], label: 'En revisión',    emoji: '📥', color: '#64748b', bg: '#f1f5f9' },
+  { estado: 'preseleccionado', aliases: [], label: 'Preseleccionado',emoji: '⭐', color: '#2563eb', bg: '#eff6ff' },
+  { estado: 'entrevista',      aliases: [], label: 'Entrevista',     emoji: '🎙️', color: '#7c3aed', bg: '#f5f3ff' },
+  { estado: 'contratado',      aliases: [], label: 'Contratado',     emoji: '🎉', color: '#16a34a', bg: '#f0fdf4' },
+  { estado: 'rechazado',       aliases: [], label: 'No seleccionado',emoji: '✕',  color: '#dc2626', bg: '#fef2f2' },
 ];
 
 // Estados que habilitan el botón de contacto/chat con el candidato
-const ESTADOS_CHAT_EMPRESA = ['preseleccionado', 'entrevista', 'entrevista_programada', 'contratado'];
+const ESTADOS_CHAT_EMPRESA = ['preseleccionado', 'entrevista', 'contratado'];
 
 function formatFecha(iso) {
   if (!iso) return '';
@@ -121,16 +117,12 @@ export default function PostulantesMiOfertaPage() {
     }
   };
 
-  // Filtrar incluyendo aliases legacy (ej: "entrevista" incluye "entrevista_programada")
-  const canonico = ESTADOS_CANONICOS.find(e => e.estado === filtro);
   const filtradas = filtro
-    ? postulaciones.filter(p =>
-        p.estado === filtro || (canonico?.aliases.includes(p.estado) ?? false)
-      )
+    ? postulaciones.filter(p => p.estado === filtro)
     : postulaciones;
 
   const total       = postulaciones.length;
-  const activos     = postulaciones.filter(p => !['no_seleccionado'].includes(p.estado)).length;
+  const activos     = postulaciones.filter(p => p.estado !== 'rechazado').length;
   const contratados = postulaciones.filter(p => p.estado === 'contratado').length;
 
   return (

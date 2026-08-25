@@ -2,12 +2,11 @@
  * MisPostulacionesPage.jsx — Lista de postulaciones del alumno/egresado.
  *
  * Muestra todas las postulaciones del usuario con:
- * - Estado actual (en_revision, preseleccionado, entrevista, contratado,
- *   no_seleccionado)
+ * - Estado actual (en_revision, preseleccionado, entrevista, contratado, rechazado)
  * - Fecha de última actualización
  * - Observaciones de la empresa (si existen)
  * - Botón "💬 Chatear con reclutador" solo cuando el estado lo habilita
- *   (preseleccionado, entrevista, entrevista_programada, contratado)
+ *   (preseleccionado, entrevista, contratado)
  *
  * Ruta: /mis-postulaciones
  * Roles: alumno, egresado
@@ -18,28 +17,26 @@ import { Link } from 'react-router-dom';
 import { postulacionService } from '../../services/api';
 import styles from './MisPostulacionesPage.module.css';
 
-// Mapa completo de estados para display en badges (incluye aliases legacy)
+// Mapa de estados para display en badges (EST-08: sin aliases legacy —
+// el backend consolidó entrevista_programada→entrevista y no_seleccionado→rechazado)
 const ESTADOS = {
-  en_revision:           { label: 'En revisión',     color: '#f59e0b', icon: '🔍', bg: '#fffbeb' },
-  preseleccionado:       { label: 'Preseleccionado', color: '#3b82f6', icon: '✅', bg: '#eff6ff' },
-  entrevista:            { label: 'Entrevista',      color: '#8b5cf6', icon: '🗓️', bg: '#f5f3ff' },
-  entrevista_programada: { label: 'Entrevista',      color: '#8b5cf6', icon: '🗓️', bg: '#f5f3ff' }, // legacy
-  no_seleccionado:       { label: 'No seleccionado', color: '#ef4444', icon: '❌', bg: '#fef2f2' },
-  rechazado:             { label: 'No seleccionado', color: '#ef4444', icon: '❌', bg: '#fef2f2' }, // legacy
-  contratado:            { label: '¡Contratado!',    color: '#10b981', icon: '🎉', bg: '#ecfdf5' },
+  en_revision:     { label: 'En revisión',     color: '#f59e0b', icon: '🔍', bg: '#fffbeb' },
+  preseleccionado: { label: 'Preseleccionado', color: '#3b82f6', icon: '✅', bg: '#eff6ff' },
+  entrevista:      { label: 'Entrevista',      color: '#8b5cf6', icon: '🗓️', bg: '#f5f3ff' },
+  rechazado:       { label: 'No seleccionado', color: '#ef4444', icon: '❌', bg: '#fef2f2' },
+  contratado:      { label: '¡Contratado!',    color: '#10b981', icon: '🎉', bg: '#ecfdf5' },
 };
 
-// Solo estados canónicos para la grilla de resumen y filtro (sin duplicados)
 const ESTADOS_RESUMEN = [
-  { key: 'en_revision',     aliases: [],                        label: 'En revisión',     color: '#f59e0b', icon: '🔍', bg: '#fffbeb' },
-  { key: 'preseleccionado', aliases: [],                        label: 'Preseleccionado', color: '#3b82f6', icon: '✅', bg: '#eff6ff' },
-  { key: 'entrevista',      aliases: ['entrevista_programada'], label: 'Entrevista',      color: '#8b5cf6', icon: '🗓️', bg: '#f5f3ff' },
-  { key: 'contratado',      aliases: [],                        label: '¡Contratado!',    color: '#10b981', icon: '🎉', bg: '#ecfdf5' },
-  { key: 'no_seleccionado', aliases: ['rechazado'],             label: 'No seleccionado', color: '#ef4444', icon: '❌', bg: '#fef2f2' },
+  { key: 'en_revision',     aliases: [], label: 'En revisión',     color: '#f59e0b', icon: '🔍', bg: '#fffbeb' },
+  { key: 'preseleccionado', aliases: [], label: 'Preseleccionado', color: '#3b82f6', icon: '✅', bg: '#eff6ff' },
+  { key: 'entrevista',      aliases: [], label: 'Entrevista',      color: '#8b5cf6', icon: '🗓️', bg: '#f5f3ff' },
+  { key: 'contratado',      aliases: [], label: '¡Contratado!',    color: '#10b981', icon: '🎉', bg: '#ecfdf5' },
+  { key: 'rechazado',       aliases: [], label: 'No seleccionado', color: '#ef4444', icon: '❌', bg: '#fef2f2' },
 ];
 
 // Estados que habilitan el chat con el reclutador
-const ESTADOS_CHAT = ['preseleccionado', 'entrevista_programada', 'entrevista', 'contratado'];
+const ESTADOS_CHAT = ['preseleccionado', 'entrevista', 'contratado'];
 
 function formatFecha(dateStr) {
   if (!dateStr) return null;

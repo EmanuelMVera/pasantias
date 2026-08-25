@@ -19,11 +19,32 @@ module.exports = (sequelize) => {
     // Identificador único autoincremental
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
 
-    // Referencia al usuario dueño del perfil (clave foránea)
+    // Referencia al usuario dueño del perfil (clave foránea).
+    // unique: la relación es 1:1 — sin esto, un bug podía crear dos
+    // perfiles para el mismo usuario sin que nada lo impidiera.
     usuarioId: {
       type: DataTypes.INTEGER,
       allowNull: false,
+      unique: true,
       references: { model: 'usuarios', key: 'id' },
+    },
+
+    // ── Identificador institucional (EST-07 / EST-08 §2) ──────────────────────
+
+    // Legajo del alumno/egresado en el instituto. Nullable a nivel columna
+    // (perfiles históricos sin legajo cargado); obligatorio a nivel
+    // aplicación en altas nuevas (ver admin.routes.js POST /usuarios).
+    // VARCHAR, no INTEGER: los legajos reales suelen tener ceros a la
+    // izquierda o prefijos (ej. "00457", "TS-00457") que un tipo numérico
+    // destruye de forma irrecuperable. Es la clave de negocio recomendada
+    // para futuras importaciones masivas — no es la PK.
+    // Formato validado contra configuracion_institucional (clave
+    // 'legajo.regex'), no hardcodeado, para poder ajustarlo sin migración
+    // si el formato real del instituto difiere del default.
+    legajo: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      unique: true,
     },
 
     // ── Datos académicos ──────────────────────────────────────────────────────
