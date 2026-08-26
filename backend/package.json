@@ -14,7 +14,7 @@
     "db:schema:dump": "node src/utils/dumpSchema.js",
     "db:reset:dev": "node src/utils/resetDev.js",
     "db:backfill:archivos": "node src/utils/backfillArchivos.js",
-    "test": "echo \"No tests configured yet\""
+    "test": "jest --runInBand"
   },
   "keywords": [],
   "author": "",
@@ -34,7 +34,9 @@
     "sequelize": "^6.37.8"
   },
   "devDependencies": {
+    "jest": "^30.4.2",
     "nodemon": "^3.1.14",
-    "sequelize-cli": "^6.6.5"
+    "sequelize-cli": "^6.6.5",
+    "supertest": "^7.2.2"
   }
 }

@@ -396,6 +396,10 @@ router.delete('/usuarios/:id', ...soloAdmin, async (req, res) => {
  */
 router.patch('/usuarios/:id/toggle', ...soloAdmin, async (req, res) => {
   try {
+    if (String(req.params.id) === String(req.usuario.id)) {
+      return res.status(403).json({ success: false, message: 'No podés cambiar el estado de tu propia cuenta de administrador.' });
+    }
+
     const usuario = await Usuario.findByPk(req.params.id);
     if (!usuario) return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
 

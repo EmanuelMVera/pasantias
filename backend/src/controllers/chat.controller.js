@@ -107,6 +107,9 @@ exports.getHistorial = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No podés chatear con vos mismo.' });
     }
 
+    const { ok, motivo } = await chatPermissionService.puedeChatear(userId, partnerId);
+    if (!ok) return res.status(403).json({ success: false, message: motivo });
+
     const resultado = await chatService.obtenerHistorial(userId, partnerId, limite, pagina);
     if (!resultado) {
       return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });

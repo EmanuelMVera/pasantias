@@ -13,7 +13,7 @@ exports.getOfertas = async (req, res) => {
   try {
     const { area, modalidad, ciudad, experiencia, tipoPuesto, q } = req.query;
 
-    const where = { estado: 'activa' };
+    const where = { estado: 'activa', moderada: true };
     if (area)       where.area = { [Op.iLike]: `%${area}%` };
     if (modalidad)  where.modalidad = modalidad;
     if (ciudad)     where.ciudad = { [Op.iLike]: `%${ciudad}%` };
@@ -58,8 +58,9 @@ exports.getOfertasRecomendadas = async (req, res) => {
 
 exports.getOfertaById = async (req, res) => {
   try {
-    const oferta = await Oferta.findByPk(req.params.id, {
-      include: [{ model: Empresa, as: 'empresa' }],
+    const oferta = await Oferta.findOne({
+      where: { id: req.params.id, estado: 'activa', moderada: true },
+      include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'logo', 'rubro', 'ciudad'] }],
     });
     if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
 
