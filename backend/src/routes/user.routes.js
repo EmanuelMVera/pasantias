@@ -13,6 +13,8 @@ const router = require('express').Router();
 const multer = require('multer');
 const path = require('path');
 const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
+const validate = require('../middleware/validate.middleware');
+const { validateUpdatePerfil } = require('../validators/user.validator');
 const {
   getPerfil,
   updatePerfil,
@@ -51,7 +53,9 @@ const uploadCarta = multer({
 
 // ── Rutas ─────────────────────────────────────────────────────────────────────
 router.get('/perfil',                    verifyToken,                                    getPerfil);
-router.put('/perfil',                    verifyToken, authorizeRoles('alumno', 'egresado'), updatePerfil);
+// QA-01: valida que llegue al menos un campo reconocido antes del controller
+// (la sanitización/coerción de tipos sigue viviendo en el controller, no se duplica acá).
+router.put('/perfil',                    verifyToken, authorizeRoles('alumno', 'egresado'), validate(validateUpdatePerfil), updatePerfil);
 router.post('/perfil/cv',               verifyToken, authorizeRoles('alumno', 'egresado'), uploadCV.single('cv'),     uploadCv);
 router.post('/perfil/carta-recomendacion', verifyToken, authorizeRoles('alumno', 'egresado'), uploadCarta.single('carta'), uploadCartaRecomendacion);
 router.get('/:id/perfil',               verifyToken,                                    getPerfilPublico);

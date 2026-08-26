@@ -81,13 +81,12 @@ exports.updateMiEmpresa = async (req, res) => {
     const empresa = await _resolverEmpresa(req);
     if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
 
+    // QA-01: validateUpdateEmpresa (middleware de la ruta) ya garantizó que
+    // llegó al menos un campo reconocido y que sitioWeb, si vino, es una URL
+    // válida — no se repite ese chequeo acá.
     const updateData = {};
     for (const campo of CAMPOS_EDITABLES_EMPRESA) {
       if (req.body[campo] !== undefined) updateData[campo] = req.body[campo];
-    }
-
-    if (Object.keys(updateData).length === 0) {
-      return res.status(400).json({ success: false, message: 'No se enviaron campos válidos para actualizar.' });
     }
 
     await empresa.update(updateData);

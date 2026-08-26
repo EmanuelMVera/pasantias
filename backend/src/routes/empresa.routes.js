@@ -56,6 +56,8 @@
 const router = require('express').Router();
 const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
 const { verifyEmpresaMember, authorizeEmpresaRoles } = require('../middleware/empresa.middleware');
+const validate = require('../middleware/validate.middleware');
+const { validateUpdateEmpresa } = require('../validators/empresa.validator');
 const ctrl = require('../controllers/empresa.controller');
 
 // Shorthand: token JWT + resolver empresa + rol en equipo
@@ -82,7 +84,8 @@ router.get('/mis-ofertas', ...miembro, ctrl.getMisOfertas);
 router.get('/mi-empresa', ...miembro, ctrl.getMiEmpresa);
 
 // PUT /api/empresas/mi-empresa — Actualiza perfil (solo admin_empresa)
-router.put('/mi-empresa', ...soloAdmin, ctrl.updateMiEmpresa);
+// QA-01: valida formato (campos reconocidos + URL de sitioWeb) antes del controller.
+router.put('/mi-empresa', ...soloAdmin, validate(validateUpdateEmpresa), ctrl.updateMiEmpresa);
 
 // ── Equipo de reclutadores ────────────────────────────────────────────────────
 
