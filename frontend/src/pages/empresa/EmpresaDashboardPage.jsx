@@ -72,6 +72,11 @@ export default function EmpresaDashboardPage() {
   const [error,         setError]         = useState('');
   const [guardando,     setGuardando]     = useState(null);
   const [filtroOferta,  setFiltroOferta]  = useState(searchParams.get('filtro') ?? '');
+  // EST-11: 'admin_empresa' | 'reclutador' — solo cambia el label de "Editar
+  // empresa" (reclutador no puede editar, MiEmpresaPage ya lo restringe;
+  // esto evita mostrarle un botón que dice "Editar" cuando en su caso es
+  // de solo lectura).
+  const [rolEnEquipo,   setRolEnEquipo]   = useState(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -85,6 +90,7 @@ export default function EmpresaDashboardPage() {
 
       // Normaliza el objeto de métricas desde la respuesta anidada del backend
       const raw = dashRes.data?.data ?? dashRes.data ?? {};
+      setRolEnEquipo(raw.rolEnEquipo ?? null);
       setMetricas({
         ofertasActivas:  raw.ofertas?.activas              ?? 0,
         ofertasCerradas: raw.ofertas?.cerradas             ?? 0,
@@ -140,7 +146,9 @@ export default function EmpresaDashboardPage() {
       <div className="dashboard-header">
         <h1>Panel de Empresa</h1>
         <div className={styles.headerActions}>
-          <Link to="/empresa/mi-empresa" className="btn-secondary">🏢 Editar empresa</Link>
+          <Link to="/empresa/mi-empresa" className="btn-secondary">
+            {rolEnEquipo === 'reclutador' ? '🏢 Ver empresa' : '🏢 Editar empresa'}
+          </Link>
           <Link to="/empresa/seguridad"  className="btn-secondary">🔐 Seguridad</Link>
           <Link to="/empresa/equipo"     className="btn-secondary">👥 Equipo</Link>
           <Link to="/empresa/nueva-oferta" className="btn-primary">+ Nueva Oferta</Link>
