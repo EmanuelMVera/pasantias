@@ -19,14 +19,28 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// ── Archivos estáticos (CV, cartas de recomendación, etc.) ──────────────────────
-// El backend sirve estos archivos fuera del prefijo /api (ej: /uploads/cv/archivo.pdf),
-// por eso se deriva la misma VITE_API_URL quitándole el sufijo /api.
-const FILES_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
-
-// Arma la URL absoluta de un archivo servido por el backend (ej: perfil.cvPath, perfil.cartaRecomendacion)
-export function getArchivoUrl(path) {
-  return path ? `${FILES_BASE_URL}${path}` : null;
+// ── Archivos privados (CV, cartas de recomendación) — SEC-01 ────────────────────
+// Ya no son URLs públicas servidas por /uploads: se piden autenticados a
+// GET /api/archivos/:id (el interceptor de abajo adjunta el token igual que
+// a cualquier otra request) y se abren/descargan como blob. Un <a href> plano
+// no funcionaría acá — el navegador no manda el header Authorization en una
+// navegación normal.
+export async function abrirArchivoPrivado(archivoId, { comoDescarga = false, nombreArchivo = 'archivo' } = {}) {
+  if (!archivoId) return;
+  const { data } = await api.get(`/archivos/${archivoId}`, { responseType: 'blob' });
+  const blobUrl = URL.createObjectURL(data);
+  if (comoDescarga) {
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = nombreArchivo;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } else {
+    window.open(blobUrl, '_blank');
+  }
+  // Libera el objeto en memoria una vez que el navegador ya lo usó para abrir/descargar
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
 }
 
 // ── Interceptor de request ────────────────────────────────────────────────────

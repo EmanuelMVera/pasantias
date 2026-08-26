@@ -86,12 +86,26 @@ module.exports = (sequelize) => {
 
     // ── Archivos ──────────────────────────────────────────────────────────────
 
-    // Ruta del archivo CV subido por el alumno (PDF almacenado en /uploads)
+    // Ruta cruda del archivo CV (legacy — se conserva por compatibilidad,
+    // pero ya NO es una URL descargable directamente desde SEC-01: /uploads
+    // dejó de servir estos archivos). El acceso real es vía cvArchivoId +
+    // GET /api/archivos/:id, que valida propietario/admin/empresa legitimada.
     cvPath: { type: DataTypes.STRING(255), allowNull: true },
 
-    // Ruta de la carta de recomendación (PDF o imagen) subida por el alumno
-    // Puede ser una referencia institucional, de docente o empleador anterior
+    // Ídem para la carta de recomendación.
     cartaRecomendacion: { type: DataTypes.STRING(255), allowNull: true },
+
+    // Referencia al archivo real en la tabla `archivos` (metadata + control
+    // de acceso). Nullable: perfiles con cvPath/cartaRecomendacion subidos
+    // antes de SEC-01 pueden no tener este FK hasta que corra el backfill.
+    cvArchivoId: {
+      type: DataTypes.UUID, allowNull: true,
+      references: { model: 'archivos', key: 'id' },
+    },
+    cartaArchivoId: {
+      type: DataTypes.UUID, allowNull: true,
+      references: { model: 'archivos', key: 'id' },
+    },
 
     // Ruta de la foto de perfil del alumno
     fotoPerfil: { type: DataTypes.STRING(255), allowNull: true },

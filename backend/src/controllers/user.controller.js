@@ -3,13 +3,14 @@ const fs = require('fs');
 const { Perfil, Usuario, Archivo } = require('../models');
 
 // Crea la fila de metadata en `archivos` para un archivo recién subido por
-// multer (EST-08 §5.4) — se hace en paralelo a guardar la ruta STRING como
-// siempre, sin romper ninguna lectura existente (expand pattern).
+// multer (EST-08 §5.4) y devuelve su id, para que el caller lo vincule desde
+// Perfil.cvArchivoId/cartaArchivoId (SEC-01) — el acceso real ya no pasa por
+// la ruta STRING/URL directa, sino por GET /api/archivos/:id.
 async function registrarArchivo(req, tipo) {
   try {
     const buffer = fs.readFileSync(req.file.path);
     const hash = crypto.createHash('sha256').update(buffer).digest('hex');
-    await Archivo.create({
+    const archivo = await Archivo.create({
       usuarioPropietarioId: req.usuario.id,
       tipo,
       nombreOriginal: req.file.originalname,
@@ -19,8 +20,10 @@ async function registrarArchivo(req, tipo) {
       hashSha256: hash,
       backend: 'local',
     });
+    return archivo.id;
   } catch (err) {
     console.error('[Archivo] No se pudo registrar metadata:', err.message);
+    return null;
   }
 }
 
@@ -118,9 +121,9 @@ const uploadCv = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No se subió ningún archivo.' });
     const cvPath = `/uploads/${req.file.filename}`;
-    await Perfil.update({ cvPath }, { where: { usuarioId: req.usuario.id } });
-    await registrarArchivo(req, 'cv');
-    return res.json({ success: true, message: 'CV subido correctamente.', cvPath });
+    const cvArchivoId = await registrarArchivo(req, 'cv');
+    await Perfil.update({ cvPath, cvArchivoId }, { where: { usuarioId: req.usuario.id } });
+    return res.json({ success: true, message: 'CV subido correctamente.', cvPath, cvArchivoId });
   } catch {
     return res.status(500).json({ success: false, message: 'Error al subir el CV.' });
   }
@@ -130,9 +133,9 @@ const uploadCartaRecomendacion = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No se subió ningún archivo.' });
     const cartaRecomendacion = `/uploads/${req.file.filename}`;
-    await Perfil.update({ cartaRecomendacion }, { where: { usuarioId: req.usuario.id } });
-    await registrarArchivo(req, 'carta_recomendacion');
-    return res.json({ success: true, message: 'Carta de recomendación subida correctamente.', cartaRecomendacion });
+    const cartaArchivoId = await registrarArchivo(req, 'carta_recomendacion');
+    await Perfil.update({ cartaRecomendacion, cartaArchivoId }, { where: { usuarioId: req.usuario.id } });
+    return res.json({ success: true, message: 'Carta de recomendación subida correctamente.', cartaRecomendacion, cartaArchivoId });
   } catch {
     return res.status(500).json({ success: false, message: 'Error al subir la carta de recomendación.' });
   }
@@ -153,7 +156,7 @@ const getPerfilPublico = async (req, res) => {
       attributes: [
         'fotoPerfil',
         'carrera', 'anioEgreso', 'descripcion', 'habilidades', 'idiomas',
-        'certificaciones', 'linkedin', 'github', 'portfolio', 'cvPath',
+        'certificaciones', 'linkedin', 'github', 'portfolio', 'cvPath', 'cvArchivoId',
         'areaInteres', 'disponibilidad', 'experienciaLaboral', 'proyectos',
         'visibilidadPerfil',
       ],

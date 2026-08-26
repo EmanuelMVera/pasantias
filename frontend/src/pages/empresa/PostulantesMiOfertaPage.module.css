@@ -367,6 +367,7 @@
   background: var(--bg);
   color: var(--text);
   text-decoration: none;
+  cursor: pointer;
   transition: background 0.15s;
 }
 .btnCv:hover { background: var(--bg-card); }

@@ -12,7 +12,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { postulacionService, getArchivoUrl } from '../../services/api';
+import { postulacionService, abrirArchivoPrivado } from '../../services/api';
 import styles from './PostulantesMiOfertaPage.module.css';
 
 /* ── Configuración de estados ────────────────────────────────────────────────── */
@@ -215,7 +215,7 @@ export default function PostulantesMiOfertaPage() {
             <div className={styles.listaCards}>
               {filtradas.map(p => {
                 const perfil = p.usuario?.perfil ?? {};
-                const cvUrl  = getArchivoUrl(perfil.cvPath);
+                const cvArchivoId = perfil.cvArchivoId;
                 const col    = ESTADO_MAP[p.estado];
                 return (
                   <div key={p.id} className={styles.candidatoCard}>
@@ -280,10 +280,14 @@ export default function PostulantesMiOfertaPage() {
 
                       {/* Extras */}
                       <div className={styles.candidatoExtras}>
-                        {cvUrl ? (
-                          <a href={cvUrl} target="_blank" rel="noreferrer" download className={styles.btnCv}>
+                        {cvArchivoId ? (
+                          <button
+                            type="button"
+                            className={styles.btnCv}
+                            onClick={() => abrirArchivoPrivado(cvArchivoId, { comoDescarga: true, nombreArchivo: `CV-${p.usuario?.nombre ?? 'candidato'}.pdf` })}
+                          >
                             📄 Descargar CV
-                          </a>
+                          </button>
                         ) : (
                           <span className={styles.sinCv}>Sin CV</span>
                         )}

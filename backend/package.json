@@ -13,6 +13,7 @@
     "db:migrate:status": "sequelize-cli db:migrate:status",
     "db:schema:dump": "node src/utils/dumpSchema.js",
     "db:reset:dev": "node src/utils/resetDev.js",
+    "db:backfill:archivos": "node src/utils/backfillArchivos.js",
     "test": "echo \"No tests configured yet\""
   },
   "keywords": [],

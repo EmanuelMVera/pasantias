@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { userService, getArchivoUrl } from '../../services/api';
+import { userService, abrirArchivoPrivado } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import styles from './PerfilPage.module.css';
 
@@ -470,12 +470,16 @@ export default function PerfilPage() {
       {/* ── 5. Currículum Vitae ────────────────────────────────────────── */}
       <div className="cv-section">
         <h2>Currículum Vitae</h2>
-        {perfil?.cvPath && (
+        {perfil?.cvArchivoId && (
           <p>
             CV actual:{' '}
-            <a href={getArchivoUrl(perfil.cvPath)} target="_blank" rel="noreferrer">
+            <button
+              type="button"
+              onClick={() => abrirArchivoPrivado(perfil.cvArchivoId, { nombreArchivo: 'CV.pdf' })}
+              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}
+            >
               📄 Ver CV actual
-            </a>
+            </button>
           </p>
         )}
         <div className={styles.cvUpload}>
@@ -502,12 +506,16 @@ export default function PerfilPage() {
           Podés subir una carta de recomendación de un docente, empleador o entidad académica.
           Es visible para las empresas cuando revisan tu perfil como candidato.
         </p>
-        {perfil?.cartaRecomendacion && (
+        {perfil?.cartaArchivoId && (
           <p>
             Carta actual:{' '}
-            <a href={getArchivoUrl(perfil.cartaRecomendacion)} target="_blank" rel="noreferrer">
+            <button
+              type="button"
+              onClick={() => abrirArchivoPrivado(perfil.cartaArchivoId, { nombreArchivo: 'Carta-recomendacion' })}
+              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}
+            >
               📄 Ver carta actual
-            </a>
+            </button>
           </p>
         )}
         <div className={styles.cvUpload}>

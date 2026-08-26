@@ -11,7 +11,13 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
+
+// Asegura que existan las carpetas de uploads antes de montar el estático o
+// de que multer intente escribir en ellas (en un clone nuevo no existen,
+// están gitignoreadas a propósito porque son datos de usuarios, no código).
+fs.mkdirSync(path.join(__dirname, '../uploads/public'), { recursive: true });
 
 const errorMiddleware = require('./middleware/error.middleware');
 
@@ -48,8 +54,12 @@ app.use(express.json());
 // Permite leer datos de formularios HTML tradicionales (application/x-www-form-urlencoded)
 app.use(express.urlencoded({ extended: true }));
 
-// Sirve los archivos subidos (CVs de los usuarios) como archivos estáticos accesibles por URL
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Archivos PÚBLICOS (avatares/logos si en el futuro se suben localmente —
+// hoy casi siempre son URLs externas). SEC-01: este mount apunta solo a la
+// subcarpeta `public/`, nunca a la raíz de `uploads/` completa — los CV y
+// cartas de recomendación viven fuera de acá y solo se sirven autenticados
+// vía GET /api/archivos/:id (ver archivo.routes.js).
+app.use('/uploads', express.static(path.join(__dirname, '../uploads/public')));
 
 // ── Rutas de la API ───────────────────────────────────────────────────────────
 // Cada ruta agrupa los endpoints relacionados a una funcionalidad del sistema
@@ -63,6 +73,7 @@ app.use('/api/postulaciones', require('./routes/postulacion.routes')); // Postul
 app.use('/api/admin',         require('./routes/admin.routes'));        // Panel de administración
 app.use('/api/notificaciones',    require('./routes/notificacion.routes'));     // Notificaciones del sistema
 app.use('/api/solicitudes-empresa', require('./routes/solicitudEmpresa.routes')); // v1.5 — Solicitudes de registro de empresa
+app.use('/api/archivos',      require('./routes/archivo.routes'));       // SEC-01 — CV/cartas privados, autenticado
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 // Endpoint simple para verificar que el servidor está activo (útil para monitoreo)

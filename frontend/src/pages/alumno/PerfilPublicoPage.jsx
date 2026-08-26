@@ -12,7 +12,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { userService } from '../../services/api';
+import { userService, abrirArchivoPrivado } from '../../services/api';
 
 /** Avatar con foto o inicial como fallback. onError evita mostrar imágenes rotas. */
 function AvatarFoto({ fotoSrc, nombre, size = 48, borderRadius = '50%', fontSize = '1.25rem' }) {
@@ -228,7 +228,7 @@ export default function PerfilPublicoPage() {
           )}
 
           {/* ── Redes y CV ── */}
-          {(perfil.linkedin || perfil.github || perfil.portfolio || perfil.cvPath) && (
+          {(perfil.linkedin || perfil.github || perfil.portfolio || perfil.cvArchivoId) && (
             <section style={{ background: 'var(--card-bg)', borderRadius: '10px', padding: '1.25rem', marginBottom: '1rem' }}>
               <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Redes y contacto</h2>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -247,10 +247,15 @@ export default function PerfilPublicoPage() {
                     🌐 Portfolio
                   </a>
                 )}
-                {perfil.cvPath && (
-                  <a href={perfil.cvPath} target="_blank" rel="noopener noreferrer" className="btn-primary" style={{ fontSize: '0.85rem' }}>
+                {perfil.cvArchivoId && (
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ fontSize: '0.85rem' }}
+                    onClick={() => abrirArchivoPrivado(perfil.cvArchivoId, { nombreArchivo: 'CV.pdf' })}
+                  >
                     📄 Descargar CV
-                  </a>
+                  </button>
                 )}
               </div>
             </section>

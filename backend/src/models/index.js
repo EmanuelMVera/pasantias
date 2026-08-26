@@ -78,10 +78,12 @@ SolicitudReclutador.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' 
 // ── Asociaciones — SolicitudEmpresa → Empresa creada (EST-08) ────────────────
 SolicitudEmpresa.belongsTo(Empresa, { foreignKey: 'empresaIdCreada', as: 'empresaCreada' });
 
-// ── Asociaciones — Archivo (EST-08 Fase 4) ────────────────────────────────────
+// ── Asociaciones — Archivo (EST-08 Fase 4 / SEC-01) ───────────────────────────
 Usuario.hasMany(Archivo, { foreignKey: 'usuarioPropietarioId', as: 'archivos', onDelete: 'CASCADE' });
 Archivo.belongsTo(Usuario, { foreignKey: 'usuarioPropietarioId', as: 'propietario' });
 Postulacion.belongsTo(Archivo, { foreignKey: 'cvArchivoId', as: 'cvArchivo' });
+Perfil.belongsTo(Archivo, { foreignKey: 'cvArchivoId', as: 'cvArchivo' });
+Perfil.belongsTo(Archivo, { foreignKey: 'cartaArchivoId', as: 'cartaArchivo' });
 
 // ── Asociaciones — PostulacionHistorialEstado (EST-08 Fase 3) ────────────────
 Postulacion.hasMany(PostulacionHistorialEstado, { foreignKey: 'postulacionId', as: 'historialEstados', onDelete: 'CASCADE' });
