@@ -24,6 +24,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { mensajeService } from '../services/api';
 import Avatar from '../components/Avatar/Avatar';
+import Modal from '../components/Modal/Modal';
 import styles from './ChatPage.module.css';
 
 const POLL_INTERVAL = 10_000; // ms
@@ -172,20 +173,12 @@ function NuevoChatModal({ onClose, onSeleccionar }) {
     }, 300);
   };
 
-  // Cerrar con Escape
-  useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
-
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <div className={styles.modalHeader}>
-          <h3>✏️ Nuevo mensaje</h3>
-          <button className={styles.modalClose} onClick={onClose} aria-label="Cerrar">✕</button>
-        </div>
+    <Modal
+      title="✏️ Nuevo mensaje"
+      onClose={onClose}
+      style={{ display: 'flex', flexDirection: 'column', maxHeight: '80vh', overflow: 'hidden' }}
+    >
 
         <div className={styles.modalSearch}>
           <input
@@ -227,8 +220,7 @@ function NuevoChatModal({ onClose, onSeleccionar }) {
             </div>
           ))}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

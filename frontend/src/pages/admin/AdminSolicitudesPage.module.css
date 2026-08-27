@@ -451,60 +451,6 @@
 .btnRechazarLg:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
 /* ── Modal de rechazo ────────────────────────────────────────────────────────── */
-.modalOverlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.45);
-  backdrop-filter: blur(2px);
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-}
-
-.modal {
-  background: #fff;
-  border-radius: 16px;
-  padding: 2rem;
-  width: 100%;
-  max-width: 480px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-  animation: popIn 0.2s ease;
-}
-
-@keyframes popIn {
-  from { opacity: 0; transform: scale(0.95) translateY(10px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.modalHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.modalHeader h2 {
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--secondary, #2D3E50);
-  margin: 0;
-}
-
-.modalClose {
-  background: none;
-  border: none;
-  font-size: 1.2rem;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 0.2rem 0.5rem;
-  border-radius: 6px;
-  transition: background 0.15s;
-}
-
-.modalClose:hover { background: #f0f4f7; }
-
 .modalBody {
   font-size: 0.9rem;
   color: var(--text-muted);

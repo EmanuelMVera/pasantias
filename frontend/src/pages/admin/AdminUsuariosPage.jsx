@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { adminService } from '../../services/api';
+import Modal from '../../components/Modal/Modal';
 import styles from './AdminUsuariosPage.module.css';
 
 /* Roles disponibles en el sistema */
@@ -308,13 +309,7 @@ export default function AdminUsuariosPage() {
 
       {/* ── Modal Crear / Editar ─────────────────────────────────────── */}
       {(modal === 'crear' || modal === 'editar') && (
-        <div className={styles.modalOverlay} onClick={cerrarModal}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <h2>{modal === 'crear' ? '+ Nuevo Usuario' : '✏️ Editar Usuario'}</h2>
-              <button className={styles.modalClose} onClick={cerrarModal}>✕</button>
-            </div>
-
+        <Modal title={modal === 'crear' ? '+ Nuevo Usuario' : '✏️ Editar Usuario'} onClose={cerrarModal}>
             <form onSubmit={modal === 'crear' ? handleCrear : handleEditar} className={styles.form}>
               {formError && <p className="error-msg">{formError}</p>}
 
@@ -384,14 +379,18 @@ export default function AdminUsuariosPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* ── Modal Confirmar Suspender / Reactivar ────────────────────── */}
       {modal === 'confirmar' && eliminando && (
-        <div className={styles.modalOverlay} onClick={cerrarModal}>
-          <div className={styles.modalConfirm} onClick={(e) => e.stopPropagation()}>
+        <Modal
+          onClose={cerrarModal}
+          ariaLabel={eliminando.activo ? 'Suspender cuenta' : 'Reactivar cuenta'}
+          className={styles.modalConfirm}
+          maxWidth={420}
+          style={{ padding: '2rem', textAlign: 'center' }}
+        >
             <span className={styles.confirmIcon}>{eliminando.activo ? '🔒' : '🔓'}</span>
             <h2>{eliminando.activo ? 'Suspender cuenta' : 'Reactivar cuenta'}</h2>
             <p>
@@ -416,8 +415,7 @@ export default function AdminUsuariosPage() {
                 {eliminando.activo ? '🔒 Sí, suspender' : '🔓 Sí, reactivar'}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

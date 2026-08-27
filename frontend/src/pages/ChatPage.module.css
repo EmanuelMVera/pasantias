@@ -403,63 +403,7 @@
   transform: translateY(-1px);
 }
 
-/* ── Modal de nuevo chat ─────────────────────────────────────────────────── */
-.modalOverlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  animation: fadeIn 0.15s ease;
-}
-
-.modal {
-  background: var(--bg-card);
-  border-radius: 16px;
-  width: min(480px, 95vw);
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-  animation: slideUp 0.2s ease;
-  overflow: hidden;
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(24px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.modalHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border);
-}
-.modalHeader h3 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--secondary);
-}
-.modalClose {
-  background: none;
-  border: none;
-  font-size: 1.1rem;
-  cursor: pointer;
-  color: var(--text-muted);
-  border-radius: 6px;
-  padding: 0.2rem 0.4rem;
-  transition: background 0.15s, color 0.15s;
-}
-.modalClose:hover {
-  background: var(--bg-card2);
-  color: var(--danger);
-}
-
+/* ── Modal de nuevo chat (chrome overlay/panel/header vive en components/Modal) ── */
 .modalSearch {
   padding: 0.9rem 1.25rem 0.5rem;
 }

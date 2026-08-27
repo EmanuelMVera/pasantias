@@ -15,6 +15,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { empresaService } from '../../services/api';
 import Avatar from '../../components/Avatar/Avatar';
+import Modal from '../../components/Modal/Modal';
 import styles from './EquipoPage.module.css';
 
 /* ── Helpers ─────────────────────────────────────────────────────────────────── */
@@ -33,26 +34,6 @@ const ESTADO_SOLICITUD = {
   aprobado:   { label: 'Aprobado',   color: '#15803d', bg: '#dcfce7' },
   rechazado:  { label: 'Rechazado',  color: '#dc2626', bg: '#fee2e2' },
 };
-
-/* ── Modal genérico ─────────────────────────────────────────────────────────── */
-function Modal({ titulo, onClose, children }) {
-  useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-  return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
-        <div className={styles.modalHeader}>
-          <h3>{titulo}</h3>
-          <button className={styles.modalClose} onClick={onClose}>✕</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
 
 /* ── Modal: Solicitar reclutador ────────────────────────────────────────────── */
 function ModalSolicitarReclutador({ onClose, onEnviada }) {
@@ -89,7 +70,7 @@ function ModalSolicitarReclutador({ onClose, onEnviada }) {
   };
 
   return (
-    <Modal titulo="📋 Solicitar nuevo reclutador" onClose={onClose}>
+    <Modal title="📋 Solicitar nuevo reclutador" onClose={onClose}>
       <form onSubmit={handleSubmit} className={styles.modalForm}>
 
         <div className={styles.infoBox}>
@@ -173,7 +154,7 @@ function ModalEditarRol({ miembro, onClose, onGuardado }) {
   };
 
   return (
-    <Modal titulo={`✏️ Cambiar rol — ${miembro.usuario?.nombre ?? miembro.nombre}`} onClose={onClose}>
+    <Modal title={`✏️ Cambiar rol — ${miembro.usuario?.nombre ?? miembro.nombre}`} onClose={onClose}>
       <form onSubmit={handleSubmit} className={styles.modalForm}>
         <div className={styles.fieldGroup}>
           <label>Rol en el equipo</label>
@@ -532,13 +513,11 @@ export default function EquipoPage() {
 
       {/* Modal confirmar suspender / reactivar */}
       {modalSuspender && (
-        <div className={styles.overlay} onClick={() => setModalSuspender(null)}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()} style={{ maxWidth: '420px' }}>
-            <div className={styles.modalHeader}>
-              <h3>{modalSuspender.activo ? '🔒 Suspender cuenta' : '🔓 Reactivar cuenta'}</h3>
-              <button className={styles.modalClose} onClick={() => setModalSuspender(null)}>✕</button>
-            </div>
-
+        <Modal
+          title={modalSuspender.activo ? '🔒 Suspender cuenta' : '🔓 Reactivar cuenta'}
+          onClose={() => setModalSuspender(null)}
+          maxWidth={420}
+        >
             {/* Avatar + nombre centrado */}
             <div style={{ textAlign: 'center', padding: '1.5rem 1.5rem 0' }}>
               <div style={{
@@ -587,19 +566,12 @@ export default function EquipoPage() {
                 {modalSuspender.activo ? '🔒 Sí, suspender' : '🔓 Sí, reactivar'}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Modal confirmar quitar del equipo (desvincular) */}
       {modalEliminar && (
-        <div className={styles.overlay} onClick={() => setModalEliminar(null)}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()} style={{ maxWidth: '420px' }}>
-            <div className={styles.modalHeader}>
-              <h3>🗑️ Quitar del equipo</h3>
-              <button className={styles.modalClose} onClick={() => setModalEliminar(null)}>✕</button>
-            </div>
-
+        <Modal title="🗑️ Quitar del equipo" onClose={() => setModalEliminar(null)} maxWidth={420}>
             <div style={{ textAlign: 'center', padding: '1.5rem 1.5rem 0' }}>
               <div style={{
                 width: 64, height: 64, borderRadius: '50%', margin: '0 auto 0.75rem',
@@ -645,19 +617,12 @@ export default function EquipoPage() {
                 🗑️ Sí, quitar del equipo
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Modal confirmar envío de recuperación de acceso (EST-10) */}
       {modalRecuperacion && (
-        <div className={styles.overlay} onClick={() => setModalRecuperacion(null)}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()} style={{ maxWidth: '420px' }}>
-            <div className={styles.modalHeader}>
-              <h3>🔑 Enviar recuperación de acceso</h3>
-              <button className={styles.modalClose} onClick={() => setModalRecuperacion(null)}>✕</button>
-            </div>
-
+        <Modal title="🔑 Enviar recuperación de acceso" onClose={() => setModalRecuperacion(null)} maxWidth={420}>
             <div style={{ textAlign: 'center', padding: '1.5rem 1.5rem 0' }}>
               <div style={{
                 width: 64, height: 64, borderRadius: '50%', margin: '0 auto 0.75rem',
@@ -702,8 +667,7 @@ export default function EquipoPage() {
                 📧 Sí, enviar recuperación
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

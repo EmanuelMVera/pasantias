@@ -187,68 +187,9 @@
 .empty span { font-size: 2.5rem; }
 
 /* ── Modal overlay ───────────────────────────────────────────────────────── */
-.modalOverlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(3px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-}
-
-.modal {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) * 1.5);
-  width: 100%;
-  max-width: 560px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  animation: slideIn 0.2s ease;
-}
-@keyframes slideIn {
-  from { transform: translateY(-16px); opacity: 0; }
-  to   { transform: translateY(0);     opacity: 1; }
-}
-
-.modalConfirm {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) * 1.5);
-  width: 100%;
-  max-width: 420px;
-  padding: 2rem;
-  text-align: center;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  animation: slideIn 0.2s ease;
-}
 .confirmIcon { font-size: 2.5rem; display: block; margin-bottom: 0.75rem; }
 .modalConfirm h2 { font-size: 1.2rem; margin-bottom: 0.5rem; }
 .modalConfirm p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
-
-.modalHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.25rem 1.5rem 0;
-  margin-bottom: 1rem;
-}
-.modalHeader h2 { font-size: 1.1rem; }
-
-.modalClose {
-  background: none;
-  border: none;
-  font-size: 1.1rem;
-  cursor: pointer;
-  color: var(--text-muted);
-  line-height: 1;
-  transition: color 0.15s;
-}
-.modalClose:hover { color: var(--text-primary); }
 
 .form { padding: 0 1.5rem 1.5rem; }
 

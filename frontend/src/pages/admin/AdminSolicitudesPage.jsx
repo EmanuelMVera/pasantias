@@ -13,6 +13,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { adminService } from '../../services/api';
+import Modal from '../../components/Modal/Modal';
 import styles from './AdminSolicitudesPage.module.css';
 
 // ── Helpers de UI ─────────────────────────────────────────────────────────────
@@ -547,12 +548,7 @@ export default function AdminSolicitudesPage() {
 
       {/* ── Modal de rechazo (empresas) ── */}
       {modalRechazo && detalle && (
-        <div className={styles.modalOverlay} onClick={() => setModalRechazo(false)}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <h2>❌ Rechazar solicitud</h2>
-              <button className={styles.modalClose} onClick={() => setModalRechazo(false)}>✕</button>
-            </div>
+        <Modal title="❌ Rechazar solicitud" onClose={() => setModalRechazo(false)}>
             <p className={styles.modalBody}>
               Vas a rechazar la solicitud de <strong>{detalle.razonSocial}</strong>.
               Se enviará un email de notificación a{' '}
@@ -577,8 +573,7 @@ export default function AdminSolicitudesPage() {
                 {accionando ? 'Rechazando...' : 'Confirmar rechazo'}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* ──────────────────────────────────────────────── */}
@@ -710,12 +705,7 @@ export default function AdminSolicitudesPage() {
 
       {/* Modal de rechazo: reclutadores */}
       {modalRechazoRecl && detalleRecl && (
-        <div className={styles.modalOverlay} onClick={() => setModalRechazoRecl(false)}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <h2>❌ Rechazar solicitud de reclutador</h2>
-              <button className={styles.modalClose} onClick={() => setModalRechazoRecl(false)}>✕</button>
-            </div>
+        <Modal title="❌ Rechazar solicitud de reclutador" onClose={() => setModalRechazoRecl(false)}>
             <p className={styles.modalBody}>
               Vas a rechazar la solicitud de <strong>{detalleRecl.nombre}</strong> ({detalleRecl.email}).
               Se enviará una notificación a la empresa propietaria.
@@ -739,8 +729,7 @@ export default function AdminSolicitudesPage() {
                 {accionandoRecl ? 'Rechazando...' : 'Confirmar rechazo'}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

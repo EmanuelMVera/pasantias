@@ -204,57 +204,7 @@
 
 .emptyState span { font-size: 2.8rem; }
 
-/* ── Overlay + Modal ────────────────────────────────────────────────────────── */
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-  animation: fadeIn 0.15s ease;
-}
-
-.modal {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) * 1.5);
-  width: 100%;
-  max-width: 520px;
-  box-shadow: 0 16px 48px rgba(0,0,0,0.18);
-  animation: slideUp 0.2s ease;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modalHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.25rem 1.5rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.modalHeader h3 {
-  font-size: 1rem;
-  font-weight: 700;
-  margin: 0;
-}
-
-.modalClose {
-  background: none;
-  border: none;
-  font-size: 1.1rem;
-  cursor: pointer;
-  color: var(--text-muted);
-  padding: 0.25rem 0.4rem;
-  border-radius: var(--radius);
-  line-height: 1;
-}
-.modalClose:hover { background: var(--bg); }
-
+/* ── Modal (contenido; el chrome overlay/panel/header vive en components/Modal) ── */
 .modalForm {
   padding: 1.25rem 1.5rem 1.5rem;
   display: flex;
