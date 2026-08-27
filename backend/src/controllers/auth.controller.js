@@ -15,6 +15,7 @@
 
 const { Usuario, ActivityLog } = require('../models');
 const authService = require('../services/auth.service');
+const HttpError = require('../utils/httpError');
 
 // Helper para registrar acciones en el log sin interrumpir el flujo principal
 async function logAction(datos) {
@@ -27,46 +28,42 @@ async function logAction(datos) {
  * Autentica un usuario con email y contraseña.
  */
 exports.login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    const usuario = await Usuario.findOne({ where: { email } });
-    if (!usuario) return res.status(401).json({ success: false, message: 'Credenciales inválidas.' });
+  const usuario = await Usuario.findOne({ where: { email } });
+  // Mismo mensaje para "no existe" y "password incorrecta" (más abajo) —
+  // protección deliberada contra enumeración de cuentas, no simplificar.
+  if (!usuario) throw new HttpError(401, 'Credenciales inválidas.');
 
-    if (!usuario.activo) return res.status(403).json({ success: false, message: 'Cuenta desactivada.' });
-    if (!usuario.habilitado) return res.status(403).json({
-      success: false,
-      message: 'Tu cuenta está pendiente de aprobación por el administrador.',
-    });
-
-    const match = await authService.compararPassword(password, usuario.password);
-    if (!match) return res.status(401).json({ success: false, message: 'Credenciales inválidas.' });
-
-    const token = authService.generarToken(usuario);
-
-    // Actualiza ultimoAcceso de forma no bloqueante (fire-and-forget)
-    usuario.update({ ultimoAcceso: new Date() }).catch((err) =>
-      console.error('⚠️  No se pudo actualizar ultimoAcceso:', err.message)
-    );
-
-    logAction({
-      usuarioId: usuario.id,
-      accion: 'login',
-      entidad: 'usuario',
-      entidadId: usuario.id,
-      detalle: { rol: usuario.rol, email: usuario.email },
-      ip: req.ip,
-    });
-
-    return res.json({
-      success: true,
-      token,
-      usuario: authService.serializarUsuario(usuario),
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: 'Error al iniciar sesión.' });
+  if (!usuario.activo) throw new HttpError(403, 'Cuenta desactivada.');
+  if (!usuario.habilitado) {
+    throw new HttpError(403, 'Tu cuenta está pendiente de aprobación por el administrador.');
   }
+
+  const match = await authService.compararPassword(password, usuario.password);
+  if (!match) throw new HttpError(401, 'Credenciales inválidas.');
+
+  const token = authService.generarToken(usuario);
+
+  // Actualiza ultimoAcceso de forma no bloqueante (fire-and-forget)
+  usuario.update({ ultimoAcceso: new Date() }).catch((err) =>
+    console.error('⚠️  No se pudo actualizar ultimoAcceso:', err.message)
+  );
+
+  logAction({
+    usuarioId: usuario.id,
+    accion: 'login',
+    entidad: 'usuario',
+    entidadId: usuario.id,
+    detalle: { rol: usuario.rol, email: usuario.email },
+    ip: req.ip,
+  });
+
+  return res.json({
+    success: true,
+    token,
+    usuario: authService.serializarUsuario(usuario),
+  });
 };
 
 // ── Perfil propio ─────────────────────────────────────────────────────────────
@@ -85,44 +82,40 @@ exports.me = async (req, res) => {
  * En modo desarrollo (sin EMAIL_USER) devuelve el token en la respuesta.
  */
 exports.forgotPassword = async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ success: false, message: 'Ingresá tu email.' });
+  const { email } = req.body;
+  if (!email) throw new HttpError(400, 'Ingresá tu email.');
 
-    const usuario = await Usuario.findOne({ where: { email } });
+  const usuario = await Usuario.findOne({ where: { email } });
 
-    // Respuesta genérica para no revelar si el email existe
-    if (!usuario) {
-      return res.json({ success: true, message: 'Si el email está registrado, recibirás las instrucciones.' });
-    }
-
-    const token = authService.generarTokenReset();
-    const expira = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
-    // Se persiste el HASH del token, nunca el token en claro — el token
-    // real solo viaja en el email que recibe el usuario.
-    await usuario.update({
-      tokenReset: authService.hashTokenReset(token),
-      tokenResetExpira: expira,
-      tokenResetUsadoEn: null,
-    });
-
-    await authService.enviarEmailReset(email, token);
-
-    // En modo dev (sin SMTP) devolver el token para facilitar pruebas
-    if (!process.env.EMAIL_USER) {
-      console.log(`\n🔑 TOKEN DE RECUPERO para ${email}:\n   ${token}\n`);
-      return res.json({
-        success: true,
-        message: 'Token generado (modo desarrollo — email no configurado).',
-        devToken: token,
-      });
-    }
-
-    return res.json({ success: true, message: 'Te enviamos un email con las instrucciones.' });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: 'Error al procesar la solicitud.' });
+  // Respuesta genérica (200, no un error) para no revelar si el email
+  // existe — la ambigüedad es intencional, no se convierte en un throw.
+  if (!usuario) {
+    return res.json({ success: true, message: 'Si el email está registrado, recibirás las instrucciones.' });
   }
+
+  const token = authService.generarTokenReset();
+  const expira = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+  // Se persiste el HASH del token, nunca el token en claro — el token
+  // real solo viaja en el email que recibe el usuario.
+  await usuario.update({
+    tokenReset: authService.hashTokenReset(token),
+    tokenResetExpira: expira,
+    tokenResetUsadoEn: null,
+  });
+
+  await authService.enviarEmailReset(email, token);
+
+  // En modo dev (sin SMTP) devolver el token para facilitar pruebas
+  if (!process.env.EMAIL_USER) {
+    console.log(`\n🔑 TOKEN DE RECUPERO para ${email}:\n   ${token}\n`);
+    return res.json({
+      success: true,
+      message: 'Token generado (modo desarrollo — email no configurado).',
+      devToken: token,
+    });
+  }
+
+  return res.json({ success: true, message: 'Te enviamos un email con las instrucciones.' });
 };
 
 // ── Restablecer contraseña ────────────────────────────────────────────────────
@@ -131,45 +124,36 @@ exports.forgotPassword = async (req, res) => {
  * Permite cambiar la contraseña usando el token recibido por email.
  */
 exports.resetPassword = async (req, res) => {
-  try {
-    const { token } = req.params;
-    const { password } = req.body;
+  const { token } = req.params;
+  const { password } = req.body;
 
-    if (!password || password.length < 6) {
-      return res.status(400).json({ success: false, message: 'La contraseña debe tener al menos 6 caracteres.' });
-    }
-
-    const tokenHash = authService.hashTokenReset(token);
-    const usuario = await Usuario.findOne({ where: { tokenReset: tokenHash } });
-
-    if (!usuario) {
-      return res.status(400).json({ success: false, message: 'Token inválido o ya utilizado.' });
-    }
-    if (usuario.tokenResetUsadoEn) {
-      return res.status(400).json({ success: false, message: 'Este token ya fue utilizado. Solicitá uno nuevo.' });
-    }
-    if (new Date() > new Date(usuario.tokenResetExpira)) {
-      return res.status(400).json({ success: false, message: 'El token expiró. Solicitá uno nuevo.' });
-    }
-
-    const hash = await authService.hashPassword(password);
-    // tokenReset/tokenResetExpira se limpian igual que antes; además se
-    // marca tokenResetUsadoEn (por si algo dejara el hash sin limpiar) y
-    // se incrementa tokenVersion para cerrar cualquier sesión que hubiera
-    // quedado abierta con la contraseña vieja.
-    await usuario.update({
-      password: hash,
-      tokenReset: null,
-      tokenResetExpira: null,
-      tokenResetUsadoEn: new Date(),
-      tokenVersion: usuario.tokenVersion + 1,
-    });
-
-    return res.json({ success: true, message: 'Contraseña restablecida correctamente. Ya podés iniciar sesión.' });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: 'Error al restablecer la contraseña.' });
+  if (!password || password.length < 6) {
+    throw new HttpError(400, 'La contraseña debe tener al menos 6 caracteres.');
   }
+
+  const tokenHash = authService.hashTokenReset(token);
+  const usuario = await Usuario.findOne({ where: { tokenReset: tokenHash } });
+
+  if (!usuario) throw new HttpError(400, 'Token inválido o ya utilizado.');
+  if (usuario.tokenResetUsadoEn) throw new HttpError(400, 'Este token ya fue utilizado. Solicitá uno nuevo.');
+  if (new Date() > new Date(usuario.tokenResetExpira)) {
+    throw new HttpError(400, 'El token expiró. Solicitá uno nuevo.');
+  }
+
+  const hash = await authService.hashPassword(password);
+  // tokenReset/tokenResetExpira se limpian igual que antes; además se
+  // marca tokenResetUsadoEn (por si algo dejara el hash sin limpiar) y
+  // se incrementa tokenVersion para cerrar cualquier sesión que hubiera
+  // quedado abierta con la contraseña vieja.
+  await usuario.update({
+    password: hash,
+    tokenReset: null,
+    tokenResetExpira: null,
+    tokenResetUsadoEn: new Date(),
+    tokenVersion: usuario.tokenVersion + 1,
+  });
+
+  return res.json({ success: true, message: 'Contraseña restablecida correctamente. Ya podés iniciar sesión.' });
 };
 
 // ── Cambiar contraseña ────────────────────────────────────────────────────────
@@ -178,28 +162,19 @@ exports.resetPassword = async (req, res) => {
  * Cambia la contraseña del usuario autenticado.
  */
 exports.cambiarPassword = async (req, res) => {
-  try {
-    const { passwordActual, nuevaPassword } = req.body;
+  const { passwordActual, nuevaPassword } = req.body;
 
-    const usuario = await Usuario.findByPk(req.usuario.id);
-    if (!usuario) {
-      return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
-    }
+  const usuario = await Usuario.findByPk(req.usuario.id);
+  if (!usuario) throw new HttpError(404, 'Usuario no encontrado.');
 
-    const esCorrecta = await authService.compararPassword(passwordActual, usuario.password);
-    if (!esCorrecta) {
-      return res.status(401).json({ success: false, message: 'La contraseña actual es incorrecta.' });
-    }
+  const esCorrecta = await authService.compararPassword(passwordActual, usuario.password);
+  if (!esCorrecta) throw new HttpError(401, 'La contraseña actual es incorrecta.');
 
-    const hash = await authService.hashPassword(nuevaPassword);
-    // Incrementa tokenVersion: cualquier JWT emitido antes de este cambio
-    // deja de ser válido (EST-08 §5.3) — es lo que un usuario espera al
-    // cambiar su contraseña después de sospechar que alguien más la tiene.
-    await usuario.update({ password: hash, tokenVersion: usuario.tokenVersion + 1 });
+  const hash = await authService.hashPassword(nuevaPassword);
+  // Incrementa tokenVersion: cualquier JWT emitido antes de este cambio
+  // deja de ser válido (EST-08 §5.3) — es lo que un usuario espera al
+  // cambiar su contraseña después de sospechar que alguien más la tiene.
+  await usuario.update({ password: hash, tokenVersion: usuario.tokenVersion + 1 });
 
-    return res.json({ success: true, message: 'Contraseña actualizada correctamente.' });
-  } catch (err) {
-    console.error('[Auth] Error en cambiar-password:', err);
-    return res.status(500).json({ success: false, message: 'Error interno al cambiar la contraseña.' });
-  }
+  return res.json({ success: true, message: 'Contraseña actualizada correctamente.' });
 };

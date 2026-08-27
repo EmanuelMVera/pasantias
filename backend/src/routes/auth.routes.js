@@ -15,6 +15,7 @@ const router = require('express').Router();
 const { verifyToken } = require('../middleware/auth.middleware');
 const validate = require('../middleware/validate.middleware');
 const { validateCambiarPassword } = require('../validators/auth.validator');
+const asyncHandler = require('../utils/asyncHandler');
 const {
   login,
   me,
@@ -23,10 +24,10 @@ const {
   cambiarPassword,
 } = require('../controllers/auth.controller');
 
-router.post('/login',                login);
-router.get('/me',          verifyToken, me);
-router.post('/forgot-password',      forgotPassword);
-router.post('/reset-password/:token', resetPassword);
-router.put('/cambiar-password', verifyToken, validate(validateCambiarPassword), cambiarPassword);
+router.post('/login',                asyncHandler(login));
+router.get('/me',          verifyToken, asyncHandler(me));
+router.post('/forgot-password',      asyncHandler(forgotPassword));
+router.post('/reset-password/:token', asyncHandler(resetPassword));
+router.put('/cambiar-password', verifyToken, validate(validateCambiarPassword), asyncHandler(cambiarPassword));
 
 module.exports = router;

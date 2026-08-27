@@ -26,11 +26,12 @@ const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware')
 const { verifyEmpresaMember, authorizeEmpresaRoles } = require('../middleware/empresa.middleware');
 const validate = require('../middleware/validate.middleware');
 const { validateUpdateEstado } = require('../validators/postulacion.validator');
+const asyncHandler = require('../utils/asyncHandler');
 
 // ── Rutas alumno/egresado ─────────────────────────────────────────────────────
 // Solo alumnos y egresados pueden postularse y ver su historial
-router.post('/', verifyToken, authorizeRoles('alumno', 'egresado'), ctrl.postular);
-router.get('/mis', verifyToken, authorizeRoles('alumno', 'egresado'), ctrl.getMisPostulaciones);
+router.post('/', verifyToken, authorizeRoles('alumno', 'egresado'), asyncHandler(ctrl.postular));
+router.get('/mis', verifyToken, authorizeRoles('alumno', 'egresado'), asyncHandler(ctrl.getMisPostulaciones));
 
 // ── Rutas empresa ─────────────────────────────────────────────────────────────
 // Shorthand: token + rol sistema 'empresa' + membresía en equipo
@@ -40,7 +41,7 @@ const baseMiembroEmpresa = [verifyToken, authorizeRoles('empresa'), verifyEmpres
 router.get(
   '/oferta/:ofertaId',
   ...baseMiembroEmpresa,
-  ctrl.getPostulacionesByOferta
+  asyncHandler(ctrl.getPostulacionesByOferta)
 );
 
 // Cambiar estado de una postulación — admin_empresa y reclutador
@@ -49,7 +50,7 @@ router.patch(
   ...baseMiembroEmpresa,
   authorizeEmpresaRoles('admin_empresa', 'reclutador'),
   validate(validateUpdateEstado),
-  ctrl.updateEstado
+  asyncHandler(ctrl.updateEstado)
 );
 
 module.exports = router;

@@ -20,6 +20,7 @@
 
 const router = require('express').Router();
 const { verifyToken } = require('../middleware/auth.middleware');
+const asyncHandler = require('../utils/asyncHandler');
 const ctrl = require('../controllers/chat.controller');
 
 // Todos los endpoints de chat requieren estar autenticado (cualquier rol)
@@ -27,19 +28,19 @@ router.use(verifyToken);
 
 // GET  /api/chat/usuarios?q=texto — Busca usuarios para iniciar un nuevo chat
 // ⚠️ Debe ir ANTES de GET /:usuarioId para que Express no confunda 'usuarios' con un ID
-router.get('/usuarios', ctrl.buscarUsuarios);
+router.get('/usuarios', asyncHandler(ctrl.buscarUsuarios));
 
 // GET  /api/chat — Lista de conversaciones con último mensaje y no leídos
-router.get('/', ctrl.getConversaciones);
+router.get('/', asyncHandler(ctrl.getConversaciones));
 
 // POST /api/chat — Enviar mensaje: { receptorId, mensaje }
-router.post('/', ctrl.enviarMensaje);
+router.post('/', asyncHandler(ctrl.enviarMensaje));
 
 // PATCH /api/chat/:usuarioId/leer — Marcar conversación como leída
 // ⚠️ Debe ir ANTES de GET /:usuarioId para evitar conflicto de rutas
-router.patch('/:usuarioId/leer', ctrl.marcarLeida);
+router.patch('/:usuarioId/leer', asyncHandler(ctrl.marcarLeida));
 
 // GET  /api/chat/:usuarioId — Historial paginado con un usuario
-router.get('/:usuarioId', ctrl.getHistorial);
+router.get('/:usuarioId', asyncHandler(ctrl.getHistorial));
 
 module.exports = router;

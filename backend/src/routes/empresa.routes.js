@@ -58,6 +58,7 @@ const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware')
 const { verifyEmpresaMember, authorizeEmpresaRoles } = require('../middleware/empresa.middleware');
 const validate = require('../middleware/validate.middleware');
 const { validateUpdateEmpresa } = require('../validators/empresa.validator');
+const asyncHandler = require('../utils/asyncHandler');
 const ctrl = require('../controllers/empresa.controller');
 
 // Shorthand: token JWT + resolver empresa + rol en equipo
@@ -73,52 +74,52 @@ const soloEmpresa = [verifyToken, authorizeRoles('empresa')];
 // ── Panel corporativo ─────────────────────────────────────────────────────────
 
 // GET /api/empresas/dashboard — Métricas globales (todos los miembros del equipo)
-router.get('/dashboard', ...miembro, ctrl.getDashboard);
+router.get('/dashboard', ...miembro, asyncHandler(ctrl.getDashboard));
 
 // GET /api/empresas/mis-ofertas — Lista de ofertas con postulaciones (todos los miembros)
-router.get('/mis-ofertas', ...miembro, ctrl.getMisOfertas);
+router.get('/mis-ofertas', ...miembro, asyncHandler(ctrl.getMisOfertas));
 
 // ── Perfil de empresa ─────────────────────────────────────────────────────────
 
 // GET /api/empresas/mi-empresa — Datos de la empresa (todos los miembros)
-router.get('/mi-empresa', ...miembro, ctrl.getMiEmpresa);
+router.get('/mi-empresa', ...miembro, asyncHandler(ctrl.getMiEmpresa));
 
 // PUT /api/empresas/mi-empresa — Actualiza perfil (solo admin_empresa)
 // QA-01: valida formato (campos reconocidos + URL de sitioWeb) antes del controller.
-router.put('/mi-empresa', ...soloAdmin, validate(validateUpdateEmpresa), ctrl.updateMiEmpresa);
+router.put('/mi-empresa', ...soloAdmin, validate(validateUpdateEmpresa), asyncHandler(ctrl.updateMiEmpresa));
 
 // ── Equipo de reclutadores ────────────────────────────────────────────────────
 
 // GET /api/empresas/candidatos?estado=X — Todas las postulaciones de la empresa (todos los miembros)
-router.get('/candidatos', ...miembro, ctrl.getAllCandidatos);
+router.get('/candidatos', ...miembro, asyncHandler(ctrl.getAllCandidatos));
 
 // GET /api/empresas/equipo — Lista todos los miembros del equipo (todos los miembros)
-router.get('/equipo', ...miembro, ctrl.getEquipo);
+router.get('/equipo', ...miembro, asyncHandler(ctrl.getEquipo));
 
 // GET /api/empresas/equipo/solicitudes — Lista solicitudes de reclutadores (solo admin_empresa)
 // ⚠️ DEBE ir ANTES de /equipo/:id
-router.get('/equipo/solicitudes', ...soloAdmin, ctrl.getMisSolicitudesReclutador);
+router.get('/equipo/solicitudes', ...soloAdmin, asyncHandler(ctrl.getMisSolicitudesReclutador));
 
 // POST /api/empresas/equipo/solicitar — Envía solicitud de alta al admin (solo admin_empresa)
 // El admin es quien crea el usuario al aprobar. La empresa NO crea usuarios directamente.
-router.post('/equipo/solicitar', ...soloAdmin, ctrl.solicitarReclutador);
+router.post('/equipo/solicitar', ...soloAdmin, asyncHandler(ctrl.solicitarReclutador));
 
 // POST /api/empresas/equipo/:id/recuperacion — Envía email de recuperación de acceso
 // a un miembro (solo admin_empresa). El admin nunca elige ni ve la contraseña — el
 // propio miembro la establece siguiendo el link del email (EST-10).
 // ⚠️ DEBE ir ANTES de /equipo/:id para que Express no interprete 'recuperacion' como un id
-router.post('/equipo/:id/recuperacion', ...soloAdmin, ctrl.enviarRecuperacionMiembro);
+router.post('/equipo/:id/recuperacion', ...soloAdmin, asyncHandler(ctrl.enviarRecuperacionMiembro));
 
 // PATCH /api/empresas/equipo/:id — Actualiza rol o estado de un miembro (solo admin_empresa)
 // Body: { rolInterno?, activo? }
-router.patch('/equipo/:id', ...soloAdmin, ctrl.updateMiembro);
+router.patch('/equipo/:id', ...soloAdmin, asyncHandler(ctrl.updateMiembro));
 
 // DELETE /api/empresas/equipo/:id — Da de baja un miembro (solo admin_empresa)
-router.delete('/equipo/:id', ...soloAdmin, ctrl.removeMiembro);
+router.delete('/equipo/:id', ...soloAdmin, asyncHandler(ctrl.removeMiembro));
 
 // ── Perfil público de empresa ─────────────────────────────────────────────────
 // ⚠️ DEBE ir al final — la ruta /:id captura cualquier path si va antes de los fijos
 // GET /api/empresas/:id — Solo empresas aprobadas; incluye últimas 10 ofertas activas
-router.get('/:id', verifyToken, ctrl.getEmpresaPublica);
+router.get('/:id', verifyToken, asyncHandler(ctrl.getEmpresaPublica));
 
 module.exports = router;

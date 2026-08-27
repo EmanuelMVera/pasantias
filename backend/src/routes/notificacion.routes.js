@@ -16,6 +16,7 @@
 
 const router = require('express').Router();
 const { verifyToken } = require('../middleware/auth.middleware');
+const asyncHandler = require('../utils/asyncHandler');
 const {
   getNotificaciones,
   getSinLeerCount,
@@ -24,10 +25,10 @@ const {
   eliminarNotificacion,
 } = require('../controllers/notificacion.controller');
 
-router.get('/',                verifyToken, getNotificaciones);
-router.get('/sin-leer-count',  verifyToken, getSinLeerCount);
-router.patch('/leer-todas',    verifyToken, leerTodas);
-router.patch('/:id/leer',      verifyToken, leerUna);
-router.delete('/:id',          verifyToken, eliminarNotificacion);
+router.get('/',                verifyToken, asyncHandler(getNotificaciones));
+router.get('/sin-leer-count',  verifyToken, asyncHandler(getSinLeerCount));
+router.patch('/leer-todas',    verifyToken, asyncHandler(leerTodas));
+router.patch('/:id/leer',      verifyToken, asyncHandler(leerUna));
+router.delete('/:id',          verifyToken, asyncHandler(eliminarNotificacion));
 
 module.exports = router;

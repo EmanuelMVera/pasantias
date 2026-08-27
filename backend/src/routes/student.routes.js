@@ -14,6 +14,7 @@
 
 const router = require('express').Router();
 const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
+const asyncHandler = require('../utils/asyncHandler');
 const { getDashboard } = require('../controllers/student.controller');
 
 // GET /api/students/dashboard
@@ -22,7 +23,7 @@ router.get(
   '/dashboard',
   verifyToken,
   authorizeRoles('alumno', 'egresado'),
-  getDashboard
+  asyncHandler(getDashboard)
 );
 
 module.exports = router;
