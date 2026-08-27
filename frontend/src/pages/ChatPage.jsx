@@ -23,6 +23,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { mensajeService } from '../services/api';
+import Avatar from '../components/Avatar/Avatar';
 import styles from './ChatPage.module.css';
 
 const POLL_INTERVAL = 10_000; // ms
@@ -59,23 +60,6 @@ function displayNombre(usuario) {
   return nombre;
 }
 
-/** Avatar circular con foto o inicial como fallback. onError evita imágenes rotas. */
-function Avatar({ nombre, fotoUrl, size = 36, color = 'var(--primary)' }) {
-  const [imgError, setImgError] = useState(false);
-  const inicial = (nombre?.[0] ?? '?').toUpperCase();
-  return (
-    <div
-      className={styles.avatar}
-      style={{ width: size, height: size, minWidth: size, background: color, fontSize: size * 0.38, overflow: 'hidden' }}
-    >
-      {fotoUrl && !imgError
-        ? <img src={fotoUrl} alt={nombre} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={() => setImgError(true)} />
-        : inicial
-      }
-    </div>
-  );
-}
-
 /**
  * Card de conversación en el panel lateral.
  * El backend devuelve: { usuario: {id, nombre, apellido, ...}, ultimoMensaje: {...}, noLeidos: N }
@@ -90,7 +74,14 @@ function ConversacionItem({ conv, activo, onClick }) {
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick()}
     >
-      <Avatar nombre={conv.usuario?.nombre} fotoUrl={conv.usuario?.fotoPerfil} color={activo ? '#fff' : 'var(--primary)'} />
+      <Avatar
+        nombre={conv.usuario?.nombre}
+        apellido={conv.usuario?.apellido}
+        src={conv.usuario?.fotoPerfil}
+        size={36}
+        color={activo ? '#fff' : 'var(--primary)'}
+        style={{ fontWeight: 800, fontSize: 36 * 0.38 }}
+      />
       <div className={styles.convInfo}>
         <div className={styles.convNombreRow}>
           <strong className={styles.convNombre}>
@@ -118,7 +109,13 @@ function BurbujaMensaje({ mensaje, esMio }) {
   return (
     <div className={`${styles.burbujaWrap} ${esMio ? styles.burbujaWrapMia : ''}`}>
       {!esMio && (
-        <Avatar nombre={mensaje.emisor?.nombre} fotoUrl={mensaje.emisor?.fotoPerfil} size={30} />
+        <Avatar
+          nombre={mensaje.emisor?.nombre}
+          apellido={mensaje.emisor?.apellido}
+          src={mensaje.emisor?.fotoPerfil}
+          size={30}
+          style={{ fontWeight: 800, fontSize: 30 * 0.38 }}
+        />
       )}
       <div className={`${styles.burbuja} ${esMio ? styles.burbujaMia : styles.burbujaSuya}`}>
         <p>{mensaje.mensaje ?? mensaje.contenido}</p>
@@ -474,7 +471,13 @@ export default function ChatPage() {
                 >
                   ←
                 </button>
-                <Avatar nombre={partnerActivo?.nombre} fotoUrl={partnerActivo?.fotoPerfil} size={36} />
+                <Avatar
+                  nombre={partnerActivo?.nombre}
+                  apellido={partnerActivo?.apellido}
+                  src={partnerActivo?.fotoPerfil}
+                  size={36}
+                  style={{ fontWeight: 800, fontSize: 36 * 0.38 }}
+                />
                 <div className={styles.chatHeaderInfo}>
                   <strong>
                     {loadingMensajes && !partnerActivo

@@ -13,6 +13,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { postulacionService, abrirArchivoPrivado } from '../../services/api';
+import Avatar from '../../components/Avatar/Avatar';
 import styles from './PostulantesMiOfertaPage.module.css';
 
 /* ── Configuración de estados ────────────────────────────────────────────────── */
@@ -40,20 +41,6 @@ const ESTADOS_CHAT_EMPRESA = ['preseleccionado', 'entrevista', 'contratado'];
 function formatFecha(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-/* ── Avatar de candidato con foto o inicial ─────────────────────────────────── */
-function CandidatoAvatar({ fotoSrc, nombre, color }) {
-  const [error, setError] = useState(false);
-  const inicial = (nombre?.[0] ?? '?').toUpperCase();
-  return (
-    <div className={styles.candidatoAvatar} style={{ background: color, overflow: 'hidden' }}>
-      {fotoSrc && !error
-        ? <img src={fotoSrc} alt={nombre} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={() => setError(true)} />
-        : inicial
-      }
-    </div>
-  );
 }
 
 /* ── Badge de aval ───────────────────────────────────────────────────────────── */
@@ -227,10 +214,13 @@ export default function PostulantesMiOfertaPage() {
                     {/* Info principal */}
                     <div className={styles.candidatoBody}>
                       <div className={styles.candidatoTop}>
-                        <CandidatoAvatar
-                          fotoSrc={p.usuario?.perfil?.fotoPerfil ?? p.usuario?.fotoPerfil}
+                        <Avatar
+                          src={p.usuario?.perfil?.fotoPerfil ?? p.usuario?.fotoPerfil}
                           nombre={p.usuario?.nombre}
+                          apellido={p.usuario?.apellido}
+                          size={40}
                           color={col?.color ?? '#64748b'}
+                          style={{ fontWeight: 800 }}
                         />
                         <div className={styles.candidatoInfo}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>

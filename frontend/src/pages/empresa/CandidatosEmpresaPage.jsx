@@ -11,24 +11,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { empresaService } from '../../services/api';
-
-function MiniAvatar({ fotoSrc, nombre }) {
-  const [error, setError] = useState(false);
-  const inicial = (nombre?.[0] ?? '?').toUpperCase();
-  return (
-    <div style={{
-      width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-      background: 'var(--primary)', display: 'inline-flex', alignItems: 'center',
-      justifyContent: 'center', color: '#fff', fontSize: '0.85rem', fontWeight: 700,
-      overflow: 'hidden', verticalAlign: 'middle', marginRight: '0.5rem',
-    }}>
-      {fotoSrc && !error
-        ? <img src={fotoSrc} alt={nombre} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={() => setError(true)} />
-        : inicial
-      }
-    </div>
-  );
-}
+import Avatar from '../../components/Avatar/Avatar';
 
 // EST-08: el backend consolidó los pares legacy/alias
 // (entrevista_programada→entrevista, no_seleccionado→rechazado).
@@ -142,7 +125,13 @@ export default function CandidatosEmpresaPage() {
               {candidatos.map(p => (
                 <tr key={p.id}>
                   <td style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'nowrap' }}>
-                    <MiniAvatar fotoSrc={p.usuario?.fotoPerfil} nombre={p.usuario?.nombre} />
+                    <Avatar
+                      src={p.usuario?.fotoPerfil}
+                      nombre={p.usuario?.nombre}
+                      apellido={p.usuario?.apellido}
+                      size={32}
+                      style={{ fontSize: '0.85rem', verticalAlign: 'middle', marginRight: '0.5rem' }}
+                    />
                     {p.usuario?.id ? (
                       <Link to={`/perfil/${p.usuario.id}`} style={{ color: 'inherit', textDecoration: 'underline' }}>
                         <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>

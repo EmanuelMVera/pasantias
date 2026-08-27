@@ -13,25 +13,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { userService, abrirArchivoPrivado } from '../../services/api';
-
-/** Avatar con foto o inicial como fallback. onError evita mostrar imágenes rotas. */
-function AvatarFoto({ fotoSrc, nombre, size = 48, borderRadius = '50%', fontSize = '1.25rem' }) {
-  const [error, setError] = useState(false);
-  const inicial = (nombre?.[0] ?? '?').toUpperCase();
-  return (
-    <div style={{
-      width: size, height: size, borderRadius,
-      background: 'var(--primary)', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', fontSize, color: '#fff',
-      flexShrink: 0, overflow: 'hidden',
-    }}>
-      {fotoSrc && !error
-        ? <img src={fotoSrc} alt={nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={() => setError(true)} />
-        : inicial
-      }
-    </div>
-  );
-}
+import Avatar from '../../components/Avatar/Avatar';
 
 const DISPONIBILIDAD_LABEL = {
   inmediata:     'Disponibilidad inmediata',
@@ -101,12 +83,11 @@ export default function PerfilPublicoPage() {
         marginBottom: '1.5rem', flexWrap: 'wrap',
       }}>
         {/* Avatar */}
-        <AvatarFoto
-          fotoSrc={fotoSrc}
+        <Avatar
+          src={fotoSrc}
           nombre={data.nombre}
+          apellido={data.apellido}
           size={80}
-          borderRadius="50%"
-          fontSize="2rem"
         />
 
         {/* Info principal */}

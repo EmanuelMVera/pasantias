@@ -314,19 +314,6 @@
   flex-wrap: wrap;
 }
 
-.candidatoAvatar {
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  border-radius: 50%;
-  color: #fff;
-  font-weight: 800;
-  font-size: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .candidatoInfo { flex: 1; min-width: 160px; }
 .candidatoInfo strong { display: block; font-size: 0.95rem; font-weight: 700; }
 .candidatoInfo span   { display: block; font-size: 0.8rem; color: var(--text-muted); }

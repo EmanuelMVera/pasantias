@@ -14,6 +14,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { empresaService } from '../../services/api';
+import Avatar from '../../components/Avatar/Avatar';
 import styles from './EquipoPage.module.css';
 
 /* ── Helpers ─────────────────────────────────────────────────────────────────── */
@@ -207,17 +208,18 @@ function ModalEditarRol({ miembro, onClose, onGuardado }) {
 function MiembroCard({ miembro, esPropietario, onToggleActivo, onEliminar, onRecuperacion }) {
   const u = miembro.usuario ?? miembro;
   const nombre = `${u.nombre ?? ''} ${u.apellido ?? ''}`.trim() || u.email;
-  const inicial = nombre[0]?.toUpperCase() ?? '?';
   const esProp = miembro.rolInterno === 'admin_empresa';
-  const [imgError, setImgError] = useState(false);
 
   return (
     <div className={`${styles.miembroCard} ${!miembro.activo ? styles.miembroInactivo : ''}`}>
-      <div className={styles.cardAvatar} style={{ background: rolColor(miembro.rolInterno) }}>
-        {u.fotoPerfil && !imgError
-          ? <img src={u.fotoPerfil} alt={nombre} onError={() => setImgError(true)} className={styles.avatarImg} />
-          : inicial}
-      </div>
+      <Avatar
+        src={u.fotoPerfil}
+        nombre={u.nombre}
+        apellido={u.apellido}
+        size={44}
+        color={rolColor(miembro.rolInterno)}
+        style={{ fontWeight: 800 }}
+      />
       <div className={styles.cardInfo}>
         <div className={styles.cardNombre}>
           <strong>{nombre}</strong>
