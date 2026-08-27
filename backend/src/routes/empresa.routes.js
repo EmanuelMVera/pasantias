@@ -54,7 +54,7 @@
 'use strict';
 
 const router = require('express').Router();
-const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
+const { verifyToken } = require('../middleware/auth.middleware');
 const { verifyEmpresaMember, authorizeEmpresaRoles } = require('../middleware/empresa.middleware');
 const validate = require('../middleware/validate.middleware');
 const { validateUpdateEmpresa } = require('../validators/empresa.validator');
@@ -65,11 +65,6 @@ const ctrl = require('../controllers/empresa.controller');
 const miembro    = [verifyToken, verifyEmpresaMember];
 // soloAdmin: solo admin_empresa puede gestionar equipo y editar perfil
 const soloAdmin  = [...miembro, authorizeEmpresaRoles('admin_empresa')];
-// ownerOGte eliminado: no existe gerente; soloAdmin reemplaza ambos
-
-// Compatibilidad: rutas donde solo el rol sistema 'empresa' puede acceder
-// (se mantiene para no romper integraciones externas existentes)
-const soloEmpresa = [verifyToken, authorizeRoles('empresa')];
 
 // ── Panel corporativo ─────────────────────────────────────────────────────────
 

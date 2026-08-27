@@ -1,6 +1,5 @@
 'use strict';
 
-const bcrypt = require('bcryptjs');
 const { EmpresaUsuario, Usuario, SolicitudReclutador } = require('../models');
 const HttpError = require('../utils/httpError');
 const authService = require('./auth.service');
@@ -45,70 +44,6 @@ async function listarEquipo(empresa) {
   }
 
   return data;
-}
-
-async function agregarMiembro(empresa, adminUsuarioId, { email, rolInterno = 'reclutador', password, nombre = 'Invitado', apellido = '' }) {
-  if (!email) throw new HttpError(400, 'El email es requerido.');
-
-  const rolesPermitidos = ['reclutador'];
-  if (!rolesPermitidos.includes(rolInterno)) {
-    throw new HttpError(400, `Rol inválido. Solo se puede agregar como 'reclutador'.`);
-  }
-
-  let usuarioAgregar = await Usuario.findOne({ where: { email } });
-  let usuarioCreado = false;
-
-  if (!usuarioAgregar) {
-    if (!password || password.length < 6) {
-      const err = new HttpError(400, 'Este email no está registrado. Ingresá una contraseña inicial de al menos 6 caracteres para crear la cuenta.');
-      err.code = 'PASSWORD_REQUERIDA';
-      throw err;
-    }
-    const hash = await bcrypt.hash(password, 12);
-    usuarioAgregar = await Usuario.create({
-      nombre, apellido, email,
-      password: hash,
-      rol: 'empresa',
-      habilitado: true,
-      activo: true,
-    });
-    usuarioCreado = true;
-  }
-
-  if (usuarioAgregar.id === adminUsuarioId) {
-    throw new HttpError(400, 'No podés agregarte a vos mismo como reclutador.');
-  }
-
-  const yaExiste = await EmpresaUsuario.findOne({
-    where: { empresaId: empresa.id, usuarioId: usuarioAgregar.id },
-  });
-
-  if (yaExiste) {
-    if (yaExiste.activo) {
-      throw new HttpError(400, 'Este usuario ya es miembro activo del equipo.');
-    }
-    await yaExiste.update({ activo: true, rolInterno });
-    return { reactivado: true, usuarioCreado: false, mensaje: 'Miembro reactivado en el equipo.', data: yaExiste };
-  }
-
-  const miembro = await EmpresaUsuario.create({
-    empresaId: empresa.id,
-    usuarioId: usuarioAgregar.id,
-    rolInterno,
-    activo: true,
-  });
-
-  return {
-    reactivado: false,
-    usuarioCreado,
-    mensaje: usuarioCreado
-      ? `Cuenta creada para ${email}. El reclutador ya puede ingresar con esas credenciales.`
-      : `${usuarioAgregar.nombre} fue agregado al equipo. Ya puede ingresar con su cuenta.`,
-    data: {
-      miembro: miembro.toJSON(),
-      usuario: { id: usuarioAgregar.id, nombre: usuarioAgregar.nombre, apellido: usuarioAgregar.apellido, email: usuarioAgregar.email },
-    },
-  };
 }
 
 /**
@@ -232,7 +167,6 @@ async function obtenerSolicitudesReclutador(empresaId) {
 
 module.exports = {
   listarEquipo,
-  agregarMiembro,
   solicitarRecuperacionAcceso,
   actualizarMiembro,
   desactivarMiembro,

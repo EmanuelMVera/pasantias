@@ -33,7 +33,7 @@
  *   router.get('/dashboard', verifyToken, verifyEmpresaMember, ctrl.getDashboard);
  *
  *   // Solo admin_empresa puede gestionar el equipo
- *   router.post('/equipo', verifyToken, verifyEmpresaMember, authorizeEmpresaRoles('admin_empresa'), ctrl.addMiembro);
+ *   router.post('/equipo', verifyToken, verifyEmpresaMember, authorizeEmpresaRoles('admin_empresa'), ctrl.solicitarReclutador);
  *
  * Changelog:
  * - v1.5: creación inicial (propietario/gerente/reclutador/viewer)
@@ -43,9 +43,6 @@
 'use strict';
 
 const { Empresa, EmpresaUsuario } = require('../models');
-
-// ── Roles disponibles (admin_empresa tiene más privilegios que reclutador) ─────
-const JERARQUIA_ROLES = ['admin_empresa', 'reclutador'];
 
 /**
  * Middleware: resuelve la empresa del usuario autenticado y la adjunta al request.
@@ -144,24 +141,4 @@ const authorizeEmpresaRoles = (...roles) => {
   };
 };
 
-/**
- * Helper exportado: verifica si un rol tiene al menos el nivel mínimo requerido.
- * Con solo 2 roles: admin_empresa (índice 0) > reclutador (índice 1).
- *
- * @param {string} rolActual   - Rol del usuario ('admin_empresa' | 'reclutador')
- * @param {string} rolMinimo   - Rol mínimo requerido
- * @returns {boolean}
- *
- * @example
- *   if (!tieneRolMinimo(req.miembroEmpresa.rolInterno, 'admin_empresa')) {
- *     return res.status(403).json({ ... });
- *   }
- */
-const tieneRolMinimo = (rolActual, rolMinimo) => {
-  const idxActual = JERARQUIA_ROLES.indexOf(rolActual);
-  const idxMinimo = JERARQUIA_ROLES.indexOf(rolMinimo);
-  if (idxActual === -1 || idxMinimo === -1) return false;
-  return idxActual <= idxMinimo; // Menor índice = mayor privilegio
-};
-
-module.exports = { verifyEmpresaMember, authorizeEmpresaRoles, tieneRolMinimo };
+module.exports = { verifyEmpresaMember, authorizeEmpresaRoles };

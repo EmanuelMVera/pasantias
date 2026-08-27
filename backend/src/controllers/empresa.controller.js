@@ -90,17 +90,6 @@ exports.getEquipo = async (req, res) => {
   return res.json({ success: true, total: data.length, rolEnEquipo, data });
 };
 
-exports.addMiembro = async (req, res) => {
-  const empresa = await _resolverEmpresa(req);
-  if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
-
-  const { email, rolInterno = 'reclutador', password, nombre = 'Invitado', apellido = '' } = req.body;
-  const resultado = await equipoService.agregarMiembro(empresa, req.usuario.id, { email, rolInterno, password, nombre, apellido });
-
-  const statusCode = resultado.usuarioCreado ? 201 : 200;
-  return res.status(statusCode).json({ success: true, message: resultado.mensaje, data: resultado.data, usuarioCreado: resultado.usuarioCreado });
-};
-
 // EST-10: el admin_empresa nunca elige ni conoce la contraseña de un
 // miembro — solo dispara el envío de un email de recuperación; el propio
 // reclutador establece su contraseña vía /reset-password/:token (público).
