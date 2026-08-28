@@ -50,7 +50,9 @@ exports.getMisOfertas = async (req, res) => {
 exports.getMiEmpresa = async (req, res) => {
   const empresa = await _resolverEmpresa(req);
   if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
-  return res.json({ success: true, data: empresa });
+  // rolEnEquipo: mismo campo informativo que ya devuelven getDashboard/getEquipo
+  // (FE-05) — solo UX, no reemplaza a authorizeEmpresaRoles como autoridad de permisos.
+  return res.json({ success: true, data: empresa, rolEnEquipo: req.miembroEmpresa?.rolInterno || null });
 };
 
 exports.updateMiEmpresa = async (req, res) => {

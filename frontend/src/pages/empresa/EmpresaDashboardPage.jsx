@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { empresaService, ofertaService } from '../../services/api';
+import { useEmpresa } from '../../context/EmpresaContext';
 import styles from './EmpresaDashboardPage.module.css';
 
 /**
@@ -75,8 +76,8 @@ export default function EmpresaDashboardPage() {
   // EST-11: 'admin_empresa' | 'reclutador' — solo cambia el label de "Editar
   // empresa" (reclutador no puede editar, MiEmpresaPage ya lo restringe;
   // esto evita mostrarle un botón que dice "Editar" cuando en su caso es
-  // de solo lectura).
-  const [rolEnEquipo,   setRolEnEquipo]   = useState(null);
+  // de solo lectura). FE-05: viene de EmpresaContext, no de este fetch.
+  const { esReclutador } = useEmpresa();
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -90,7 +91,6 @@ export default function EmpresaDashboardPage() {
 
       // Normaliza el objeto de métricas desde la respuesta anidada del backend
       const raw = dashRes.data?.data ?? dashRes.data ?? {};
-      setRolEnEquipo(raw.rolEnEquipo ?? null);
       setMetricas({
         ofertasActivas:  raw.ofertas?.activas              ?? 0,
         ofertasCerradas: raw.ofertas?.cerradas             ?? 0,
@@ -147,7 +147,7 @@ export default function EmpresaDashboardPage() {
         <h1>Panel de Empresa</h1>
         <div className={styles.headerActions}>
           <Link to="/empresa/mi-empresa" className="btn-secondary">
-            {rolEnEquipo === 'reclutador' ? '🏢 Ver empresa' : '🏢 Editar empresa'}
+            {esReclutador ? '🏢 Ver empresa' : '🏢 Editar empresa'}
           </Link>
           <Link to="/empresa/seguridad"  className="btn-secondary">🔐 Seguridad</Link>
           <Link to="/empresa/equipo"     className="btn-secondary">👥 Equipo</Link>

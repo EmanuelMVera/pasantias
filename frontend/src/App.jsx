@@ -20,6 +20,7 @@
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { EmpresaProvider } from './context/EmpresaContext';
 
 
 // Páginas públicas (accesibles sin login)
@@ -282,11 +283,13 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <TopBanner />  {/* Banner institucional con logo (siempre visible) */}
-        <Navbar />     {/* Barra de navegación (se oculta si no hay sesión) */}
-        <AppRoutes />  {/* Sistema de rutas */}
-      </BrowserRouter>
+      <EmpresaProvider>
+        <BrowserRouter>
+          <TopBanner />  {/* Banner institucional con logo (siempre visible) */}
+          <Navbar />     {/* Barra de navegación (se oculta si no hay sesión) */}
+          <AppRoutes />  {/* Sistema de rutas */}
+        </BrowserRouter>
+      </EmpresaProvider>
     </AuthProvider>
   );
 }

@@ -13,6 +13,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { empresaService } from '../../services/api';
+import { useEmpresa } from '../../context/EmpresaContext';
 
 const ESTADO_LABEL = {
   aprobada:  '✅ Aprobada',
@@ -81,9 +82,9 @@ function ToastExito({ mensaje, onClose }) {
 
 export default function MiEmpresaPage() {
   const navigate = useNavigate();
+  const { esAdminEmpresa, loading: loadingRol } = useEmpresa();
 
   const [empresa,    setEmpresa]    = useState(null);
-  const [rolEnEquipo, setRolEnEquipo] = useState(null); // 'admin_empresa' | 'reclutador'
   const [form,       setForm]       = useState({});
   const [loading,    setLoading]    = useState(true);
   const [guardando,  setGuardando]  = useState(false);
@@ -91,14 +92,11 @@ export default function MiEmpresaPage() {
   const [showToast,  setShowToast]  = useState(false);
 
   // admin_empresa: puede editar. reclutador: solo lectura.
-  const esAdmin = rolEnEquipo === 'admin_empresa';
+  const esAdmin = esAdminEmpresa;
 
   useEffect(() => {
-    Promise.all([
-      empresaService.getMiEmpresa(),
-      empresaService.getDashboard(),
-    ])
-      .then(([empRes, dashRes]) => {
+    empresaService.getMiEmpresa()
+      .then((empRes) => {
         const e = empRes.data?.data ?? empRes.data;
         setEmpresa(e);
         setForm({
@@ -109,9 +107,6 @@ export default function MiEmpresaPage() {
           direccion:   e.direccion   ?? '',
           ciudad:      e.ciudad      ?? '',
         });
-        // rolEnEquipo viene del dashboard
-        const rol = dashRes.data?.data?.rolEnEquipo ?? 'admin_empresa';
-        setRolEnEquipo(rol);
       })
       .catch(() => setError('No se pudo cargar el perfil de empresa.'))
       .finally(() => setLoading(false));
@@ -149,7 +144,7 @@ export default function MiEmpresaPage() {
     }
   };
 
-  if (loading) return <p className="msg">Cargando...</p>;
+  if (loading || loadingRol) return <p className="msg">Cargando...</p>;
 
   return (
     <div className="page-container" style={{ maxWidth: 720 }}>

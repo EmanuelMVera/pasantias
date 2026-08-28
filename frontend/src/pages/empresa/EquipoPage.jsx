@@ -14,6 +14,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { empresaService } from '../../services/api';
+import { useEmpresa } from '../../context/EmpresaContext';
 import Avatar from '../../components/Avatar/Avatar';
 import Modal from '../../components/Modal/Modal';
 import styles from './EquipoPage.module.css';
@@ -259,12 +260,12 @@ function SolicitudRow({ sol }) {
 
 /* ── Componente principal ───────────────────────────────────────────────────── */
 export default function EquipoPage() {
+  const { esAdminEmpresa } = useEmpresa();
   const [equipo,      setEquipo]      = useState([]);
   const [solicitudes, setSolicitudes] = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState('');
   const [toast,       setToast]       = useState('');
-  const [rolEnEquipo, setRolEnEquipo] = useState(null);
 
   const [modalSolicitar,  setModalSolicitar]  = useState(false);
   const [modalRol,        setModalRol]        = useState(null);
@@ -272,7 +273,7 @@ export default function EquipoPage() {
   const [modalEliminar,   setModalEliminar]   = useState(null); // miembro a quitar del equipo
   const [modalRecuperacion, setModalRecuperacion] = useState(null); // miembro a enviarle recuperación de acceso
 
-  const esPropietario = rolEnEquipo === 'admin_empresa';
+  const esPropietario = esAdminEmpresa;
   const activos    = equipo.filter(m => m.activo !== false);
   const suspendidos = equipo.filter(m => m.activo === false);
 
@@ -282,9 +283,10 @@ export default function EquipoPage() {
     async function cargar() {
       try {
         const equipoRes = await empresaService.getEquipo();
+        // Decisión local e inmediata (no depende del context, que puede no
+        // haber resuelto todavía) — solo se usa acá adentro, una sola vez.
         const rolRecibido = equipoRes.data.rolEnEquipo ?? null;
         setEquipo(equipoRes.data.data ?? []);
-        setRolEnEquipo(rolRecibido);
 
         if (rolRecibido === 'admin_empresa') {
           try {
