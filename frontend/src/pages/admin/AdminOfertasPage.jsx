@@ -10,6 +10,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { adminService } from '../../services/api';
+import Paginacion from '../../components/Paginacion/Paginacion';
 
 const ESTADO_COLOR = {
   activa:    '#27ae60',
@@ -30,6 +31,8 @@ const FILTROS = ['todas', 'activa', 'pausada', 'rechazada', 'cerrada'];
 export default function AdminOfertasPage() {
   const [pendientes,   setPendientes]   = useState([]);
   const [todas,        setTodas]        = useState([]);
+  const [paginationHist, setPaginationHist] = useState(null);
+  const [pageHist,     setPageHist]     = useState(1);
   const [filtroEstado, setFiltroEstado] = useState('todas');
   const [loading,      setLoading]      = useState(true);
   const [loadingHist,  setLoadingHist]  = useState(true);
@@ -49,12 +52,15 @@ export default function AdminOfertasPage() {
     }
   }, []);
 
-  const cargarTodas = useCallback(async (estado) => {
+  const cargarTodas = useCallback(async (estado, pagina = 1) => {
     setLoadingHist(true);
     try {
-      const params = estado && estado !== 'todas' ? { estado } : {};
+      const params = { page: pagina, limit: 25 };
+      if (estado && estado !== 'todas') params.estado = estado;
       const res = await adminService.getTodasOfertas(params);
       setTodas(res.data?.data ?? []);
+      setPaginationHist(res.data?.pagination ?? null);
+      setPageHist(pagina);
     } catch {
       // silencioso — el historial es secundario
     } finally {
@@ -63,7 +69,7 @@ export default function AdminOfertasPage() {
   }, []);
 
   useEffect(() => { cargarPendientes(); }, [cargarPendientes]);
-  useEffect(() => { cargarTodas(filtroEstado); }, [filtroEstado, cargarTodas]);
+  useEffect(() => { cargarTodas(filtroEstado, 1); }, [filtroEstado, cargarTodas]);
 
   const handleAccion = async (id, accion) => {
     setAccionando(id);
@@ -75,8 +81,8 @@ export default function AdminOfertasPage() {
       setMensaje(`Oferta ${labels[accion]} correctamente.`);
       // Quitar de pendientes
       setPendientes((prev) => prev.filter((o) => o.id !== id));
-      // Refrescar historial
-      cargarTodas(filtroEstado);
+      // Refrescar historial (misma página)
+      cargarTodas(filtroEstado, pageHist);
     } catch (err) {
       setError(err.response?.data?.message ?? 'Error al moderar la oferta.');
     } finally {
@@ -220,7 +226,7 @@ export default function AdminOfertasPage() {
             ))}
           </div>
           <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginLeft: 'auto' }}>
-            {loadingHist ? '...' : `${ofertasFiltradas.length} resultado${ofertasFiltradas.length !== 1 ? 's' : ''}`}
+            {loadingHist ? '...' : `${paginationHist?.total ?? ofertasFiltradas.length} resultado${(paginationHist?.total ?? ofertasFiltradas.length) !== 1 ? 's' : ''}`}
           </span>
         </div>
 
@@ -328,6 +334,13 @@ export default function AdminOfertasPage() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {!loadingHist && (
+          <Paginacion
+            pagination={paginationHist}
+            onPageChange={(p) => cargarTodas(filtroEstado, p)}
+          />
         )}
       </section>
     </div>

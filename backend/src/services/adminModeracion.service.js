@@ -17,6 +17,7 @@
 const { Empresa, Usuario, Oferta, ActivityLog } = require('../models');
 const { crearNotificacion } = require('../utils/notificador');
 const HttpError = require('../utils/httpError');
+const { buildPagination } = require('../utils/pagination');
 
 async function logAction({ usuarioId, accion, entidad, entidadId, detalle, ip }) {
   try {
@@ -69,15 +70,19 @@ async function listarOfertasPendientes() {
   });
 }
 
-async function listarOfertas({ estado }) {
+async function listarOfertas({ estado, page = 1, limit = 25, offset = 0 }) {
   const where = {};
   if (estado) where.estado = estado;
 
-  return Oferta.findAll({
+  const { count, rows } = await Oferta.findAndCountAll({
     where,
     include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial', 'rubro'] }],
-    order: [['createdAt', 'DESC']],
+    order: [['createdAt', 'DESC'], ['id', 'DESC']],
+    limit,
+    offset,
   });
+
+  return { data: rows, pagination: buildPagination(count, { page, limit }) };
 }
 
 const ACCIONES_VALIDAS = ['aprobar', 'pausar', 'rechazar', 'cerrar'];

@@ -12,6 +12,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminService } from '../../services/api';
 import Modal from '../../components/Modal/Modal';
+import Paginacion from '../../components/Paginacion/Paginacion';
+import { usePaginacion } from '../../hooks/usePaginacion';
 import styles from './AdminUsuariosPage.module.css';
 
 /* Roles disponibles en el sistema */
@@ -70,6 +72,10 @@ export default function AdminUsuariosPage() {
   const [filtroRol,   setFiltroRol]  = useState('');
   const [filtroActivo, setFiltroActivo] = useState('');
 
+  // Paginación (contrato común SCALE-03)
+  const { page, setPage } = usePaginacion([filtroRol, filtroActivo, busqueda]);
+  const [pagination, setPagination] = useState(null);
+
   // Modal
   const [modal,       setModal]      = useState(null);   // null | 'crear' | 'editar' | 'confirmar'
   const [editando,    setEditando]   = useState(null);   // usuario a editar
@@ -83,18 +89,19 @@ export default function AdminUsuariosPage() {
     setLoading(true);
     setError('');
     try {
-      const params = {};
+      const params = { page, limit: 25 };
       if (filtroRol)           params.rol    = filtroRol;
       if (filtroActivo !== '') params.activo  = filtroActivo;
       if (busqueda)            params.q       = busqueda;
       const res = await adminService.getUsuarios(params);
       setUsuarios(res.data.data ?? res.data ?? []);
+      setPagination(res.data.pagination ?? null);
     } catch {
       setError('No se pudieron cargar los usuarios.');
     } finally {
       setLoading(false);
     }
-  }, [filtroRol, filtroActivo, busqueda]);
+  }, [filtroRol, filtroActivo, busqueda, page]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -186,7 +193,7 @@ export default function AdminUsuariosPage() {
         <div>
           <h1>Gestión de Usuarios</h1>
           <p className={styles.subtitle}>
-            {loading ? '...' : `${usuarios.length} usuario${usuarios.length !== 1 ? 's' : ''} encontrado${usuarios.length !== 1 ? 's' : ''}`}
+            {loading ? '...' : `${pagination?.total ?? usuarios.length} usuario${(pagination?.total ?? usuarios.length) !== 1 ? 's' : ''} encontrado${(pagination?.total ?? usuarios.length) !== 1 ? 's' : ''}`}
           </p>
         </div>
         <button id="btn-crear-usuario" className="btn-primary" onClick={abrirCrear}>
@@ -306,6 +313,8 @@ export default function AdminUsuariosPage() {
           </table>
         </div>
       )}
+
+      {!loading && <Paginacion pagination={pagination} onPageChange={setPage} />}
 
       {/* ── Modal Crear / Editar ─────────────────────────────────────── */}
       {(modal === 'crear' || modal === 'editar') && (

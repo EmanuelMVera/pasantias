@@ -3,6 +3,7 @@
 const { Oferta, Empresa, Perfil, Postulacion, Usuario } = require('../models');
 const { Op } = require('sequelize');
 const { crearNotificacion } = require('../utils/notificador');
+const { buildPagination } = require('../utils/pagination');
 
 const TIPOS_PUESTO_VALIDOS = ['pasante', 'trainee', 'junior'];
 const CARRERAS_VALIDAS = require('../data/catalogos.json').carreras;
@@ -59,11 +60,9 @@ function validarCamposPuesto(body) {
 /**
  * Ofertas recomendadas para el endpoint /api/ofertas/recomendadas (con paginación).
  * Solo ofertas activas; no requiere moderada=true (alumnos ven aunque esté pendiente).
+ * Recibe { page, limit, offset } ya saneados por parsePagination (SCALE-03).
  */
-async function obtenerRecomendadas(usuarioId, usuario, { limite = 10, pagina = 1 } = {}) {
-  const limiteReal = Math.min(limite, 20);
-  const offset = (pagina - 1) * limiteReal;
-
+async function obtenerRecomendadas(usuarioId, usuario, { page = 1, limit = 12, offset = 0 } = {}) {
   const perfil = await Perfil.findOne({ where: { usuarioId } });
 
   const where = { estado: 'activa' };
@@ -86,16 +85,14 @@ async function obtenerRecomendadas(usuarioId, usuario, { limite = 10, pagina = 1
   const { count, rows: ofertas } = await Oferta.findAndCountAll({
     where,
     include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial', 'logo', 'rubro', 'ciudad'] }],
-    order: [['createdAt', 'DESC']],
-    limit: limiteReal,
+    order: [['createdAt', 'DESC'], ['id', 'DESC']],
+    limit,
     offset,
   });
 
   return {
-    total: count,
-    pagina,
-    totalPaginas: Math.ceil(count / limiteReal),
     data: ofertas,
+    pagination: buildPagination(count, { page, limit }),
     criterios: {
       areaInteres: perfil?.areaInteres || null,
       habilidades: perfil?.habilidades || [],

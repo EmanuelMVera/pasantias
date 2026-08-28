@@ -3,6 +3,7 @@
 const { Empresa, Oferta, ActivityLog } = require('../models');
 const empresaService = require('../services/empresa.service');
 const equipoService  = require('../services/empresaEquipo.service');
+const { parsePagination } = require('../utils/pagination');
 
 const CAMPOS_EDITABLES_EMPRESA = [
   'descripcion', 'rubro', 'sitioWeb', 'telefono', 'direccion', 'ciudad', 'logo',
@@ -41,8 +42,11 @@ exports.getMisOfertas = async (req, res) => {
   const empresa = await _resolverEmpresa(req);
   if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
 
-  const data = await empresaService.obtenerOfertasConConteo(empresa.id);
-  return res.json({ success: true, total: data.length, data });
+  const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
+  const { data, pagination } = await empresaService.obtenerOfertasConConteo(empresa.id, {
+    estado: req.query.estado, page, limit, offset,
+  });
+  return res.json({ success: true, data, pagination, total: pagination.total });
 };
 
 // ── Perfil de empresa ─────────────────────────────────────────────────────────
@@ -77,8 +81,11 @@ exports.getAllCandidatos = async (req, res) => {
   const empresa = await _resolverEmpresa(req);
   if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
 
-  const data = await empresaService.obtenerCandidatosConFoto(empresa.id, req.query.estado);
-  return res.json({ success: true, total: data.length, data });
+  const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
+  const { data, pagination, conteoPorEstado } = await empresaService.obtenerCandidatosConFoto(empresa.id, {
+    estado: req.query.estado, page, limit, offset,
+  });
+  return res.json({ success: true, data, pagination, conteoPorEstado, total: pagination.total });
 };
 
 // ── Equipo ────────────────────────────────────────────────────────────────────

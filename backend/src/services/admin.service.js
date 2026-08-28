@@ -9,6 +9,7 @@
 
 const { Usuario, Empresa, Oferta, Postulacion, Notificacion, ActivityLog } = require('../models');
 const { Op } = require('sequelize');
+const { buildPagination } = require('../utils/pagination');
 
 async function obtenerDashboardGeneral() {
   const [
@@ -89,12 +90,8 @@ function _whereLogs({ accion, usuarioId, entidad, desde, hasta }) {
   return where;
 }
 
-async function listarLogs({ accion, usuarioId, entidad, desde, hasta, page = 1, limit = 25 }) {
+async function listarLogs({ accion, usuarioId, entidad, desde, hasta, page = 1, limit = 25, offset = 0 }) {
   const where = _whereLogs({ accion, usuarioId, entidad, desde, hasta });
-
-  const pageNum  = Math.max(1, parseInt(page, 10));
-  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
-  const offset   = (pageNum - 1) * limitNum;
 
   const { count, rows } = await ActivityLog.findAndCountAll({
     where,
@@ -103,17 +100,12 @@ async function listarLogs({ accion, usuarioId, entidad, desde, hasta, page = 1, 
       attributes: ['nombre', 'apellido', 'email', 'rol'],
       required: false,
     }],
-    order: [['createdAt', 'DESC']],
-    limit: limitNum,
+    order: [['createdAt', 'DESC'], ['id', 'DESC']],
+    limit,
     offset,
   });
 
-  return {
-    total: count,
-    page: pageNum,
-    totalPages: Math.ceil(count / limitNum),
-    data: rows,
-  };
+  return { data: rows, pagination: buildPagination(count, { page, limit }) };
 }
 
 async function exportarLogsCSV({ accion, usuarioId, entidad, desde, hasta }) {

@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { empresaService, ofertaService } from '../../services/api';
 import { useEmpresa } from '../../context/EmpresaContext';
+import Paginacion from '../../components/Paginacion/Paginacion';
 import styles from './EmpresaDashboardPage.module.css';
 
 /**
@@ -69,6 +70,8 @@ export default function EmpresaDashboardPage() {
 
   const [metricas,      setMetricas]      = useState(null);
   const [ofertas,       setOfertas]       = useState([]);
+  const [paginationOfertas, setPaginationOfertas] = useState(null);
+  const [pageOfertas,   setPageOfertas]   = useState(1);
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState('');
   const [guardando,     setGuardando]     = useState(null);
@@ -79,17 +82,10 @@ export default function EmpresaDashboardPage() {
   // de solo lectura). FE-05: viene de EmpresaContext, no de este fetch.
   const { esReclutador } = useEmpresa();
 
-  const cargar = useCallback(async () => {
-    setLoading(true);
+  const cargarMetricas = useCallback(async () => {
     setError('');
     try {
-      // Carga en paralelo: métricas del dashboard + lista de ofertas propias
-      const [dashRes, ofertasRes] = await Promise.all([
-        empresaService.getDashboard(),
-        empresaService.getMisOfertas(),
-      ]);
-
-      // Normaliza el objeto de métricas desde la respuesta anidada del backend
+      const dashRes = await empresaService.getDashboard();
       const raw = dashRes.data?.data ?? dashRes.data ?? {};
       setMetricas({
         ofertasActivas:  raw.ofertas?.activas              ?? 0,
@@ -99,24 +95,30 @@ export default function EmpresaDashboardPage() {
         contrataciones:  raw.postulaciones?.contrataciones ?? 0,
         miembrosEquipo:  raw.equipo?.totalMiembros         ?? 0,
       });
-
-      setOfertas(ofertasRes.data?.data ?? []);
     } catch (err) {
-      const msg = err.response?.data?.message ?? 'No se pudo cargar el panel.';
-      setError(msg);
+      setError(err.response?.data?.message ?? 'No se pudo cargar el panel.');
       console.error('Dashboard error:', err.response?.data ?? err.message);
+    }
+  }, []);
 
-      // Fallback: al menos intentar traer las ofertas
-      try {
-        const ofertasRes = await empresaService.getMisOfertas();
-        setOfertas(ofertasRes.data?.data ?? []);
-      } catch (_) {}
+  const cargarOfertas = useCallback(async (estado, pagina = 1) => {
+    setLoading(true);
+    try {
+      const params = { page: pagina, limit: 20 };
+      if (estado) params.estado = estado;
+      const res = await empresaService.getMisOfertas(params);
+      setOfertas(res.data?.data ?? []);
+      setPaginationOfertas(res.data?.pagination ?? null);
+      setPageOfertas(pagina);
+    } catch {
+      // silencioso — el error global lo cubre cargarMetricas
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { cargar(); }, [cargar]);
+  useEffect(() => { cargarMetricas(); }, [cargarMetricas]);
+  useEffect(() => { cargarOfertas(filtroOferta, 1); }, [filtroOferta, cargarOfertas]);
 
   /* Cambia estado de una oferta (pausar / activar / cerrar) */
   const handleCambiarEstado = async (id, estado) => {
@@ -132,6 +134,8 @@ export default function EmpresaDashboardPage() {
           ofertasCerradas: estado === 'cerrada' ? m.ofertasCerradas + 1 : m.ofertasCerradas,
         }));
       }
+      // Si hay filtro por estado activo, la fila puede haber salido de la página
+      if (filtroOferta) cargarOfertas(filtroOferta, pageOfertas);
     } catch {
       alert('Error al cambiar el estado de la oferta. Intentá de nuevo.');
     } finally {
@@ -196,9 +200,12 @@ export default function EmpresaDashboardPage() {
             </span>
           )}
           <span className={styles.totalBadge}>
-            {filtroOferta
-              ? `${ofertas.filter(o => o.estado === filtroOferta).length} resultado${ofertas.filter(o => o.estado === filtroOferta).length !== 1 ? 's' : ''}`
-              : `${ofertas.length} publicada${ofertas.length !== 1 ? 's' : ''}`}
+            {(() => {
+              const n = paginationOfertas?.total ?? ofertas.length;
+              return filtroOferta
+                ? `${n} resultado${n !== 1 ? 's' : ''}`
+                : `${n} publicada${n !== 1 ? 's' : ''}`;
+            })()}
           </span>
         </div>
       </div>
@@ -227,7 +234,7 @@ export default function EmpresaDashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {(filtroOferta ? ofertas.filter(o => o.estado === filtroOferta) : ofertas).map((o) => (
+              {ofertas.map((o) => (
                 <tr key={o.id} className={guardando === o.id ? styles.rowGuardando : ''}>
                   <td>
                     <strong>{o.titulo}</strong>
@@ -311,6 +318,10 @@ export default function EmpresaDashboardPage() {
               ))}
             </tbody>
           </table>
+          <Paginacion
+            pagination={paginationOfertas}
+            onPageChange={(p) => cargarOfertas(filtroOferta, p)}
+          />
         </div>
       )}
     </div>

@@ -15,6 +15,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { postulacionService } from '../../services/api';
+import Paginacion from '../../components/Paginacion/Paginacion';
 import { LISTA_ESTADOS_POSTULACION, ESTADOS_HABILITAN_CHAT, getEstadoInfo, normalizarEstado } from '../../constants/postulacionEstados';
 import styles from './MisPostulacionesPage.module.css';
 
@@ -39,28 +40,29 @@ export default function MisPostulacionesPage() {
   const [loading, setLoading]             = useState(true);
   const [filtroEstado, setFiltroEstado]   = useState('');
   const [successMsg, setSuccessMsg]       = useState('');
+  const [pagination, setPagination]       = useState(null);
+  const [conteoPorEstado, setConteoPorEstado] = useState({});
 
-  const cargar = useCallback(() => {
+  const cargar = useCallback((pagina = 1) => {
     setLoading(true);
-    postulacionService.getMias()
-      .then(({ data }) => setPostulaciones(data.data ?? []))
+    const params = { page: pagina, limit: 20 };
+    if (filtroEstado) params.estado = filtroEstado;
+    postulacionService.getMias(params)
+      .then(({ data }) => {
+        setPostulaciones(data.data ?? []);
+        setPagination(data.pagination ?? null);
+        setConteoPorEstado(data.conteoPorEstado ?? {});
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [filtroEstado]);
 
-  useEffect(() => { cargar(); }, [cargar]);
+  useEffect(() => { cargar(1); }, [cargar]);
 
-  // Filtrar incluyendo aliases legacy cuando el filtro activo es un estado canónico
-  const filtradas = filtroEstado
-    ? postulaciones.filter((p) => normalizarEstado(p.estado) === filtroEstado)
-    : postulaciones;
+  const filtradas = postulaciones; // el filtro por estado ahora es server-side
+  const conteoCanonicos = conteoPorEstado;
+  const totalGlobal = Object.values(conteoPorEstado).reduce((a, b) => a + b, 0);
 
-  // Conteo agrupado: alias legacy se suma al estado canónico correspondiente
-  const conteoCanonicos = LISTA_ESTADOS_POSTULACION.reduce((acc, e) => {
-    acc[e.estado] = postulaciones.filter(p => normalizarEstado(p.estado) === e.estado).length;
-    return acc;
-  }, {});
-
-  if (loading) {
+  if (loading && !pagination) {
     return (
       <div className="page-container">
         <h1>Mis Postulaciones</h1>
@@ -87,7 +89,7 @@ export default function MisPostulacionesPage() {
         </div>
       )}
 
-      {postulaciones.length === 0 ? (
+      {totalGlobal === 0 ? (
         <div className={styles.emptyState}>
           <span className={styles.emptyIcon}>📋</span>
           <h3>Todavía no te postulaste a ninguna oferta</h3>
@@ -197,6 +199,8 @@ export default function MisPostulacionesPage() {
               })
             )}
           </div>
+
+          <Paginacion pagination={pagination} onPageChange={cargar} />
         </>
       )}
     </div>

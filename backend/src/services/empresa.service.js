@@ -2,6 +2,7 @@
 
 const { Oferta, Postulacion, Perfil, Usuario, Empresa, EmpresaUsuario, sequelize } = require('../models');
 const { Op } = require('sequelize');
+const { buildPagination, groupCount } = require('../utils/pagination');
 
 // Resolución canónica de empresa para un request autenticado.
 // Orden: (1) req.empresa inyectado por middleware → (2) membresía activa en
@@ -76,16 +77,23 @@ async function obtenerMetricasDashboard(empresaId) {
   };
 }
 
-// Reemplaza el N+1 de getMisOfertas con una sola query GROUP BY
-async function obtenerOfertasConConteo(empresaId) {
-  const ofertas = await Oferta.findAll({
-    where: { empresaId },
+// Reemplaza el N+1 de getMisOfertas con una sola query GROUP BY.
+// Paginado (SCALE-03): recibe { estado, page, limit, offset } ya saneados.
+async function obtenerOfertasConConteo(empresaId, { estado, page = 1, limit = 20, offset = 0 } = {}) {
+  const where = { empresaId };
+  if (estado) where.estado = estado;
+
+  const { count, rows: ofertas } = await Oferta.findAndCountAll({
+    where,
     attributes: ['id', 'titulo', 'modalidad', 'ciudad', 'estado', 'moderada',
                  'cantidadVacantes', 'fechaLimite', 'area', 'createdAt'],
-    order: [['createdAt', 'DESC']],
+    order: [['createdAt', 'DESC'], ['id', 'DESC']],
+    limit,
+    offset,
   });
 
-  if (ofertas.length === 0) return [];
+  const pagination = buildPagination(count, { page, limit });
+  if (ofertas.length === 0) return { data: [], pagination };
 
   const ofertaIds = ofertas.map((o) => o.id);
 
@@ -102,26 +110,34 @@ async function obtenerOfertasConConteo(empresaId) {
   const conteoMap = {};
   conteos.forEach((c) => { conteoMap[c.ofertaId] = parseInt(c.total, 10); });
 
-  return ofertas.map((o) => ({ ...o.toJSON(), totalPostulaciones: conteoMap[o.id] || 0 }));
+  const data = ofertas.map((o) => ({ ...o.toJSON(), totalPostulaciones: conteoMap[o.id] || 0 }));
+  return { data, pagination };
 }
 
-async function obtenerCandidatosConFoto(empresaId, estado) {
+// Paginado (SCALE-03): recibe { estado, page, limit, offset } ya saneados.
+async function obtenerCandidatosConFoto(empresaId, { estado, page = 1, limit = 20, offset = 0 } = {}) {
   const ofertas = await Oferta.findAll({ where: { empresaId }, attributes: ['id'] });
   const ofertaIds = ofertas.map((o) => o.id);
 
-  if (ofertaIds.length === 0) return [];
+  const vacio = { data: [], pagination: buildPagination(0, { page, limit }), conteoPorEstado: {} };
+  if (ofertaIds.length === 0) return vacio;
 
-  const where = { ofertaId: { [Op.in]: ofertaIds } };
-  if (estado) where.estado = estado;
+  const scope = { ofertaId: { [Op.in]: ofertaIds } };
+  const where = estado ? { ...scope, estado } : scope;
 
-  const postulaciones = await Postulacion.findAll({
-    where,
-    include: [
-      { model: Usuario, as: 'usuario', attributes: ['id', 'nombre', 'apellido', 'email', 'fotoPerfil'] },
-      { model: Oferta,  as: 'oferta',  attributes: ['id', 'titulo', 'area'] },
-    ],
-    order: [['updatedAt', 'DESC']],
-  });
+  const [{ count, rows: postulaciones }, conteoPorEstado] = await Promise.all([
+    Postulacion.findAndCountAll({
+      where,
+      include: [
+        { model: Usuario, as: 'usuario', attributes: ['id', 'nombre', 'apellido', 'email', 'fotoPerfil'] },
+        { model: Oferta,  as: 'oferta',  attributes: ['id', 'titulo', 'area'] },
+      ],
+      order: [['updatedAt', 'DESC'], ['id', 'DESC']],
+      limit,
+      offset,
+    }),
+    groupCount(Postulacion, 'estado', scope),
+  ]);
 
   const usuariosSinFoto = [...new Set(
     postulaciones.filter((p) => p.usuario?.id && !p.usuario.fotoPerfil).map((p) => p.usuario.id)
@@ -136,13 +152,15 @@ async function obtenerCandidatosConFoto(empresaId, estado) {
     perfiles.forEach((p) => { fotoMap[p.usuarioId] = p.fotoPerfil; });
   }
 
-  return postulaciones.map((p) => {
+  const data = postulaciones.map((p) => {
     const plain = p.toJSON();
     if (plain.usuario && !plain.usuario.fotoPerfil) {
       plain.usuario.fotoPerfil = fotoMap[plain.usuario.id] ?? null;
     }
     return plain;
   });
+
+  return { data, pagination: buildPagination(count, { page, limit }), conteoPorEstado };
 }
 
 module.exports = {

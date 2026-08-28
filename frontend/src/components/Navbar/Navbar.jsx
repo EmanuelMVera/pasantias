@@ -39,10 +39,9 @@ export default function Navbar() {
       .then(({ data }) => setNoLeidas(data.count ?? 0))
       .catch(() => { });
 
-    notificacionService.getAll()
+    notificacionService.getAll({ leida: false, limit: 20 })
       .then(({ data }) => {
-        const lista = data.data ?? data ?? [];
-        const sinLeer = lista.filter((n) => !n.leida);
+        const sinLeer = data.data ?? data ?? [];
         setPrioridadAlta(sinLeer.some((n) => n.prioridad === 'alta' || n.tipoVisual === 'urgente'));
       })
       .catch(() => { });

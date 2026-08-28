@@ -4,6 +4,7 @@ const { Mensaje, Usuario } = require('../models');
 const { crearNotificacion } = require('../utils/notificador');
 const chatPermissionService = require('../services/chatPermission.service');
 const chatService           = require('../services/chat.service');
+const { parsePagination } = require('../utils/pagination');
 
 // ── Buscar usuarios ───────────────────────────────────────────────────────────
 
@@ -84,8 +85,7 @@ exports.enviarMensaje = async (req, res) => {
 exports.getHistorial = async (req, res) => {
   const userId    = req.usuario.id;
   const partnerId = Number(req.params.usuarioId);
-  const limite    = Math.min(parseInt(req.query.limit) || 50, 100);
-  const pagina    = Math.max(parseInt(req.query.page) || 1, 1);
+  const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 50, maxLimit: 100 });
 
   if (partnerId === userId) {
     return res.status(400).json({ success: false, message: 'No podés chatear con vos mismo.' });
@@ -94,7 +94,7 @@ exports.getHistorial = async (req, res) => {
   const { ok, motivo } = await chatPermissionService.puedeChatear(userId, partnerId);
   if (!ok) return res.status(403).json({ success: false, message: motivo });
 
-  const resultado = await chatService.obtenerHistorial(userId, partnerId, limite, pagina);
+  const resultado = await chatService.obtenerHistorial(userId, partnerId, { page, limit, offset });
   if (!resultado) {
     return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
   }

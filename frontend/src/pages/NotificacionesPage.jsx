@@ -16,7 +16,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { notificacionService } from '../services/api';
+import Paginacion from '../components/Paginacion/Paginacion';
+import { usePaginacion } from '../hooks/usePaginacion';
 import styles from './NotificacionesPage.module.css';
+
+// Cada tab de filtro → valor del query param `leida` del backend
+const FILTRO_A_LEIDA = { todas: undefined, 'no-leidas': 'false', leidas: 'true' };
 
 /* ── Configuración visual por tipo ─────────────────────────────────────────── */
 const TIPO_CONFIG = {
@@ -132,64 +137,76 @@ export default function NotificacionesPage() {
   const [filtro,   setFiltro]   = useState('todas');
   const [error,    setError]    = useState('');
   const [success,  setSuccess]  = useState('');
+  const [pagination, setPagination] = useState(null);
+  const [noLeidasCount, setNoLeidasCount] = useState(0);
+  const { page, setPage } = usePaginacion([filtro]);
 
-  /* Carga */
+  const refrescarSinLeer = useCallback(() => {
+    notificacionService.sinLeerCount()
+      .then(({ data }) => setNoLeidasCount(data.count ?? 0))
+      .catch(() => {});
+  }, []);
+
+  /* Carga (paginada, filtro server-side por `leida`) */
   const cargar = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const { data } = await notificacionService.getAll();
+      const params = { page, limit: 20 };
+      const leida = FILTRO_A_LEIDA[filtro];
+      if (leida !== undefined) params.leida = leida;
+      const { data } = await notificacionService.getAll(params);
       setNotifs(data.data ?? []);
+      setPagination(data.pagination ?? null);
+      if (typeof data.sinLeer === 'number') setNoLeidasCount(data.sinLeer);
     } catch {
       setError('No se pudieron cargar las notificaciones.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, filtro]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
   /* Marcar como leída (optimista) */
   const handleLeer = async (id) => {
     setNotifs((prev) => prev.map((n) => n.id === id ? { ...n, leida: true } : n));
+    setNoLeidasCount((c) => Math.max(0, c - 1));
     try {
       await notificacionService.leer(id);
     } catch {
-      // Revertir si falla
       setNotifs((prev) => prev.map((n) => n.id === id ? { ...n, leida: false } : n));
+      refrescarSinLeer();
     }
   };
 
   /* Marcar todas como leídas */
   const handleLeerTodas = async () => {
-    setNotifs((prev) => prev.map((n) => ({ ...n, leida: true })));
     try {
       await notificacionService.leerTodas();
       setSuccess('Todas marcadas como leídas.');
       setTimeout(() => setSuccess(''), 2500);
+      setNoLeidasCount(0);
+      cargar();
     } catch {
-      cargar(); // Recargar si falla
+      cargar();
     }
   };
 
   /* Eliminar (optimista) */
   const handleEliminar = async (id) => {
+    const eliminada = notifs.find((n) => n.id === id);
     setNotifs((prev) => prev.filter((n) => n.id !== id));
+    if (eliminada && !eliminada.leida) setNoLeidasCount((c) => Math.max(0, c - 1));
     try {
       await notificacionService.eliminar(id);
+      setPagination((p) => (p ? { ...p, total: Math.max(0, p.total - 1) } : p));
     } catch {
-      cargar(); // Recargar si falla
+      cargar();
     }
   };
 
-  /* Filtrado */
-  const noLeidasCount = notifs.filter((n) => !n.leida).length;
-
-  const notifsFiltradas = notifs.filter((n) => {
-    if (filtro === 'no-leidas') return !n.leida;
-    if (filtro === 'leidas')    return n.leida;
-    return true;
-  });
+  const notifsFiltradas = notifs;
 
   return (
     <div className="page-container">
@@ -218,10 +235,11 @@ export default function NotificacionesPage() {
       {/* ── Filtro tabs ─────────────────────────────────────────────────── */}
       <div className={styles.filtroTabs}>
         {FILTROS.map((f) => {
-          const count = f === 'todas'     ? notifs.length
-                      : f === 'no-leidas' ? notifs.filter((n) => !n.leida).length
-                      : notifs.filter((n) => n.leida).length;
           const label = f === 'todas' ? 'Todas' : f === 'no-leidas' ? 'Sin leer' : 'Leídas';
+          // Solo "Sin leer" tiene un contador siempre disponible (sinLeerCount);
+          // el resto muestra el total de la página activa cuando lo es.
+          const count = f === 'no-leidas' ? noLeidasCount
+                      : (filtro === f ? pagination?.total : null);
           return (
             <button
               key={f}
@@ -229,7 +247,7 @@ export default function NotificacionesPage() {
               onClick={() => setFiltro(f)}
             >
               {label}
-              <span className={styles.filtroCount}>{count}</span>
+              {count != null && <span className={styles.filtroCount}>{count}</span>}
             </button>
           );
         })}
@@ -252,16 +270,19 @@ export default function NotificacionesPage() {
           </p>
         </div>
       ) : (
-        <div className={styles.notifList}>
-          {notifsFiltradas.map((n) => (
-            <NotifCard
-              key={n.id}
-              notif={n}
-              onLeer={handleLeer}
-              onEliminar={handleEliminar}
-            />
-          ))}
-        </div>
+        <>
+          <div className={styles.notifList}>
+            {notifsFiltradas.map((n) => (
+              <NotifCard
+                key={n.id}
+                notif={n}
+                onLeer={handleLeer}
+                onEliminar={handleEliminar}
+              />
+            ))}
+          </div>
+          <Paginacion pagination={pagination} onPageChange={setPage} />
+        </>
       )}
     </div>
   );

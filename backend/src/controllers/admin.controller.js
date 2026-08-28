@@ -16,6 +16,7 @@ const adminModeracionService = require('../services/adminModeracion.service');
 const { SolicitudEmpresa, SolicitudReclutador, Empresa } = require('../models');
 const solicitudEmpresaService = require('../services/solicitudEmpresa.service');
 const solicitudReclutadorService = require('../services/solicitudReclutador.service');
+const { parsePagination, buildPagination, groupCount } = require('../utils/pagination');
 
 // ── Dashboard / métricas ──────────────────────────────────────────────────────
 
@@ -37,9 +38,12 @@ exports.getActividadReciente = async (req, res) => {
 // ── Logs ───────────────────────────────────────────────────────────────────────
 
 exports.getLogs = async (req, res) => {
-  const { accion, usuarioId, entidad, desde, hasta, page, limit } = req.query;
-  const resultado = await adminService.listarLogs({ accion, usuarioId, entidad, desde, hasta, page, limit });
-  return res.json({ success: true, ...resultado });
+  const { accion, usuarioId, entidad, desde, hasta } = req.query;
+  const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 25, maxLimit: 100 });
+  const { data, pagination } = await adminService.listarLogs({
+    accion, usuarioId, entidad, desde, hasta, page, limit, offset,
+  });
+  return res.json({ success: true, data, pagination, total: pagination.total });
 };
 
 exports.exportarLogs = async (req, res) => {
@@ -55,8 +59,9 @@ exports.exportarLogs = async (req, res) => {
 
 exports.getUsuarios = async (req, res) => {
   const { rol, activo, q } = req.query;
-  const usuarios = await adminUsuariosService.listarUsuarios({ rol, activo, q });
-  return res.json({ success: true, total: usuarios.length, data: usuarios });
+  const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 25, maxLimit: 100 });
+  const { data, pagination } = await adminUsuariosService.listarUsuarios({ rol, activo, q, page, limit, offset });
+  return res.json({ success: true, data, pagination, total: pagination.total });
 };
 
 exports.getUsuarioById = async (req, res) => {
@@ -116,8 +121,9 @@ exports.getOfertasPendientes = async (req, res) => {
 
 exports.getOfertas = async (req, res) => {
   const { estado } = req.query;
-  const ofertas = await adminModeracionService.listarOfertas({ estado });
-  return res.json({ success: true, total: ofertas.length, data: ofertas });
+  const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 25, maxLimit: 100 });
+  const { data, pagination } = await adminModeracionService.listarOfertas({ estado, page, limit, offset });
+  return res.json({ success: true, data, pagination, total: pagination.total });
 };
 
 exports.moderarOferta = async (req, res) => {
@@ -135,11 +141,16 @@ exports.moderarOferta = async (req, res) => {
 
 exports.getSolicitudesEmpresa = async (req, res) => {
   const { estado } = req.query;
-  const where = {};
-  if (estado) where.estado = estado;
+  const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 25, maxLimit: 100 });
+  const where = estado ? { estado } : {};
 
-  const solicitudes = await SolicitudEmpresa.findAll({ where, order: [['createdAt', 'DESC']] });
-  return res.json({ success: true, total: solicitudes.length, data: solicitudes });
+  const [{ count, rows }, conteoPorEstado] = await Promise.all([
+    SolicitudEmpresa.findAndCountAll({ where, order: [['createdAt', 'DESC'], ['id', 'DESC']], limit, offset }),
+    groupCount(SolicitudEmpresa, 'estado', {}),
+  ]);
+
+  const pagination = buildPagination(count, { page, limit });
+  return res.json({ success: true, data: rows, pagination, conteoPorEstado, total: pagination.total });
 };
 
 exports.aprobarSolicitudEmpresa = async (req, res) => {
@@ -173,15 +184,22 @@ exports.rechazarSolicitudEmpresa = async (req, res) => {
 
 exports.getSolicitudesReclutador = async (req, res) => {
   const { estado } = req.query;
-  const where = {};
-  if (estado) where.estado = estado;
+  const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 25, maxLimit: 100 });
+  const where = estado ? { estado } : {};
 
-  const solicitudes = await SolicitudReclutador.findAll({
-    where,
-    include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'usuarioId'] }],
-    order: [['createdAt', 'DESC']],
-  });
-  return res.json({ success: true, total: solicitudes.length, data: solicitudes });
+  const [{ count, rows }, conteoPorEstado] = await Promise.all([
+    SolicitudReclutador.findAndCountAll({
+      where,
+      include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'usuarioId'] }],
+      order: [['createdAt', 'DESC'], ['id', 'DESC']],
+      limit,
+      offset,
+    }),
+    groupCount(SolicitudReclutador, 'estado', {}),
+  ]);
+
+  const pagination = buildPagination(count, { page, limit });
+  return res.json({ success: true, data: rows, pagination, conteoPorEstado, total: pagination.total });
 };
 
 exports.aprobarSolicitudReclutador = async (req, res) => {

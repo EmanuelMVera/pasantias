@@ -1,16 +1,26 @@
 const { Notificacion } = require('../models');
+const { parsePagination, buildPagination } = require('../utils/pagination');
 
 const getNotificaciones = async (req, res) => {
-  const notificaciones = await Notificacion.findAll({
-    where: { usuarioId: req.usuario.id },
-    order: [
-      ['leida', 'ASC'],
-      ['createdAt', 'DESC'],
-    ],
-    limit: 50,
-  });
-  const sinLeer = notificaciones.filter((n) => !n.leida).length;
-  return res.json({ success: true, sinLeer, total: notificaciones.length, data: notificaciones });
+  const usuarioId = req.usuario.id;
+  const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 50 });
+
+  const where = { usuarioId };
+  if (req.query.leida === 'true')  where.leida = true;
+  if (req.query.leida === 'false') where.leida = false;
+
+  const [{ count, rows }, sinLeer] = await Promise.all([
+    Notificacion.findAndCountAll({
+      where,
+      order: [['leida', 'ASC'], ['createdAt', 'DESC'], ['id', 'DESC']],
+      limit,
+      offset,
+    }),
+    Notificacion.count({ where: { usuarioId, leida: false } }),
+  ]);
+
+  const pagination = buildPagination(count, { page, limit });
+  return res.json({ success: true, data: rows, pagination, sinLeer, total: pagination.total });
 };
 
 // Endpoint de badge/polling: una falla acá nunca debe mostrarse como error al

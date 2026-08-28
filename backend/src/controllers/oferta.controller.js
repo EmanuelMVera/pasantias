@@ -4,6 +4,7 @@ const { Oferta, Empresa } = require('../models');
 const { Op } = require('sequelize');
 const ofertaService   = require('../services/oferta.service');
 const empresaService  = require('../services/empresa.service');
+const { parsePagination, buildPagination } = require('../utils/pagination');
 
 const _resolverEmpresa = empresaService.resolverEmpresaDelRequest;
 
@@ -11,6 +12,7 @@ const _resolverEmpresa = empresaService.resolverEmpresaDelRequest;
 
 exports.getOfertas = async (req, res) => {
   const { area, modalidad, ciudad, experiencia, tipoPuesto, q } = req.query;
+  const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 12, maxLimit: 48 });
 
   const where = { estado: 'activa', moderada: true };
   if (area)       where.area = { [Op.iLike]: `%${area}%` };
@@ -20,25 +22,28 @@ exports.getOfertas = async (req, res) => {
   if (experiencia) where.nivelExperiencia = experiencia;
   if (q)          where.titulo = { [Op.iLike]: `%${q}%` };
 
-  const ofertas = await Oferta.findAll({
+  const { count, rows } = await Oferta.findAndCountAll({
     where,
     include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial', 'logo', 'rubro', 'ciudad'] }],
-    order: [['createdAt', 'DESC']],
+    order: [['createdAt', 'DESC'], ['id', 'DESC']],
+    limit,
+    offset,
   });
 
-  return res.json({ success: true, total: ofertas.length, data: ofertas });
+  const pagination = buildPagination(count, { page, limit });
+  // `total` top-level: alias @deprecated de pagination.total (compat SCALE-03).
+  return res.json({ success: true, data: rows, pagination, total: pagination.total });
 };
 
 // ── Ofertas recomendadas ──────────────────────────────────────────────────────
 
 exports.getOfertasRecomendadas = async (req, res) => {
-  const limite = Math.min(parseInt(req.query.limit) || 10, 20);
-  const pagina = Math.max(parseInt(req.query.page) || 1, 1);
+  const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 12, maxLimit: 20 });
 
   const resultado = await ofertaService.obtenerRecomendadas(
     req.usuario.id,
     req.usuario,
-    { limite, pagina }
+    { page, limit, offset }
   );
 
   return res.json({ success: true, ...resultado });

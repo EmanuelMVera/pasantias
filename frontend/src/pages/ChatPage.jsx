@@ -241,13 +241,26 @@ export default function ChatPage() {
   const [nuevoMensaje,    setNuevoMensaje]    = useState('');
   const [loadingConvs,    setLoadingConvs]    = useState(true);
   const [loadingMensajes, setLoadingMensajes] = useState(false);
+  const [loadingViejos,   setLoadingViejos]   = useState(false);
+  const [pagHist,         setPagHist]         = useState(null); // { page, limit, total, totalPages }
   const [enviando,        setEnviando]        = useState(false);
   const [errorConvs,      setErrorConvs]      = useState('');
   const [modalAbierto,    setModalAbierto]    = useState(false);
 
   const mensajesEndRef = useRef(null);
+  const mensajesAreaRef = useRef(null);
   const inputRef       = useRef(null);
   const pollRef        = useRef(null);
+
+  /* Une dos listas de mensajes por id, en orden cronológico. */
+  const mergeMensajes = useCallback((a, b) => {
+    const map = new Map();
+    for (const m of a) map.set(m.id, m);
+    for (const m of b) map.set(m.id, m);
+    return [...map.values()].sort(
+      (x, y) => new Date(x.createdAt) - new Date(y.createdAt) || x.id - y.id
+    );
+  }, []);
 
   /* ── Scroll al último mensaje ──────────────────────────────────────────── */
   const scrollBottom = useCallback(() => {
@@ -284,37 +297,71 @@ export default function ChatPage() {
   useEffect(() => {
     if (!convActivaId) return;
 
-    const cargarMensajes = async () => {
-      setLoadingMensajes(true);
+    // Trae la página 1 (mensajes más nuevos) y la fusiona con lo ya cargado
+    // (así el poller de 10s no borra las páginas viejas traídas por scroll).
+    const cargarNuevos = async ({ inicial = false } = {}) => {
+      if (inicial) setLoadingMensajes(true);
       try {
-        const { data } = await mensajeService.getMensajes(convActivaId);
+        const { data } = await mensajeService.getMensajes(convActivaId, { page: 1 });
         const lista = data.data ?? data ?? [];
-        setMensajes(lista);
-        // Capturar datos del interlocutor devueltos por getHistorial.
-        // Esto permite mostrar nombre/empresa aunque no haya mensajes previos
-        // ni la conversación esté en la lista de conversaciones.
+        setMensajes((prev) => (inicial ? lista : mergeMensajes(prev, lista)));
+        // El poller trae la página 1: actualiza total/totalPages pero NO pisa
+        // el "hasta qué página vieja llegó" el usuario con scroll.
+        setPagHist((prev) => {
+          if (!data.pagination) return prev;
+          if (!prev || inicial) return data.pagination;
+          return { ...data.pagination, page: Math.max(prev.page, data.pagination.page) };
+        });
         if (data.usuario) setPartnerInfo(data.usuario);
         mensajeService.marcarLeida(convActivaId).catch(() => {});
         setConversaciones((prev) =>
-          prev.map((c) =>
-            c.usuario?.id === convActivaId ? { ...c, noLeidos: 0 } : c
-          )
+          prev.map((c) => (c.usuario?.id === convActivaId ? { ...c, noLeidos: 0 } : c))
         );
       } catch {
         // Fallo silencioso para no interrumpir el polling
       } finally {
-        setLoadingMensajes(false);
+        if (inicial) setLoadingMensajes(false);
       }
     };
 
-    cargarMensajes().then(scrollBottom);
+    setMensajes([]);
+    setPagHist(null);
+    cargarNuevos({ inicial: true }).then(scrollBottom);
 
     clearInterval(pollRef.current);
-    pollRef.current = setInterval(cargarMensajes, POLL_INTERVAL);
+    pollRef.current = setInterval(() => cargarNuevos(), POLL_INTERVAL);
     return () => clearInterval(pollRef.current);
-  }, [convActivaId, scrollBottom]);
+  }, [convActivaId, scrollBottom, mergeMensajes]);
 
-  useEffect(() => { scrollBottom(); }, [mensajes, scrollBottom]);
+  /* ── Cargar mensajes ANTIGUOS al scrollear hacia arriba ───────────────── */
+  const cargarViejos = useCallback(async () => {
+    if (loadingViejos || !pagHist || pagHist.page >= pagHist.totalPages) return;
+    setLoadingViejos(true);
+    const area = mensajesAreaRef.current;
+    const alturaPrevia = area?.scrollHeight ?? 0;
+    try {
+      const paginaVieja = pagHist.page + 1;
+      const { data } = await mensajeService.getMensajes(convActivaId, { page: paginaVieja });
+      const viejos = data.data ?? [];
+      setMensajes((prev) => mergeMensajes(viejos, prev));
+      setPagHist((prev) => ({ ...(data.pagination ?? prev), page: paginaVieja }));
+      // Preservar la posición de scroll: el contenido creció hacia arriba.
+      requestAnimationFrame(() => {
+        if (area) area.scrollTop = area.scrollHeight - alturaPrevia;
+      });
+    } catch {
+      // silencioso
+    } finally {
+      setLoadingViejos(false);
+    }
+  }, [convActivaId, pagHist, loadingViejos, mergeMensajes]);
+
+  const handleScrollMensajes = (e) => {
+    if (e.target.scrollTop < 80) cargarViejos();
+  };
+
+  // Auto-scroll al fondo solo cuando llegan mensajes nuevos (no al cargar viejos).
+  useEffect(() => { if (!loadingViejos) scrollBottom(); }, [mensajes, loadingViejos, scrollBottom]);
 
   /* ── Enviar mensaje ────────────────────────────────────────────────────── */
   const handleEnviar = async (e) => {
@@ -525,7 +572,14 @@ export default function ChatPage() {
               </div>
 
               {/* Mensajes */}
-              <div className={styles.mensajesArea}>
+              <div
+                className={styles.mensajesArea}
+                ref={mensajesAreaRef}
+                onScroll={handleScrollMensajes}
+              >
+                {loadingViejos && (
+                  <p className={styles.cargandoMsg}>Cargando mensajes anteriores…</p>
+                )}
                 {loadingMensajes && mensajes.length === 0 ? (
                   <p className={styles.cargandoMsg}>Cargando mensajes...</p>
                 ) : mensajes.length === 0 ? (

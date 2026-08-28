@@ -3,6 +3,7 @@
 const { Mensaje, Usuario, Empresa, EmpresaUsuario, Perfil } = require('../models');
 const { Op } = require('sequelize');
 const { resolverEmpresasDeUsuario } = require('./chatPermission.service');
+const { buildPagination } = require('../utils/pagination');
 
 // ── Helpers de datos ──────────────────────────────────────────────────────────
 
@@ -229,11 +230,12 @@ async function obtenerConversaciones(userId) {
  * Resuelve datos del interlocutor (foto, razonSocial) y marca como leídos los
  * mensajes recibidos no leídos.
  *
- * @returns {{ total, pagina, totalPaginas, usuario, data }}
+ * `data` va en orden cronológico (más viejo primero) DENTRO de la página; la
+ * página 1 es la de los mensajes más nuevos, la 2 los siguientes más viejos,
+ * etc. — el frontend hace prepend al scrollear hacia arriba (SCALE-03).
+ * @returns {{ usuario, data, pagination }}
  */
-async function obtenerHistorial(userId, partnerId, limite, pagina) {
-  const offset = (pagina - 1) * limite;
-
+async function obtenerHistorial(userId, partnerId, { page = 1, limit = 50, offset = 0 } = {}) {
   const partner = await Usuario.findOne({
     where: { id: partnerId },
     attributes: ['id', 'nombre', 'apellido', 'fotoPerfil', 'rol', 'ultimoAcceso'],
@@ -262,8 +264,8 @@ async function obtenerHistorial(userId, partnerId, limite, pagina) {
         { emisorId: partnerId, receptorId: userId },
       ],
     },
-    order: [['createdAt', 'DESC']],
-    limit: limite,
+    order: [['createdAt', 'DESC'], ['id', 'DESC']],
+    limit,
     offset,
   });
 
@@ -273,11 +275,9 @@ async function obtenerHistorial(userId, partnerId, limite, pagina) {
   );
 
   return {
-    total: count,
-    pagina,
-    totalPaginas: Math.ceil(count / limite),
     usuario: partnerData,
     data: mensajes.reverse(),
+    pagination: buildPagination(count, { page, limit }),
   };
 }
 

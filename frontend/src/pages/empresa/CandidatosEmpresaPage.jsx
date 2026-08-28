@@ -12,6 +12,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { empresaService } from '../../services/api';
 import Avatar from '../../components/Avatar/Avatar';
+import Paginacion from '../../components/Paginacion/Paginacion';
 import { getEstadoInfo } from '../../constants/postulacionEstados';
 
 // Labels en plural para las tabs de filtro — los `value` son los estados
@@ -37,13 +38,19 @@ export default function CandidatosEmpresaPage() {
   const [candidatos, setCandidatos] = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState('');
+  const [pagination, setPagination] = useState(null);
+  const [conteoPorEstado, setConteoPorEstado] = useState({});
 
-  const cargar = useCallback(async (estado) => {
+  const cargar = useCallback(async (estado, pagina = 1) => {
     setLoading(true);
     setError('');
     try {
-      const { data } = await empresaService.getCandidatos(estado ? { estado } : {});
+      const params = { page: pagina, limit: 20 };
+      if (estado) params.estado = estado;
+      const { data } = await empresaService.getCandidatos(params);
       setCandidatos(data.data ?? []);
+      setPagination(data.pagination ?? null);
+      setConteoPorEstado(data.conteoPorEstado ?? {});
     } catch {
       setError('No se pudieron cargar los candidatos.');
     } finally {
@@ -52,8 +59,10 @@ export default function CandidatosEmpresaPage() {
   }, []);
 
   useEffect(() => {
-    cargar(estadoParam);
+    cargar(estadoParam, 1);
   }, [cargar, estadoParam]);
+
+  const totalTodos = Object.values(conteoPorEstado).reduce((a, b) => a + b, 0);
 
   const handleTab = (valor) => {
     if (valor) setSearchParams({ estado: valor });
@@ -74,24 +83,27 @@ export default function CandidatosEmpresaPage() {
 
       {/* Tabs de filtro */}
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-        {ESTADOS_TABS.map(tab => (
-          <button
-            key={tab.value}
-            onClick={() => handleTab(tab.value)}
-            style={{
-              padding: '0.35rem 0.9rem',
-              borderRadius: 99,
-              border: `1.5px solid ${estadoParam === tab.value ? 'var(--primary)' : 'var(--border)'}`,
-              background: estadoParam === tab.value ? 'var(--primary)' : 'transparent',
-              color: estadoParam === tab.value ? '#fff' : 'var(--text)',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-              fontWeight: estadoParam === tab.value ? 600 : 400,
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {ESTADOS_TABS.map(tab => {
+          const n = tab.value === '' ? totalTodos : (conteoPorEstado[tab.value] ?? 0);
+          return (
+            <button
+              key={tab.value}
+              onClick={() => handleTab(tab.value)}
+              style={{
+                padding: '0.35rem 0.9rem',
+                borderRadius: 99,
+                border: `1.5px solid ${estadoParam === tab.value ? 'var(--primary)' : 'var(--border)'}`,
+                background: estadoParam === tab.value ? 'var(--primary)' : 'transparent',
+                color: estadoParam === tab.value ? '#fff' : 'var(--text)',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+                fontWeight: estadoParam === tab.value ? 600 : 400,
+              }}
+            >
+              {tab.label} ({n})
+            </button>
+          );
+        })}
       </div>
 
       {error && <p className="error-msg">{error}</p>}
@@ -168,6 +180,13 @@ export default function CandidatosEmpresaPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {!loading && (
+        <Paginacion
+          pagination={pagination}
+          onPageChange={(p) => cargar(estadoParam, p)}
+        />
       )}
     </div>
   );

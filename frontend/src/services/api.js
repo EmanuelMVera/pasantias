@@ -90,15 +90,15 @@ export const ofertaService = {
   create:          (data) => api.post('/ofertas', data),              // Publicar nueva oferta
   update:          (id, data) => api.put(`/ofertas/${id}`, data),     // Editar oferta existente
   delete:          (id) => api.delete(`/ofertas/${id}`),              // Cerrar oferta
-  getRecomendadas: () => api.get('/ofertas/recomendadas'),            // Ofertas recomendadas para el alumno
+  getRecomendadas: (params) => api.get('/ofertas/recomendadas', { params }), // Ofertas recomendadas para el alumno
 };
 
 // ── Servicio de postulaciones ─────────────────────────────────────────────────
 // Funciones para los endpoints de /api/postulaciones
 export const postulacionService = {
   postular: (data) => api.post('/postulaciones', data),                          // Postularse a una oferta
-  getMias: () => api.get('/postulaciones/mis'),                                  // Ver mis postulaciones
-  getByOferta: (ofertaId) => api.get(`/postulaciones/oferta/${ofertaId}`),      // Ver candidatos de una oferta
+  getMias: (params) => api.get('/postulaciones/mis', { params }),                // Ver mis postulaciones
+  getByOferta: (ofertaId, params) => api.get(`/postulaciones/oferta/${ofertaId}`, { params }), // Ver candidatos de una oferta
   updateEstado: (id, estado) => api.patch(`/postulaciones/${id}/estado`, { estado }), // Cambiar estado
 };
 
@@ -125,7 +125,7 @@ export const studentService = {
 // ── Servicio de notificaciones ────────────────────────────────────────────────
 // Funciones para los endpoints de /api/notificaciones
 export const notificacionService = {
-  getAll:       () => api.get('/notificaciones'),
+  getAll:       (params) => api.get('/notificaciones', { params }),
   sinLeerCount: () => api.get('/notificaciones/sin-leer-count'),
   leer:         (id) => api.patch(`/notificaciones/${id}/leer`),
   leerTodas:    () => api.patch('/notificaciones/leer-todas'),
@@ -187,7 +187,7 @@ export const mensajeService = {
   // GET /api/chat/usuarios?q=texto → buscar usuarios para iniciar un nuevo chat
   buscarUsuarios: (q) => api.get('/chat/usuarios', { params: { q } }),
   // GET /api/chat/:usuarioId → historial de mensajes con un usuario específico
-  getMensajes: (usuarioId) => api.get(`/chat/${usuarioId}`),
+  getMensajes: (usuarioId, params) => api.get(`/chat/${usuarioId}`, { params }),
   // POST /api/chat → enviar mensaje: { receptorId, mensaje }
   enviar: (data) => api.post('/chat', data),
   // PATCH /api/chat/:usuarioId/leer → marcar conversación con ese usuario como leída
@@ -198,7 +198,7 @@ export const mensajeService = {
 // Funciones para los endpoints de /api/empresas (accesibles con rol empresa)
 export const empresaService = {
   getDashboard:          () => api.get('/empresas/dashboard'),
-  getMisOfertas:         () => api.get('/empresas/mis-ofertas'),
+  getMisOfertas:         (params) => api.get('/empresas/mis-ofertas', { params }),
   getMiEmpresa:          () => api.get('/empresas/mi-empresa'),
   getPublico:            (empresaId) => api.get(`/empresas/${empresaId}`), // Perfil público de empresa
   updateMiEmpresa:       (data) => api.put('/empresas/mi-empresa', data),

@@ -10,10 +10,11 @@
  * - Stats rápidas (total, en proceso, contratados)
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { postulacionService, abrirArchivoPrivado } from '../../services/api';
 import Avatar from '../../components/Avatar/Avatar';
+import Paginacion from '../../components/Paginacion/Paginacion';
 import { LISTA_ESTADOS_POSTULACION, ESTADOS_HABILITAN_CHAT, getEstadoInfo, normalizarEstado } from '../../constants/postulacionEstados';
 import styles from './PostulantesMiOfertaPage.module.css';
 
@@ -60,19 +61,32 @@ export default function PostulantesMiOfertaPage() {
   const [error,         setError]         = useState('');
   const [filtro,        setFiltro]        = useState('');
   const [toast,         setToast]         = useState('');
+  const [pagination,    setPagination]    = useState(null);
+  const [conteoPorEstado, setConteoPorEstado] = useState({});
+  const [page,          setPage]          = useState(1);
 
-  useEffect(() => {
-    postulacionService
-      .getByOferta(ofertaId)
-      .then(({ data }) => setPostulaciones(data.data ?? data ?? []))
-      .catch(err => setError(err.response?.data?.message ?? 'Error al cargar los candidatos.'))
-      .finally(() => setLoading(false));
-  }, [ofertaId]);
+  const cargar = useCallback(async (pagina = 1) => {
+    setLoading(true);
+    try {
+      const params = { page: pagina, limit: 20 };
+      if (filtro) params.estado = filtro;
+      const { data } = await postulacionService.getByOferta(ofertaId, params);
+      setPostulaciones(data.data ?? []);
+      setPagination(data.pagination ?? null);
+      setConteoPorEstado(data.conteoPorEstado ?? {});
+      setPage(pagina);
+    } catch (err) {
+      setError(err.response?.data?.message ?? 'Error al cargar los candidatos.');
+    } finally {
+      setLoading(false);
+    }
+  }, [ofertaId, filtro]);
+
+  useEffect(() => { cargar(1); }, [cargar]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
   const handleCambiarEstado = async (id, nuevoEstado) => {
-    // Actualización optimista
     setPostulaciones(prev => prev.map(p => p.id === id ? { ...p, estado: nuevoEstado } : p));
     try {
       await postulacionService.updateEstado(id, nuevoEstado);
@@ -80,16 +94,16 @@ export default function PostulantesMiOfertaPage() {
       showToast(`${e.emoji} Candidato movido a "${e.label}"`);
     } catch {
       showToast('✗ Error al cambiar el estado.');
+    } finally {
+      cargar(page); // reconciliar lista + conteos + paginación
     }
   };
 
-  const filtradas = filtro
-    ? postulaciones.filter(p => p.estado === filtro)
-    : postulaciones;
+  const filtradas = postulaciones; // el filtro por estado ahora es server-side
 
-  const total       = postulaciones.length;
-  const activos     = postulaciones.filter(p => p.estado !== 'rechazado').length;
-  const contratados = postulaciones.filter(p => p.estado === 'contratado').length;
+  const total       = Object.values(conteoPorEstado).reduce((a, b) => a + b, 0);
+  const activos     = total - (conteoPorEstado.rechazado ?? 0);
+  const contratados = conteoPorEstado.contratado ?? 0;
 
   return (
     <div className="page-container">
@@ -153,8 +167,7 @@ export default function PostulantesMiOfertaPage() {
                 Todos ({total})
               </button>
               {LISTA_ESTADOS_POSTULACION.map(e => {
-                // Contar estado canónico + sus aliases legacy
-                const n = postulaciones.filter(p => normalizarEstado(p.estado) === e.estado).length;
+                const n = conteoPorEstado[e.estado] ?? 0;
                 if (!n) return null;
                 return (
                   <button
@@ -285,6 +298,8 @@ export default function PostulantesMiOfertaPage() {
               })}
             </div>
           )}
+
+          <Paginacion pagination={pagination} onPageChange={cargar} />
         </>
       )}
 

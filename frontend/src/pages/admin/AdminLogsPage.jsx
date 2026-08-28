@@ -10,6 +10,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { adminService } from '../../services/api';
+import Paginacion from '../../components/Paginacion/Paginacion';
 import styles from './AdminLogsPage.module.css';
 
 /* Tipos de acción con etiqueta y color */
@@ -38,10 +39,8 @@ export default function AdminLogsPage() {
   const [error,       setError]      = useState('');
   const [exporting,   setExporting]  = useState(false);
 
-  // Paginación
-  const [page,        setPage]       = useState(1);
-  const [totalPages,  setTotalPages] = useState(1);
-  const [total,       setTotal]      = useState(0);
+  // Paginación (contrato común: { page, limit, total, totalPages })
+  const [pagination, setPagination] = useState(null);
 
   // Filtros
   const [filtroAccion, setFiltroAccion] = useState('');
@@ -62,9 +61,7 @@ export default function AdminLogsPage() {
 
       const res = await adminService.getLogs(params);
       setLogs(res.data.data ?? []);
-      setTotal(res.data.total ?? 0);
-      setTotalPages(res.data.totalPages ?? 1);
-      setPage(p);
+      setPagination(res.data.pagination ?? null);
     } catch {
       setError('No se pudieron cargar los logs del sistema.');
     } finally {
@@ -105,7 +102,7 @@ export default function AdminLogsPage() {
       <div className="dashboard-header">
         <div>
           <h1>Historial de Accesos</h1>
-          <p className={styles.subtitle}>{loading ? '...' : `${total} registro${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`}</p>
+          <p className={styles.subtitle}>{loading ? '...' : `${pagination?.total ?? 0} registro${(pagination?.total ?? 0) !== 1 ? 's' : ''} encontrado${(pagination?.total ?? 0) !== 1 ? 's' : ''}`}</p>
         </div>
         <button
           id="btn-exportar-logs"
@@ -221,28 +218,7 @@ export default function AdminLogsPage() {
             </table>
           </div>
 
-          {/* Paginación */}
-          {totalPages > 1 && (
-            <div className={styles.pagination}>
-              <button
-                className="btn-secondary"
-                disabled={page <= 1}
-                onClick={() => cargar(page - 1)}
-              >
-                ← Anterior
-              </button>
-              <span className={styles.pageInfo}>
-                Página <strong>{page}</strong> de <strong>{totalPages}</strong>
-              </span>
-              <button
-                className="btn-secondary"
-                disabled={page >= totalPages}
-                onClick={() => cargar(page + 1)}
-              >
-                Siguiente →
-              </button>
-            </div>
-          )}
+          <Paginacion pagination={pagination} onPageChange={cargar} />
         </>
       )}
     </div>

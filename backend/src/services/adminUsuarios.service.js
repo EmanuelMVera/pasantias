@@ -13,6 +13,7 @@ const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 const { Usuario, Perfil, Empresa, EmpresaUsuario, ActivityLog, ConfiguracionInstitucional } = require('../models');
 const HttpError = require('../utils/httpError');
+const { buildPagination } = require('../utils/pagination');
 
 async function logAction({ usuarioId, accion, entidad, entidadId, detalle, ip }) {
   try {
@@ -22,7 +23,7 @@ async function logAction({ usuarioId, accion, entidad, entidadId, detalle, ip })
   }
 }
 
-async function listarUsuarios({ rol, activo, q }) {
+async function listarUsuarios({ rol, activo, q, page = 1, limit = 25, offset = 0 }) {
   const where = {};
   if (rol) where.rol = rol;
   if (activo !== undefined) where.activo = activo === 'true';
@@ -34,10 +35,14 @@ async function listarUsuarios({ rol, activo, q }) {
     ];
   }
 
-  return Usuario.findAll({
+  const { count, rows } = await Usuario.findAndCountAll({
     where,
     attributes: { exclude: ['password', 'tokenReset', 'tokenResetExpira'] },
-    order: [['createdAt', 'DESC']],
+    order: [['createdAt', 'DESC'], ['id', 'DESC']],
+    limit,
+    offset,
+    // `membresiasEmpresa` es hasMany → sin `distinct` el count se infla por el join.
+    distinct: true,
     // Para usuarios con rol 'empresa' incluimos su membresía y empresa;
     // para alumno/egresado incluimos el legajo (vive en Perfil).
     include: [
@@ -56,6 +61,8 @@ async function listarUsuarios({ rol, activo, q }) {
       { model: Perfil, as: 'perfil', required: false, attributes: ['legajo'] },
     ],
   });
+
+  return { data: rows, pagination: buildPagination(count, { page, limit }) };
 }
 
 async function obtenerUsuario(id) {

@@ -14,7 +14,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminService } from '../../services/api';
 import Modal from '../../components/Modal/Modal';
+import Paginacion from '../../components/Paginacion/Paginacion';
 import styles from './AdminSolicitudesPage.module.css';
+
+const sumar = (obj) => Object.values(obj).reduce((a, b) => a + b, 0);
 
 // ── Helpers de UI ─────────────────────────────────────────────────────────────
 const ESTADO_CONFIG = {
@@ -50,6 +53,9 @@ export default function AdminSolicitudesPage() {
   const [error,       setError]       = useState('');
   const [success,     setSuccess]     = useState('');
   const [filtroEstado, setFiltroEstado] = useState(''); // '' | 'pendiente' | 'aprobado' | 'rechazado'
+  const [paginationEmp, setPaginationEmp] = useState(null);
+  const [conteoEmp,     setConteoEmp]     = useState({});
+  const [pageEmp,       setPageEmp]       = useState(1);
 
   // Panel de detalle / acción
   const [detalle,    setDetalle]    = useState(null); // solicitud seleccionada
@@ -64,6 +70,9 @@ export default function AdminSolicitudesPage() {
   const [solicitudesRecl,    setSolicitudesRecl]    = useState([]);
   const [loadingRecl,        setLoadingRecl]        = useState(true);
   const [filtroRecl,         setFiltroRecl]         = useState('');
+  const [paginationRecl,     setPaginationRecl]     = useState(null);
+  const [conteoRecl,         setConteoRecl]         = useState({});
+  const [pageRecl,           setPageRecl]           = useState(1);
   const [confirmandoRecl,    setConfirmandoRecl]    = useState(null);
   const [accionandoRecl,     setAccionandoRecl]     = useState(false);
   const [modalRechazoRecl,   setModalRechazoRecl]   = useState(false);
@@ -71,14 +80,17 @@ export default function AdminSolicitudesPage() {
   const [motivoRecl,         setMotivoRecl]         = useState('');
 
   // ── Carga de datos ──────────────────────────────────────────────────
-  const cargar = useCallback(async () => {
+  const cargar = useCallback(async (pagina = 1) => {
     setLoading(true);
     setError('');
     try {
-      const params = {};
+      const params = { page: pagina, limit: 25 };
       if (filtroEstado) params.estado = filtroEstado;
       const res = await adminService.getSolicitudesEmpresa(params);
       setSolicitudes(res.data.data ?? []);
+      setPaginationEmp(res.data.pagination ?? null);
+      setConteoEmp(res.data.conteoPorEstado ?? {});
+      setPageEmp(pagina);
     } catch {
       setError('No se pudieron cargar las solicitudes.');
     } finally {
@@ -86,13 +98,16 @@ export default function AdminSolicitudesPage() {
     }
   }, [filtroEstado]);
 
-  const cargarRecl = useCallback(async () => {
+  const cargarRecl = useCallback(async (pagina = 1) => {
     setLoadingRecl(true);
     try {
-      const params = {};
+      const params = { page: pagina, limit: 25 };
       if (filtroRecl) params.estado = filtroRecl;
       const res = await adminService.getSolicitudesReclutador(params);
       setSolicitudesRecl(res.data.data ?? []);
+      setPaginationRecl(res.data.pagination ?? null);
+      setConteoRecl(res.data.conteoPorEstado ?? {});
+      setPageRecl(pagina);
     } catch {
       // falla silenciosa — la sección muestra vacío
     } finally {
@@ -100,8 +115,8 @@ export default function AdminSolicitudesPage() {
     }
   }, [filtroRecl]);
 
-  useEffect(() => { cargar();    }, [cargar]);
-  useEffect(() => { cargarRecl(); }, [cargarRecl]);
+  useEffect(() => { cargar(1);     }, [cargar]);
+  useEffect(() => { cargarRecl(1); }, [cargarRecl]);
 
   // ── Helpers de toast ────────────────────────────────────────────────────────
   const showSuccess = (msg) => {
@@ -128,7 +143,7 @@ export default function AdminSolicitudesPage() {
         (data?.reclutadoresPendientes ? ` · ${data.reclutadoresPendientes} solicitud(es) de reclutador creadas.` : '')
       );
       setDetalle(null);
-      cargar();
+      cargar(pageEmp);
     } catch (err) {
       const msg = err.response?.data?.message ?? 'Error al aprobar la solicitud.';
       setError(msg);
@@ -152,7 +167,7 @@ export default function AdminSolicitudesPage() {
       showSuccess(`❌ Solicitud de "${detalle.razonSocial}" rechazada. Notificación enviada.`);
       setModalRechazo(false);
       setDetalle(null);
-      cargar();
+      cargar(pageEmp);
     } catch (err) {
       setError(err.response?.data?.message ?? 'Error al rechazar la solicitud.');
       setModalRechazo(false);
@@ -173,7 +188,7 @@ export default function AdminSolicitudesPage() {
         `✅ Reclutador "${sol.nombre}" aprobado. Credenciales enviadas a ${sol.email}` +
         (data?.passwordGenerada ? ` (pwd dev: ${data.passwordGenerada})` : '')
       );
-      cargarRecl();
+      cargarRecl(pageRecl);
     } catch (err) {
       setError(err.response?.data?.message ?? 'Error al aprobar.');
     } finally {
@@ -189,7 +204,7 @@ export default function AdminSolicitudesPage() {
       showSuccess(`❌ Solicitud de "${detalleRecl.nombre}" rechazada. Notificación enviada a la empresa.`);
       setModalRechazoRecl(false);
       setDetalleRecl(null);
-      cargarRecl();
+      cargarRecl(pageRecl);
     } catch (err) {
       setError(err.response?.data?.message ?? 'Error al rechazar.');
       setModalRechazoRecl(false);
@@ -198,20 +213,18 @@ export default function AdminSolicitudesPage() {
     }
   };
 
-  // ── Estadísticas rápidas ─────────────────────────────────────────────────
-  // Estadísticas de empresas
+  // ── Estadísticas rápidas (del sidecar conteoPorEstado, sobre TODO el set) ──
   const stats = {
-    total:     solicitudes.length,
-    pendiente: solicitudes.filter(s => s.estado === 'pendiente').length,
-    aprobado:  solicitudes.filter(s => s.estado === 'aprobado').length,
-    rechazado: solicitudes.filter(s => s.estado === 'rechazado').length,
+    total:     sumar(conteoEmp),
+    pendiente: conteoEmp.pendiente ?? 0,
+    aprobado:  conteoEmp.aprobado  ?? 0,
+    rechazado: conteoEmp.rechazado ?? 0,
   };
-  // Estadísticas de reclutadores
   const statsRecl = {
-    total:     solicitudesRecl.length,
-    pendiente: solicitudesRecl.filter(s => s.estado === 'pendiente').length,
-    aprobado:  solicitudesRecl.filter(s => s.estado === 'aprobado').length,
-    rechazado: solicitudesRecl.filter(s => s.estado === 'rechazado').length,
+    total:     sumar(conteoRecl),
+    pendiente: conteoRecl.pendiente ?? 0,
+    aprobado:  conteoRecl.aprobado  ?? 0,
+    rechazado: conteoRecl.rechazado ?? 0,
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -390,6 +403,10 @@ export default function AdminSolicitudesPage() {
                 </tbody>
               </table>
             </div>
+          )}
+
+          {!loading && (
+            <Paginacion pagination={paginationEmp} onPageChange={cargar} />
           )}
         </div>
 
@@ -700,6 +717,10 @@ export default function AdminSolicitudesPage() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {!loadingRecl && (
+          <Paginacion pagination={paginationRecl} onPageChange={cargarRecl} />
         )}
       </div>
 

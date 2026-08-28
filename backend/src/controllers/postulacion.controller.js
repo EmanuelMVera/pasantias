@@ -4,6 +4,7 @@ const { Postulacion, Oferta, Usuario, Perfil, Empresa, Archivo, PostulacionHisto
 const { crearNotificacion } = require('../utils/notificador');
 const postulacionService = require('../services/postulacion.service');
 const empresaService     = require('../services/empresa.service');
+const { parsePagination, buildPagination, groupCount } = require('../utils/pagination');
 
 const _resolverEmpresa = empresaService.resolverEmpresaDelRequest;
 
@@ -67,18 +68,31 @@ exports.postular = async (req, res) => {
 // ── Historial de postulaciones del alumno ─────────────────────────────────────
 
 exports.getMisPostulaciones = async (req, res) => {
-  const postulaciones = await Postulacion.findAll({
-    where: { usuarioId: req.usuario.id },
-    include: [{
-      model: Oferta,
-      as: 'oferta',
-      include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial', 'logo', 'ciudad', 'rubro'] }],
-    }],
-    order: [['createdAt', 'DESC']],
-  });
+  const usuarioId = req.usuario.id;
+  const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
+  const { estado } = req.query;
 
-  const data = postulaciones.map(postulacionService.formatearPostulacion);
-  return res.json({ success: true, total: data.length, data });
+  const where = { usuarioId };
+  if (estado) where.estado = estado;
+
+  const [{ count, rows }, conteoPorEstado] = await Promise.all([
+    Postulacion.findAndCountAll({
+      where,
+      include: [{
+        model: Oferta,
+        as: 'oferta',
+        include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial', 'logo', 'ciudad', 'rubro'] }],
+      }],
+      order: [['createdAt', 'DESC'], ['id', 'DESC']],
+      limit,
+      offset,
+    }),
+    groupCount(Postulacion, 'estado', { usuarioId }),
+  ]);
+
+  const data = rows.map(postulacionService.formatearPostulacion);
+  const pagination = buildPagination(count, { page, limit });
+  return res.json({ success: true, data, pagination, conteoPorEstado, total: pagination.total });
 };
 
 // ── Candidatos de una oferta (empresa) ───────────────────────────────────────
@@ -90,16 +104,27 @@ exports.getPostulacionesByOferta = async (req, res) => {
   const oferta = await Oferta.findOne({ where: { id: req.params.ofertaId, empresaId: empresa.id } });
   if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
 
-  const postulaciones = await Postulacion.findAll({
-    where: { ofertaId: oferta.id },
-    include: [{
-      model: Usuario,
-      as: 'usuario',
-      attributes: { exclude: ['password', 'tokenReset', 'tokenResetExpira'] },
-      include: [{ model: Perfil, as: 'perfil' }],
-    }],
-    order: [['createdAt', 'DESC']],
-  });
+  const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
+  const { estado } = req.query;
+
+  const where = { ofertaId: oferta.id };
+  if (estado) where.estado = estado;
+
+  const [{ count, rows: postulaciones }, conteoPorEstado] = await Promise.all([
+    Postulacion.findAndCountAll({
+      where,
+      include: [{
+        model: Usuario,
+        as: 'usuario',
+        attributes: { exclude: ['password', 'tokenReset', 'tokenResetExpira'] },
+        include: [{ model: Perfil, as: 'perfil' }],
+      }],
+      order: [['createdAt', 'DESC'], ['id', 'DESC']],
+      limit,
+      offset,
+    }),
+    groupCount(Postulacion, 'estado', { ofertaId: oferta.id }),
+  ]);
 
   const data = postulaciones.map((p) => {
     const plain = p.toJSON();
@@ -122,11 +147,14 @@ exports.getPostulacionesByOferta = async (req, res) => {
     };
   });
 
+  const pagination = buildPagination(count, { page, limit });
   return res.json({
     success: true,
-    total: data.length,
-    oferta: { id: oferta.id, titulo: oferta.titulo, habilidadesRequeridas: oferta.habilidadesRequeridas },
     data,
+    pagination,
+    conteoPorEstado,
+    total: pagination.total,
+    oferta: { id: oferta.id, titulo: oferta.titulo, habilidadesRequeridas: oferta.habilidadesRequeridas },
   });
 };
 

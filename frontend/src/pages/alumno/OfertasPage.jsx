@@ -13,7 +13,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ofertaService } from '../../services/api';
+import Paginacion from '../../components/Paginacion/Paginacion';
 import styles from './OfertasPage.module.css';
+
+const FILTROS_VACIOS = { q: '', area: '', modalidad: '', ciudad: '', tipoPuesto: '' };
+const LIMITE = 12;
 
 const TIPO_PUESTO_LABEL = { pasante: '🎓 Pasante', trainee: '🌱 Trainee', junior: '💼 Junior' };
 
@@ -72,57 +76,61 @@ export default function OfertasPage() {
   const [loading, setLoading]       = useState(true);
   const [loadingRec, setLoadingRec] = useState(false);
   const [recCargadas, setRecCargadas] = useState(false);
-  const [filtros, setFiltros]       = useState({
-    q: '', area: '', modalidad: '', ciudad: '', tipoPuesto: '',
-  });
+  const [filtros, setFiltros]       = useState(FILTROS_VACIOS);
+  const [pagTodas, setPagTodas]     = useState(null);
+  const [pagRec, setPagRec]         = useState(null);
 
-  // Carga todas las ofertas (con filtros)
-  const cargarOfertas = useCallback(async () => {
+  // Carga todas las ofertas (con filtros). `filtrosArg` explícito para poder
+  // limpiar sin esperar al re-render del state.
+  const cargarOfertas = useCallback(async (pagina = 1, filtrosArg = filtros) => {
     setLoading(true);
     try {
-      const { data } = await ofertaService.getAll(filtros);
+      const { data } = await ofertaService.getAll({ ...filtrosArg, page: pagina, limit: LIMITE });
       setOfertas(data.data ?? []);
+      setPagTodas(data.pagination ?? null);
     } catch {
       setOfertas([]);
+      setPagTodas(null);
     } finally {
       setLoading(false);
     }
   }, [filtros]);
 
-  // Carga ofertas recomendadas (lazy: solo al hacer click)
-  const cargarRecomendadas = async () => {
-    if (recCargadas) return;
+  // Carga ofertas recomendadas (lazy: solo al entrar a la tab)
+  const cargarRecomendadas = useCallback(async (pagina = 1) => {
     setLoadingRec(true);
     try {
-      const { data } = await ofertaService.getRecomendadas();
+      const { data } = await ofertaService.getRecomendadas({ page: pagina, limit: LIMITE });
       setRecomendadas(data.data ?? []);
+      setPagRec(data.pagination ?? null);
       setRecCargadas(true);
     } catch {
       setRecomendadas([]);
+      setPagRec(null);
       setRecCargadas(true);
     } finally {
       setLoadingRec(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { cargarOfertas(); }, []);
+  useEffect(() => { cargarOfertas(1); }, []);
 
   const handleFiltro  = (e) => setFiltros({ ...filtros, [e.target.name]: e.target.value });
-  const handleBuscar  = (e) => { e.preventDefault(); cargarOfertas(); };
+  const handleBuscar  = (e) => { e.preventDefault(); cargarOfertas(1); };
   const handleLimpiar = () => {
-    setFiltros({ q: '', area: '', modalidad: '', ciudad: '', tipoPuesto: '' });
-    setOfertas([]);
-    setLoading(true);
-    ofertaService.getAll({}).then(({ data }) => setOfertas(data.data ?? [])).finally(() => setLoading(false));
+    setFiltros(FILTROS_VACIOS);
+    cargarOfertas(1, FILTROS_VACIOS);
   };
 
   const handleTabRecomendadas = () => {
     setModo('recomendadas');
-    cargarRecomendadas();
+    if (!recCargadas) cargarRecomendadas(1);
   };
 
   const listaActual = modo === 'recomendadas' ? recomendadas : ofertas;
   const cargandoActual = modo === 'recomendadas' ? loadingRec : loading;
+  const pagActual = modo === 'recomendadas' ? pagRec : pagTodas;
+  const onPageActual = modo === 'recomendadas' ? cargarRecomendadas : cargarOfertas;
 
   return (
     <div className="page-container">
@@ -140,14 +148,14 @@ export default function OfertasPage() {
           onClick={() => setModo('todas')}
         >
           🏢 Todas las ofertas
-          {!loading && <span className={styles.tabCount}>{ofertas.length}</span>}
+          {!loading && pagTodas && <span className={styles.tabCount}>{pagTodas.total}</span>}
         </button>
         <button
           className={`${styles.tab} ${modo === 'recomendadas' ? styles.tabActive : ''}`}
           onClick={handleTabRecomendadas}
         >
           ⭐ Recomendadas para vos
-          {recCargadas && <span className={styles.tabCount}>{recomendadas.length}</span>}
+          {recCargadas && pagRec && <span className={styles.tabCount}>{pagRec.total}</span>}
         </button>
       </div>
 
@@ -228,7 +236,7 @@ export default function OfertasPage() {
       ) : (
         <>
           <p className={styles.resultCount}>
-            {listaActual.length} oferta{listaActual.length !== 1 ? 's' : ''}
+            {(pagActual?.total ?? listaActual.length)} oferta{(pagActual?.total ?? listaActual.length) !== 1 ? 's' : ''}
             {modo === 'recomendadas' ? ' recomendadas' : ' encontradas'}
           </p>
           <div className="ofertas-grid">
@@ -236,6 +244,7 @@ export default function OfertasPage() {
               <OfertaCard key={oferta.id} oferta={oferta} />
             ))}
           </div>
+          <Paginacion pagination={pagActual} onPageChange={onPageActual} />
         </>
       )}
     </div>
