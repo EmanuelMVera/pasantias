@@ -13,21 +13,18 @@
  * empresas ingresan vía /api/solicitudes-empresa con aprobación del admin.
  */
 
-const { Usuario, ActivityLog } = require('../models');
+const { Usuario } = require('../models');
 const authService = require('../services/auth.service');
 const HttpError = require('../utils/httpError');
 const { cookieOptionsToken } = require('../utils/cookies');
+const { registrarAuditoria } = require('../utils/auditLog');
+const logger = require('../utils/logger');
 
 // Opciones para borrar la cookie (mismas que al setearla salvo maxAge).
 const cookieClearOptions = () => {
   const { maxAge, ...rest } = cookieOptionsToken();
   return rest;
 };
-
-// Helper para registrar acciones en el log sin interrumpir el flujo principal
-async function logAction(datos) {
-  try { await ActivityLog.create(datos); } catch (e) { /* Fallo silencioso */ }
-}
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 /**
@@ -58,16 +55,16 @@ exports.login = async (req, res) => {
 
   // Actualiza ultimoAcceso de forma no bloqueante (fire-and-forget)
   usuario.update({ ultimoAcceso: new Date() }).catch((err) =>
-    console.error('⚠️  No se pudo actualizar ultimoAcceso:', err.message)
+    (req.log || logger).warn({ err }, 'ultimoAcceso_no_actualizado')
   );
 
-  logAction({
+  registrarAuditoria({
+    req,
     usuarioId: usuario.id,
     accion: 'login',
     entidad: 'usuario',
     entidadId: usuario.id,
     detalle: { rol: usuario.rol, email: usuario.email },
-    ip: req.ip,
   });
 
   return res.json({
@@ -130,7 +127,7 @@ exports.forgotPassword = async (req, res) => {
   // facilitar pruebas locales. En producción NUNCA se devuelve ni se loguea
   // (SEC-02): filtraría tokens de reset si faltara EMAIL_USER.
   if (process.env.NODE_ENV !== 'production' && !process.env.EMAIL_USER) {
-    console.log(`\n🔑 TOKEN DE RECUPERO para ${email}:\n   ${token}\n`);
+    (req.log || logger).debug({ email }, `token de recupero (dev): ${token}`);
     return res.json({
       success: true,
       message: 'Token generado (modo desarrollo — email no configurado).',

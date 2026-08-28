@@ -4,15 +4,13 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const {
   Usuario, Empresa, EmpresaUsuario, SolicitudReclutador,
-  ActivityLog, sequelize,
+  sequelize,
 } = require('../models');
 const HttpError = require('../utils/httpError');
 const { enviarEmail } = require('../utils/mailer');
 const { crearNotificacion } = require('../utils/notificador');
-
-async function logAction(datos) {
-  try { await ActivityLog.create(datos); } catch (e) { console.warn('[ActivityLog]', e.message); }
-}
+const { registrarAuditoria } = require('../utils/auditLog');
+const logger = require('../utils/logger');
 
 /**
  * Aprueba una solicitud de reclutador:
@@ -24,7 +22,7 @@ async function logAction(datos) {
  *
  * @returns {{ usuarioId, email, passwordGenerada }}
  */
-async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip }) {
+async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }) {
   const t = await sequelize.transaction();
   try {
     const solicitud = await SolicitudReclutador.findByPk(solicitudId, {
@@ -71,13 +69,14 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip }) {
     await solicitud.update({ estado: 'aprobado' }, { transaction: t });
     await t.commit();
 
-    await logAction({
+    await registrarAuditoria({
       usuarioId: adminUsuarioId,
+      ip,
+      requestId,
       accion:    'aprobar_solicitud_reclutador',
       entidad:   'solicitud_reclutador',
       entidadId: solicitud.id,
       detalle:   { email: solicitud.email, empresaId: solicitud.empresaId },
-      ip,
     });
 
     // Notificación in-app al admin_empresa
@@ -91,7 +90,7 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip }) {
         tipoVisual: 'success',
         enlace: '/empresa/equipo',
         accionURL: '/empresa/equipo',
-      }).catch((e) => console.error('[Admin] Error notif aprobación reclutador:', e.message));
+      }).catch((e) => logger.error({ err: e }, 'notif_aprobacion_reclutador_fallo'));
     }
 
     const loginUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/login`;
@@ -111,7 +110,7 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip }) {
         <p style="color:#c0392b;font-size:0.88rem">⚠️ Cambiá tu contraseña al ingresar por primera vez.</p>
         <a href="${loginUrl}" style="display:inline-block;margin-top:1rem;background:#0073AD;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold">Ingresar al sistema</a>
       </div>`,
-    }).catch((e) => console.error('[Admin] Email reclutador aprobado:', e.message));
+    }).catch((e) => logger.error({ err: e }, 'email_reclutador_aprobado_fallo'));
 
     // Email al propietario de la empresa
     if (empresaOwner) {
@@ -125,7 +124,7 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip }) {
             <p>La solicitud de reclutador para <strong>${solicitud.nombre}</strong> (${solicitud.email}) fue <strong>aprobada</strong>.</p>
             <p>El reclutador ya puede acceder al sistema con las credenciales enviadas a su email.</p>
           </div>`,
-        }).catch((e) => console.error('[Admin] Email notif empresa aprobado:', e.message));
+        }).catch((e) => logger.error({ err: e }, 'email_empresa_aprobado_fallo'));
       }
     }
 
@@ -140,7 +139,7 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip }) {
 /**
  * Rechaza una solicitud de reclutador, notifica in-app y por email al propietario.
  */
-async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip }, motivo) {
+async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }, motivo) {
   const solicitud = await SolicitudReclutador.findByPk(solicitudId, {
     include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'usuarioId'] }],
   });
@@ -151,13 +150,14 @@ async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip }, motivo) {
 
   await solicitud.update({ estado: 'rechazado', motivoRechazo: motivo || null });
 
-  await logAction({
+  await registrarAuditoria({
     usuarioId: adminUsuarioId,
+    ip,
+    requestId,
     accion:    'rechazar_solicitud_reclutador',
     entidad:   'solicitud_reclutador',
     entidadId: solicitud.id,
     detalle:   { email: solicitud.email, motivo },
-    ip,
   });
 
   const empresaOwner = solicitud.empresa?.usuarioId;
@@ -171,7 +171,7 @@ async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip }, motivo) {
       tipoVisual: 'error',
       enlace: '/empresa/equipo',
       accionURL: '/empresa/equipo',
-    }).catch((e) => console.error('[Admin] Error notif rechazo reclutador:', e.message));
+    }).catch((e) => logger.error({ err: e }, 'notif_rechazo_reclutador_fallo'));
 
     const propietario = await Usuario.findByPk(empresaOwner);
     if (propietario) {
@@ -184,7 +184,7 @@ async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip }, motivo) {
           ${motivo ? `<p><strong>Motivo:</strong> ${motivo}</p>` : ''}
           <p>Si tenés consultas, contactate con el equipo del instituto.</p>
         </div>`,
-      }).catch((e) => console.error('[Admin] Email notif empresa rechazado:', e.message));
+      }).catch((e) => logger.error({ err: e }, 'email_empresa_rechazado_fallo'));
     }
   }
 }

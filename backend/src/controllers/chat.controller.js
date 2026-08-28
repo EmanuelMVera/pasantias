@@ -4,6 +4,7 @@ const { Mensaje, Usuario } = require('../models');
 const { crearNotificacion } = require('../utils/notificador');
 const chatPermissionService = require('../services/chatPermission.service');
 const chatService           = require('../services/chat.service');
+const logger = require('../utils/logger');
 const { parsePagination } = require('../utils/pagination');
 
 // ── Buscar usuarios ───────────────────────────────────────────────────────────
@@ -74,7 +75,7 @@ exports.enviarMensaje = async (req, res) => {
       prioridad: 'normal',
       enlace: `/chat/${emisorId}`,
       accionURL: `/chat/${emisorId}`,
-    }).catch((err) => console.error('[Chat] Error al notificar mensaje:', err.message));
+    }).catch((err) => (req.log || logger).error({ err }, 'notif_mensaje_chat_fallo'));
   }
 
   return res.status(201).json({ success: true, message: 'Mensaje enviado.', data: nuevoMensaje });

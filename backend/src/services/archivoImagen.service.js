@@ -18,6 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const logger = require('../utils/logger');
 const multer = require('multer');
 const HttpError = require('../utils/httpError');
 const { Archivo } = require('../models');
@@ -102,7 +103,7 @@ async function procesarSubidaImagen({ req, tipo, valorAnterior }) {
     });
     archivoId = archivo.id;
   } catch (err) {
-    console.error('[ArchivoImagen] No se pudo registrar metadata:', err.message);
+    logger.error({ err }, 'archivo_imagen_metadata_no_registrada');
   }
 
   const base = (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');

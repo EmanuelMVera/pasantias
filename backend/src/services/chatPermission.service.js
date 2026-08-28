@@ -1,6 +1,7 @@
 'use strict';
 
 const { Usuario, Empresa, EmpresaUsuario } = require('../models');
+const logger = require('../utils/logger');
 
 /**
  * Devuelve un Set con todos los IDs de empresa a los que pertenece el usuario.
@@ -78,7 +79,7 @@ async function puedeChatear(emisorId, receptorId) {
 
     return { ok: false, motivo: 'Combinación de roles no válida para el chat.' };
   } catch (err) {
-    console.error('[Chat] Error en puedeChatear:', err.message);
+    logger.error({ err }, 'puedeChatear_fallo');
     return { ok: false, motivo: 'Error al verificar permisos de chat.' };
   }
 }

@@ -11,17 +11,10 @@
 
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
-const { Usuario, Perfil, Empresa, EmpresaUsuario, ActivityLog, ConfiguracionInstitucional } = require('../models');
+const { Usuario, Perfil, Empresa, EmpresaUsuario, ConfiguracionInstitucional } = require('../models');
 const HttpError = require('../utils/httpError');
 const { buildPagination } = require('../utils/pagination');
-
-async function logAction({ usuarioId, accion, entidad, entidadId, detalle, ip }) {
-  try {
-    await ActivityLog.create({ usuarioId, accion, entidad, entidadId, detalle, ip });
-  } catch (e) {
-    console.warn('[ActivityLog] Error al registrar acción:', e.message);
-  }
-}
+const { registrarAuditoria } = require('../utils/auditLog');
 
 async function listarUsuarios({ rol, activo, q, page = 1, limit = 25, offset = 0 }) {
   const where = {};
@@ -92,7 +85,7 @@ async function _validarLegajoNuevo(legajo) {
   return legajoNormalizado;
 }
 
-async function crearUsuario({ nombre, apellido, email, password, rol, telefono, ubicacion, legajo }, { actorUsuarioId, ip }) {
+async function crearUsuario({ nombre, apellido, email, password, rol, telefono, ubicacion, legajo }, { actorUsuarioId, ip, requestId }) {
   if (!nombre || !apellido || !email || !password || !rol) {
     throw new HttpError(400, 'Faltan campos obligatorios (nombre, apellido, email, password, rol).');
   }
@@ -122,20 +115,21 @@ async function crearUsuario({ nombre, apellido, email, password, rol, telefono, 
     await Perfil.create({ usuarioId: nuevo.id, legajo: legajoNormalizado });
   }
 
-  await logAction({
+  await registrarAuditoria({
     usuarioId: actorUsuarioId,
+    ip,
+    requestId,
     accion: 'crear_usuario',
     entidad: 'usuario',
     entidadId: nuevo.id,
     detalle: { nombre, apellido, email, rol },
-    ip,
   });
 
   const { password: _, ...data } = nuevo.toJSON();
   return data;
 }
 
-async function actualizarUsuario(id, body, { actorUsuarioId, ip }) {
+async function actualizarUsuario(id, body, { actorUsuarioId, ip, requestId }) {
   const usuario = await Usuario.findByPk(id);
   if (!usuario) throw new HttpError(404, 'Usuario no encontrado.');
 
@@ -180,20 +174,21 @@ async function actualizarUsuario(id, body, { actorUsuarioId, ip }) {
   }
 
   const accion = rol && rol !== antes.rol ? 'cambiar_rol' : 'editar_usuario';
-  await logAction({
+  await registrarAuditoria({
     usuarioId: actorUsuarioId,
+    ip,
+    requestId,
     accion,
     entidad: 'usuario',
     entidadId: usuario.id,
     detalle: { antes, despues: { rol: usuario.rol, activo: usuario.activo } },
-    ip,
   });
 
   const { password: _, tokenReset: __, tokenResetExpira: ___, ...data } = usuario.toJSON();
   return data;
 }
 
-async function eliminarUsuario(id, { actorUsuarioId, ip }) {
+async function eliminarUsuario(id, { actorUsuarioId, ip, requestId }) {
   if (String(id) === String(actorUsuarioId)) {
     throw new HttpError(403, 'No podés eliminar tu propia cuenta de administrador.');
   }
@@ -203,17 +198,18 @@ async function eliminarUsuario(id, { actorUsuarioId, ip }) {
 
   await usuario.update({ activo: false });
 
-  await logAction({
+  await registrarAuditoria({
     usuarioId: actorUsuarioId,
+    ip,
+    requestId,
     accion: 'eliminar_usuario',
     entidad: 'usuario',
     entidadId: usuario.id,
     detalle: { nombre: usuario.nombre, apellido: usuario.apellido, email: usuario.email, rol: usuario.rol },
-    ip,
   });
 }
 
-async function toggleUsuario(id, { actorUsuarioId, ip }) {
+async function toggleUsuario(id, { actorUsuarioId, ip, requestId }) {
   if (String(id) === String(actorUsuarioId)) {
     throw new HttpError(403, 'No podés cambiar el estado de tu propia cuenta de administrador.');
   }
@@ -223,13 +219,14 @@ async function toggleUsuario(id, { actorUsuarioId, ip }) {
 
   await usuario.update({ activo: !usuario.activo });
 
-  await logAction({
+  await registrarAuditoria({
     usuarioId: actorUsuarioId,
+    ip,
+    requestId,
     accion: 'toggle_usuario',
     entidad: 'usuario',
     entidadId: usuario.id,
     detalle: { nuevoEstado: usuario.activo },
-    ip,
   });
 
   return usuario;

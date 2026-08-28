@@ -105,6 +105,30 @@ Explicación simple:
 - Roles (admin, empresa, alumno, egresado) se controlan en `authorizeRoles`.
 - Ejemplo: `/api/auth/me` es ruta protegida y devuelve usuario si el token es válido.
 
+## 8b. Observabilidad y logs (OPS-01)
+
+El sistema tiene **dos tipos de log distintos, con propósitos distintos**:
+
+| | **Log de auditoría** (`activity_logs`) | **Log técnico** (stdout, JSON — `pino`) |
+|---|---|---|
+| Para qué | "quién hizo qué a qué" — negocio + seguridad | ciclo de vida de requests, errores, warnings de operación |
+| Quién lo lee | admins (panel `/admin/logs`), compliance | desarrolladores / ops |
+| Inmutable | sí (solo INSERT vía `utils/auditLog.js::registrarAuditoria`) | no (efímero; lo rota la plataforma/pm2) |
+| Datos personales | sí, por diseño (email/nombre — hace falta para auditar) | minimizados |
+| Secretos | **nunca** (`redactar()` scrub-ea `detalle`) | **nunca** (`redact` de pino) |
+| Retención | 12 meses → `npm run logs:archivar` → `backend/archive/*.jsonl.gz` | la de la plataforma (rotación de stdout) |
+| Correlación | columna `requestId` ↔ los logs técnicos del mismo request | `req.id` en cada línea; header `X-Request-Id` en request y respuesta |
+| Se escribe desde | `registrarAuditoria` (punto único) | `logger` / `req.log` en cualquier archivo |
+
+**Regla:** eventos de negocio/seguridad → `registrarAuditoria`. Todo lo demás → `logger`
+(`src/utils/logger.js`). Nunca meter ruido técnico en `activity_logs`, nunca auditar con `console`.
+
+- **Nivel de log**: env `LOG_LEVEL` (`debug|info|warn|error|fatal|silent`). Default: `debug` en
+  desarrollo (incluye el SQL de Sequelize), `info` en producción, `silent` en tests.
+- **Retención**: `npm run logs:archivar` (dry-run) / `npm run logs:archivar -- --apply`.
+  Archiva a `.jsonl.gz` y verifica antes de borrar. Env `ACTIVITY_LOG_RETENTION_DAYS` (default 365).
+  A escala real, el siguiente paso es particionar `activity_logs` por mes.
+
 ## 9. Cómo explicarlo en una exposición
 - "El backend es la parte que corre en el servidor: recibe pedidos del frontend, consulta la base de datos y devuelve respuestas.
 - Tiene rutas en `src/routes`, lógica en `src/controllers`, y datos en `src/models`.

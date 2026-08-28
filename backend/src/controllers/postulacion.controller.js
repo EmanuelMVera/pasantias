@@ -1,16 +1,13 @@
 'use strict';
 
-const { Postulacion, Oferta, Usuario, Perfil, Empresa, Archivo, PostulacionHistorialEstado, ActivityLog } = require('../models');
+const { Postulacion, Oferta, Usuario, Perfil, Empresa, Archivo, PostulacionHistorialEstado } = require('../models');
 const { crearNotificacion } = require('../utils/notificador');
 const postulacionService = require('../services/postulacion.service');
 const empresaService     = require('../services/empresa.service');
 const { parsePagination, buildPagination, groupCount } = require('../utils/pagination');
+const { registrarAuditoria } = require('../utils/auditLog');
 
 const _resolverEmpresa = empresaService.resolverEmpresaDelRequest;
-
-async function logAction(datos) {
-  try { await ActivityLog.create(datos); } catch (e) { /* fallo silencioso */ }
-}
 
 // ── Postularse ────────────────────────────────────────────────────────────────
 
@@ -49,13 +46,13 @@ exports.postular = async (req, res) => {
     accionURL: `/empresa/postulantes/${ofertaId}`,
   });
 
-  logAction({
+  registrarAuditoria({
+    req,
     usuarioId,
     accion: 'postular',
     entidad: 'postulacion',
     entidadId: postulacion.id,
     detalle: { ofertaId, ofertaTitulo: oferta.titulo, empresa: oferta.empresa?.razonSocial },
-    ip: req.ip,
   });
 
   return res.status(201).json({
@@ -208,13 +205,12 @@ exports.updateEstado = async (req, res) => {
       accionURL: '/mis-postulaciones',
     });
 
-    logAction({
-      usuarioId: req.usuario.id,
+    registrarAuditoria({
+      req,
       accion: 'cambiar_estado_postulacion',
       entidad: 'postulacion',
       entidadId: postulacion.id,
       detalle: { nuevoEstado: estado, oferta: postulacion.oferta?.titulo },
-      ip: req.ip,
     });
   }
 

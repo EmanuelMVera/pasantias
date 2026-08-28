@@ -1,5 +1,6 @@
 const HttpError = require('../utils/httpError');
 const multer = require('multer');
+const logger = require('../utils/logger');
 
 /**
  * error.middleware.js — REF-ERR-01.
@@ -13,8 +14,9 @@ const multer = require('multer');
  *   lanza como HttpError desde el fileFilter): 400 con mensaje claro, nunca
  *   500 — un archivo demasiado grande es un error esperable, no interno.
  * - Cualquier otro error: nunca se reenvía `err.message` ni el stack al
- *   cliente — solo un mensaje genérico fijo. El detalle real se loguea
- *   server-side con console.error(err.stack), sin cambios ahí.
+ *   cliente — solo un mensaje genérico fijo + el `requestId` para que el
+ *   usuario pueda citarlo a soporte. El detalle real (con stack) se loguea
+ *   server-side vía el logger técnico (OPS-01), correlacionado por requestId.
  */
 const errorMiddleware = (err, req, res, next) => {
   if (err instanceof HttpError) {
@@ -34,8 +36,8 @@ const errorMiddleware = (err, req, res, next) => {
     return res.status(400).json({ success: false, message: mensajes[err.code] || 'Error al procesar el archivo subido.' });
   }
 
-  console.error(err.stack);
-  return res.status(500).json({ success: false, message: 'Error interno del servidor.' });
+  (req.log || logger).error({ err, reqId: req.id }, 'unhandled_error');
+  return res.status(500).json({ success: false, message: 'Error interno del servidor.', requestId: req.id });
 };
 
 module.exports = errorMiddleware;

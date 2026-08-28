@@ -4,6 +4,7 @@ const { Oferta, Empresa, Perfil, Postulacion, Usuario } = require('../models');
 const { Op } = require('sequelize');
 const { crearNotificacion } = require('../utils/notificador');
 const { buildPagination } = require('../utils/pagination');
+const logger = require('../utils/logger');
 
 const TIPOS_PUESTO_VALIDOS = ['pasante', 'trainee', 'junior'];
 const CARRERAS_VALIDAS = require('../data/catalogos.json').carreras;
@@ -152,7 +153,7 @@ async function notificarAdminsNuevaOferta(oferta, empresa) {
       })
     ));
   } catch (e) {
-    console.error('[Oferta] Error notif admin moderación:', e.message);
+    logger.error({ err: e }, 'notif_admin_nueva_oferta_fallo');
   }
 }
 

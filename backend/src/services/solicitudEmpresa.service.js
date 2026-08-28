@@ -4,14 +4,12 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const {
   Usuario, Empresa, EmpresaUsuario, SolicitudEmpresa, SolicitudReclutador,
-  ActivityLog, sequelize,
+  sequelize,
 } = require('../models');
 const HttpError = require('../utils/httpError');
 const { enviarEmail } = require('../utils/mailer');
-
-async function logAction(datos) {
-  try { await ActivityLog.create(datos); } catch (e) { console.warn('[ActivityLog]', e.message); }
-}
+const { registrarAuditoria } = require('../utils/auditLog');
+const logger = require('../utils/logger');
 
 /**
  * Aprueba una solicitud de empresa:
@@ -22,7 +20,7 @@ async function logAction(datos) {
  *
  * @returns {{ empresaId, usuarioId, email, razonSocial, reclutadoresPendientes, passwordGenerada }}
  */
-async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip }) {
+async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }) {
   const solicitud = await SolicitudEmpresa.findByPk(solicitudId);
   if (!solicitud) throw new HttpError(404, 'Solicitud no encontrada.');
   if (solicitud.estado !== 'pendiente') {
@@ -115,13 +113,14 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip }) {
     throw err;
   }
 
-  await logAction({
+  await registrarAuditoria({
     usuarioId: adminUsuarioId,
+    ip,
+    requestId,
     accion:    'aprobar_solicitud_empresa',
     entidad:   'solicitud_empresa',
     entidadId: solicitud.id,
     detalle:   { razonSocial: solicitud.razonSocial, emailLogin: loginEmail, empresaId: nuevaEmpresa.id, reclutadoresCreados },
-    ip,
   });
 
   // Email con credenciales — fire-and-forget
@@ -155,7 +154,7 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip }) {
         <p style="margin-top:2rem;color:#888;font-size:0.82rem">SisPasantías – Portal Institucional de Empleo</p>
       </div>
     `,
-  }).catch((e) => console.error('[Admin] Error enviando email de aprobación:', e.message));
+  }).catch((e) => logger.error({ err: e }, 'email_aprobacion_solicitud_fallo'));
 
   return {
     empresaId: nuevaEmpresa.id,
@@ -170,7 +169,7 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip }) {
 /**
  * Rechaza una solicitud de empresa y notifica por email.
  */
-async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip }, motivo) {
+async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }, motivo) {
   const solicitud = await SolicitudEmpresa.findByPk(solicitudId);
   if (!solicitud) throw new HttpError(404, 'Solicitud no encontrada.');
   if (solicitud.estado !== 'pendiente') {
@@ -184,13 +183,14 @@ async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip }, motivo) {
     motivoRechazo: motivo || null,
   });
 
-  await logAction({
+  await registrarAuditoria({
     usuarioId: adminUsuarioId,
+    ip,
+    requestId,
     accion:    'rechazar_solicitud_empresa',
     entidad:   'solicitud_empresa',
     entidadId: solicitud.id,
     detalle:   { razonSocial: solicitud.razonSocial, email: solicitud.email, motivo },
-    ip,
   });
 
   enviarEmail({
@@ -208,7 +208,7 @@ async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip }, motivo) {
         <p style="margin-top:2rem;color:#888;font-size:0.82rem">SisPasantías – Portal Institucional de Empleo</p>
       </div>
     `,
-  }).catch((e) => console.error('[Admin] Error enviando email de rechazo:', e.message));
+  }).catch((e) => logger.error({ err: e }, 'email_rechazo_solicitud_fallo'));
 }
 
 module.exports = { aprobarSolicitud, rechazarSolicitud };

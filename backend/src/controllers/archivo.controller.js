@@ -3,6 +3,7 @@
 const fs = require('fs');
 const archivoService = require('../services/archivo.service');
 const { contentDisposition } = require('../utils/archivoNombre');
+const logger = require('../utils/logger');
 
 // Tipos que es seguro mostrar embebidos (inline). El resto se fuerza a descarga.
 const INLINE_OK = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
@@ -36,7 +37,7 @@ exports.descargar = async (req, res) => {
     if (error.statusCode) {
       return res.status(error.statusCode).json({ success: false, message: error.message });
     }
-    console.error('[GET /archivos/:id]', error);
+    (req.log || logger).error({ err: error }, 'descarga_archivo_fallo');
     return res.status(500).json({ success: false, message: 'Error al obtener el archivo.' });
   }
 };

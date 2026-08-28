@@ -73,25 +73,25 @@ exports.crearUsuario = async (req, res) => {
   const { nombre, apellido, email, password, rol, telefono, ubicacion, legajo } = req.body;
   const data = await adminUsuariosService.crearUsuario(
     { nombre, apellido, email, password, rol, telefono, ubicacion, legajo },
-    { actorUsuarioId: req.usuario.id, ip: req.ip }
+    { actorUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id }
   );
   return res.status(201).json({ success: true, message: 'Usuario creado.', data });
 };
 
 exports.actualizarUsuario = async (req, res) => {
   const data = await adminUsuariosService.actualizarUsuario(
-    req.params.id, req.body, { actorUsuarioId: req.usuario.id, ip: req.ip }
+    req.params.id, req.body, { actorUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id }
   );
   return res.json({ success: true, message: 'Usuario actualizado.', data });
 };
 
 exports.eliminarUsuario = async (req, res) => {
-  await adminUsuariosService.eliminarUsuario(req.params.id, { actorUsuarioId: req.usuario.id, ip: req.ip });
+  await adminUsuariosService.eliminarUsuario(req.params.id, { actorUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id });
   return res.json({ success: true, message: 'Usuario desactivado (soft delete).' });
 };
 
 exports.toggleUsuario = async (req, res) => {
-  const usuario = await adminUsuariosService.toggleUsuario(req.params.id, { actorUsuarioId: req.usuario.id, ip: req.ip });
+  const usuario = await adminUsuariosService.toggleUsuario(req.params.id, { actorUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id });
   return res.json({ success: true, message: `Usuario ${usuario.activo ? 'activado' : 'desactivado'}.` });
 };
 
@@ -103,12 +103,12 @@ exports.getEmpresasPendientes = async (req, res) => {
 };
 
 exports.aprobarEmpresa = async (req, res) => {
-  await adminModeracionService.aprobarEmpresa(req.params.id, { actorUsuarioId: req.usuario.id, ip: req.ip });
+  await adminModeracionService.aprobarEmpresa(req.params.id, { actorUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id });
   return res.json({ success: true, message: 'Empresa aprobada.' });
 };
 
 exports.rechazarEmpresa = async (req, res) => {
-  await adminModeracionService.rechazarEmpresa(req.params.id, req.body?.motivo, { actorUsuarioId: req.usuario.id, ip: req.ip });
+  await adminModeracionService.rechazarEmpresa(req.params.id, req.body?.motivo, { actorUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id });
   return res.json({ success: true, message: 'Empresa rechazada.' });
 };
 
@@ -128,7 +128,7 @@ exports.getOfertas = async (req, res) => {
 
 exports.moderarOferta = async (req, res) => {
   const { accion, estado } = await adminModeracionService.moderarOferta(
-    req.params.id, req.body, { actorUsuarioId: req.usuario.id, ip: req.ip }
+    req.params.id, req.body, { actorUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id }
   );
   const mensajeAccion = accion === 'aprobar' ? 'aprobada' : accion === 'pausar' ? 'pausada' : accion === 'rechazar' ? 'rechazada' : 'cerrada';
   return res.json({ success: true, message: `Oferta ${mensajeAccion}.`, data: { estado, moderada: true } });
@@ -156,7 +156,7 @@ exports.getSolicitudesEmpresa = async (req, res) => {
 exports.aprobarSolicitudEmpresa = async (req, res) => {
   const resultado = await solicitudEmpresaService.aprobarSolicitud(
     req.params.id,
-    { adminUsuarioId: req.usuario.id, ip: req.ip }
+    { adminUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id }
   );
   return res.json({
     success: true,
@@ -174,7 +174,7 @@ exports.aprobarSolicitudEmpresa = async (req, res) => {
 exports.rechazarSolicitudEmpresa = async (req, res) => {
   await solicitudEmpresaService.rechazarSolicitud(
     req.params.id,
-    { adminUsuarioId: req.usuario.id, ip: req.ip },
+    { adminUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id },
     req.body.motivo
   );
   return res.json({ success: true, message: 'Solicitud rechazada. Notificación enviada por email.' });
@@ -205,7 +205,7 @@ exports.getSolicitudesReclutador = async (req, res) => {
 exports.aprobarSolicitudReclutador = async (req, res) => {
   const resultado = await solicitudReclutadorService.aprobarSolicitud(
     req.params.id,
-    { adminUsuarioId: req.usuario.id, ip: req.ip }
+    { adminUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id }
   );
   return res.json({
     success: true,
@@ -221,7 +221,7 @@ exports.aprobarSolicitudReclutador = async (req, res) => {
 exports.rechazarSolicitudReclutador = async (req, res) => {
   await solicitudReclutadorService.rechazarSolicitud(
     req.params.id,
-    { adminUsuarioId: req.usuario.id, ip: req.ip },
+    { adminUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id },
     req.body.motivo
   );
   return res.json({ success: true, message: 'Solicitud rechazada. Notificación enviada a la empresa.' });

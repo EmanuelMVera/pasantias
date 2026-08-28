@@ -190,7 +190,8 @@ CREATE TABLE public.activity_logs (
     "entidadId" integer,
     detalle json,
     ip character varying(45),
-    "createdAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    "createdAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "requestId" character varying(36)
 );
 
 
@@ -1031,6 +1032,13 @@ ALTER TABLE ONLY public.usuarios
 
 
 --
+-- Name: idx_activity_logs_accion_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_activity_logs_accion_created ON public.activity_logs USING btree (accion, "createdAt" DESC);
+
+
+--
 -- Name: idx_activity_logs_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1042,6 +1050,13 @@ CREATE INDEX idx_activity_logs_created ON public.activity_logs USING btree ("cre
 --
 
 CREATE INDEX idx_activity_logs_entidad ON public.activity_logs USING btree (entidad, "entidadId");
+
+
+--
+-- Name: idx_activity_logs_request; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_activity_logs_request ON public.activity_logs USING btree ("requestId") WHERE ("requestId" IS NOT NULL);
 
 
 --

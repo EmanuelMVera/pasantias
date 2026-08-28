@@ -21,6 +21,7 @@
 
 const { Notificacion, Usuario } = require('../models');
 const { enviarEmail, htmlNotificacion } = require('./mailer');
+const logger = require('./logger');
 
 /**
  * Crea una notificación en la base de datos y envía un email al destinatario.
@@ -40,7 +41,7 @@ async function crearNotificacion(datos) {
 
   // 2. Enviar email de forma asíncrona (fire-and-forget — no bloquea la respuesta)
   _enviarEmailNotificacion(payload).catch((err) =>
-    console.error('[Notificador] Error enviando email:', err.message)
+    logger.error({ err }, 'notificacion_email_fallo')
   );
 
   return notif;
@@ -63,7 +64,7 @@ async function _enviarEmailNotificacion({ usuarioId, titulo, mensaje, enlace }) 
       html: htmlNotificacion({ titulo, mensaje, enlace }),
     });
   } catch (err) {
-    console.error('[Notificador] No se pudo enviar el email de notificación:', err.message);
+    logger.error({ err }, 'notificacion_email_no_enviado');
   }
 }
 

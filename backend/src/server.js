@@ -15,6 +15,7 @@
 require('dotenv').config();         // Carga las variables de entorno (.env)
 const app = require('./app');       // Importa la aplicación Express ya configurada
 const { sequelize } = require('./models'); // Importa la instancia de Sequelize
+const logger = require('./utils/logger');
 
 // Puerto donde escucha el servidor (por defecto 5000 si no está en .env)
 const PORT = process.env.PORT || 5000;
@@ -27,14 +28,14 @@ async function startServer() {
   try {
     // Verifica que la conexión con PostgreSQL esté funcionando
     await sequelize.authenticate();
-    console.log('✅ Conexión a PostgreSQL establecida.');
+    logger.info('Conexión a PostgreSQL establecida');
 
     // Inicia el servidor HTTP en el puerto definido
     app.listen(PORT, () => {
-      console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+      logger.info({ port: PORT }, `Servidor escuchando en http://localhost:${PORT}`);
     });
   } catch (error) {
-    console.error('❌ Error al iniciar el servidor:', error);
+    logger.fatal({ err: error }, 'No se pudo iniciar el servidor');
     process.exit(1); // Sale con código de error si algo falla
   }
 }

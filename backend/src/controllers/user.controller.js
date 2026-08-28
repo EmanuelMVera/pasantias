@@ -4,6 +4,7 @@ const { Perfil, Usuario, Archivo } = require('../models');
 const HttpError = require('../utils/httpError');
 const { firmaCoincide, sanitizarNombreOriginal } = require('../utils/archivoNombre');
 const { procesarSubidaImagen } = require('../services/archivoImagen.service');
+const logger = require('../utils/logger');
 
 /**
  * SEC-02: verifica que el CONTENIDO del archivo coincida con el mimetype que
@@ -41,7 +42,7 @@ async function registrarArchivo(req, tipo, buffer) {
     });
     return archivo.id;
   } catch (err) {
-    console.error('[Archivo] No se pudo registrar metadata:', err.message);
+    logger.error({ err }, 'archivo_metadata_no_registrada');
     return null;
   }
 }

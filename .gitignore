@@ -20,6 +20,8 @@ backend/uploads/
 
 # ── Logs ───────────────────────────────────────────────────────────────────────
 *.log
+# Archivos de retención de activity_logs (OPS-01)
+backend/archive/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

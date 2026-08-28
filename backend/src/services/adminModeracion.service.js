@@ -14,18 +14,12 @@
  * decisión 2).
  */
 
-const { Empresa, Usuario, Oferta, ActivityLog } = require('../models');
+const { Empresa, Usuario, Oferta } = require('../models');
 const { crearNotificacion } = require('../utils/notificador');
 const HttpError = require('../utils/httpError');
 const { buildPagination } = require('../utils/pagination');
-
-async function logAction({ usuarioId, accion, entidad, entidadId, detalle, ip }) {
-  try {
-    await ActivityLog.create({ usuarioId, accion, entidad, entidadId, detalle, ip });
-  } catch (e) {
-    console.warn('[ActivityLog] Error al registrar acción:', e.message);
-  }
-}
+const { registrarAuditoria } = require('../utils/auditLog');
+const logger = require('../utils/logger');
 
 // ── Empresas (aprobación directa) ──────────────────────────────────────────────
 
@@ -36,7 +30,7 @@ async function listarEmpresasPendientes() {
   });
 }
 
-async function aprobarEmpresa(id, { actorUsuarioId, ip }) {
+async function aprobarEmpresa(id, { actorUsuarioId, ip, requestId }) {
   const empresa = await Empresa.findByPk(id);
   if (!empresa) throw new HttpError(404, 'Empresa no encontrada.');
 
@@ -46,10 +40,10 @@ async function aprobarEmpresa(id, { actorUsuarioId, ip }) {
     aprobadaEn: new Date(),
   });
   await Usuario.update({ habilitado: true }, { where: { id: empresa.usuarioId } });
-  await logAction({ usuarioId: actorUsuarioId, accion: 'aprobar_empresa', entidad: 'empresa', entidadId: empresa.id, detalle: { razonSocial: empresa.razonSocial }, ip });
+  await registrarAuditoria({ usuarioId: actorUsuarioId, ip, requestId, accion: 'aprobar_empresa', entidad: 'empresa', entidadId: empresa.id, detalle: { razonSocial: empresa.razonSocial } });
 }
 
-async function rechazarEmpresa(id, motivo, { actorUsuarioId, ip }) {
+async function rechazarEmpresa(id, motivo, { actorUsuarioId, ip, requestId }) {
   const empresa = await Empresa.findByPk(id);
   if (!empresa) throw new HttpError(404, 'Empresa no encontrada.');
 
@@ -57,7 +51,7 @@ async function rechazarEmpresa(id, motivo, { actorUsuarioId, ip }) {
     estadoAprobacion: 'rechazada',
     motivoRechazo: motivo || null,
   });
-  await logAction({ usuarioId: actorUsuarioId, accion: 'rechazar_empresa', entidad: 'empresa', entidadId: empresa.id, detalle: { razonSocial: empresa.razonSocial }, ip });
+  await registrarAuditoria({ usuarioId: actorUsuarioId, ip, requestId, accion: 'rechazar_empresa', entidad: 'empresa', entidadId: empresa.id, detalle: { razonSocial: empresa.razonSocial } });
 }
 
 // ── Moderación de ofertas ───────────────────────────────────────────────────────
@@ -99,7 +93,7 @@ const NOTIF_POR_ACCION = {
   cerrar:   { titulo: '🔒 Tu oferta fue cerrada',   mensaje: (titulo) => `La oferta "${titulo}" fue cerrada por el administrador.`,           tipoVisual: 'info'    },
 };
 
-async function moderarOferta(id, body, { actorUsuarioId, ip }) {
+async function moderarOferta(id, body, { actorUsuarioId, ip, requestId }) {
   const oferta = await Oferta.findByPk(id);
   if (!oferta) throw new HttpError(404, 'Oferta no encontrada.');
 
@@ -116,13 +110,14 @@ async function moderarOferta(id, body, { actorUsuarioId, ip }) {
   const nuevoEstado = ESTADO_POR_ACCION[accion];
   await oferta.update({ moderada: true, estado: nuevoEstado });
 
-  await logAction({
+  await registrarAuditoria({
     usuarioId: actorUsuarioId,
+    ip,
+    requestId,
     accion: `${accion}_oferta`,
     entidad: 'oferta',
     entidadId: oferta.id,
     detalle: { titulo: oferta.titulo, nuevoEstado },
-    ip,
   });
 
   // Notificar a la empresa según la acción
@@ -140,7 +135,7 @@ async function moderarOferta(id, body, { actorUsuarioId, ip }) {
         accionURL: '/empresa',
       });
     }
-  } catch (e) { console.error('[Admin] Error notif moderación oferta:', e.message); }
+  } catch (e) { logger.error({ err: e }, 'notif_moderacion_oferta_fallo'); }
 
   return { accion, estado: nuevoEstado };
 }

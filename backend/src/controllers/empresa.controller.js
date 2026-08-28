@@ -1,10 +1,11 @@
 'use strict';
 
-const { Empresa, Oferta, ActivityLog } = require('../models');
+const { Empresa, Oferta } = require('../models');
 const empresaService = require('../services/empresa.service');
 const equipoService  = require('../services/empresaEquipo.service');
 const { parsePagination } = require('../utils/pagination');
 const { procesarSubidaImagen } = require('../services/archivoImagen.service');
+const { registrarAuditoria } = require('../utils/auditLog');
 
 // SEC-03: `logo` NO se edita por texto libre — se sube por
 // POST /api/empresas/mi-empresa/logo (multipart, validado).
@@ -15,11 +16,6 @@ const CAMPOS_EDITABLES_EMPRESA = [
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const _resolverEmpresa = empresaService.resolverEmpresaDelRequest;
-
-// Auditoría best-effort: nunca debe interrumpir el flujo principal si falla.
-async function logAction(datos) {
-  try { await ActivityLog.create(datos); } catch (e) { console.warn('[ActivityLog]', e.message); }
-}
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
@@ -125,13 +121,12 @@ exports.enviarRecuperacionMiembro = async (req, res) => {
   const { email, usuarioId } = await equipoService.solicitarRecuperacionAcceso(empresa, req.params.id);
 
   // Auditoría: nunca se registra password ni token, solo a quién se le envió.
-  logAction({
-    usuarioId: req.usuario.id,
+  registrarAuditoria({
+    req,
     accion: 'solicitar_recuperacion_miembro',
     entidad: 'usuario',
     entidadId: usuarioId,
     detalle: { miembroId: req.params.id, empresaId: empresa.id, emailDestino: email },
-    ip: req.ip,
   });
 
   return res.json({ success: true, message: `Le enviamos un email a ${email} para que establezca su contraseña.` });

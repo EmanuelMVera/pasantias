@@ -17,6 +17,7 @@
 'use strict';
 
 const nodemailer = require('nodemailer');
+const logger = require('./logger');
 
 // Transporter reutilizable (lazy init)
 let _transporter = null;
@@ -43,7 +44,7 @@ function getTransporter() {
 async function enviarEmail({ to, subject, html }) {
   try {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.log(`[Mailer DEV] Para: ${to} | Asunto: ${subject}`);
+      logger.info({ to, subject }, 'email_dev_no_enviado');
       return;
     }
     const transporter = getTransporter();
@@ -54,7 +55,7 @@ async function enviarEmail({ to, subject, html }) {
       html,
     });
   } catch (err) {
-    console.error(`[Mailer] Error al enviar email a ${to}:`, err.message);
+    logger.error({ err, to }, 'email_envio_fallo');
   }
 }
 

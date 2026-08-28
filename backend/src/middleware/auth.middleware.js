@@ -16,6 +16,7 @@
 const jwt = require('jsonwebtoken');
 const { Usuario } = require('../models');
 const { parseCookies } = require('../utils/cookies');
+const logger = require('../utils/logger');
 
 /**
  * Middleware: verifica que el token JWT del header Authorization sea válido.
@@ -62,7 +63,7 @@ const verifyToken = async (req, res, next) => {
     // Actualiza la fecha de último acceso de forma no bloqueante.
     // El catch silencioso evita que un error de DB interrumpa la request del usuario.
     usuario.update({ ultimoAcceso: new Date() }).catch((err) =>
-      console.error('⚠️  No se pudo actualizar ultimoAcceso:', err.message)
+      (req.log || logger).warn({ err }, 'ultimoAcceso_no_actualizado')
     );
 
     // Adjunta el usuario al request para que los controllers lo puedan usar

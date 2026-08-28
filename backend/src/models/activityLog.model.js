@@ -78,6 +78,12 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING(45), // Hasta 45 chars para soportar IPv6
       allowNull: true,
     },
+    // OPS-01: id del request (X-Request-Id / req.id) que originó esta acción —
+    // permite cruzar esta entrada de auditoría con los logs técnicos.
+    requestId: {
+      type: DataTypes.STRING(36),
+      allowNull: true,
+    },
   }, {
     tableName: 'activity_logs',
     timestamps: true,

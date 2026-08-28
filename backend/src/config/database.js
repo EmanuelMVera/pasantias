@@ -1,5 +1,6 @@
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
+const logger = require('../utils/logger');
 
 const sequelize = new Sequelize(
   process.env.DB_NAME,
@@ -9,7 +10,11 @@ const sequelize = new Sequelize(
     host: process.env.DB_HOST,
     port: process.env.DB_PORT || 5432,
     dialect: 'postgres',
-    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    // OPS-01: el SQL solo se logea con LOG_LEVEL=debug (evita construir el
+    // string en prod). Va por el logger técnico, no a console.
+    logging: process.env.LOG_LEVEL === 'debug'
+      ? (sql) => logger.debug({ sql }, 'sequelize')
+      : false,
     pool: {
       max: 10,
       min: 0,

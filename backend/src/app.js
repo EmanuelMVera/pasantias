@@ -12,9 +12,13 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const crypto = require('crypto');
+const pinoHttp = require('pino-http');
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
+
+const logger = require('./utils/logger');
 
 // Asegura que existan las carpetas de uploads antes de montar el estático o
 // de que multer intente escribir en ellas (en un clone nuevo no existen,
@@ -36,6 +40,29 @@ const isProd = process.env.NODE_ENV === 'production';
 if (process.env.TRUST_PROXY) {
   app.set('trust proxy', Number(process.env.TRUST_PROXY) || 1);
 }
+
+// ── Logging técnico + request id (OPS-01) ─────────────────────────────────────
+// Va PRIMERO: así todo request (incluidos 429, CORS rechazado, estáticos) tiene
+// `req.id`, queda logeado, y devuelve el header X-Request-Id.
+app.use(pinoHttp({
+  logger,
+  genReqId: (req, res) => {
+    const entrante = req.headers['x-request-id'];
+    const id = (typeof entrante === 'string' && /^[\w-]{8,64}$/.test(entrante))
+      ? entrante
+      : crypto.randomUUID();
+    res.setHeader('X-Request-Id', id);
+    return id;
+  },
+  autoLogging: { ignore: (req) => req.url === '/api/health' },
+  customLogLevel: (req, res, err) =>
+    (err || res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info'),
+  customSuccessMessage: (req, res) => `${req.method} ${req.url} → ${res.statusCode}`,
+  serializers: {
+    req: (req) => ({ id: req.id, method: req.method, url: req.url }),
+    res: (res) => ({ statusCode: res.statusCode }),
+  },
+}));
 
 // ── Security headers (SEC-02) ─────────────────────────────────────────────────
 app.use(helmet({

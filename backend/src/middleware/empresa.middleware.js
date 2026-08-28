@@ -43,6 +43,7 @@
 'use strict';
 
 const { Empresa, EmpresaUsuario } = require('../models');
+const logger = require('../utils/logger');
 
 /**
  * Middleware: resuelve la empresa del usuario autenticado y la adjunta al request.
@@ -95,7 +96,7 @@ const verifyEmpresaMember = async (req, res, next) => {
     req.miembroEmpresa = membresia;
     return next();
   } catch (error) {
-    console.error('Error en verifyEmpresaMember:', error);
+    (req.log || logger).error({ err: error }, 'verifyEmpresaMember_fallo');
     return res.status(500).json({ success: false, message: 'Error al verificar membresía.' });
   }
 };
