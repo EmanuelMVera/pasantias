@@ -12,9 +12,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { empresaService } from '../../services/api';
 import Avatar from '../../components/Avatar/Avatar';
+import { getEstadoInfo } from '../../constants/postulacionEstados';
 
-// EST-08: el backend consolidó los pares legacy/alias
-// (entrevista_programada→entrevista, no_seleccionado→rechazado).
+// Labels en plural para las tabs de filtro — los `value` son los estados
+// canónicos de constants/postulacionEstados.js (fuente de color/label/emoji).
 const ESTADOS_TABS = [
   { value: '',             label: 'Todos' },
   { value: 'en_revision',  label: 'En revisión' },
@@ -28,12 +29,6 @@ function formatFecha(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
-
-const ESTADO_COLORS = {
-  en_revision: '#64748b', preseleccionado: '#2563eb',
-  entrevista: '#7c3aed',
-  contratado: '#16a34a', rechazado: '#dc2626',
-};
 
 export default function CandidatosEmpresaPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -146,14 +141,19 @@ export default function CandidatosEmpresaPage() {
                     {p.oferta?.area && <small style={{ display: 'block', color: 'var(--text-muted)' }}>{p.oferta.area}</small>}
                   </td>
                   <td>
-                    <span style={{
-                      padding: '2px 8px', borderRadius: 99, fontSize: '0.8rem',
-                      background: (ESTADO_COLORS[p.estado] ?? '#64748b') + '22',
-                      color: ESTADO_COLORS[p.estado] ?? '#64748b',
-                      fontWeight: 600,
-                    }}>
-                      {p.estado?.replace(/_/g, ' ')}
-                    </span>
+                    {(() => {
+                      const info = getEstadoInfo(p.estado);
+                      return (
+                        <span style={{
+                          padding: '2px 8px', borderRadius: 99, fontSize: '0.8rem',
+                          background: info.color + '22',
+                          color: info.color,
+                          fontWeight: 600,
+                        }}>
+                          {info.emoji} {info.label}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td style={{ fontSize: '0.85rem' }}>{formatFecha(p.updatedAt)}</td>
                   <td>

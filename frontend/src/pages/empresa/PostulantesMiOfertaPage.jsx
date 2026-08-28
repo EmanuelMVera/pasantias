@@ -14,29 +14,8 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { postulacionService, abrirArchivoPrivado } from '../../services/api';
 import Avatar from '../../components/Avatar/Avatar';
+import { LISTA_ESTADOS_POSTULACION, ESTADOS_HABILITAN_CHAT, getEstadoInfo, normalizarEstado } from '../../constants/postulacionEstados';
 import styles from './PostulantesMiOfertaPage.module.css';
-
-/* ── Configuración de estados ────────────────────────────────────────────────── */
-// EST-08: el backend consolidó los pares legacy/alias
-// (entrevista_programada→entrevista, no_seleccionado→rechazado).
-const ESTADO_MAP = {
-  en_revision:     { label: 'En revisión',     emoji: '📥', color: '#64748b', bg: '#f1f5f9' },
-  preseleccionado: { label: 'Preseleccionado', emoji: '⭐', color: '#2563eb', bg: '#eff6ff' },
-  entrevista:      { label: 'Entrevista',      emoji: '🎙️', color: '#7c3aed', bg: '#f5f3ff' },
-  contratado:      { label: 'Contratado',      emoji: '🎉', color: '#16a34a', bg: '#f0fdf4' },
-  rechazado:       { label: 'No seleccionado', emoji: '✕',  color: '#dc2626', bg: '#fef2f2' },
-};
-
-const ESTADOS_CANONICOS = [
-  { estado: 'en_revision',     aliases: [], label: 'En revisión',    emoji: '📥', color: '#64748b', bg: '#f1f5f9' },
-  { estado: 'preseleccionado', aliases: [], label: 'Preseleccionado',emoji: '⭐', color: '#2563eb', bg: '#eff6ff' },
-  { estado: 'entrevista',      aliases: [], label: 'Entrevista',     emoji: '🎙️', color: '#7c3aed', bg: '#f5f3ff' },
-  { estado: 'contratado',      aliases: [], label: 'Contratado',     emoji: '🎉', color: '#16a34a', bg: '#f0fdf4' },
-  { estado: 'rechazado',       aliases: [], label: 'No seleccionado',emoji: '✕',  color: '#dc2626', bg: '#fef2f2' },
-];
-
-// Estados que habilitan el botón de contacto/chat con el candidato
-const ESTADOS_CHAT_EMPRESA = ['preseleccionado', 'entrevista', 'contratado'];
 
 function formatFecha(iso) {
   if (!iso) return '';
@@ -97,8 +76,8 @@ export default function PostulantesMiOfertaPage() {
     setPostulaciones(prev => prev.map(p => p.id === id ? { ...p, estado: nuevoEstado } : p));
     try {
       await postulacionService.updateEstado(id, nuevoEstado);
-      const e = ESTADO_MAP[nuevoEstado];
-      showToast(`${e?.emoji ?? ''} Candidato movido a "${e?.label ?? nuevoEstado}"`);
+      const e = getEstadoInfo(nuevoEstado);
+      showToast(`${e.emoji} Candidato movido a "${e.label}"`);
     } catch {
       showToast('✗ Error al cambiar el estado.');
     }
@@ -173,11 +152,9 @@ export default function PostulantesMiOfertaPage() {
               >
                 Todos ({total})
               </button>
-              {ESTADOS_CANONICOS.map(e => {
+              {LISTA_ESTADOS_POSTULACION.map(e => {
                 // Contar estado canónico + sus aliases legacy
-                const n = postulaciones.filter(p =>
-                  p.estado === e.estado || e.aliases.includes(p.estado)
-                ).length;
+                const n = postulaciones.filter(p => normalizarEstado(p.estado) === e.estado).length;
                 if (!n) return null;
                 return (
                   <button
@@ -203,7 +180,7 @@ export default function PostulantesMiOfertaPage() {
               {filtradas.map(p => {
                 const perfil = p.usuario?.perfil ?? {};
                 const cvArchivoId = perfil.cvArchivoId;
-                const col    = ESTADO_MAP[p.estado];
+                const col    = getEstadoInfo(p.estado);
                 return (
                   <div key={p.id} className={styles.candidatoCard}>
                     {/* Estado lateral */}
@@ -225,7 +202,7 @@ export default function PostulantesMiOfertaPage() {
                         <div className={styles.candidatoInfo}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                             <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>
-                            {ESTADOS_CHAT_EMPRESA.includes(p.estado) && p.usuario?.id && (
+                            {ESTADOS_HABILITAN_CHAT.includes(normalizarEstado(p.estado)) && p.usuario?.id && (
                               <button
                                 onClick={() => navigate(`/chat/${p.usuario.id}`)}
                                 title="Contactar a este candidato"
@@ -298,7 +275,7 @@ export default function PostulantesMiOfertaPage() {
                         onChange={e => handleCambiarEstado(p.id, e.target.value)}
                         style={{ borderColor: col?.color ?? 'var(--border)' }}
                       >
-                        {ESTADOS_CANONICOS.map(e => (
+                        {LISTA_ESTADOS_POSTULACION.map(e => (
                           <option key={e.estado} value={e.estado}>{e.emoji} {e.label}</option>
                         ))}
                       </select>

@@ -15,28 +15,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { postulacionService } from '../../services/api';
+import { LISTA_ESTADOS_POSTULACION, ESTADOS_HABILITAN_CHAT, getEstadoInfo, normalizarEstado } from '../../constants/postulacionEstados';
 import styles from './MisPostulacionesPage.module.css';
-
-// Mapa de estados para display en badges (EST-08: sin aliases legacy —
-// el backend consolidó entrevista_programada→entrevista y no_seleccionado→rechazado)
-const ESTADOS = {
-  en_revision:     { label: 'En revisión',     color: '#f59e0b', icon: '🔍', bg: '#fffbeb' },
-  preseleccionado: { label: 'Preseleccionado', color: '#3b82f6', icon: '✅', bg: '#eff6ff' },
-  entrevista:      { label: 'Entrevista',      color: '#8b5cf6', icon: '🗓️', bg: '#f5f3ff' },
-  rechazado:       { label: 'No seleccionado', color: '#ef4444', icon: '❌', bg: '#fef2f2' },
-  contratado:      { label: '¡Contratado!',    color: '#10b981', icon: '🎉', bg: '#ecfdf5' },
-};
-
-const ESTADOS_RESUMEN = [
-  { key: 'en_revision',     aliases: [], label: 'En revisión',     color: '#f59e0b', icon: '🔍', bg: '#fffbeb' },
-  { key: 'preseleccionado', aliases: [], label: 'Preseleccionado', color: '#3b82f6', icon: '✅', bg: '#eff6ff' },
-  { key: 'entrevista',      aliases: [], label: 'Entrevista',      color: '#8b5cf6', icon: '🗓️', bg: '#f5f3ff' },
-  { key: 'contratado',      aliases: [], label: '¡Contratado!',    color: '#10b981', icon: '🎉', bg: '#ecfdf5' },
-  { key: 'rechazado',       aliases: [], label: 'No seleccionado', color: '#ef4444', icon: '❌', bg: '#fef2f2' },
-];
-
-// Estados que habilitan el chat con el reclutador
-const ESTADOS_CHAT = ['preseleccionado', 'entrevista', 'contratado'];
 
 function formatFecha(dateStr) {
   if (!dateStr) return null;
@@ -70,18 +50,13 @@ export default function MisPostulacionesPage() {
   useEffect(() => { cargar(); }, [cargar]);
 
   // Filtrar incluyendo aliases legacy cuando el filtro activo es un estado canónico
-  const filtroCanonInfo = ESTADOS_RESUMEN.find(e => e.key === filtroEstado);
   const filtradas = filtroEstado
-    ? postulaciones.filter((p) =>
-        p.estado === filtroEstado || (filtroCanonInfo?.aliases.includes(p.estado) ?? false)
-      )
+    ? postulaciones.filter((p) => normalizarEstado(p.estado) === filtroEstado)
     : postulaciones;
 
   // Conteo agrupado: alias legacy se suma al estado canónico correspondiente
-  const conteoCanonicos = ESTADOS_RESUMEN.reduce((acc, e) => {
-    acc[e.key] = postulaciones.filter(p =>
-      p.estado === e.key || e.aliases.includes(p.estado)
-    ).length;
+  const conteoCanonicos = LISTA_ESTADOS_POSTULACION.reduce((acc, e) => {
+    acc[e.estado] = postulaciones.filter(p => normalizarEstado(p.estado) === e.estado).length;
     return acc;
   }, {});
 
@@ -123,16 +98,16 @@ export default function MisPostulacionesPage() {
         <>
           {/* ── Resumen visual ───────────────────────────────────────────── */}
           <div className={styles.resumenGrid}>
-            {ESTADOS_RESUMEN.map((e) => (
+            {LISTA_ESTADOS_POSTULACION.map((e) => (
               <button
-                key={e.key}
-                className={`${styles.resumenCard} ${filtroEstado === e.key ? styles.resumenCardActive : ''}`}
-                style={filtroEstado === e.key ? { borderColor: e.color, background: e.bg } : {}}
-                onClick={() => setFiltroEstado(filtroEstado === e.key ? '' : e.key)}
+                key={e.estado}
+                className={`${styles.resumenCard} ${filtroEstado === e.estado ? styles.resumenCardActive : ''}`}
+                style={filtroEstado === e.estado ? { borderColor: e.color, background: e.bg } : {}}
+                onClick={() => setFiltroEstado(filtroEstado === e.estado ? '' : e.estado)}
               >
-                <span className={styles.resumenIcon}>{e.icon}</span>
-                <span className={styles.resumenCount} style={filtroEstado === e.key ? { color: e.color } : {}}>
-                  {conteoCanonicos[e.key] ?? 0}
+                <span className={styles.resumenIcon}>{e.emoji}</span>
+                <span className={styles.resumenCount} style={filtroEstado === e.estado ? { color: e.color } : {}}>
+                  {conteoCanonicos[e.estado] ?? 0}
                 </span>
                 <span className={styles.resumenLabel}>{e.label}</span>
               </button>
@@ -142,7 +117,7 @@ export default function MisPostulacionesPage() {
           {/* Indicador de filtro activo */}
           {filtroEstado && (
             <div className={styles.filtroActivo}>
-              Mostrando: <strong>{filtroCanonInfo?.label ?? ESTADOS[filtroEstado]?.label}</strong>
+              Mostrando: <strong>{getEstadoInfo(filtroEstado).label}</strong>
               <button className={styles.limpiarFiltro} onClick={() => setFiltroEstado('')}>
                 ✕ Limpiar filtro
               </button>
@@ -155,9 +130,7 @@ export default function MisPostulacionesPage() {
               <p className={styles.sinResultados}>No hay postulaciones con ese estado.</p>
             ) : (
               filtradas.map((p) => {
-                const estado = ESTADOS[p.estado] ?? {
-                  label: p.estado, color: '#6b7280', icon: '❓', bg: '#f9fafb',
-                };
+                const estado = getEstadoInfo(p.estado);
 
                 return (
                   <div
@@ -179,7 +152,7 @@ export default function MisPostulacionesPage() {
                         className={styles.estadoBadge}
                         style={{ background: estado.bg, color: estado.color, border: `1px solid ${estado.color}` }}
                       >
-                        {estado.icon} {estado.label}
+                        {estado.emoji} {estado.label}
                       </span>
                     </div>
 
@@ -209,7 +182,7 @@ export default function MisPostulacionesPage() {
                         </Link>
                       )}
                       {/* Chat: solo cuando la postulación está en estado activo */}
-                      {ESTADOS_CHAT.includes(p.estado) && p.oferta?.empresa?.usuarioId && (
+                      {ESTADOS_HABILITAN_CHAT.includes(normalizarEstado(p.estado)) && p.oferta?.empresa?.usuarioId && (
                         <Link
                           to={`/chat/${p.oferta.empresa.usuarioId}`}
                           className={styles.btnChat}
