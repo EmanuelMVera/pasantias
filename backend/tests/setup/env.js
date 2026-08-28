@@ -16,7 +16,7 @@ require('dotenv').config();
 
 process.env.NODE_ENV = 'test';
 
-// Nunca la base de desarrollo — mismo fallback que ya usa config-cli.js
+// Nunca la base de desarrollo — mismo fallback histórico (`${DB_NAME}_test`).
 // para el entorno `test` de Sequelize CLI.
 process.env.DB_NAME = process.env.DB_NAME_TEST || `${process.env.DB_NAME}_test`;
 

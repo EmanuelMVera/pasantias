@@ -53,9 +53,9 @@ async function main() {
     await client.end();
   }
 
-  console.log('▶ Corriendo migraciones (npx sequelize-cli db:migrate)...');
+  console.log('▶ Corriendo migraciones (node scripts/migrate.js up)...');
   await new Promise((resolve, reject) => {
-    execFile('npx', ['sequelize-cli', 'db:migrate'], { shell: true, cwd: __dirname + '/../..' }, (err, stdout, stderr) => {
+    execFile('node', ['scripts/migrate.js', 'up'], { cwd: __dirname + '/../..' }, (err, stdout, stderr) => {
       process.stdout.write(stdout);
       if (err) { process.stderr.write(stderr); return reject(err); }
       resolve();

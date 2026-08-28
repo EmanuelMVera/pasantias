@@ -7,7 +7,7 @@
  *
  *   1. Calcula el nombre de la base de test (mismo criterio que env.js).
  *   2. La crea si no existe (mismo patrón que resetDev.js).
- *   3. Corre las migraciones existentes (000 a 006) contra ella.
+ *   3. Corre TODAS las migraciones (scripts/migrate.js) contra ella.
  *
  * Nunca toca la base de desarrollo — se conecta a `postgres` (DB de
  * mantenimiento) solo para el CREATE DATABASE condicional.
@@ -42,12 +42,11 @@ module.exports = async function globalSetup() {
     await client.end();
   }
 
-  // config-cli.js ya resuelve el nombre de test como DB_NAME_TEST || `${DB_NAME}_test`.
-  // Pasar DB_NAME_TEST (no DB_NAME) evita que ese cálculo se aplique dos veces.
-  execFileSync('npx', ['sequelize-cli', 'db:migrate'], {
+  // env.js ya setea NODE_ENV=test y DB_NAME → la base de test; el runner
+  // (scripts/migrate.js) usa la instancia sequelize de la app.
+  execFileSync('node', ['scripts/migrate.js', 'up'], {
     cwd: path.join(__dirname, '../..'),
-    env: { ...process.env, DB_NAME_TEST: dbNameTest },
+    env: { ...process.env, NODE_ENV: 'test', DB_NAME: dbNameTest },
     stdio: 'inherit',
-    shell: true,
   });
 };

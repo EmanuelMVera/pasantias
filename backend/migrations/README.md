@@ -1,75 +1,85 @@
 # Migraciones — Sistema de Pasantías
 
-Esquema de base de datos gestionado con **Sequelize CLI**. Reemplaza al
-mecanismo anterior (`sequelize.sync({ alter: true })` en desarrollo +
-scripts `.sql` corridos a mano en producción), retirado en EST-08 Fase 0
-por no ser reproducible desde una base vacía ni estar versionado.
+Esquema de base de datos versionado. Runner: **Umzug v3** (`backend/scripts/migrate.js`),
+que corre con la misma instancia `sequelize` y el logger de la app. Reemplazó a
+Sequelize CLI en DB-01 (era `devDependency` → no se instalaba en producción con
+`npm ci --omit=dev`).
 
-## Cómo funciona ahora
+## Cómo funciona
 
-- **Desarrollo y producción usan exactamente el mismo mecanismo**: correr
-  las migraciones con Sequelize CLI. Ya no hay `sync()` en `server.js` —
+- **Desarrollo y producción usan el mismo runner.** No hay `sync()` en `server.js` —
   el esquema se aplica únicamente vía migraciones.
-- Cada archivo de esta carpeta (`NNN-descripcion.js` o timestamp-descripcion.js)
-  es una migración de Sequelize CLI, con `up()` y `down()`.
-- `000-baseline.js` es el punto de partida: crea el esquema completo tal
-  como lo define hoy la aplicación (`backend/src/models/`), probado contra
-  una base vacía. A partir de ahí, todo cambio de esquema es una migración
-  nueva generada con `npx sequelize-cli migration:generate --name algo`.
+- Cada archivo `NNN-descripcion.js` de esta carpeta exporta `up()` y `down()`.
+- El estado (qué migraciones se aplicaron) vive en la tabla **`SequelizeMeta`**
+  (una fila por migración). La creó y la sigue usando el runner.
+- **`000-baseline.js`** es el punto de partida: crea el esquema completo tal como
+  lo definen hoy los modelos (`backend/src/models/`). Una base vacía + `db:migrate`
+  aplica `000` … `NNN`.
+- Los `CREATE INDEX CONCURRENTLY` van fuera de transacción (`002`, `010`, `011`).
+- El runner toma un **`pg_advisory_lock`**: si el deploy corre `db:migrate` en
+  varias instancias, solo una migra y el resto espera.
 
 ## Comandos
 
 ```bash
 cd backend
 
-npm run db:migrate           # aplica las migraciones pendientes
-npm run db:migrate:undo      # revierte la última migración aplicada
-npm run db:migrate:status    # ver qué migraciones están aplicadas
-npm run db:schema:dump       # regenera schema.sql (raíz del repo) desde la base actual
-npm run db:reset:dev         # SOLO desarrollo: recrea la base local desde cero + migra
+npm run db:migrate                 # aplica las migraciones pendientes
+npm run db:migrate:status          # ejecutadas + pendientes
+npm run db:migrate:down            # revierte la última
+node scripts/migrate.js down --to 003-archivos.js   # revierte hasta (sin incluir) esa
+node scripts/migrate.js down --step 2               # revierte las últimas 2
+npm run db:migrate:create nombre-en-kebab-case      # crea migrations/NNN-nombre.js desde plantilla
+npm run db:schema:dump             # regenera schema.sql (raíz del repo) desde la base actual
+npm run db:backup                  # pg_dump -Fc a backend/backups/ + verifica el dump
+npm run db:reset:dev               # SOLO desarrollo: dropea + recrea la base local + migra
 ```
 
-`db:reset:dev` (`backend/src/utils/resetDev.js`) reemplaza al viejo
-`cleanup_db.sql`: aborta si `NODE_ENV` no es `development` o si `DB_HOST`
-no es local, y en vez de borrar filas selectivamente, dropea y recrea la
-base entera — más rápido, determinista, y sin riesgo de tocar por error
-una base que no sea la de desarrollo.
-
-## Base de datos de desarrollo existente (`pasantias_db`)
-
-Si ya tenés una base de desarrollo creada por el viejo `sync({ alter: true
-})` (con datos de `db:seed:demo` u otros), **esta migración baseline no la
-toca ni la reconcilia automáticamente** — `db:migrate` fallaría con "la
-tabla ya existe" si se corre contra ella tal cual. Opciones:
-
-1. **Recomendado si no te importa perder los datos actuales**: correr
-   `npm run db:reset:dev` (recrea la base vacía y aplica la baseline) y
-   volver a sembrar con `db:seed:admin`/`db:seed:demo`.
-2. Si necesitás conservar datos reales ya cargados, hace falta una
-   migración de reconciliación específica (marcar `000-baseline` como
-   aplicada sin recrear tablas, más una migración aparte que convierta las
-   5 columnas ENUM→VARCHAR+CHECK sobre la base existente). No está hecha
-   todavía — es trabajo de una etapa posterior si se necesita.
-
-## Migraciones anteriores a la baseline
-
-Los 13 scripts `.sql` que se usaban antes viven en `legacy-sql/` como
-referencia histórica. **No se ejecutan más** — ver
-`legacy-sql/README.md` para el detalle de por qué se retiraron.
-
-## Agregar una migración nueva
+## Crear una migración nueva
 
 ```bash
-npx sequelize-cli migration:generate --name descripcion-del-cambio
+npm run db:migrate:create agregar-campo-x
 ```
 
-Reglas (EST-08 §5.2):
+Genera `migrations/NNN-agregar-campo-x.js` desde `scripts/_migration-template.js`.
+La plantilla trae `module.exports.useTransaction = true` (la migración corre dentro
+de una transacción y recibe `t`; poné `{ transaction: t }` en cada llamada a
+`queryInterface`). **Excepción:** si usás `CREATE INDEX CONCURRENTLY`, poné
+`useTransaction = false` (Postgres no permite CONCURRENTLY dentro de una transacción).
 
-- Todo `down()` debe probarse, no solo escribirse.
-- Cambios destructivos (eliminar/renombrar columnas) van en el patrón
-  expand → migrate → contract, nunca en un solo paso.
-- Backfills de datos en lotes, no en una sola sentencia sobre toda la tabla.
-- `NOT NULL` se agrega en dos pasos: columna nullable + backfill primero,
-  constraint después.
-- Índices sobre tablas con datos: `CREATE INDEX CONCURRENTLY`, nunca
-  `CREATE INDEX` a secas contra una base en producción.
+Reglas:
+
+- `down()` **probado**, no solo escrito (en CI: `down --to 000-baseline.js` → `up`).
+- Cambios destructivos (drop/rename de columnas) → patrón **expand → migrate → contract**
+  en releases separados, nunca en un solo paso.
+- `NOT NULL` en dos pasos: columna nullable + backfill, y la constraint después.
+- Backfills de datos en lotes, no una sola sentencia sobre toda la tabla.
+- `CREATE INDEX CONCURRENTLY` en tablas con datos, nunca `CREATE INDEX` a secas.
+- Toda migración pendiente debe ser **backward-compatible** con la versión de app
+  que está corriendo en producción (se migra ANTES de activar el código nuevo).
+
+## Base de datos nueva (fresh install)
+
+DB vacía → `npm run db:migrate`. El rol de conexión necesita privilegio
+`CREATE EXTENSION` (migración `003` crea `pgcrypto`, `010` crea `pg_trgm`). En
+Postgres administrado suele venir habilitado; si no, pedirle al proveedor:
+`CREATE EXTENSION pgcrypto; CREATE EXTENSION pg_trgm;` una vez.
+
+## Adoptar una base que precede a las migraciones
+
+Si hay una base creada por el viejo `sync({alter:true})` (o una prod anterior a
+este runner), **no** correr `db:migrate` directo (`000` fallaría con "la tabla ya
+existe"). Usar la operación única y supervisada:
+
+```bash
+node scripts/adopt-baseline.js --assume-at 011   # marca 000..011 como aplicadas sin ejecutarlas
+node scripts/migrate.js status                   # verificar
+```
+
+`adopt-baseline.js` verifica objetos-centinela y aborta si `SequelizeMeta` ya
+tiene filas. No borra ni convierte nada.
+
+## Migraciones legacy (pre-baseline)
+
+Los 13 scripts `.sql` que se usaban antes viven en `legacy-sql/` como referencia
+histórica. **No se ejecutan más** — ver `legacy-sql/README.md`.

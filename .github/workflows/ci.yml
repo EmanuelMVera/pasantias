@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancela runs viejos del mismo PR/branch cuando llega un push nuevo.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Backend: migraciones (fresh + reversibilidad + drift) y suite de tests.
+  # ──────────────────────────────────────────────────────────────────────────
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        # Pin del minor: el drift check (paso 3) compara byte a byte contra
+        # schema.sql, generado con pg_dump 17.5. Al subir de minor, regenerar
+        # schema.sql con `npm run db:schema:dump` y actualizar este tag.
+        image: postgres:17.5
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pasantias_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: development
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: pasantias_ci
+      DB_NAME_TEST: pasantias_ci_test
+      JWT_SECRET: ci-not-a-real-secret
+      LOG_LEVEL: warn
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+
+      # 1. Baseline + TODAS las migraciones desde una base vacía.
+      #    Detecta una migración nueva que asume un objeto que otra aún no creó.
+      - name: Migrate up (base vacía)
+        run: node scripts/migrate.js up
+
+      # 2. Reversibilidad total: revierte TODAS las migraciones (incluido el
+      #    baseline) y las vuelve a aplicar. Prueba cada down() y cada up()
+      #    (regla "down() probado, no solo escrito").
+      - name: Migrate down → up (reversibilidad)
+        run: |
+          node scripts/migrate.js down --to 000-baseline.js
+          node scripts/migrate.js up
+
+      # 3. Drift check: el esquema real == schema.sql committeado.
+      #    Detecta un modelo cambiado sin migración, o schema.sql sin regenerar.
+      #    pg_dump 17.5 se corre desde la imagen postgres:17.5 (evita instalar
+      #    el cliente por apt y matchea la versión con la que se generó schema.sql).
+      - name: Schema drift check
+        run: |
+          docker run --rm --network host -e PGPASSWORD=postgres postgres:17.5 \
+            pg_dump -h localhost -U postgres -d pasantias_ci \
+            --schema-only --no-owner --no-privileges > /tmp/schema.ci.sql
+          # Comparar ignorando líneas de comentario (incluye la de versión) y blancos.
+          if ! diff -u \
+            <(grep -vE '^(--|$)' ../schema.sql) \
+            <(grep -vE '^(--|$)' /tmp/schema.ci.sql); then
+            echo "::error::schema.sql está desactualizado — corré 'npm run db:schema:dump' y comiteá el resultado."
+            exit 1
+          fi
+
+      # 4. Suite completa (globalSetup crea pasantias_ci_test y la migra).
+      - name: Tests
+        run: npm test
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Frontend: que compile.
+  # ──────────────────────────────────────────────────────────────────────────
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build

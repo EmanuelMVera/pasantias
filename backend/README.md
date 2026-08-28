@@ -129,6 +129,39 @@ El sistema tiene **dos tipos de log distintos, con propósitos distintos**:
   Archiva a `.jsonl.gz` y verifica antes de borrar. Env `ACTIVITY_LOG_RETENTION_DAYS` (default 365).
   A escala real, el siguiente paso es particionar `activity_logs` por mes.
 
+## 8c. Migraciones y deploy (DB-01)
+
+El esquema se versiona con migraciones (`backend/migrations/NNN-*.js`), runner
+**Umzug** (`scripts/migrate.js`). Estado en la tabla `SequelizeMeta`. Detalle en
+`backend/migrations/README.md`.
+
+### Runbook de deploy sin pérdida de datos (Postgres administrado)
+
+1. **Pre-check**: `npm run db:migrate:status` — ver qué se aplicaría; confirmar que
+   cada migración pendiente es *backward-compatible* con la versión de app en prod.
+2. **Backup**: snapshot del proveedor + `npm run db:backup`, y **restore-test** del
+   `.dump` en una base scratch (`pg_restore -d <db>_restore_test …` + `db:migrate:status`).
+   Un backup que no se restauró no cuenta.
+3. **Migrar** (release phase / job one-shot, **antes** de activar el código nuevo):
+   `npm run db:migrate`. El `pg_advisory_lock` garantiza que solo una instancia migra.
+4. **Health check**: `GET /api/health` + una consulta a cada tabla tocada.
+5. **Deploy de la app** (nueva versión; rolling: instancia por instancia).
+6. **Smoke test**: login, listar ofertas, subir archivo, `/admin/logs`.
+
+### Rollback
+
+| Situación | Acción |
+|---|---|
+| Migración OK, código nuevo falla | Rollback del **deploy de la app** (versión anterior). La DB queda adelante — funciona por expand/contract. |
+| La migración es mala (recién aplicada, no destructiva) | `npm run db:migrate:down` + redeploy versión anterior. |
+| `down()` no puede deshacer sin pérdida (fase *contract*) | **Restore desde el backup / PITR**. Por eso el *contract* solo se despliega tras 1 release estable de expand+migrate. |
+
+### Backups
+
+- **Primario**: snapshots + PITR del proveedor (retención ≥ 7 días PITR, ≥ 30 días snapshots; alertas de fallo).
+- **`npm run db:backup`**: `pg_dump -Fc` a `backend/backups/` (gitignored) + verificación. Es lo que se restore-testea antes de migrar y la copia portable fuera del server.
+- **Trimestral**: ejercicio de disaster-recovery (restore completo end-to-end).
+
 ## 9. Cómo explicarlo en una exposición
 - "El backend es la parte que corre en el servidor: recibe pedidos del frontend, consulta la base de datos y devuelve respuestas.
 - Tiene rutas en `src/routes`, lógica en `src/controllers`, y datos en `src/models`.
