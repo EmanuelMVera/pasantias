@@ -14,8 +14,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { ofertaService } from '../../services/api';
-import api from '../../services/api';
+import { ofertaService, studentService } from '../../services/api';
 import styles from './AlumnoDashboardPage.module.css';
 
 // ── Tarjeta de métrica ────────────────────────────────────────────────────────
@@ -91,7 +90,7 @@ export default function AlumnoDashboardPage() {
 
   // Carga métricas del dashboard
   useEffect(() => {
-    api.get('/students/dashboard')
+    studentService.getDashboard()
       .then(({ data }) => setStats(data.data ?? data))
       .catch(() => setErrorStats(true))
       .finally(() => setLoadingStats(false));

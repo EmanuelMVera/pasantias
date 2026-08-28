@@ -16,7 +16,7 @@
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../../services/api';
+import { solicitudEmpresaService } from '../../services/api';
 import styles from './SolicitudEmpresaPage.module.css';
 
 // ── Lista de carreras disponibles ─────────────────────────────────────────────
@@ -126,7 +126,7 @@ export default function SolicitudEmpresaPage() {
         r.nombre.trim() && r.apellido.trim() && r.email.trim()
       );
 
-      await api.post('/solicitudes-empresa', {
+      await solicitudEmpresaService.crear({
         ...form,
         carrerasInteres: carreras,
         reclutadores:    recls,

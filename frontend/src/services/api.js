@@ -75,6 +75,12 @@ export const authService = {
     api.put('/auth/cambiar-password', { passwordActual, nuevaPassword }),
 };
 
+// ── Servicio de solicitudes de registro de empresa ────────────────────────────
+// Funciones para /api/solicitudes-empresa (pública, sin autenticación)
+export const solicitudEmpresaService = {
+  crear: (data) => api.post('/solicitudes-empresa', data),
+};
+
 
 // ── Servicio de ofertas ───────────────────────────────────────────────────────
 // Funciones para los endpoints de /api/ofertas
@@ -108,6 +114,12 @@ export const userService = {
   subirCartaRecomendacion: (formData) => api.post('/users/perfil/carta-recomendacion', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
+};
+
+// ── Servicio de alumno/egresado (dashboard) ───────────────────────────────────
+// Funciones para /api/students
+export const studentService = {
+  getDashboard: () => api.get('/students/dashboard'),
 };
 
 // ── Servicio de notificaciones ────────────────────────────────────────────────

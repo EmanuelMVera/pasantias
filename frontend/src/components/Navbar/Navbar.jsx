@@ -32,12 +32,17 @@ export default function Navbar() {
   useEffect(() => {
     if (!usuario) return;
 
-    // Notificaciones
+    // Notificaciones: el conteo usa el endpoint dedicado (más liviano que traer
+    // la lista completa); la lista solo se pide para saber si hay alguna sin
+    // leer de prioridad alta/urgente y así colorear el badge.
+    notificacionService.sinLeerCount()
+      .then(({ data }) => setNoLeidas(data.count ?? 0))
+      .catch(() => { });
+
     notificacionService.getAll()
       .then(({ data }) => {
         const lista = data.data ?? data ?? [];
         const sinLeer = lista.filter((n) => !n.leida);
-        setNoLeidas(sinLeer.length);
         setPrioridadAlta(sinLeer.some((n) => n.prioridad === 'alta' || n.tipoVisual === 'urgente'));
       })
       .catch(() => { });
