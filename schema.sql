@@ -18,6 +18,20 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: pg_trgm; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION pg_trgm; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION pg_trgm IS 'text similarity measurement and index searching based on trigrams';
+
+
+--
 -- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
 --
 
@@ -55,7 +69,8 @@ CREATE TYPE public.enum_activity_logs_accion AS ENUM (
     'rechazar_solicitud_empresa',
     'aprobar_solicitud_reclutador',
     'rechazar_solicitud_reclutador',
-    'sistema'
+    'sistema',
+    'solicitar_recuperacion_miembro'
 );
 
 
@@ -501,7 +516,9 @@ CREATE TABLE public.perfiles (
     proyectos text,
     "createdAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    legajo character varying(20)
+    legajo character varying(20),
+    "cvArchivoId" uuid,
+    "cartaArchivoId" uuid
 );
 
 
@@ -625,7 +642,11 @@ CREATE TABLE public.solicitudes_empresa (
     estado public.enum_solicitudes_empresa_estado DEFAULT 'pendiente'::public.enum_solicitudes_empresa_estado NOT NULL,
     reclutadores json DEFAULT '[]'::json,
     "createdAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    "updatedAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    "updatedAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    "revisadaPorUsuarioId" integer,
+    "revisadaEn" timestamp with time zone,
+    "motivoRechazo" text,
+    "empresaIdCreada" integer
 );
 
 
@@ -1010,6 +1031,13 @@ ALTER TABLE ONLY public.usuarios
 
 
 --
+-- Name: idx_activity_logs_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_activity_logs_created ON public.activity_logs USING btree ("createdAt" DESC);
+
+
+--
 -- Name: idx_activity_logs_entidad; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1031,10 +1059,38 @@ CREATE INDEX idx_archivos_propietario ON public.archivos USING btree ("usuarioPr
 
 
 --
+-- Name: idx_empresa_usuarios_usuario_activo; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_empresa_usuarios_usuario_activo ON public.empresa_usuarios USING btree ("usuarioId", activo);
+
+
+--
+-- Name: idx_empresas_aprobacion_pendiente; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_empresas_aprobacion_pendiente ON public.empresas USING btree ("estadoAprobacion") WHERE ("estadoAprobacion" = 'pendiente'::public."enum_empresas_estadoAprobacion");
+
+
+--
 -- Name: idx_historial_postulacion; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_historial_postulacion ON public.postulacion_historial_estados USING btree ("postulacionId");
+
+
+--
+-- Name: idx_mensajes_emisor_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_mensajes_emisor_created ON public.mensajes USING btree ("emisorId", "createdAt" DESC);
+
+
+--
+-- Name: idx_mensajes_receptor_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_mensajes_receptor_created ON public.mensajes USING btree ("receptorId", "createdAt" DESC);
 
 
 --
@@ -1059,10 +1115,24 @@ CREATE INDEX idx_ofertas_busqueda_texto ON public.ofertas USING gin (to_tsvector
 
 
 --
+-- Name: idx_ofertas_carreras_gin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ofertas_carreras_gin ON public.ofertas USING gin ("carrerasDestinatarias") WHERE ("deletedAt" IS NULL);
+
+
+--
 -- Name: idx_ofertas_empresa_estado; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_ofertas_empresa_estado ON public.ofertas USING btree ("empresaId", estado);
+
+
+--
+-- Name: idx_ofertas_estado_moderada_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ofertas_estado_moderada_created ON public.ofertas USING btree (estado, moderada, "createdAt" DESC) WHERE ("deletedAt" IS NULL);
 
 
 --
@@ -1080,10 +1150,24 @@ CREATE INDEX idx_ofertas_fecha_limite_activa ON public.ofertas USING btree ("fec
 
 
 --
+-- Name: idx_ofertas_habilidades_gin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ofertas_habilidades_gin ON public.ofertas USING gin ("habilidadesRequeridas") WHERE ("deletedAt" IS NULL);
+
+
+--
 -- Name: idx_ofertas_moderada_estado; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_ofertas_moderada_estado ON public.ofertas USING btree (moderada, estado);
+
+
+--
+-- Name: idx_postulaciones_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_postulaciones_created ON public.postulaciones USING btree ("createdAt" DESC);
 
 
 --
@@ -1094,10 +1178,24 @@ CREATE INDEX idx_postulaciones_oferta_estado ON public.postulaciones USING btree
 
 
 --
+-- Name: idx_postulaciones_oferta_updated; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_postulaciones_oferta_updated ON public.postulaciones USING btree ("ofertaId", "updatedAt" DESC);
+
+
+--
 -- Name: idx_postulaciones_usuario_created; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_postulaciones_usuario_created ON public.postulaciones USING btree ("usuarioId", "createdAt" DESC);
+
+
+--
+-- Name: idx_postulaciones_usuario_estado; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_postulaciones_usuario_estado ON public.postulaciones USING btree ("usuarioId", estado);
 
 
 --
@@ -1115,10 +1213,45 @@ CREATE INDEX idx_solicitudes_reclutador_empresa ON public.solicitudes_reclutador
 
 
 --
--- Name: mensajes_emisor_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_usuarios_apellido_trgm; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX mensajes_emisor_idx ON public.mensajes USING btree ("emisorId");
+CREATE INDEX idx_usuarios_apellido_trgm ON public.usuarios USING gin (apellido public.gin_trgm_ops);
+
+
+--
+-- Name: idx_usuarios_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_usuarios_created ON public.usuarios USING btree ("createdAt" DESC) WHERE ("deletedAt" IS NULL);
+
+
+--
+-- Name: idx_usuarios_email_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_usuarios_email_trgm ON public.usuarios USING gin (email public.gin_trgm_ops);
+
+
+--
+-- Name: idx_usuarios_nombre_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_usuarios_nombre_trgm ON public.usuarios USING gin (nombre public.gin_trgm_ops);
+
+
+--
+-- Name: idx_usuarios_rol_activo; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_usuarios_rol_activo ON public.usuarios USING btree (rol, activo) WHERE ("deletedAt" IS NULL);
+
+
+--
+-- Name: idx_usuarios_token_reset; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_usuarios_token_reset ON public.usuarios USING btree ("tokenReset") WHERE ("tokenReset" IS NOT NULL);
 
 
 --
@@ -1126,13 +1259,6 @@ CREATE INDEX mensajes_emisor_idx ON public.mensajes USING btree ("emisorId");
 --
 
 CREATE INDEX mensajes_emisor_receptor_idx ON public.mensajes USING btree ("emisorId", "receptorId");
-
-
---
--- Name: mensajes_receptor_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX mensajes_receptor_idx ON public.mensajes USING btree ("receptorId");
 
 
 --
@@ -1186,7 +1312,7 @@ ALTER TABLE ONLY public.empresa_usuarios
 --
 
 ALTER TABLE ONLY public.empresas
-    ADD CONSTRAINT "empresas_aprobadaPorUsuarioId_fkey" FOREIGN KEY ("aprobadaPorUsuarioId") REFERENCES public.usuarios(id);
+    ADD CONSTRAINT "empresas_aprobadaPorUsuarioId_fkey" FOREIGN KEY ("aprobadaPorUsuarioId") REFERENCES public.usuarios(id) ON DELETE SET NULL;
 
 
 --
@@ -1230,6 +1356,22 @@ ALTER TABLE ONLY public.ofertas
 
 
 --
+-- Name: perfiles perfiles_cartaArchivoId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.perfiles
+    ADD CONSTRAINT "perfiles_cartaArchivoId_fkey" FOREIGN KEY ("cartaArchivoId") REFERENCES public.archivos(id) ON DELETE SET NULL;
+
+
+--
+-- Name: perfiles perfiles_cvArchivoId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.perfiles
+    ADD CONSTRAINT "perfiles_cvArchivoId_fkey" FOREIGN KEY ("cvArchivoId") REFERENCES public.archivos(id) ON DELETE SET NULL;
+
+
+--
 -- Name: perfiles perfiles_usuarioId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1258,7 +1400,7 @@ ALTER TABLE ONLY public.postulacion_historial_estados
 --
 
 ALTER TABLE ONLY public.postulaciones
-    ADD CONSTRAINT "postulaciones_cvArchivoId_fkey" FOREIGN KEY ("cvArchivoId") REFERENCES public.archivos(id);
+    ADD CONSTRAINT "postulaciones_cvArchivoId_fkey" FOREIGN KEY ("cvArchivoId") REFERENCES public.archivos(id) ON DELETE SET NULL;
 
 
 --
@@ -1275,6 +1417,22 @@ ALTER TABLE ONLY public.postulaciones
 
 ALTER TABLE ONLY public.postulaciones
     ADD CONSTRAINT "postulaciones_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES public.usuarios(id) ON DELETE CASCADE;
+
+
+--
+-- Name: solicitudes_empresa solicitudes_empresa_empresaIdCreada_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.solicitudes_empresa
+    ADD CONSTRAINT "solicitudes_empresa_empresaIdCreada_fkey" FOREIGN KEY ("empresaIdCreada") REFERENCES public.empresas(id) ON DELETE SET NULL;
+
+
+--
+-- Name: solicitudes_empresa solicitudes_empresa_revisadaPorUsuarioId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.solicitudes_empresa
+    ADD CONSTRAINT "solicitudes_empresa_revisadaPorUsuarioId_fkey" FOREIGN KEY ("revisadaPorUsuarioId") REFERENCES public.usuarios(id) ON DELETE SET NULL;
 
 
 --

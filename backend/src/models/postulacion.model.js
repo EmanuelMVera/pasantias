@@ -99,6 +99,14 @@ module.exports = (sequelize) => {
         fields: ['usuarioId', 'ofertaId'],
         name: 'unique_postulacion',
       },
+      // Índices de rendimiento — creados por migraciones (no hay sync()):
+      //   002-indices.js  → oferta_estado, usuario_created
+      //   010-indices-escala.js → usuario_estado, oferta_updated, created
+      { name: 'idx_postulaciones_oferta_estado', fields: ['ofertaId', 'estado'] },
+      { name: 'idx_postulaciones_usuario_created', fields: ['usuarioId', { name: 'createdAt', order: 'DESC' }] },
+      { name: 'idx_postulaciones_usuario_estado', fields: ['usuarioId', 'estado'] },
+      { name: 'idx_postulaciones_oferta_updated', fields: ['ofertaId', { name: 'updatedAt', order: 'DESC' }] },
+      { name: 'idx_postulaciones_created', fields: [{ name: 'createdAt', order: 'DESC' }] },
     ],
   });
 

@@ -70,6 +70,10 @@ module.exports = (sequelize) => {
         fields: ['empresaId', 'usuarioId'],
         name: 'unique_empresa_usuario',
       },
+      // El UNIQUE de arriba arranca por empresaId → no sirve para buscar por
+      // usuarioId solo (verifyEmpresaMember, permisos de chat). Índice creado
+      // por la migración 010-indices-escala.js (SCALE-02), no hay sync().
+      { name: 'idx_empresa_usuarios_usuario_activo', fields: ['usuarioId', 'activo'] },
     ],
   });
 

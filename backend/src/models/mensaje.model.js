@@ -54,11 +54,14 @@ module.exports = (sequelize) => {
     tableName: 'mensajes',   // Nombre exacto de la tabla en PostgreSQL
     timestamps: true,        // createdAt = fecha de envío; updatedAt = fecha de lectura
     indexes: [
-      // Índices para acelerar la consulta de conversaciones
-      { fields: ['emisorId'] },
-      { fields: ['receptorId'] },
-      { fields: ['emisorId', 'receptorId'] },
-      { fields: ['receptorId', 'leido'] }, // Para contar no leídos eficientemente
+      // Lista de conversaciones e historial: filtro por emisor/receptor +
+      // ORDER BY createdAt DESC LIMIT. Los índices simples (emisorId) /
+      // (receptorId) del baseline quedaron subsumidos por estos compuestos
+      // y se eliminaron en la migración 010-indices-escala.js (SCALE-02).
+      { name: 'idx_mensajes_emisor_created', fields: ['emisorId', { name: 'createdAt', order: 'DESC' }] },
+      { name: 'idx_mensajes_receptor_created', fields: ['receptorId', { name: 'createdAt', order: 'DESC' }] },
+      { name: 'mensajes_emisor_receptor_idx', fields: ['emisorId', 'receptorId'] }, // par exacto (debeNotificarMensaje)
+      { name: 'mensajes_receptor_leido_idx', fields: ['receptorId', 'leido'] }, // contar no leídos
     ],
   });
 
