@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { authService } from '../../services/api';
+import { calcularFortalezaPassword } from '../../utils/passwordStrength';
 import styles from './SeguridadPage.module.css';
 
 export default function SeguridadPage() {
@@ -75,16 +76,7 @@ export default function SeguridadPage() {
     }
   }
 
-  // ── Indicador de fortaleza ───────────────────────────────────────────────────
-  function fortaleza(pwd) {
-    if (!pwd) return null;
-    if (pwd.length < 6)  return { nivel: 1, label: 'Muy débil', color: '#dc2626' };
-    if (pwd.length < 8)  return { nivel: 2, label: 'Débil',     color: '#ea580c' };
-    if (!/[A-Z]/.test(pwd) || !/[0-9]/.test(pwd)) return { nivel: 3, label: 'Media', color: '#ca8a04' };
-    return { nivel: 4, label: 'Fuerte', color: '#16a34a' };
-  }
-
-  const fuerza = fortaleza(form.nuevaPassword);
+  const fuerza = calcularFortalezaPassword(form.nuevaPassword);
 
   return (
     <div className="page-container" style={{ maxWidth: 560 }}>

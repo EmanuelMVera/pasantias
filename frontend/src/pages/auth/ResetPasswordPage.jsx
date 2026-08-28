@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { authService } from '../../services/api';
+import { calcularFortalezaPassword } from '../../utils/passwordStrength';
 import styles from './LoginPage.module.css';
 
 export default function ResetPasswordPage() {
@@ -33,8 +34,7 @@ export default function ResetPasswordPage() {
     }
   };
 
-  const strength = password.length === 0 ? null : password.length < 6 ? 'weak' : password.length < 10 ? 'medium' : 'strong';
-  const strengthLabel = { weak: 'Muy corta', medium: 'Aceptable', strong: '✓ Segura' };
+  const fuerza = calcularFortalezaPassword(password);
 
   return (
     <div className={styles.authLayout}>
@@ -110,14 +110,11 @@ export default function ResetPasswordPage() {
                   </button>
                 </div>
                 {/* Indicador de fortaleza */}
-                {strength && (
+                {fuerza && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.35rem' }}>
-                    <div style={{
-                      flex: 1, height: 4, borderRadius: 4,
-                      background: strength === 'weak' ? '#ef4444' : strength === 'medium' ? '#f59e0b' : '#10b981',
-                    }} />
+                    <div style={{ flex: 1, height: 4, borderRadius: 4, background: fuerza.color }} />
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                      {strengthLabel[strength]}
+                      {fuerza.label}
                     </span>
                   </div>
                 )}
