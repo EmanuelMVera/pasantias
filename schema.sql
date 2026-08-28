@@ -408,7 +408,7 @@ CREATE TABLE public.notificaciones (
     "accionURL" character varying(255),
     "createdAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT chk_notificaciones_tipo CHECK (((tipo)::text = ANY ((ARRAY['postulacion'::character varying, 'estado'::character varying, 'oferta'::character varying, 'aval'::character varying, 'chat'::character varying, 'sistema'::character varying])::text[])))
+    CONSTRAINT chk_notificaciones_tipo CHECK (((tipo)::text = ANY ((ARRAY['postulacion'::character varying, 'estado'::character varying, 'oferta'::character varying, 'chat'::character varying, 'sistema'::character varying])::text[])))
 );
 
 

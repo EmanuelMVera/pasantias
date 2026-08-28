@@ -28,7 +28,6 @@ const TIPO_CONFIG = {
   postulacion: { icon: '📋', label: 'Postulación',  color: '#3498db' },
   estado:      { icon: '🔄', label: 'Estado',       color: '#8e44ad' },
   oferta:      { icon: '📢', label: 'Oferta',       color: '#27ae60' },
-  aval:        { icon: '🎓', label: 'Aval',         color: '#e67e22' },
   chat:        { icon: '💬', label: 'Mensaje',      color: '#16a085' },
   sistema:     { icon: '⚙️', label: 'Sistema',      color: '#7f8c8d' },
 };

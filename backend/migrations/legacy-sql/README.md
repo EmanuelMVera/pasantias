@@ -18,6 +18,11 @@ CLI como mecanismo formal de migraciones (ver `../000-baseline.js` y
   `gerente`, `viewer`) que los modelos Sequelize actuales ya no usan, y crean
   una tabla (`avales`, script 006) que no tiene modelo ni código de
   aplicación asociado.
+  - **DB-02** (migración `../012-limpiar-residuos-legacy.js`): si una base fue
+    adoptada del viejo `sync` y arrastra la tabla `avales` **vacía**, la 012 la
+    dropea; si tiene filas, aborta (hay que archivarla a mano). Los valores
+    muertos de ENUM **no** se tocan (Postgres no permite quitar un valor de un
+    ENUM sin recrear el tipo).
 
 ## Qué reemplaza a esto
 

@@ -6,7 +6,7 @@
  * Muestra la lista completa de postulantes con:
  * - Filtro por estado
  * - Selector de estado inline (dropdown) para avanzar candidatos
- * - CV descargable, carta de presentación y badge de aval
+ * - CV descargable y carta de presentación
  * - Stats rápidas (total, en proceso, contratados)
  */
 
@@ -21,18 +21,6 @@ import styles from './PostulantesMiOfertaPage.module.css';
 function formatFecha(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-/* ── Badge de aval ───────────────────────────────────────────────────────────── */
-function AvalBadge({ avales = [] }) {
-  if (!avales?.length) return (
-    <span className={styles.avalBadge} style={{ background: '#f1f5f9', color: '#94a3b8' }}>Sin aval</span>
-  );
-  const aprobado  = avales.find(a => a.estado === 'aprobado');
-  const pendiente = avales.find(a => a.estado === 'pendiente');
-  if (aprobado)  return <span className={styles.avalBadge} style={{ background: '#dcfce7', color: '#16a34a' }}>🎓 Aval aprobado</span>;
-  if (pendiente) return <span className={styles.avalBadge} style={{ background: '#fef9c3', color: '#ca8a04' }}>⏳ Aval pendiente</span>;
-  return <span className={styles.avalBadge} style={{ background: '#fee2e2', color: '#dc2626' }}>✕ Aval rechazado</span>;
 }
 
 /* ── Barra de compatibilidad ─────────────────────────────────────────────────── */
@@ -252,7 +240,6 @@ export default function PostulantesMiOfertaPage() {
                           {perfil.carrera && <span className={styles.carrera}>{perfil.carrera}</span>}
                         </div>
                         <div className={styles.candidatoMeta}>
-                          <AvalBadge avales={p.avales} />
                           {p.compatibilidadOferta != null && <CompatBar valor={p.compatibilidadOferta} />}
                           <span className={styles.fechaPost}>📅 {formatFecha(p.fechaPostulacion)}</span>
                         </div>
