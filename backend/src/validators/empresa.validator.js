@@ -2,7 +2,8 @@
 
 const { esUrlValida } = require('./common.validator');
 
-const CAMPOS_EDITABLES = ['descripcion', 'rubro', 'sitioWeb', 'telefono', 'direccion', 'ciudad', 'logo'];
+// `logo` se sube por POST /api/empresas/mi-empresa/logo (SEC-03), no por acá.
+const CAMPOS_EDITABLES = ['descripcion', 'rubro', 'sitioWeb', 'telefono', 'direccion', 'ciudad'];
 
 /**
  * Valida el body de PUT /api/empresas/mi-empresa.

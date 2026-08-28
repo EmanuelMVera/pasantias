@@ -8,8 +8,13 @@ export default defineConfig({
     host: true,
     allowedHosts: true,
     proxy: {
-      // Redirige /api al backend local — así solo se necesita 1 túnel
+      // Redirige /api y /uploads al backend local — así solo se necesita 1 túnel
       '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+      // SEC-03: avatares/logos servidos por el backend (/uploads/public/...)
+      '/uploads': {
         target: 'http://localhost:5000',
         changeOrigin: true,
       },

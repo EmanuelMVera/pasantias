@@ -4,9 +4,12 @@ const { Empresa, Oferta, ActivityLog } = require('../models');
 const empresaService = require('../services/empresa.service');
 const equipoService  = require('../services/empresaEquipo.service');
 const { parsePagination } = require('../utils/pagination');
+const { procesarSubidaImagen } = require('../services/archivoImagen.service');
 
+// SEC-03: `logo` NO se edita por texto libre — se sube por
+// POST /api/empresas/mi-empresa/logo (multipart, validado).
 const CAMPOS_EDITABLES_EMPRESA = [
-  'descripcion', 'rubro', 'sitioWeb', 'telefono', 'direccion', 'ciudad', 'logo',
+  'descripcion', 'rubro', 'sitioWeb', 'telefono', 'direccion', 'ciudad',
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -73,6 +76,19 @@ exports.updateMiEmpresa = async (req, res) => {
 
   await empresa.update(updateData);
   return res.json({ success: true, data: empresa });
+};
+
+// SEC-03: subida del logo (imagen pública, validada, nombre server-side).
+exports.uploadLogo = async (req, res) => {
+  const empresa = await _resolverEmpresa(req);
+  if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
+
+  const { urlPublica, archivoId } = await procesarSubidaImagen({
+    req, tipo: 'logo_empresa', valorAnterior: empresa.logo,
+  });
+  await empresa.update({ logo: urlPublica });
+
+  return res.json({ success: true, message: 'Logo actualizado.', logo: urlPublica, archivoId });
 };
 
 // ── Candidatos ────────────────────────────────────────────────────────────────

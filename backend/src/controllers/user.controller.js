@@ -3,6 +3,7 @@ const fs = require('fs');
 const { Perfil, Usuario, Archivo } = require('../models');
 const HttpError = require('../utils/httpError');
 const { firmaCoincide, sanitizarNombreOriginal } = require('../utils/archivoNombre');
+const { procesarSubidaImagen } = require('../services/archivoImagen.service');
 
 /**
  * SEC-02: verifica que el CONTENIDO del archivo coincida con el mimetype que
@@ -97,10 +98,13 @@ const updatePerfil = async (req, res) => {
     await Usuario.update(datosUsuario, { where: { id: req.usuario.id } });
   }
 
+  // SEC-03: `fotoPerfil` ya NO se acepta por texto libre — se sube por
+  // POST /api/users/perfil/foto (multipart, validado). Las URLs externas
+  // cargadas antes de SEC-03 quedan hasta que se reemplacen por una subida.
   const camposPermitidos = [
     'carrera', 'anioEgreso', 'descripcion', 'habilidades', 'idiomas',
     'certificaciones', 'linkedin', 'github', 'portfolio', 'redesSociales',
-    'fotoPerfil', 'areaInteres', 'disponibilidad', 'preferenciasLaborales',
+    'areaInteres', 'disponibilidad', 'preferenciasLaborales',
     'salarioPretendido', 'visibilidadPerfil', 'experienciaLaboral', 'proyectos',
   ];
   const datosLimpios = Object.fromEntries(
@@ -108,11 +112,6 @@ const updatePerfil = async (req, res) => {
   );
 
   await Perfil.update(datosLimpios, { where: { usuarioId: req.usuario.id } });
-
-  // Sincronizar fotoPerfil al modelo Usuario para que el auth context y Navbar lo muestren
-  if (datosLimpios.fotoPerfil !== undefined) {
-    await Usuario.update({ fotoPerfil: datosLimpios.fotoPerfil || null }, { where: { id: req.usuario.id } });
-  }
 
   const perfil = await Perfil.findOne({ where: { usuarioId: req.usuario.id } });
   const usuarioActualizado = await Usuario.findByPk(req.usuario.id, {
@@ -141,6 +140,20 @@ const uploadCartaRecomendacion = async (req, res) => {
   const cartaArchivoId = await registrarArchivo(req, 'carta_recomendacion', buffer);
   await Perfil.update({ cartaRecomendacion, cartaArchivoId }, { where: { usuarioId: req.usuario.id } });
   return res.json({ success: true, message: 'Carta de recomendación subida correctamente.', cartaRecomendacion, cartaArchivoId });
+};
+
+// SEC-03: subida de foto de perfil (imagen pública, validada, nombre server-side).
+const uploadFoto = async (req, res) => {
+  const perfil = await Perfil.findOne({ where: { usuarioId: req.usuario.id }, attributes: ['fotoPerfil'] });
+  const { urlPublica, archivoId } = await procesarSubidaImagen({
+    req, tipo: 'foto_perfil', valorAnterior: perfil?.fotoPerfil,
+  });
+
+  await Perfil.update({ fotoPerfil: urlPublica }, { where: { usuarioId: req.usuario.id } });
+  // Sync a Usuario.fotoPerfil (lo usan AuthContext / Navbar / listados).
+  await Usuario.update({ fotoPerfil: urlPublica }, { where: { id: req.usuario.id } });
+
+  return res.json({ success: true, message: 'Foto de perfil actualizada.', fotoPerfil: urlPublica, archivoId });
 };
 
 const getPerfilPublico = async (req, res) => {
@@ -185,5 +198,6 @@ module.exports = {
   updatePerfil,
   uploadCv,
   uploadCartaRecomendacion,
+  uploadFoto,
   getPerfilPublico,
 };

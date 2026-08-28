@@ -19,11 +19,13 @@ const HttpError = require('../utils/httpError');
 const asyncHandler = require('../utils/asyncHandler');
 const { uploadLimiter } = require('../middleware/rateLimit');
 const { EXT_POR_MIME } = require('../utils/archivoNombre');
+const { multerImagen } = require('../services/archivoImagen.service');
 const {
   getPerfil,
   updatePerfil,
   uploadCv,
   uploadCartaRecomendacion,
+  uploadFoto,
   getPerfilPublico,
 } = require('../controllers/user.controller');
 
@@ -68,6 +70,7 @@ router.get('/perfil',                    verifyToken,                           
 router.put('/perfil',                    verifyToken, authorizeRoles('alumno', 'egresado'), validate(validateUpdatePerfil), asyncHandler(updatePerfil));
 router.post('/perfil/cv',               verifyToken, authorizeRoles('alumno', 'egresado'), uploadLimiter, uploadCV.single('cv'),     asyncHandler(uploadCv));
 router.post('/perfil/carta-recomendacion', verifyToken, authorizeRoles('alumno', 'egresado'), uploadLimiter, uploadCarta.single('carta'), asyncHandler(uploadCartaRecomendacion));
+router.post('/perfil/foto',             verifyToken, authorizeRoles('alumno', 'egresado'), uploadLimiter, multerImagen.single('foto'), asyncHandler(uploadFoto));
 router.get('/:id/perfil',               verifyToken,                                    asyncHandler(getPerfilPublico));
 
 module.exports = router;

@@ -59,6 +59,8 @@ const { verifyEmpresaMember, authorizeEmpresaRoles } = require('../middleware/em
 const validate = require('../middleware/validate.middleware');
 const { validateUpdateEmpresa } = require('../validators/empresa.validator');
 const asyncHandler = require('../utils/asyncHandler');
+const { uploadLimiter } = require('../middleware/rateLimit');
+const { multerImagen } = require('../services/archivoImagen.service');
 const ctrl = require('../controllers/empresa.controller');
 
 // Shorthand: token JWT + resolver empresa + rol en equipo
@@ -82,6 +84,9 @@ router.get('/mi-empresa', ...miembro, asyncHandler(ctrl.getMiEmpresa));
 // PUT /api/empresas/mi-empresa — Actualiza perfil (solo admin_empresa)
 // QA-01: valida formato (campos reconocidos + URL de sitioWeb) antes del controller.
 router.put('/mi-empresa', ...soloAdmin, validate(validateUpdateEmpresa), asyncHandler(ctrl.updateMiEmpresa));
+
+// POST /api/empresas/mi-empresa/logo — Sube el logo (imagen, solo admin_empresa) — SEC-03
+router.post('/mi-empresa/logo', ...soloAdmin, uploadLimiter, multerImagen.single('logo'), asyncHandler(ctrl.uploadLogo));
 
 // ── Equipo de reclutadores ────────────────────────────────────────────────────
 

@@ -24,10 +24,14 @@ const errorMiddleware = (err, req, res, next) => {
   }
 
   if (err instanceof multer.MulterError) {
-    const mensaje = err.code === 'LIMIT_FILE_SIZE'
-      ? 'El archivo supera el tamaño máximo permitido.'
-      : 'Error al procesar el archivo subido.';
-    return res.status(400).json({ success: false, message: mensaje });
+    const mensajes = {
+      LIMIT_FILE_SIZE: 'El archivo supera el tamaño máximo permitido.',
+      LIMIT_FILE_COUNT: 'Se subieron demasiados archivos.',
+      LIMIT_PART_COUNT: 'La solicitud tiene demasiadas partes.',
+      LIMIT_FIELD_COUNT: 'La solicitud tiene demasiados campos.',
+      LIMIT_UNEXPECTED_FILE: 'Campo de archivo inesperado.',
+    };
+    return res.status(400).json({ success: false, message: mensajes[err.code] || 'Error al procesar el archivo subido.' });
   }
 
   console.error(err.stack);

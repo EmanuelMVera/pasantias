@@ -127,6 +127,10 @@ export const userService = {
   subirCartaRecomendacion: (formData) => api.post('/users/perfil/carta-recomendacion', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
+  // SEC-03: la foto de perfil se sube como imagen (JPG/PNG/WEBP), ya no como URL.
+  subirFoto: (formData) => api.post('/users/perfil/foto', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
 };
 
 // ── Servicio de alumno/egresado (dashboard) ───────────────────────────────────
@@ -215,6 +219,10 @@ export const empresaService = {
   getMiEmpresa:          () => api.get('/empresas/mi-empresa'),
   getPublico:            (empresaId) => api.get(`/empresas/${empresaId}`), // Perfil público de empresa
   updateMiEmpresa:       (data) => api.put('/empresas/mi-empresa', data),
+  // SEC-03: el logo se sube como imagen (JPG/PNG/WEBP), solo admin_empresa.
+  subirLogo:             (formData) => api.post('/empresas/mi-empresa/logo', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
   getCandidatos:         (params) => api.get('/empresas/candidatos', { params }),
   getEquipo:             () => api.get('/empresas/equipo'),
   editarMiembro:         (id, data) => api.patch(`/empresas/equipo/${id}`, data),

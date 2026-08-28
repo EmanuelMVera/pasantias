@@ -77,12 +77,20 @@ app.use(express.json({ limit: '100kb' }));
 app.use('/api', apiLimiter);
 app.use(csrfProtection);
 
-// Archivos PÚBLICOS (avatares/logos si en el futuro se suben localmente —
-// hoy casi siempre son URLs externas). SEC-01: este mount apunta solo a la
-// subcarpeta `public/`, nunca a la raíz de `uploads/` completa — los CV y
-// cartas de recomendación viven fuera de acá y solo se sirven autenticados
-// vía GET /api/archivos/:id (ver archivo.routes.js).
-app.use('/uploads', express.static(path.join(__dirname, '../uploads/public')));
+// Archivos PÚBLICOS (avatares y logos subidos vía SEC-03). El mount es
+// `/uploads/public` → carpeta `uploads/public/` — así la URL guardada
+// (`/uploads/public/<archivo>`) coincide con la ruta servida y con lo que
+// espera archivo.service.js::resolverRutaSegura. Los CV y cartas viven en
+// `uploads/` (fuera de `public/`) y solo se sirven autenticados vía
+// GET /api/archivos/:id.
+// SEC-03: sin listado de directorio, sin dotfiles; helmet ya aplica nosniff +
+// CSP `default-src 'none'` + CORP cross-origin a estas respuestas.
+app.use('/uploads/public', express.static(path.join(__dirname, '../uploads/public'), {
+  dotfiles: 'deny',
+  index: false,
+  redirect: false,
+  setHeaders: (res) => res.setHeader('Cache-Control', 'public, max-age=3600'),
+}));
 
 // ── Rutas de la API ───────────────────────────────────────────────────────────
 // Cada ruta agrupa los endpoints relacionados a una funcionalidad del sistema

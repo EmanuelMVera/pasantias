@@ -90,6 +90,8 @@ export default function MiEmpresaPage() {
   const [guardando,  setGuardando]  = useState(false);
   const [error,      setError]      = useState('');
   const [showToast,  setShowToast]  = useState(false);
+  const [logoFile,     setLogoFile]     = useState(null);
+  const [subiendoLogo, setSubiendoLogo] = useState(false);
 
   // admin_empresa: puede editar. reclutador: solo lectura.
   const esAdmin = esAdminEmpresa;
@@ -141,6 +143,36 @@ export default function MiEmpresaPage() {
       setError(err.response?.data?.message ?? 'Error al guardar los cambios.');
     } finally {
       setGuardando(false);
+    }
+  };
+
+  // SEC-03: el logo se sube como imagen validada (JPG/PNG/WEBP, ≤ 2 MB).
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0] || null;
+    if (file && file.size > 2 * 1024 * 1024) {
+      setError('La imagen del logo no puede superar los 2 MB.');
+      e.target.value = '';
+      return;
+    }
+    setError('');
+    setLogoFile(file);
+  };
+
+  const handleSubirLogo = async () => {
+    if (!logoFile) return;
+    setSubiendoLogo(true);
+    setError('');
+    const formData = new FormData();
+    formData.append('logo', logoFile);
+    try {
+      const { data } = await empresaService.subirLogo(formData);
+      setEmpresa((prev) => ({ ...prev, logo: data.logo }));
+      setLogoFile(null);
+      setShowToast(true);
+    } catch (err) {
+      setError(err.response?.data?.message ?? 'Error al subir el logo.');
+    } finally {
+      setSubiendoLogo(false);
     }
   };
 
@@ -205,6 +237,29 @@ export default function MiEmpresaPage() {
           Para modificar la razón social o el CUIT, contactate con el administrador del sistema.
         </p>
       </section>
+
+      {/* Logo — solo admin_empresa (SEC-03: subida de imagen validada) */}
+      {esAdmin && (
+        <section style={{ marginBottom: '2rem' }}>
+          <h3 style={{ fontSize: '0.95rem', marginBottom: '0.75rem' }}>Logo de la empresa</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            {empresa?.logo && (
+              <img
+                key={empresa.logo}
+                src={empresa.logo}
+                alt="Logo actual"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                style={{ width: 80, height: 80, objectFit: 'contain', border: '1px solid var(--border)', borderRadius: 8, padding: 4 }}
+              />
+            )}
+            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoChange} />
+            <button type="button" className="btn-secondary" onClick={handleSubirLogo} disabled={!logoFile || subiendoLogo}>
+              {subiendoLogo ? 'Subiendo...' : 'Subir logo'}
+            </button>
+          </div>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>JPG, PNG o WEBP. Máximo 2 MB.</span>
+        </section>
+      )}
 
       {/* Formulario */}
       <form onSubmit={esAdmin ? handleSubmit : (e) => e.preventDefault()}>

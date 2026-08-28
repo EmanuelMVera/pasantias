@@ -101,6 +101,8 @@ export default function PerfilPage() {
   const [subiendoCV, setSubiendoCV] = useState(false);
   const [cartaFile, setCartaFile] = useState(null);
   const [subiendoCarta, setSubiendoCarta] = useState(false);
+  const [fotoFile, setFotoFile] = useState(null);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [fotoPreview, setFotoPreview] = useState('');
 
   const [form, setForm] = useState({
@@ -160,8 +162,6 @@ export default function PerfilPage() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
-    // Actualizar preview de foto en tiempo real
-    if (name === 'fotoPerfil') setFotoPreview(value);
   };
 
   const handleGuardar = async (e) => {
@@ -180,14 +180,12 @@ export default function PerfilPage() {
       // Limpiar campos auxiliares de texto que no van al backend
       delete payload.habilidadesTexto;
       delete payload.idiomasTexto;
+      // SEC-03: la foto se sube por su propio endpoint (handleSubirFoto), no por acá.
+      delete payload.fotoPerfil;
 
       const { data } = await userService.updatePerfil(payload);
       const perfilActualizado = data.data;
       setPerfil(perfilActualizado);
-      // Sincroniza fotoPerfil con el AuthContext si cambió
-      if (form.fotoPerfil) actualizarUsuario({ fotoPerfil: form.fotoPerfil });
-      // Mantener preview actualizado
-      setFotoPreview(form.fotoPerfil || '');
       setMsg('✅ Perfil actualizado correctamente.');
     } catch (err) {
       const detalle = err?.response?.data?.message || '';
@@ -229,6 +227,37 @@ export default function PerfilPage() {
       setMsg('❌ Error al subir la carta de recomendación.');
     } finally {
       setSubiendoCarta(false);
+      setTimeout(() => setMsg(''), 4000);
+    }
+  };
+
+  // SEC-03: la foto de perfil se sube como imagen validada (JPG/PNG/WEBP, ≤ 2 MB).
+  const handleFotoChange = (e) => {
+    const file = e.target.files?.[0] || null;
+    if (file && file.size > 2 * 1024 * 1024) {
+      setMsg('❌ La imagen no puede superar los 2 MB.');
+      e.target.value = '';
+      return;
+    }
+    setFotoFile(file);
+  };
+
+  const handleSubirFoto = async () => {
+    if (!fotoFile) return;
+    setSubiendoFoto(true);
+    const formData = new FormData();
+    formData.append('foto', fotoFile);
+    try {
+      const { data } = await userService.subirFoto(formData);
+      setFotoPreview(data.fotoPerfil);
+      setForm((prev) => ({ ...prev, fotoPerfil: data.fotoPerfil }));
+      actualizarUsuario({ fotoPerfil: data.fotoPerfil });
+      setFotoFile(null);
+      setMsg('✅ Foto de perfil actualizada.');
+    } catch (err) {
+      setMsg(`❌ Error al subir la foto.${err?.response?.data?.message ? ' ' + err.response.data.message : ''}`);
+    } finally {
+      setSubiendoFoto(false);
       setTimeout(() => setMsg(''), 4000);
     }
   };
@@ -325,27 +354,33 @@ export default function PerfilPage() {
             </div>
           </div>
           <div className="form-group">
-            <label>URL de foto de perfil</label>
-            <input name="fotoPerfil" value={form.fotoPerfil || ''} onChange={handleChange}
-              placeholder="https://ejemplo.com/mi-foto.jpg" />
-            {fotoPreview && (
-              <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <label>Foto de perfil</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {fotoPreview && (
                 <img
                   key={fotoPreview}
                   src={fotoPreview}
-                  alt="Preview foto de perfil"
-                  onError={(e) => { e.currentTarget.style.opacity = '0'; e.currentTarget.style.pointerEvents = 'none'; }}
-                  onLoad={(e) => { e.currentTarget.style.opacity = '1'; }}
+                  alt="Foto de perfil"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
                   style={{
                     width: 72, height: 72, borderRadius: '50%',
                     objectFit: 'cover', border: '2px solid var(--border)',
-                    opacity: 0,
-                    transition: 'opacity 0.3s ease',
                   }}
                 />
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Vista previa</span>
-              </div>
-            )}
+              )}
+              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleFotoChange} />
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleSubirFoto}
+                disabled={!fotoFile || subiendoFoto}
+              >
+                {subiendoFoto ? 'Subiendo...' : 'Subir foto'}
+              </button>
+            </div>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              JPG, PNG o WEBP. Máximo 2 MB.
+            </span>
           </div>
         </FormSection>
 
