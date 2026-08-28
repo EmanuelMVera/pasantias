@@ -15,6 +15,7 @@
 
 const jwt = require('jsonwebtoken');
 const { Usuario } = require('../models');
+const { parseCookies } = require('../utils/cookies');
 
 /**
  * Middleware: verifica que el token JWT del header Authorization sea válido.
@@ -27,8 +28,10 @@ const { Usuario } = require('../models');
  * 5. Adjunta el usuario al objeto `req` para que los siguientes handlers lo usen
  */
 const verifyToken = async (req, res, next) => {
+  // SEC-02: el token viaja en la cookie `token` (HttpOnly). Fallback al header
+  // `Authorization: Bearer` para clientes API / la suite de tests.
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Extrae la parte "Bearer <token>"
+  const token = parseCookies(req).token || (authHeader && authHeader.split(' ')[1]);
 
   // Si no se envió un token, se rechaza el acceso
   if (!token) {

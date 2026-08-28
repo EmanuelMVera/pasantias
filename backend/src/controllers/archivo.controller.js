@@ -2,6 +2,10 @@
 
 const fs = require('fs');
 const archivoService = require('../services/archivo.service');
+const { contentDisposition } = require('../utils/archivoNombre');
+
+// Tipos que es seguro mostrar embebidos (inline). El resto se fuerza a descarga.
+const INLINE_OK = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
 
 /**
  * GET /api/archivos/:id
@@ -14,9 +18,14 @@ exports.descargar = async (req, res) => {
     const archivo = await archivoService.autorizarYObtenerArchivo(req.params.id, req.usuario);
     const rutaAbsoluta = archivoService.resolverRutaSegura(archivo.claveAlmacenamiento);
 
-    res.setHeader('Content-Type', archivo.mimeType || 'application/octet-stream');
-    const nombreDescarga = (archivo.nombreOriginal || 'archivo').replace(/"/g, '');
-    res.setHeader('Content-Disposition', `inline; filename="${nombreDescarga}"`);
+    const mime = archivo.mimeType || 'application/octet-stream';
+    const disposition = INLINE_OK.has(mime) ? 'inline' : 'attachment';
+
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', contentDisposition(archivo.nombreOriginal, disposition));
+    // SEC-02: el navegador no debe adivinar el tipo ni ejecutar nada de este archivo.
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
 
     const stream = fs.createReadStream(rutaAbsoluta);
     stream.on('error', () => {

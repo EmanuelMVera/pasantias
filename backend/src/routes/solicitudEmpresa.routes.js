@@ -10,9 +10,11 @@
 'use strict';
 const router = require('express').Router();
 const validate = require('../middleware/validate.middleware');
+const asyncHandler = require('../utils/asyncHandler');
+const { publicWriteLimiter } = require('../middleware/rateLimit');
 const { validateCrearSolicitud } = require('../validators/solicitudEmpresa.validator');
 const { crearSolicitud } = require('../controllers/solicitudEmpresa.controller');
 
-router.post('/', validate(validateCrearSolicitud), crearSolicitud);
+router.post('/', publicWriteLimiter, validate(validateCrearSolicitud), asyncHandler(crearSolicitud));
 
 module.exports = router;

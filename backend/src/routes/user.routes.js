@@ -17,6 +17,8 @@ const validate = require('../middleware/validate.middleware');
 const { validateUpdatePerfil } = require('../validators/user.validator');
 const HttpError = require('../utils/httpError');
 const asyncHandler = require('../utils/asyncHandler');
+const { uploadLimiter } = require('../middleware/rateLimit');
+const { EXT_POR_MIME } = require('../utils/archivoNombre');
 const {
   getPerfil,
   updatePerfil,
@@ -26,13 +28,19 @@ const {
 } = require('../controllers/user.controller');
 
 // ── Configuración de multer ───────────────────────────────────────────────────
+// SEC-02: la extensión del archivo guardado se deriva del mimetype VALIDADO
+// (EXT_POR_MIME), nunca de file.originalname (input del atacante).
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.join(__dirname, '../../uploads')),
   filename: (req, file, cb) => {
     const prefix = file.fieldname === 'carta' ? 'carta' : 'cv';
-    cb(null, `${prefix}_${req.usuario.id}_${Date.now()}${path.extname(file.originalname)}`);
+    const ext = EXT_POR_MIME[file.mimetype] || '.bin';
+    cb(null, `${prefix}_${req.usuario.id}_${Date.now()}${ext}`);
   },
 });
+
+// SEC-02: límites de multipart contra abuso (además del tamaño).
+const LIMITS = { fileSize: 5 * 1024 * 1024, files: 1, parts: 10, fields: 5 };
 
 const uploadCV = multer({
   storage,
@@ -40,7 +48,7 @@ const uploadCV = multer({
     if (file.mimetype === 'application/pdf') cb(null, true);
     else cb(new HttpError(400, 'Solo se aceptan archivos PDF.'));
   },
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: LIMITS,
 });
 
 const uploadCarta = multer({
@@ -50,7 +58,7 @@ const uploadCarta = multer({
     if (permitidos.includes(file.mimetype)) cb(null, true);
     else cb(new HttpError(400, 'Solo se aceptan PDF o imágenes (JPG, PNG, WEBP).'));
   },
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: LIMITS,
 });
 
 // ── Rutas ─────────────────────────────────────────────────────────────────────
@@ -58,8 +66,8 @@ router.get('/perfil',                    verifyToken,                           
 // QA-01: valida que llegue al menos un campo reconocido antes del controller
 // (la sanitización/coerción de tipos sigue viviendo en el controller, no se duplica acá).
 router.put('/perfil',                    verifyToken, authorizeRoles('alumno', 'egresado'), validate(validateUpdatePerfil), asyncHandler(updatePerfil));
-router.post('/perfil/cv',               verifyToken, authorizeRoles('alumno', 'egresado'), uploadCV.single('cv'),     asyncHandler(uploadCv));
-router.post('/perfil/carta-recomendacion', verifyToken, authorizeRoles('alumno', 'egresado'), uploadCarta.single('carta'), asyncHandler(uploadCartaRecomendacion));
+router.post('/perfil/cv',               verifyToken, authorizeRoles('alumno', 'egresado'), uploadLimiter, uploadCV.single('cv'),     asyncHandler(uploadCv));
+router.post('/perfil/carta-recomendacion', verifyToken, authorizeRoles('alumno', 'egresado'), uploadLimiter, uploadCarta.single('carta'), asyncHandler(uploadCartaRecomendacion));
 router.get('/:id/perfil',               verifyToken,                                    asyncHandler(getPerfilPublico));
 
 module.exports = router;

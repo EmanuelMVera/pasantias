@@ -12,12 +12,22 @@
 
 import axios from 'axios';
 
-// Crea una instancia de Axios con la configuración base
-// La URL base se toma de la variable de entorno VITE_API_URL o usa localhost en desarrollo
+// Crea una instancia de Axios con la configuración base.
+// SEC-02: `withCredentials: true` → el navegador manda la cookie de sesión
+// (HttpOnly) en cada request. El token ya NO vive en localStorage.
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 });
+
+// Lee una cookie del document (para el double-submit token CSRF).
+function leerCookie(nombre) {
+  const match = document.cookie.match(new RegExp('(?:^|; )' + nombre + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+const METODOS_MUTANTES = ['post', 'put', 'patch', 'delete'];
 
 // ── Archivos privados (CV, cartas de recomendación) — SEC-01 ────────────────────
 // Ya no son URLs públicas servidas por /uploads: se piden autenticados a
@@ -44,21 +54,23 @@ export async function abrirArchivoPrivado(archivoId, { comoDescarga = false, nom
 }
 
 // ── Interceptor de request ────────────────────────────────────────────────────
-// Antes de cada request, adjunta el token JWT del localStorage en el header Authorization
+// SEC-02: la sesión va por cookie (no hay header Authorization que setear).
+// En métodos que mutan estado, se reenvía el token CSRF (double-submit).
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (METODOS_MUTANTES.includes((config.method || 'get').toLowerCase())) {
+    const csrf = leerCookie('csrf_token');
+    if (csrf) config.headers['X-CSRF-Token'] = csrf;
+  }
   return config;
 });
 
 // ── Interceptor de response ───────────────────────────────────────────────────
-// Si el servidor responde con 401 (no autorizado), limpia la sesión y redirige al login
+// 401 (sesión inválida/expirada) → redirige al login. No hay token local que borrar.
 api.interceptors.response.use(
-  (response) => response, // Si la respuesta es exitosa, la devuelve sin cambios
+  (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token'); // Elimina el token inválido/expirado
-      window.location.href = '/login';  // Redirige al login
+    if (error.response?.status === 401 && !window.location.pathname.startsWith('/login')) {
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }
@@ -68,6 +80,7 @@ api.interceptors.response.use(
 // Funciones para los endpoints de /api/auth
 export const authService = {
   login: (data) => api.post('/auth/login', data),
+  logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
   resetPassword: (token, password) => api.post(`/auth/reset-password/${token}`, { password }),

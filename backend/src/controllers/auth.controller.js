@@ -16,6 +16,13 @@
 const { Usuario, ActivityLog } = require('../models');
 const authService = require('../services/auth.service');
 const HttpError = require('../utils/httpError');
+const { cookieOptionsToken } = require('../utils/cookies');
+
+// Opciones para borrar la cookie (mismas que al setearla salvo maxAge).
+const cookieClearOptions = () => {
+  const { maxAge, ...rest } = cookieOptionsToken();
+  return rest;
+};
 
 // Helper para registrar acciones en el log sin interrumpir el flujo principal
 async function logAction(datos) {
@@ -45,6 +52,10 @@ exports.login = async (req, res) => {
 
   const token = authService.generarToken(usuario);
 
+  // SEC-02: el token va en una cookie HttpOnly. Se mantiene también en el body
+  // por transición (clientes API / suite de tests con header Authorization).
+  res.cookie('token', token, cookieOptionsToken());
+
   // Actualiza ultimoAcceso de forma no bloqueante (fire-and-forget)
   usuario.update({ ultimoAcceso: new Date() }).catch((err) =>
     console.error('⚠️  No se pudo actualizar ultimoAcceso:', err.message)
@@ -73,6 +84,16 @@ exports.login = async (req, res) => {
  */
 exports.me = async (req, res) => {
   return res.json({ success: true, usuario: req.usuario });
+};
+
+// ── Logout ────────────────────────────────────────────────────────────────────
+/**
+ * POST /api/auth/logout
+ * Borra la cookie de sesión. No requiere token válido (borrar siempre es seguro).
+ */
+exports.logout = async (req, res) => {
+  res.clearCookie('token', cookieClearOptions());
+  return res.json({ success: true, message: 'Sesión cerrada.' });
 };
 
 // ── Solicitar recupero de contraseña ──────────────────────────────────────────
@@ -105,8 +126,10 @@ exports.forgotPassword = async (req, res) => {
 
   await authService.enviarEmailReset(email, token);
 
-  // En modo dev (sin SMTP) devolver el token para facilitar pruebas
-  if (!process.env.EMAIL_USER) {
+  // Solo FUERA de producción, y sin SMTP configurado, se expone el token para
+  // facilitar pruebas locales. En producción NUNCA se devuelve ni se loguea
+  // (SEC-02): filtraría tokens de reset si faltara EMAIL_USER.
+  if (process.env.NODE_ENV !== 'production' && !process.env.EMAIL_USER) {
     console.log(`\n🔑 TOKEN DE RECUPERO para ${email}:\n   ${token}\n`);
     return res.json({
       success: true,
@@ -153,6 +176,10 @@ exports.resetPassword = async (req, res) => {
     tokenVersion: usuario.tokenVersion + 1,
   });
 
+  // SEC-02: si había una sesión abierta en este navegador, la cookie ya no
+  // sirve (tokenVersion cambió) — se borra para forzar un login limpio.
+  res.clearCookie('token', cookieClearOptions());
+
   return res.json({ success: true, message: 'Contraseña restablecida correctamente. Ya podés iniciar sesión.' });
 };
 
@@ -175,6 +202,9 @@ exports.cambiarPassword = async (req, res) => {
   // deja de ser válido (EST-08 §5.3) — es lo que un usuario espera al
   // cambiar su contraseña después de sospechar que alguien más la tiene.
   await usuario.update({ password: hash, tokenVersion: usuario.tokenVersion + 1 });
+
+  // SEC-02: la sesión actual queda invalidada (tokenVersion) — borrar la cookie.
+  res.clearCookie('token', cookieClearOptions());
 
   return res.json({ success: true, message: 'Contraseña actualizada correctamente.' });
 };

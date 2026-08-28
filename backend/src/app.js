@@ -2,7 +2,8 @@
  * app.js — Configuración central de la aplicación Express.
  *
  * Aquí se configuran:
- * - Los middlewares globales (CORS, parseo de JSON, archivos estáticos)
+ * - Hardening HTTP (helmet, rate limiting, CORS, CSRF, límites de body) — SEC-02
+ * - El parseo de JSON y los archivos estáticos
  * - Las rutas de la API REST
  * - El endpoint de health check
  * - El manejador global de errores
@@ -10,6 +11,7 @@
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
@@ -20,39 +22,60 @@ require('dotenv').config();
 fs.mkdirSync(path.join(__dirname, '../uploads/public'), { recursive: true });
 
 const errorMiddleware = require('./middleware/error.middleware');
+const csrfProtection = require('./middleware/csrf');
+const { apiLimiter } = require('./middleware/rateLimit');
 
 const app = express();
+const isProd = process.env.NODE_ENV === 'production';
 
-// ── Configuración de CORS ─────────────────────────────────────────────────────
-// Lista de orígenes permitidos para hacer requests al backend
-const allowedOrigins = [
-  process.env.CLIENT_URL || 'http://localhost:5173',
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:5175',
-];
+// ── trust proxy (SEC-02) ──────────────────────────────────────────────────────
+// Necesario detrás de un reverse proxy / Cloudflare Tunnel para que `req.ip`
+// (y por lo tanto el rate limiting y ActivityLog.ip) tomen la IP real del
+// cliente del header X-Forwarded-For. NO setear si el backend recibe tráfico
+// directo — permitiría spoofear la IP.
+if (process.env.TRUST_PROXY) {
+  app.set('trust proxy', Number(process.env.TRUST_PROXY) || 1);
+}
+
+// ── Security headers (SEC-02) ─────────────────────────────────────────────────
+app.use(helmet({
+  // API JSON: nada se renderiza como documento → CSP mínima (sin defaults de helmet).
+  contentSecurityPolicy: { useDefaults: false, directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } },
+  hsts: isProd ? { maxAge: 31536000, includeSubDomains: true } : false,
+  // El frontend (otro origin) tiene que poder cargar /uploads/public (avatares/logos).
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  referrerPolicy: { policy: 'no-referrer' },
+}));
+
+// ── CORS (SEC-02) ─────────────────────────────────────────────────────────────
+const allowlist = (process.env.ALLOWED_ORIGINS || process.env.CLIENT_URL || 'http://localhost:5173')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+// Túneles trycloudflare: solo fuera de producción y con opt-in explícito.
+const allowTunnels = process.env.ALLOW_TUNNEL_ORIGINS === 'true' && !isProd;
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Permitir requests sin origin (ej: Postman, curl, herramientas de testing)
+    // Requests sin origin (curl, Postman, health checks, same-origin server-side).
     if (!origin) return callback(null, true);
-    // Permitir orígenes locales y subdominios de Cloudflare Tunnel (para exposición pública)
-    if (
-      allowedOrigins.includes(origin) ||
-      /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(origin)
-    ) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS: origen no permitido → ${origin}`));
-    }
+    if (allowlist.includes(origin)) return callback(null, true);
+    if (allowTunnels && /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(origin)) return callback(null, true);
+    // Origen no permitido: se responde SIN cabeceras CORS (el navegador bloquea
+    // la respuesta). No se lanza error → nada de 500 ni stack en los logs.
+    return callback(null, false);
   },
-  credentials: true, // Permite el envío de cookies y headers de autorización
+  credentials: true, // necesario para la cookie de sesión (SEC-02)
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
 }));
 
-// Permite que el servidor lea el cuerpo de las requests en formato JSON
-app.use(express.json());
-// Permite leer datos de formularios HTML tradicionales (application/x-www-form-urlencoded)
-app.use(express.urlencoded({ extended: true }));
+// ── Body parsing (SEC-02) ─────────────────────────────────────────────────────
+// Solo JSON. `express.urlencoded` se removió: ningún endpoint lo usa y su
+// ausencia impide que un <form> cross-site forje un POST (refuerzo CSRF).
+app.use(express.json({ limit: '100kb' }));
+
+// ── Rate limiting global + CSRF (SEC-02) ──────────────────────────────────────
+app.use('/api', apiLimiter);
+app.use(csrfProtection);
 
 // Archivos PÚBLICOS (avatares/logos si en el futuro se suben localmente —
 // hoy casi siempre son URLs externas). SEC-01: este mount apunta solo a la

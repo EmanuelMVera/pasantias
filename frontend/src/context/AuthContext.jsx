@@ -4,9 +4,9 @@
  * Provee a toda la aplicación React el estado del usuario autenticado
  * y las funciones para iniciar sesión, registrarse y cerrar sesión.
  *
- * Funcionamiento:
- * - Al cargar la app, intenta recuperar la sesión guardada en localStorage
- * - Si hay un token válido, llama a /api/auth/me para obtener el usuario
+ * Funcionamiento (SEC-02):
+ * - La sesión vive en una cookie HttpOnly (el JS no la ve). Al cargar la app se
+ *   llama SIEMPRE a /api/auth/me; un 401 significa "sin sesión".
  * - Expone el usuario, el estado de carga y las funciones login/logout
  *
  * Estructura del objeto usuario:
@@ -59,39 +59,31 @@ export const AuthProvider = ({ children }) => {
   const [usuario, setUsuario] = useState(null);  // Usuario autenticado (null si no hay sesión)
   const [loading, setLoading] = useState(true);  // Indica si se está verificando la sesión inicial
 
-  // Al montar el componente, verifica si hay una sesión activa guardada
+  // Al montar: preguntar al backend si la cookie de sesión es válida.
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      // Si hay token, consulta la API para obtener los datos del usuario
-      authService.me()
-        .then(({ data }) => setUsuario(normalizarUsuario(data.usuario)))
-        .catch(() => localStorage.removeItem('token')) // Token inválido → limpia el storage
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false); // No hay token → no hay sesión activa
-    }
+    authService.me()
+      .then(({ data }) => setUsuario(normalizarUsuario(data.usuario)))
+      .catch(() => setUsuario(null)) // 401 → sin sesión
+      .finally(() => setLoading(false));
   }, []);
 
   /**
-   * Inicia sesión con email y contraseña.
-   * Guarda el token en localStorage y actualiza el estado del usuario.
+   * Inicia sesión con email y contraseña. El backend setea la cookie HttpOnly;
+   * acá solo guardamos el usuario en memoria.
    * @returns {Object} Datos del usuario autenticado (normalizados)
    */
   const login = async (email, password) => {
     const { data } = await authService.login({ email, password });
-    localStorage.setItem('token', data.token);
     const normalizado = normalizarUsuario(data.usuario);
     setUsuario(normalizado);
     return normalizado;
   };
 
   /**
-   * Cierra la sesión del usuario actual.
-   * Elimina el token del localStorage y limpia el estado.
+   * Cierra la sesión: el backend borra la cookie, acá limpiamos el estado.
    */
-  const logout = () => {
-    localStorage.removeItem('token');
+  const logout = async () => {
+    try { await authService.logout(); } catch { /* no bloquear el logout local */ }
     setUsuario(null);
   };
 

@@ -16,18 +16,21 @@ const { verifyToken } = require('../middleware/auth.middleware');
 const validate = require('../middleware/validate.middleware');
 const { validateCambiarPassword } = require('../validators/auth.validator');
 const asyncHandler = require('../utils/asyncHandler');
+const { authLimiter, passwordResetLimiter } = require('../middleware/rateLimit');
 const {
   login,
   me,
+  logout,
   forgotPassword,
   resetPassword,
   cambiarPassword,
 } = require('../controllers/auth.controller');
 
-router.post('/login',                asyncHandler(login));
+router.post('/login',                 authLimiter, asyncHandler(login));
+router.post('/logout',                asyncHandler(logout));
 router.get('/me',          verifyToken, asyncHandler(me));
-router.post('/forgot-password',      asyncHandler(forgotPassword));
-router.post('/reset-password/:token', asyncHandler(resetPassword));
+router.post('/forgot-password',       passwordResetLimiter, asyncHandler(forgotPassword));
+router.post('/reset-password/:token', passwordResetLimiter, asyncHandler(resetPassword));
 router.put('/cambiar-password', verifyToken, validate(validateCambiarPassword), asyncHandler(cambiarPassword));
 
 module.exports = router;

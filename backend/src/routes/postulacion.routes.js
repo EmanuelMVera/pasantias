@@ -27,10 +27,11 @@ const { verifyEmpresaMember, authorizeEmpresaRoles } = require('../middleware/em
 const validate = require('../middleware/validate.middleware');
 const { validateUpdateEstado } = require('../validators/postulacion.validator');
 const asyncHandler = require('../utils/asyncHandler');
+const { writeLimiter } = require('../middleware/rateLimit');
 
 // ── Rutas alumno/egresado ─────────────────────────────────────────────────────
 // Solo alumnos y egresados pueden postularse y ver su historial
-router.post('/', verifyToken, authorizeRoles('alumno', 'egresado'), asyncHandler(ctrl.postular));
+router.post('/', verifyToken, authorizeRoles('alumno', 'egresado'), writeLimiter, asyncHandler(ctrl.postular));
 router.get('/mis', verifyToken, authorizeRoles('alumno', 'egresado'), asyncHandler(ctrl.getMisPostulaciones));
 
 // ── Rutas empresa ─────────────────────────────────────────────────────────────

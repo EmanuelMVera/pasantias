@@ -2,6 +2,22 @@ const crypto = require('crypto');
 const fs = require('fs');
 const { Perfil, Usuario, Archivo } = require('../models');
 const HttpError = require('../utils/httpError');
+const { firmaCoincide, sanitizarNombreOriginal } = require('../utils/archivoNombre');
+
+/**
+ * SEC-02: verifica que el CONTENIDO del archivo coincida con el mimetype que
+ * declaró el cliente (multer solo mira el header multipart, falsificable).
+ * Si no coincide, borra el archivo del disco y lanza 400 (propaga a
+ * error.middleware). Devuelve el buffer ya leído para reusarlo en el hash.
+ */
+function validarContenidoArchivo(req) {
+  const buffer = fs.readFileSync(req.file.path);
+  if (!firmaCoincide(buffer, req.file.mimetype)) {
+    try { fs.rmSync(req.file.path, { force: true }); } catch { /* nada */ }
+    throw new HttpError(400, 'El contenido del archivo no coincide con su tipo declarado.');
+  }
+  return buffer;
+}
 
 // Crea la fila de metadata en `archivos` para un archivo recién subido por
 // multer (EST-08 §5.4) y devuelve su id, para que el caller lo vincule desde
@@ -9,14 +25,13 @@ const HttpError = require('../utils/httpError');
 // la ruta STRING/URL directa, sino por GET /api/archivos/:id.
 // Soft-fail deliberado: si falla el registro de metadata, la subida del
 // archivo en sí no debe fallar (REF-ERR-01: se mantiene igual).
-async function registrarArchivo(req, tipo) {
+async function registrarArchivo(req, tipo, buffer) {
   try {
-    const buffer = fs.readFileSync(req.file.path);
     const hash = crypto.createHash('sha256').update(buffer).digest('hex');
     const archivo = await Archivo.create({
       usuarioPropietarioId: req.usuario.id,
       tipo,
-      nombreOriginal: req.file.originalname,
+      nombreOriginal: sanitizarNombreOriginal(req.file.originalname, req.file.mimetype),
       claveAlmacenamiento: `/uploads/${req.file.filename}`,
       mimeType: req.file.mimetype,
       tamanioBytes: req.file.size,
@@ -112,16 +127,18 @@ const updatePerfil = async (req, res) => {
 
 const uploadCv = async (req, res) => {
   if (!req.file) throw new HttpError(400, 'No se subió ningún archivo.');
+  const buffer = validarContenidoArchivo(req);
   const cvPath = `/uploads/${req.file.filename}`;
-  const cvArchivoId = await registrarArchivo(req, 'cv');
+  const cvArchivoId = await registrarArchivo(req, 'cv', buffer);
   await Perfil.update({ cvPath, cvArchivoId }, { where: { usuarioId: req.usuario.id } });
   return res.json({ success: true, message: 'CV subido correctamente.', cvPath, cvArchivoId });
 };
 
 const uploadCartaRecomendacion = async (req, res) => {
   if (!req.file) throw new HttpError(400, 'No se subió ningún archivo.');
+  const buffer = validarContenidoArchivo(req);
   const cartaRecomendacion = `/uploads/${req.file.filename}`;
-  const cartaArchivoId = await registrarArchivo(req, 'carta_recomendacion');
+  const cartaArchivoId = await registrarArchivo(req, 'carta_recomendacion', buffer);
   await Perfil.update({ cartaRecomendacion, cartaArchivoId }, { where: { usuarioId: req.usuario.id } });
   return res.json({ success: true, message: 'Carta de recomendación subida correctamente.', cartaRecomendacion, cartaArchivoId });
 };

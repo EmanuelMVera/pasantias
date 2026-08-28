@@ -21,6 +21,7 @@
 const router = require('express').Router();
 const { verifyToken } = require('../middleware/auth.middleware');
 const asyncHandler = require('../utils/asyncHandler');
+const { writeLimiter } = require('../middleware/rateLimit');
 const ctrl = require('../controllers/chat.controller');
 
 // Todos los endpoints de chat requieren estar autenticado (cualquier rol)
@@ -34,7 +35,7 @@ router.get('/usuarios', asyncHandler(ctrl.buscarUsuarios));
 router.get('/', asyncHandler(ctrl.getConversaciones));
 
 // POST /api/chat — Enviar mensaje: { receptorId, mensaje }
-router.post('/', asyncHandler(ctrl.enviarMensaje));
+router.post('/', writeLimiter, asyncHandler(ctrl.enviarMensaje));
 
 // PATCH /api/chat/:usuarioId/leer — Marcar conversación como leída
 // ⚠️ Debe ir ANTES de GET /:usuarioId para evitar conflicto de rutas

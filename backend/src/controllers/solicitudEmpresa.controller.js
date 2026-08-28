@@ -5,10 +5,11 @@ const { SolicitudEmpresa } = require('../models');
 /**
  * POST /api/solicitudes-empresa
  * La validación de inputs se realiza en validate.middleware + solicitudEmpresa.validator.
- * Este controller solo normaliza y persiste.
+ * Este controller solo normaliza y persiste. Va envuelto en asyncHandler en la
+ * ruta: cualquier error propaga a error.middleware (SEC-02), no se traga con un
+ * 500 a mano.
  */
 async function crearSolicitud(req, res) {
-  try {
     const {
       razonSocial, cuit, rubro, sitioWeb, direccion, ciudad, email, telefono,
       responsableNombre, responsableApellido, responsableEmail, responsableTelefono, responsableCargo,
@@ -59,13 +60,6 @@ async function crearSolicitud(req, res) {
       message: 'Tu solicitud fue enviada. Será evaluada por el instituto.',
       data: { id: solicitud.id, estado: solicitud.estado, createdAt: solicitud.createdAt },
     });
-  } catch (error) {
-    console.error('[SolicitudEmpresa] Error al crear solicitud:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Error interno al registrar la solicitud. Intentá de nuevo más tarde.',
-    });
-  }
 }
 
 module.exports = { crearSolicitud };
