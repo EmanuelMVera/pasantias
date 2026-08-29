@@ -1,0 +1,6799 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "API — Sistema de Pasantías IT Beltrán",
+    "version": "1.0.0",
+    "license": {
+      "name": "ISC"
+    },
+    "description": "Documentación de la API REST (DOC-02).\n\n## Convenciones\n- **Envelope de éxito:** `{ \"success\": true, ... }`. Normalmente los datos\n  van en `data`; algunas operaciones (login, `/auth/me`, subidas) usan\n  otras claves — está documentado operación por operación.\n- **Errores:** `{ \"success\": false, \"message\": \"<texto>\", \"code\"?: \"<CODE>\" }`.\n  `requestId` se agrega solo en los 500.\n- **Paginación:** query `?page=&limit=`; respuesta\n  `pagination: { page, limit, total, totalPages }`. Las listas repiten\n  `total` en el nivel superior por compatibilidad (legacy).\n\n## Autenticación\nLa sesión vive en la **cookie `token` HttpOnly** (se setea al hacer login).\nPara clientes de API / esta consola: `Authorization: Bearer <token>`\n(el body del login devuelve el `token`).\n\n## CSRF\nLos métodos que mutan estado (`POST/PUT/PATCH/DELETE`) exigen el header\n`X-CSRF-Token` con el valor de la cookie `csrf_token`. Excepciones:\n`POST /auth/login`, `/auth/logout`, `/auth/forgot-password`,\n`/auth/reset-password/{token}` y `POST /solicitudes-empresa`.\n\n## Comportamientos conocidos\n- `POST/PUT /ofertas` sin `titulo`/`descripcion` responde **500** (no 400):\n  la validación de esos campos la hace Sequelize, no un guard de request.\n- `PATCH /admin/solicitudes-empresa/{id}/rechazar` y\n  `.../solicitudes-reclutador/{id}/rechazar` con body vacío responden **500**."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000/api",
+      "description": "Desarrollo local"
+    },
+    {
+      "url": "{publicUrl}/api",
+      "description": "Despliegue",
+      "variables": {
+        "publicUrl": {
+          "default": "https://api.ejemplo.edu"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "cookieAuth": []
+    },
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Autenticación, sesión y contraseña"
+    },
+    {
+      "name": "usuarios",
+      "description": "Perfil propio y subida de CV / carta / foto"
+    },
+    {
+      "name": "alumno",
+      "description": "Panel del alumno / egresado"
+    },
+    {
+      "name": "empresas",
+      "description": "Panel corporativo, perfil de empresa y equipo"
+    },
+    {
+      "name": "ofertas",
+      "description": "Publicaciones de pasantías"
+    },
+    {
+      "name": "postulaciones",
+      "description": "Postulaciones y embudo de selección"
+    },
+    {
+      "name": "solicitudes",
+      "description": "Alta de empresa (pública) y de reclutadores"
+    },
+    {
+      "name": "chat",
+      "description": "Mensajería directa entre usuarios"
+    },
+    {
+      "name": "notificaciones",
+      "description": "Notificaciones in-app"
+    },
+    {
+      "name": "admin",
+      "description": "Panel de administración del instituto (rol admin)"
+    },
+    {
+      "name": "archivos",
+      "description": "Descarga autenticada de archivos privados"
+    }
+  ],
+  "externalDocs": {
+    "description": "Roles y matriz de permisos",
+    "url": "https://github.com/lucashmercado/pasantias/blob/main/docs/ROLES-Y-PERMISOS.md"
+  },
+  "components": {
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "token",
+        "description": "JWT de sesión en cookie **HttpOnly `token`** (SEC-02). Se setea al hacer `POST /auth/login` y el navegador la reenvía sola. El JS del cliente no la ve."
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Alternativa para clientes de API y esta consola: `Authorization: Bearer <token>`. El body de `POST /auth/login` devuelve el `token` a usar acá."
+      }
+    },
+    "parameters": {
+      "pageParam": {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "description": "Número de página (base 1).",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        }
+      },
+      "limitParam": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "description": "Ítems por página. Se recorta al máximo del endpoint (12–100 según el caso).",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 20
+        }
+      },
+      "id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "csrfHeader": {
+        "name": "X-CSRF-Token",
+        "in": "header",
+        "required": true,
+        "description": "Double-submit CSRF: debe coincidir con la cookie `csrf_token`. Obligatorio en todos los métodos que mutan estado salvo los endpoints exentos (ver descripción de la API).",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "estadoQuery": {
+        "name": "estado",
+        "in": "query",
+        "required": false,
+        "description": "Filtra por estado (valores según el recurso).",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "qQuery": {
+        "name": "q",
+        "in": "query",
+        "required": false,
+        "description": "Texto de búsqueda.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "ValidationError400": {
+        "description": "Body inválido — falta un campo requerido o un valor no es válido.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "message": "Faltan campos obligatorios."
+            }
+          }
+        }
+      },
+      "Error401": {
+        "description": "No autenticado — falta el token, es inválido o expiró.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "message": "Token inválido o expirado."
+            }
+          }
+        }
+      },
+      "Error403": {
+        "description": "Sin permisos para la acción (rol de sistema o rol interno de empresa).",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "message": "No tenés permisos para realizar esta acción."
+            }
+          }
+        }
+      },
+      "Error403Csrf": {
+        "description": "Falta el header `X-CSRF-Token` o no coincide con la cookie `csrf_token`.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "code": "CSRF",
+              "message": "Token de seguridad inválido o ausente. Recargá la página e intentá de nuevo."
+            }
+          }
+        }
+      },
+      "Error404": {
+        "description": "El recurso no existe o no es visible para este usuario.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "message": "Recurso no encontrado."
+            }
+          }
+        }
+      },
+      "Error404Empresa": {
+        "description": "El usuario no pertenece a ninguna empresa.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "code": "SIN_EMPRESA",
+              "message": "No tenés acceso a ninguna empresa. Necesitás ser invitado por un administrador."
+            }
+          }
+        }
+      },
+      "Error429": {
+        "description": "Límite de tasa alcanzado (rate limiting).",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "code": "RATE_LIMITED",
+              "message": "Demasiadas solicitudes. Esperá un momento e intentá de nuevo."
+            }
+          }
+        }
+      },
+      "Error500": {
+        "description": "Error interno no controlado.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "success": false,
+              "message": "Error interno del servidor.",
+              "requestId": "a1b2c3d4-..."
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Envelope": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "const": true
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "properties": {
+          "success": {
+            "const": false
+          },
+          "message": {
+            "type": "string",
+            "description": "Mensaje legible en español."
+          },
+          "code": {
+            "type": "string",
+            "description": "Código tipificado (no siempre presente). Middleware: `CSRF`, `RATE_LIMITED`, `SIN_EMPRESA`, `SIN_ROL`, `ROL_INSUFICIENTE`. Negocio: `CV_REQUERIDO`, `POSTULACION_DUPLICADA`, `OFERTA_NO_ACTIVA`, `OFERTA_VENCIDA`, `EMAIL_DUPLICADO`, `YA_ES_MIEMBRO`, `EMAIL_REGISTRADO`, `EMAIL_SOLICITUD_PENDIENTE`, `PERFIL_PRIVADO`."
+          },
+          "rolesPermitidos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Solo en 403 `ROL_INSUFICIENTE`: roles internos que sí pueden."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Solo en 500 — correlaciona con los logs técnicos."
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ],
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "Página actual (recortada a [1, totalPages])."
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total de filas del scope filtrado."
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "Siempre ≥ 1."
+          }
+        }
+      },
+      "Usuario": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "nombre": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "apellido": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "rol": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "activo": {
+            "type": "boolean"
+          },
+          "habilitado": {
+            "type": "boolean",
+            "description": "Para empresas: requiere aprobación del admin"
+          },
+          "telefono": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "ubicacion": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "ultimoAcceso": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fotoPerfil": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UsuarioResumen": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "apellido": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "alumno",
+              "egresado",
+              "empresa",
+              "admin"
+            ]
+          },
+          "telefono": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ubicacion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fotoPerfil": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Perfil": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "usuarioId": {
+            "type": "integer"
+          },
+          "legajo": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "carrera": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "anioEgreso": {
+            "type": "integer"
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "habilidades": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "idiomas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "certificaciones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "linkedin": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "github": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "portfolio": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "redesSociales": {},
+          "cvPath": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "cartaRecomendacion": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "cvArchivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cartaArchivoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fotoPerfil": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "areaInteres": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "disponibilidad": {
+            "type": "string",
+            "enum": [
+              "inmediata",
+              "1_mes",
+              "3_meses",
+              "no_disponible"
+            ]
+          },
+          "preferenciasLaborales": {
+            "type": "string"
+          },
+          "salarioPretendido": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "visibilidadPerfil": {
+            "type": "boolean"
+          },
+          "experienciaLaboral": {
+            "type": "string"
+          },
+          "proyectos": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PerfilUpdate": {
+        "type": "object",
+        "description": "Se envía al menos uno de estos campos. `telefono` y `ubicacion` también se aceptan y se persisten en el `Usuario`.",
+        "minProperties": 1,
+        "properties": {
+          "carrera": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "anioEgreso": {
+            "type": "integer"
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "habilidades": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "idiomas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "certificaciones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "linkedin": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "github": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "portfolio": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "redesSociales": {},
+          "fotoPerfil": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "areaInteres": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "disponibilidad": {
+            "type": "string",
+            "enum": [
+              "inmediata",
+              "1_mes",
+              "3_meses",
+              "no_disponible"
+            ]
+          },
+          "preferenciasLaborales": {
+            "type": "string"
+          },
+          "salarioPretendido": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "visibilidadPerfil": {
+            "type": "boolean"
+          },
+          "experienciaLaboral": {
+            "type": "string"
+          },
+          "proyectos": {
+            "type": "string"
+          },
+          "telefono": {
+            "type": "string"
+          },
+          "ubicacion": {
+            "type": "string"
+          }
+        }
+      },
+      "Empresa": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "usuarioId": {
+            "type": "integer"
+          },
+          "razonSocial": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "cuit": {
+            "type": "string",
+            "maxLength": 11
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "rubro": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "sitioWeb": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "telefono": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "direccion": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "ciudad": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "logo": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "estadoAprobacion": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "aprobada",
+              "rechazada"
+            ]
+          },
+          "aprobadaPorUsuarioId": {
+            "type": "integer"
+          },
+          "aprobadaEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "motivoRechazo": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EmpresaResumen": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "razonSocial": {
+            "type": "string"
+          },
+          "logo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rubro": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ciudad": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "EmpresaPublica": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "razonSocial": {
+            "type": "string"
+          },
+          "rubro": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "descripcion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ciudad": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "direccion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "telefono": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sitioWeb": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "logo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "usuarioId": {
+            "type": "integer"
+          },
+          "ofertas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfertaResumen"
+            }
+          }
+        }
+      },
+      "EmpresaUpdate": {
+        "type": "object",
+        "minProperties": 1,
+        "properties": {
+          "descripcion": {
+            "type": "string"
+          },
+          "rubro": {
+            "type": "string"
+          },
+          "sitioWeb": {
+            "type": "string",
+            "format": "uri"
+          },
+          "telefono": {
+            "type": "string"
+          },
+          "direccion": {
+            "type": "string"
+          },
+          "ciudad": {
+            "type": "string"
+          }
+        }
+      },
+      "Oferta": {
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "empresaId": {
+                "type": "integer"
+              },
+              "titulo": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "descripcion": {
+                "type": "string"
+              },
+              "requisitos": {
+                "type": "string"
+              },
+              "area": {
+                "type": "string",
+                "maxLength": 150
+              },
+              "modalidad": {
+                "type": "string",
+                "enum": [
+                  "presencial",
+                  "remoto",
+                  "hibrido"
+                ]
+              },
+              "modalidadExtendida": {
+                "type": "string",
+                "maxLength": 255
+              },
+              "ciudad": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "remuneracion": {
+                "type": "string",
+                "maxLength": 100
+              },
+              "salario": {
+                "type": "integer"
+              },
+              "beneficios": {
+                "type": "string"
+              },
+              "cantidadVacantes": {
+                "type": "integer"
+              },
+              "habilidadesRequeridas": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "nivelExperiencia": {
+                "type": "string",
+                "enum": [
+                  "sin_experiencia",
+                  "junior",
+                  "semi_senior"
+                ]
+              },
+              "tipoPuesto": {
+                "type": "string",
+                "maxLength": 20
+              },
+              "requiereExperiencia": {
+                "type": "boolean"
+              },
+              "experienciaDetalle": {
+                "type": "string"
+              },
+              "carrerasDestinatarias": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "fechaPublicacion": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "fechaLimite": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "estado": {
+                "type": "string",
+                "maxLength": 20
+              },
+              "moderada": {
+                "type": "boolean"
+              },
+              "vistas": {
+                "type": "integer"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "properties": {
+              "empresa": {
+                "$ref": "#/components/schemas/EmpresaResumen"
+              }
+            }
+          }
+        ]
+      },
+      "OfertaResumen": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "titulo": {
+            "type": "string"
+          },
+          "area": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "modalidad": {
+            "type": "string"
+          },
+          "ciudad": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tipoPuesto": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fechaLimite": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "OfertaCreate": {
+        "type": "object",
+        "required": [
+          "titulo",
+          "descripcion"
+        ],
+        "description": "Omitir `titulo` o `descripcion` provoca un **500** (los valida Sequelize, no un guard). `salario`, `fechaPublicacion` y `fechaLimite` en `\"\"` se guardan como `null`.",
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "requisitos": {
+            "type": "string"
+          },
+          "area": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "modalidad": {
+            "type": "string",
+            "enum": [
+              "presencial",
+              "remoto",
+              "hibrido"
+            ]
+          },
+          "modalidadExtendida": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "ciudad": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "remuneracion": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "salario": {
+            "type": "integer"
+          },
+          "beneficios": {
+            "type": "string"
+          },
+          "cantidadVacantes": {
+            "type": "integer"
+          },
+          "habilidadesRequeridas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tipoPuesto": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "requiereExperiencia": {
+            "type": "boolean"
+          },
+          "experienciaDetalle": {
+            "type": "string"
+          },
+          "carrerasDestinatarias": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fechaPublicacion": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fechaLimite": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "OfertaUpdate": {
+        "type": "object",
+        "description": "Mismos campos que `OfertaCreate`; se envían solo los que cambian.",
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "requisitos": {
+            "type": "string"
+          },
+          "area": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "modalidad": {
+            "type": "string",
+            "enum": [
+              "presencial",
+              "remoto",
+              "hibrido"
+            ]
+          },
+          "modalidadExtendida": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "ciudad": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "remuneracion": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "salario": {
+            "type": "integer"
+          },
+          "beneficios": {
+            "type": "string"
+          },
+          "cantidadVacantes": {
+            "type": "integer"
+          },
+          "habilidadesRequeridas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tipoPuesto": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "requiereExperiencia": {
+            "type": "boolean"
+          },
+          "experienciaDetalle": {
+            "type": "string"
+          },
+          "carrerasDestinatarias": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fechaPublicacion": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fechaLimite": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Postulacion": {
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "usuarioId": {
+                "type": "integer"
+              },
+              "ofertaId": {
+                "type": "integer"
+              },
+              "cartaPresentacion": {
+                "type": "string"
+              },
+              "estado": {
+                "type": "string",
+                "maxLength": 30
+              },
+              "fechaPostulacion": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "notasEmpresa": {
+                "type": "string"
+              },
+              "cvArchivoId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "`formatearPostulacion` agrega alias sobre los campos del modelo.",
+            "properties": {
+              "estadoActual": {
+                "type": "string",
+                "enum": [
+                  "en_revision",
+                  "preseleccionado",
+                  "entrevista",
+                  "contratado",
+                  "rechazado"
+                ],
+                "description": "Alias de `estado`."
+              },
+              "ultimaActualizacion": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "observacionesEmpresa": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Alias de `notasEmpresa`."
+              },
+              "oferta": {
+                "$ref": "#/components/schemas/OfertaResumen"
+              },
+              "usuario": {
+                "$ref": "#/components/schemas/UsuarioResumen"
+              }
+            }
+          }
+        ]
+      },
+      "PostulacionCreate": {
+        "type": "object",
+        "required": [
+          "ofertaId"
+        ],
+        "properties": {
+          "ofertaId": {
+            "type": "integer"
+          },
+          "cartaPresentacion": {
+            "type": "string",
+            "description": "Opcional."
+          }
+        }
+      },
+      "PostulacionEstadoUpdate": {
+        "type": "object",
+        "description": "Ambos campos son opcionales; sin ninguno, la operación es un no-op y responde 200.",
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "en_revision",
+              "preseleccionado",
+              "entrevista",
+              "contratado",
+              "rechazado"
+            ]
+          },
+          "notasEmpresa": {
+            "type": "string"
+          }
+        }
+      },
+      "SolicitudEmpresa": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "razonSocial": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "cuit": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "rubro": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "direccion": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "ciudad": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "sitioWeb": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "telefono": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "responsableNombre": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "responsableApellido": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "responsableEmail": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "responsableTelefono": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "responsableCargo": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "carrerasInteres": {},
+          "descripcion": {
+            "type": "string"
+          },
+          "puestos": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "aprobado",
+              "rechazado"
+            ]
+          },
+          "reclutadores": {},
+          "revisadaPorUsuarioId": {
+            "type": "integer"
+          },
+          "revisadaEn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "motivoRechazo": {
+            "type": "string"
+          },
+          "empresaIdCreada": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SolicitudEmpresaCreate": {
+        "type": "object",
+        "required": [
+          "razonSocial",
+          "cuit",
+          "rubro",
+          "email",
+          "responsableNombre",
+          "responsableApellido",
+          "responsableEmail"
+        ],
+        "properties": {
+          "razonSocial": {
+            "type": "string"
+          },
+          "cuit": {
+            "type": "string"
+          },
+          "rubro": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email institucional de contacto."
+          },
+          "sitioWeb": {
+            "type": "string"
+          },
+          "direccion": {
+            "type": "string"
+          },
+          "ciudad": {
+            "type": "string"
+          },
+          "telefono": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "puestos": {
+            "type": "string"
+          },
+          "responsableNombre": {
+            "type": "string"
+          },
+          "responsableApellido": {
+            "type": "string"
+          },
+          "responsableEmail": {
+            "type": "string",
+            "format": "email"
+          },
+          "responsableTelefono": {
+            "type": "string"
+          },
+          "responsableCargo": {
+            "type": "string"
+          },
+          "carrerasInteres": {
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "Array o string JSON."
+          },
+          "reclutadores": {
+            "type": "array",
+            "description": "Opcional. Cada entrada no vacía requiere nombre, apellido y email.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "nombre": {
+                  "type": "string"
+                },
+                "apellido": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string",
+                  "format": "email"
+                }
+              }
+            }
+          }
+        }
+      },
+      "SolicitudReclutador": {
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "empresaId": {
+                "type": "integer"
+              },
+              "nombre": {
+                "type": "string",
+                "maxLength": 150
+              },
+              "apellido": {
+                "type": "string",
+                "maxLength": 150
+              },
+              "email": {
+                "type": "string",
+                "maxLength": 255
+              },
+              "estado": {
+                "type": "string",
+                "enum": [
+                  "pendiente",
+                  "aprobado",
+                  "rechazado"
+                ]
+              },
+              "motivoRechazo": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "properties": {
+              "empresa": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer"
+                  },
+                  "razonSocial": {
+                    "type": "string"
+                  },
+                  "usuarioId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "SolicitudReclutadorCreate": {
+        "type": "object",
+        "required": [
+          "nombre",
+          "apellido",
+          "email"
+        ],
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "apellido": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        }
+      },
+      "MotivoRechazo": {
+        "type": "object",
+        "description": "`motivo` es opcional, pero el body **no puede faltar por completo** en `rechazarSolicitudEmpresa` / `rechazarSolicitudReclutador` (body vacío → 500).",
+        "properties": {
+          "motivo": {
+            "type": "string"
+          }
+        }
+      },
+      "Notificacion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "usuarioId": {
+            "type": "integer"
+          },
+          "titulo": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "mensaje": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "leida": {
+            "type": "boolean"
+          },
+          "enlace": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "prioridad": {
+            "type": "string",
+            "enum": [
+              "baja",
+              "normal",
+              "alta",
+              "urgente"
+            ]
+          },
+          "tipoVisual": {
+            "type": "string",
+            "enum": [
+              "info",
+              "success",
+              "warning",
+              "error"
+            ]
+          },
+          "accionURL": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Mensaje": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "emisorId": {
+            "type": "integer"
+          },
+          "receptorId": {
+            "type": "integer"
+          },
+          "mensaje": {
+            "type": "string"
+          },
+          "leido": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MensajeCreate": {
+        "type": "object",
+        "required": [
+          "receptorId",
+          "mensaje"
+        ],
+        "properties": {
+          "receptorId": {
+            "type": "integer"
+          },
+          "mensaje": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        }
+      },
+      "Conversacion": {
+        "type": "object",
+        "properties": {
+          "usuario": {
+            "$ref": "#/components/schemas/UsuarioResumen"
+          },
+          "ultimoMensaje": {
+            "$ref": "#/components/schemas/Mensaje"
+          },
+          "noLeidos": {
+            "type": "integer"
+          }
+        }
+      },
+      "ActivityLog": {
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "usuarioId": {
+                "type": "integer"
+              },
+              "accion": {
+                "type": "string",
+                "enum": [
+                  "login",
+                  "logout",
+                  "crear_usuario",
+                  "editar_usuario",
+                  "eliminar_usuario",
+                  "cambiar_rol",
+                  "toggle_usuario",
+                  "aprobar_empresa",
+                  "rechazar_empresa",
+                  "aprobar_oferta",
+                  "rechazar_oferta",
+                  "crear_oferta",
+                  "cerrar_oferta",
+                  "postular",
+                  "cambiar_estado_postulacion",
+                  "aprobar_solicitud_empresa",
+                  "rechazar_solicitud_empresa",
+                  "aprobar_solicitud_reclutador",
+                  "rechazar_solicitud_reclutador",
+                  "solicitar_recuperacion_miembro",
+                  "sistema"
+                ]
+              },
+              "entidad": {
+                "type": "string",
+                "maxLength": 50
+              },
+              "entidadId": {
+                "type": "integer"
+              },
+              "detalle": {},
+              "ip": {
+                "type": "string",
+                "maxLength": 45
+              },
+              "requestId": {
+                "type": "string",
+                "maxLength": 36
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "properties": {
+              "usuario": {
+                "$ref": "#/components/schemas/UsuarioResumen"
+              }
+            }
+          }
+        ]
+      },
+      "AdminUsuarioCreate": {
+        "type": "object",
+        "required": [
+          "nombre",
+          "apellido",
+          "email",
+          "password",
+          "rol"
+        ],
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "apellido": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "alumno",
+              "egresado",
+              "empresa",
+              "admin"
+            ]
+          },
+          "telefono": {
+            "type": "string"
+          },
+          "ubicacion": {
+            "type": "string"
+          },
+          "legajo": {
+            "type": "string",
+            "description": "Obligatorio si `rol` es `alumno` o `egresado`."
+          }
+        }
+      },
+      "AdminUsuarioUpdate": {
+        "type": "object",
+        "description": "Todos opcionales; se ignoran los `undefined`.",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "apellido": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "alumno",
+              "egresado",
+              "empresa",
+              "admin"
+            ]
+          },
+          "activo": {
+            "type": "boolean"
+          },
+          "telefono": {
+            "type": "string"
+          },
+          "ubicacion": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "legajo": {
+            "type": "string"
+          }
+        }
+      },
+      "AdminModerarOferta": {
+        "type": "object",
+        "required": [
+          "accion"
+        ],
+        "properties": {
+          "accion": {
+            "type": "string",
+            "enum": [
+              "aprobar",
+              "pausar",
+              "rechazar",
+              "cerrar"
+            ]
+          },
+          "aprobada": {
+            "type": "boolean",
+            "deprecated": true,
+            "description": "Fallback legacy de `accion`."
+          }
+        }
+      },
+      "DashboardGeneral": {
+        "type": "object",
+        "properties": {
+          "usuarios": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "pasantias": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "sistema": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "actividadReciente": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActivityLog"
+            }
+          }
+        }
+      },
+      "DashboardEmpresa": {
+        "type": "object",
+        "properties": {
+          "empresa": {
+            "$ref": "#/components/schemas/EmpresaResumen"
+          },
+          "rolEnEquipo": {
+            "type": "string",
+            "enum": [
+              "admin_empresa",
+              "reclutador"
+            ]
+          },
+          "ofertas": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "postulaciones": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "equipo": {
+            "type": "object",
+            "properties": {
+              "totalMiembros": {
+                "type": "integer"
+              }
+            }
+          },
+          "ofertasRecientes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfertaResumen"
+            }
+          }
+        }
+      },
+      "DashboardAlumno": {
+        "type": "object",
+        "description": "Métricas personales, ofertas recomendadas y % de completitud del perfil.",
+        "additionalProperties": true
+      },
+      "EquipoMiembro": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "rolInterno": {
+            "type": "string",
+            "enum": [
+              "admin_empresa",
+              "reclutador"
+            ]
+          },
+          "activo": {
+            "type": "boolean"
+          },
+          "esAdminVirtual": {
+            "type": "boolean",
+            "description": "true = dueño directo sin fila en empresa_usuarios."
+          },
+          "usuario": {
+            "$ref": "#/components/schemas/UsuarioResumen"
+          }
+        }
+      },
+      "LoginResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Envelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "token",
+              "usuario"
+            ],
+            "properties": {
+              "token": {
+                "type": "string",
+                "description": "JWT. La sesión real es la cookie `token`; este campo es para clientes de API / la consola."
+              },
+              "usuario": {
+                "$ref": "#/components/schemas/UsuarioResumen"
+              }
+            }
+          }
+        ]
+      },
+      "AuthMeResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Envelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "usuario"
+            ],
+            "properties": {
+              "usuario": {
+                "$ref": "#/components/schemas/Usuario"
+              }
+            }
+          }
+        ]
+      },
+      "ForgotPasswordResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Envelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "message"
+            ],
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "devToken": {
+                "type": "string",
+                "description": "Solo fuera de producción y sin email configurado — token de reset en claro."
+              }
+            }
+          }
+        ]
+      },
+      "UnreadCountResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Envelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "count"
+            ],
+            "properties": {
+              "count": {
+                "type": "integer"
+              }
+            }
+          }
+        ]
+      },
+      "LogoUploadResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Envelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "message"
+            ],
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "logo": {
+                "type": "string"
+              },
+              "archivoId": {
+                "type": "integer"
+              }
+            }
+          }
+        ]
+      },
+      "CvUploadResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Envelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "message"
+            ],
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "cvPath": {
+                "type": "string"
+              },
+              "cvArchivoId": {
+                "type": "integer"
+              }
+            }
+          }
+        ]
+      },
+      "CartaUploadResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Envelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "message"
+            ],
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "cartaRecomendacion": {
+                "type": "string"
+              },
+              "cartaArchivoId": {
+                "type": "integer"
+              }
+            }
+          }
+        ]
+      },
+      "FotoUploadResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Envelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "message"
+            ],
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "fotoPerfil": {
+                "type": "string"
+              },
+              "archivoId": {
+                "type": "integer"
+              }
+            }
+          }
+        ]
+      },
+      "MarcarLeidaResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Envelope"
+          },
+          {
+            "type": "object",
+            "required": [
+              "message"
+            ],
+            "properties": {
+              "success": {
+                "const": true
+              },
+              "message": {
+                "type": "string"
+              },
+              "actualizados": {
+                "type": "integer"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "authLogin",
+        "summary": "Iniciar sesión",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Setea la cookie `token` (HttpOnly) y además devuelve el `token` en el body. CSRF exento.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "authLogout",
+        "summary": "Cerrar sesión",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Borra la cookie `token`. No requiere autenticación. CSRF exento.",
+        "security": []
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "authMe",
+        "summary": "Usuario de la sesión actual",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthMeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "authForgotPassword",
+        "summary": "Solicitar recuperación de contraseña",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForgotPasswordResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Responde siempre 200 con un mensaje genérico (no revela si el email existe). CSRF exento.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/reset-password/{token}": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "authResetPassword",
+        "summary": "Restablecer contraseña con token",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "CSRF exento. Invalida las sesiones previas (bump de `tokenVersion`).",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "password"
+                ],
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 6
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/cambiar-password": {
+      "put": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "authCambiarPassword",
+        "summary": "Cambiar la contraseña propia",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403Csrf"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "passwordActual",
+                  "nuevaPassword"
+                ],
+                "properties": {
+                  "passwordActual": {
+                    "type": "string"
+                  },
+                  "nuevaPassword": {
+                    "type": "string",
+                    "minLength": 6,
+                    "description": "Debe diferir de la actual."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/perfil": {
+      "get": {
+        "tags": [
+          "usuarios"
+        ],
+        "operationId": "usuariosGetPerfil",
+        "summary": "Mi perfil (usuario + perfil académico)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Perfil"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "usuarios"
+        ],
+        "operationId": "usuariosUpdatePerfil",
+        "summary": "Actualizar mi perfil académico",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Perfil"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** alumno · egresado",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PerfilUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/perfil/cv": {
+      "post": {
+        "tags": [
+          "usuarios"
+        ],
+        "operationId": "usuariosUploadCv",
+        "summary": "Subir el CV (PDF)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CvUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** alumno · egresado",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "cv"
+                ],
+                "properties": {
+                  "cv": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          },
+          "description": "multipart/form-data con el campo `cv` (application/pdf, máx. 5 MB)."
+        }
+      }
+    },
+    "/api/users/perfil/carta-recomendacion": {
+      "post": {
+        "tags": [
+          "usuarios"
+        ],
+        "operationId": "usuariosUploadCarta",
+        "summary": "Subir la carta de recomendación (PDF o imagen)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartaUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** alumno · egresado",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "carta"
+                ],
+                "properties": {
+                  "carta": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          },
+          "description": "multipart/form-data con el campo `carta` (PDF / JPG / PNG / WEBP, máx. 5 MB)."
+        }
+      }
+    },
+    "/api/users/perfil/foto": {
+      "post": {
+        "tags": [
+          "usuarios"
+        ],
+        "operationId": "usuariosUploadFoto",
+        "summary": "Subir la foto de perfil (imagen)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FotoUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** alumno · egresado",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "foto"
+                ],
+                "properties": {
+                  "foto": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          },
+          "description": "multipart/form-data con el campo `foto` (imagen validada por magic bytes, máx. 2 MB)."
+        }
+      }
+    },
+    "/api/users/{id}/perfil": {
+      "get": {
+        "tags": [
+          "usuarios"
+        ],
+        "operationId": "usuariosGetPerfilPublico",
+        "summary": "Perfil público de otro usuario",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Perfil"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Respeta `visibilidadPerfil`. Cualquier usuario autenticado.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/students/dashboard": {
+      "get": {
+        "tags": [
+          "alumno"
+        ],
+        "operationId": "alumnoDashboard",
+        "summary": "Panel del alumno / egresado",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/DashboardAlumno"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Métricas personales, ofertas recomendadas y % de completitud del perfil.\n\n**Roles:** alumno · egresado"
+      }
+    },
+    "/api/ofertas/recomendadas": {
+      "get": {
+        "tags": [
+          "alumno"
+        ],
+        "operationId": "alumnoOfertasRecomendadas",
+        "summary": "Ofertas recomendadas para mi perfil",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data",
+                        "pagination"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Oferta"
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        },
+                        "criterios": {
+                          "type": "object",
+                          "additionalProperties": true
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** alumno · egresado",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          }
+        ]
+      }
+    },
+    "/api/empresas/dashboard": {
+      "get": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasDashboard",
+        "summary": "Métricas del panel corporativo",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/DashboardEmpresa"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404Empresa"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** empresa/admin_empresa · empresa/reclutador"
+      }
+    },
+    "/api/empresas/mis-ofertas": {
+      "get": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasMisOfertas",
+        "summary": "Mis ofertas (con conteo de postulaciones)",
+        "responses": {
+          "200": {
+            "description": "Lista paginada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data",
+                        "pagination"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Oferta"
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Redundante con pagination.total (legacy)."
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404Empresa"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          },
+          {
+            "$ref": "#/components/parameters/estadoQuery"
+          }
+        ]
+      }
+    },
+    "/api/empresas/mi-empresa": {
+      "get": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasMiEmpresa",
+        "summary": "Datos de mi empresa",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Empresa"
+                        },
+                        "rolEnEquipo": {
+                          "type": "string",
+                          "enum": [
+                            "admin_empresa",
+                            "reclutador"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404Empresa"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** empresa/admin_empresa · empresa/reclutador"
+      },
+      "put": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasUpdateMiEmpresa",
+        "summary": "Editar el perfil de mi empresa",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Empresa"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404Empresa"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** empresa/admin_empresa",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmpresaUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/empresas/mi-empresa/logo": {
+      "post": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasUploadLogo",
+        "summary": "Subir el logo de mi empresa",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404Empresa"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** empresa/admin_empresa",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "logo"
+                ],
+                "properties": {
+                  "logo": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          },
+          "description": "multipart/form-data con el campo `logo` (imagen validada, máx. 2 MB)."
+        }
+      }
+    },
+    "/api/empresas/candidatos": {
+      "get": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasCandidatos",
+        "summary": "Todas las postulaciones de mi empresa",
+        "responses": {
+          "200": {
+            "description": "Lista paginada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data",
+                        "pagination"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Postulacion"
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Redundante con pagination.total (legacy)."
+                        },
+                        "conteoPorEstado": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404Empresa"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          },
+          {
+            "$ref": "#/components/parameters/estadoQuery"
+          }
+        ]
+      }
+    },
+    "/api/empresas/equipo": {
+      "get": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasEquipo",
+        "summary": "Miembros del equipo (activos e inactivos)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/EquipoMiembro"
+                          }
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "rolEnEquipo": {
+                          "type": "string",
+                          "enum": [
+                            "admin_empresa",
+                            "reclutador"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404Empresa"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** empresa/admin_empresa · empresa/reclutador"
+      }
+    },
+    "/api/empresas/equipo/solicitudes": {
+      "get": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasEquipoSolicitudes",
+        "summary": "Solicitudes de reclutador de mi empresa",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/SolicitudReclutador"
+                          }
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404Empresa"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** empresa/admin_empresa"
+      }
+    },
+    "/api/empresas/equipo/solicitar": {
+      "post": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasEquipoSolicitar",
+        "summary": "Solicitar el alta de un reclutador",
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/SolicitudReclutador"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404Empresa"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Crea una `SolicitudReclutador` pendiente; el **admin del instituto** crea la cuenta al aprobar.\n\n**Roles:** empresa/admin_empresa",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudReclutadorCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/empresas/equipo/{id}/recuperacion": {
+      "post": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasEquipoRecuperacion",
+        "summary": "Enviar recuperación de acceso a un miembro",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Manda un email al miembro para que fije su contraseña. El admin_empresa nunca ve ni elige la contraseña.\n\n**Roles:** empresa/admin_empresa",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ]
+      }
+    },
+    "/api/empresas/equipo/{id}": {
+      "patch": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasEquipoUpdate",
+        "summary": "Cambiar rol o estado de un miembro",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/EquipoMiembro"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** empresa/admin_empresa",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rolInterno": {
+                    "type": "string",
+                    "enum": [
+                      "reclutador"
+                    ],
+                    "description": "Solo se puede asignar `reclutador`."
+                  },
+                  "activo": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasEquipoRemove",
+        "summary": "Dar de baja un miembro del equipo",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** empresa/admin_empresa",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ]
+      }
+    },
+    "/api/empresas/{id}": {
+      "get": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasGetPublica",
+        "summary": "Perfil público de una empresa",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/EmpresaPublica"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Cualquier usuario autenticado. Solo empresas `aprobada`; incluye sus últimas ofertas activas.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
+    "/api/ofertas": {
+      "get": {
+        "tags": [
+          "ofertas"
+        ],
+        "operationId": "ofertasList",
+        "summary": "Listar ofertas activas y aprobadas",
+        "responses": {
+          "200": {
+            "description": "Lista paginada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data",
+                        "pagination"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Oferta"
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Redundante con pagination.total (legacy)."
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Público. Solo devuelve ofertas `estado=activa` y `moderada=true`.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          },
+          {
+            "$ref": "#/components/parameters/estadoQuery"
+          },
+          {
+            "name": "area",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "modalidad",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "presencial",
+                "remoto",
+                "hibrido"
+              ]
+            }
+          },
+          {
+            "name": "ciudad",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "experiencia",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipoPuesto",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pasante",
+                "trainee",
+                "junior"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": []
+      },
+      "post": {
+        "tags": [
+          "ofertas"
+        ],
+        "operationId": "ofertasCreate",
+        "summary": "Publicar una oferta",
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/Oferta"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404Empresa"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "La oferta queda `moderada=false` hasta que un admin la aprueba.\n\n**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfertaCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ofertas/{id}": {
+      "get": {
+        "tags": [
+          "ofertas"
+        ],
+        "operationId": "ofertasGet",
+        "summary": "Detalle de una oferta",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Oferta"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Público. Incrementa el contador de vistas. 404 si no está `activa`+`moderada`.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "security": []
+      },
+      "put": {
+        "tags": [
+          "ofertas"
+        ],
+        "operationId": "ofertasUpdate",
+        "summary": "Editar una oferta de mi empresa",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Oferta"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfertaUpdate"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "ofertas"
+        ],
+        "operationId": "ofertasDelete",
+        "summary": "Cerrar una oferta de mi empresa",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Soft close — pasa a `estado=cerrada`.\n\n**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ]
+      }
+    },
+    "/api/postulaciones": {
+      "post": {
+        "tags": [
+          "postulaciones"
+        ],
+        "operationId": "postulacionesCrear",
+        "summary": "Postularme a una oferta",
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/Postulacion"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Requiere tener un CV subido. El CV se snapshotea en la postulación.\n\n**Roles:** alumno · egresado",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostulacionCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/postulaciones/mis": {
+      "get": {
+        "tags": [
+          "postulaciones"
+        ],
+        "operationId": "postulacionesMias",
+        "summary": "Mis postulaciones",
+        "responses": {
+          "200": {
+            "description": "Lista paginada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data",
+                        "pagination"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Postulacion"
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Redundante con pagination.total (legacy)."
+                        },
+                        "conteoPorEstado": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** alumno · egresado",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          },
+          {
+            "$ref": "#/components/parameters/estadoQuery"
+          }
+        ]
+      }
+    },
+    "/api/postulaciones/oferta/{ofertaId}": {
+      "get": {
+        "tags": [
+          "postulaciones"
+        ],
+        "operationId": "postulacionesByOferta",
+        "summary": "Candidatos de una oferta de mi empresa",
+        "responses": {
+          "200": {
+            "description": "Lista paginada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data",
+                        "pagination"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Postulacion"
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Redundante con pagination.total (legacy)."
+                        },
+                        "conteoPorEstado": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "integer"
+                          }
+                        },
+                        "oferta": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "titulo": {
+                              "type": "string"
+                            },
+                            "habilidadesRequeridas": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "parameters": [
+          {
+            "name": "ofertaId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          },
+          {
+            "$ref": "#/components/parameters/estadoQuery"
+          }
+        ]
+      }
+    },
+    "/api/postulaciones/{id}/estado": {
+      "patch": {
+        "tags": [
+          "postulaciones"
+        ],
+        "operationId": "postulacionesUpdateEstado",
+        "summary": "Cambiar el estado de una postulación",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/Postulacion"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostulacionEstadoUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/solicitudes-empresa": {
+      "post": {
+        "tags": [
+          "solicitudes"
+        ],
+        "operationId": "solicitudesEmpresaCrear",
+        "summary": "Enviar una solicitud de registro de empresa",
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "estado": {
+                              "type": "string",
+                              "enum": [
+                                "pendiente"
+                              ]
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Endpoint **público** (sin auth, CSRF exento). La revisa un admin del instituto.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudEmpresaCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/usuarios": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "operationId": "chatBuscarUsuarios",
+        "summary": "Buscar usuarios para chatear",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/UsuarioResumen"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Requiere `q` de ≥ 2 caracteres. Los admin no participan del chat (devuelve lista vacía).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/qQuery"
+          }
+        ]
+      }
+    },
+    "/api/chat": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "operationId": "chatConversaciones",
+        "summary": "Mis conversaciones",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Conversacion"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "operationId": "chatEnviarMensaje",
+        "summary": "Enviar un mensaje",
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/Mensaje"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Las reglas de con quién se puede chatear las aplica `chatPermission.service` (403 con el motivo).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MensajeCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/{usuarioId}": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "operationId": "chatHistorial",
+        "summary": "Historial de mensajes con un usuario",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data",
+                        "pagination"
+                      ],
+                      "properties": {
+                        "usuario": {
+                          "$ref": "#/components/schemas/UsuarioResumen"
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Mensaje"
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "parameters": [
+          {
+            "name": "usuarioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          }
+        ]
+      }
+    },
+    "/api/chat/{usuarioId}/leer": {
+      "patch": {
+        "tags": [
+          "chat"
+        ],
+        "operationId": "chatMarcarLeida",
+        "summary": "Marcar como leídos los mensajes de un usuario",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarcarLeidaResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403Csrf"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "parameters": [
+          {
+            "name": "usuarioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ]
+      }
+    },
+    "/api/notificaciones": {
+      "get": {
+        "tags": [
+          "notificaciones"
+        ],
+        "operationId": "notificacionesList",
+        "summary": "Mis notificaciones",
+        "responses": {
+          "200": {
+            "description": "Lista paginada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data",
+                        "pagination"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Notificacion"
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Redundante con pagination.total (legacy)."
+                        },
+                        "sinLeer": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          },
+          {
+            "name": "leida",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/notificaciones/sin-leer-count": {
+      "get": {
+        "tags": [
+          "notificaciones"
+        ],
+        "operationId": "notificacionesSinLeerCount",
+        "summary": "Cantidad de notificaciones sin leer",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadCountResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/notificaciones/leer-todas": {
+      "patch": {
+        "tags": [
+          "notificaciones"
+        ],
+        "operationId": "notificacionesLeerTodas",
+        "summary": "Marcar todas como leídas",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403Csrf"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ]
+      }
+    },
+    "/api/notificaciones/{id}/leer": {
+      "patch": {
+        "tags": [
+          "notificaciones"
+        ],
+        "operationId": "notificacionesLeerUna",
+        "summary": "Marcar una notificación como leída",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403Csrf"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ]
+      }
+    },
+    "/api/notificaciones/{id}": {
+      "delete": {
+        "tags": [
+          "notificaciones"
+        ],
+        "operationId": "notificacionesEliminar",
+        "summary": "Eliminar una notificación",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403Csrf"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ]
+      }
+    },
+    "/api/admin/dashboard-general": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminDashboardGeneral",
+        "summary": "Métricas globales del instituto",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/DashboardGeneral"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin"
+      }
+    },
+    "/api/admin/stats": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminStats",
+        "summary": "Stats resumidas (legacy)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/DashboardGeneral"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin",
+        "deprecated": true
+      }
+    },
+    "/api/admin/actividad-reciente": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminActividadReciente",
+        "summary": "Últimas 20 acciones registradas",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ActivityLog"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin"
+      }
+    },
+    "/api/admin/usuarios": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminUsuariosList",
+        "summary": "Listar usuarios",
+        "responses": {
+          "200": {
+            "description": "Lista paginada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data",
+                        "pagination"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Usuario"
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Redundante con pagination.total (legacy)."
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          },
+          {
+            "name": "rol",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "alumno",
+                "egresado",
+                "empresa",
+                "admin"
+              ]
+            }
+          },
+          {
+            "name": "activo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/qQuery"
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminUsuariosCrear",
+        "summary": "Crear un usuario",
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/Usuario"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUsuarioCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/usuarios/{id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminUsuariosGet",
+        "summary": "Detalle de un usuario",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Usuario"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminUsuariosUpdate",
+        "summary": "Editar un usuario",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/Usuario"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUsuarioUpdate"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminUsuariosEliminar",
+        "summary": "Desactivar un usuario (soft delete)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ]
+      }
+    },
+    "/api/admin/usuarios/{id}/toggle": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminUsuariosToggle",
+        "summary": "Activar / desactivar un usuario",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ]
+      }
+    },
+    "/api/admin/empresas/pendientes": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminEmpresasPendientes",
+        "summary": "Empresas pendientes de aprobación",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Empresa"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin"
+      }
+    },
+    "/api/admin/empresas/{id}/aprobar": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminEmpresasAprobar",
+        "summary": "Aprobar una empresa",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ]
+      }
+    },
+    "/api/admin/empresas/{id}/rechazar": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminEmpresasRechazar",
+        "summary": "Rechazar una empresa",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MotivoRechazo"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/ofertas/pendientes": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminOfertasPendientes",
+        "summary": "Ofertas pendientes de moderación",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Oferta"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin"
+      }
+    },
+    "/api/admin/ofertas": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminOfertasList",
+        "summary": "Listar todas las ofertas",
+        "responses": {
+          "200": {
+            "description": "Lista paginada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data",
+                        "pagination"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Oferta"
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Redundante con pagination.total (legacy)."
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          },
+          {
+            "$ref": "#/components/parameters/estadoQuery"
+          }
+        ]
+      }
+    },
+    "/api/admin/ofertas/{id}/moderar": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminOfertasModerar",
+        "summary": "Moderar una oferta (aprobar/pausar/rechazar/cerrar)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "estado": {
+                              "type": "string"
+                            },
+                            "moderada": {
+                              "type": "boolean"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminModerarOferta"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/logs": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminLogsList",
+        "summary": "Listar el log de auditoría",
+        "responses": {
+          "200": {
+            "description": "Lista paginada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data",
+                        "pagination"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ActivityLog"
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Redundante con pagination.total (legacy)."
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          },
+          {
+            "name": "accion",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "usuarioId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "entidad",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/logs/export": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminLogsExport",
+        "summary": "Exportar el log de auditoría a CSV",
+        "responses": {
+          "200": {
+            "description": "CSV con las columnas ID,Fecha,Acción,Entidad,EntidadID,Usuario,Email,IP,Detalle.",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Devuelve un CSV (máx. 5000 filas) con BOM.\n\n**Roles:** admin",
+        "parameters": [
+          {
+            "name": "accion",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "usuarioId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "entidad",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/solicitudes-empresa": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminSolicitudesEmpresaList",
+        "summary": "Listar solicitudes de empresa",
+        "responses": {
+          "200": {
+            "description": "Lista paginada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data",
+                        "pagination"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/SolicitudEmpresa"
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Redundante con pagination.total (legacy)."
+                        },
+                        "conteoPorEstado": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          },
+          {
+            "$ref": "#/components/parameters/estadoQuery"
+          }
+        ]
+      }
+    },
+    "/api/admin/solicitudes-empresa/{id}/aprobar": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminSolicitudEmpresaAprobar",
+        "summary": "Aprobar una solicitud de empresa",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "empresaId": {
+                              "type": "integer"
+                            },
+                            "usuarioId": {
+                              "type": "integer"
+                            },
+                            "email": {
+                              "type": "string"
+                            },
+                            "reclutadoresPendientes": {
+                              "type": "integer"
+                            },
+                            "passwordGenerada": {
+                              "type": "string",
+                              "description": "Solo fuera de producción."
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Crea `Usuario` (rol empresa) + `Empresa` (aprobada) + `EmpresaUsuario` (admin_empresa).\n\n**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ]
+      }
+    },
+    "/api/admin/solicitudes-empresa/{id}/rechazar": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminSolicitudEmpresaRechazar",
+        "summary": "Rechazar una solicitud de empresa",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "El body no puede faltar por completo (body vacío → 500). `motivo` es opcional.\n\n**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MotivoRechazo"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/solicitudes-reclutador": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminSolicitudesReclutadorList",
+        "summary": "Listar solicitudes de reclutador",
+        "responses": {
+          "200": {
+            "description": "Lista paginada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data",
+                        "pagination"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/SolicitudReclutador"
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Redundante con pagination.total (legacy)."
+                        },
+                        "conteoPorEstado": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          },
+          {
+            "$ref": "#/components/parameters/estadoQuery"
+          }
+        ]
+      }
+    },
+    "/api/admin/solicitudes-reclutador/{id}/aprobar": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminSolicitudReclutadorAprobar",
+        "summary": "Aprobar una solicitud de reclutador",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "usuarioId": {
+                              "type": "integer"
+                            },
+                            "email": {
+                              "type": "string"
+                            },
+                            "passwordGenerada": {
+                              "type": "string",
+                              "description": "Solo fuera de producción."
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Crea `Usuario` (rol empresa) + `EmpresaUsuario` (reclutador).\n\n**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ]
+      }
+    },
+    "/api/admin/solicitudes-reclutador/{id}/rechazar": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminSolicitudReclutadorRechazar",
+        "summary": "Rechazar una solicitud de reclutador",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "El body no puede faltar por completo (body vacío → 500). `motivo` es opcional.\n\n**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MotivoRechazo"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/archivos/{id}": {
+      "get": {
+        "tags": [
+          "archivos"
+        ],
+        "operationId": "archivosDescargar",
+        "summary": "Descargar un archivo privado (CV / carta)",
+        "responses": {
+          "200": {
+            "description": "El archivo (stream binario).",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Autenticado + autorización fina en el controller: solo el **propietario** del archivo, un **admin**, o una **empresa** con una postulación del alumno a una de sus ofertas.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

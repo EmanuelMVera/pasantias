@@ -119,6 +119,12 @@ app.use('/uploads/public', express.static(path.join(__dirname, '../uploads/publi
   setHeaders: (res) => res.setHeader('Cache-Control', 'public, max-age=3600'),
 }));
 
+// ── Documentación OpenAPI (DOC-02) ────────────────────────────────────────────
+// GET /api/docs (Swagger UI) + GET /api/openapi.json. Apagado en producción
+// salvo ENABLE_API_DOCS=true. El mount usa su propio CSP (el helmet global
+// bloquea el JS/CSS inline de Swagger UI).
+require('./docs/serve')(app);
+
 // ── Rutas de la API ───────────────────────────────────────────────────────────
 // Cada ruta agrupa los endpoints relacionados a una funcionalidad del sistema
 app.use('/api/auth',          require('./routes/auth.routes'));         // Autenticación y registro

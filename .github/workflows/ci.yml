@@ -94,6 +94,12 @@ jobs:
       - name: Tests
         run: npm test
 
+      # 5. La spec OpenAPI committeada está al día con el generador (DOC-02).
+      #    Mismo patrón que el drift check de schema.sql. El test openapi.test.js
+      #    (dentro de `npm test`) ya verifica que la spec ↔ las rutas no divergen.
+      - name: OpenAPI spec al día
+        run: npm run docs:check
+
   # ──────────────────────────────────────────────────────────────────────────
   # Frontend: que pase el lint y compile.
   # ──────────────────────────────────────────────────────────────────────────

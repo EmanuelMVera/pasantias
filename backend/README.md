@@ -279,8 +279,52 @@ sesión, guards de rol, front consumiendo la API).
 ### CI
 
 `.github/workflows/ci.yml` corre en cada push a `main` y cada PR: job **backend**
-(migrate up → down→up de reversibilidad → drift check de `schema.sql` → `npm test`),
-job **frontend** (`npm run lint` → `npm run build`), job **e2e** (Playwright).
+(migrate up → down→up de reversibilidad → drift check de `schema.sql` → `npm test`
+→ drift check de `openapi.json`), job **frontend** (`npm run lint` → `npm run build`),
+job **e2e** (Playwright).
+
+## 8e. Documentación de la API — OpenAPI (DOC-02)
+
+Spec **OpenAPI 3.1** construida como código en `src/docs/`, servida con Swagger UI.
+
+- **`GET /api/docs`** — Swagger UI interactiva (assets locales, offline).
+- **`GET /api/openapi.json`** — la spec cruda (para Postman, codegen, Redocly…).
+- **`backend/openapi.json`** — copia versionada; `npm run docs:openapi` la regenera.
+- **Gate**: env `ENABLE_API_DOCS` — vacío + `NODE_ENV=production` = **OFF**;
+  vacío + no-prod = ON; `true`/`false` fuerzan. En producción, si hace falta
+  exponerla, ponerla detrás de auth (fuera del alcance de DOC-02).
+
+### Cómo está armada
+
+```
+src/docs/
+  openapi.base.js   info, servers, tags, security por defecto
+  helpers.js        operation(), ok(), paginated(), message(), errors() — el "motor DRY"
+  modelToSchema.js  atributos Sequelize → JSON Schema (base de las entidades)
+  components/        securitySchemes, parameters, responses y schemas reutilizables
+  paths/            un archivo por grupo; cada operación es ~10 líneas
+  serve.js          monta /api/docs y /api/openapi.json con su propio CSP
+```
+
+Los contratos transversales (envelope, errores, paginación, seguridad, header
+CSRF) se definen **una sola vez** en `components/` y se referencian con `$ref`.
+
+### Agregar / cambiar un endpoint
+
+1. Tocás la ruta en `src/routes/*.routes.js` (como siempre).
+2. Agregás/editás la operación en el `src/docs/paths/*.js` que corresponda.
+3. `npm run docs:openapi` y comiteás `openapi.json`.
+
+`tests/openapi.test.js` (dentro de `npm test`) falla si la spec y las rutas
+divergen en cualquier dirección, si un `$ref` no resuelve, o si el schema
+`Usuario` filtra un campo sensible. El CI además corre `npm run docs:check`
+(byte-diff de `openapi.json`, igual que con `schema.sql`).
+
+### Limitaciones
+
+El test cruza `MÉTODO /path`, no valida que la **forma de la respuesta** siga
+coincidiendo con la spec. Validación completa (`jest-openapi`) queda como mejora
+futura.
 
 ---
 

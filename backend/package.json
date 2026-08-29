@@ -18,6 +18,8 @@
     "db:backfill:archivos": "node src/utils/backfillArchivos.js",
     "logs:archivar": "node src/utils/archivarActivityLogs.js",
     "e2e:seed": "node scripts/seed-e2e.js",
+    "docs:openapi": "node scripts/generate-openapi.js",
+    "docs:check": "node scripts/generate-openapi.js && git diff --exit-code openapi.json",
     "test": "jest --runInBand"
   },
   "keywords": [],
@@ -39,6 +41,7 @@
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
     "sequelize": "^6.37.8",
+    "swagger-ui-express": "^5.0.1",
     "umzug": "^3.8.3"
   },
   "devDependencies": {

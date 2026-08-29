@@ -188,13 +188,24 @@ La **matriz de permisos completa** (qué puede hacer cada rol) está en
 | `npm run preview` | Sirve el build para probarlo localmente |
 | `npm run lint` | ESLint (`eslint .`) — bloqueante en CI |
 
+### Documentación de la API
+
+| Script (en `backend/`) | Qué hace |
+|---|---|
+| `npm run docs:openapi` | Regenera `backend/openapi.json` desde `src/docs/` |
+| `npm run docs:check` | Regenera y falla si quedó desactualizado (corre en CI) |
+
+Con el backend levantado: **`http://localhost:5000/api/docs`** (Swagger UI) y
+`http://localhost:5000/api/openapi.json` (spec cruda). Apagado en producción
+salvo `ENABLE_API_DOCS=true`.
+
 ---
 
 ## 6. Tests
 
 | Suite | Comando | Qué cubre |
 |---|---|---|
-| **Backend** | `cd backend && npm test` | API a nivel HTTP: auth, roles, multitenancy, uploads, paginación, observabilidad, seguridad… (17 suites). Usa una base de test aislada (`${DB_NAME}_test` o `DB_NAME_TEST`), creada y migrada por el `globalSetup`. |
+| **Backend** | `cd backend && npm test` | API a nivel HTTP: auth, roles, multitenancy, uploads, paginación, observabilidad, seguridad, drift de la spec OpenAPI… (18 suites). Usa una base de test aislada (`${DB_NAME}_test` o `DB_NAME_TEST`), creada y migrada por el `globalSetup`. |
 | **E2E** | `npm run e2e` (raíz) | 13 flujos críticos de 4 roles en un navegador real (Playwright + Chromium). Base **dedicada** `pasantias_db_e2e`, recreada en cada corrida. Ver [`e2e/`](e2e/) y `backend/README.md` §Tests E2E. |
 | **Lint / build front** | `cd frontend && npm run lint && npm run build` | ESLint + compilación. |
 
@@ -272,7 +283,8 @@ pasantias/
 
 | Documento | Contenido |
 |---|---|
-| [`backend/README.md`](backend/README.md) | Arquitectura del backend, observabilidad/logs, deploy y rollback, tests E2E |
+| [`backend/README.md`](backend/README.md) | Arquitectura del backend, observabilidad/logs, deploy y rollback, tests, OpenAPI |
+| **`/api/docs`** (con el backend levantado) | Referencia interactiva de todos los endpoints (Swagger UI, OpenAPI 3.1) |
 | [`backend/migrations/README.md`](backend/migrations/README.md) | Cómo funcionan las migraciones, lista 000–012, ENUMs legacy, regla de no editar |
 | [`frontend/README.md`](frontend/README.md) | Arquitectura del frontend, routing, cómo consume la API |
 | [`docs/ROLES-Y-PERMISOS.md`](docs/ROLES-Y-PERMISOS.md) | Roles de sistema e internos, matriz de permisos por acción |
