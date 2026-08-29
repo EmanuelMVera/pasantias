@@ -13,7 +13,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { ofertaService, studentService } from '../../services/api';
 import styles from './AlumnoDashboardPage.module.css';
 

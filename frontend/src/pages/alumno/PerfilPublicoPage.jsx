@@ -9,9 +9,9 @@
  * salario pretendido, preferencias laborales). Respeta visibilidadPerfil.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { userService, abrirArchivoPrivado } from '../../services/api';
 import Avatar from '../../components/Avatar/Avatar';
 
@@ -39,17 +39,18 @@ export default function PerfilPublicoPage() {
   const [error,   setError]   = useState('');
 
   useEffect(() => {
-    setLoading(true);
-    setError('');
+    let vigente = true;
     userService.getPerfilPublico(usuarioId)
-      .then(({ data: res }) => setData(res.data))
+      .then(({ data: res }) => { if (vigente) { setData(res.data); setError(''); } })
       .catch((err) => {
+        if (!vigente) return;
         const status = err.response?.status;
         if (status === 403) setError('Este perfil es privado.');
         else if (status === 404) setError('Usuario no encontrado.');
         else setError('Error al cargar el perfil.');
       })
-      .finally(() => setLoading(false));
+      .finally(() => { if (vigente) setLoading(false); });
+    return () => { vigente = false; };
   }, [usuarioId]);
 
   if (loading) return <div className="page-container"><p className="msg">Cargando perfil...</p></div>;

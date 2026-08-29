@@ -12,7 +12,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { notificacionService, mensajeService } from '../../services/api';
 import Avatar from '../Avatar/Avatar';
 import styles from './Navbar.module.css';

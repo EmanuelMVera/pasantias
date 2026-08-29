@@ -12,7 +12,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { empresaService, ofertaService } from '../../services/api';
-import { useEmpresa } from '../../context/EmpresaContext';
+import { useEmpresa } from '../../hooks/useEmpresa';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import styles from './EmpresaDashboardPage.module.css';
 
@@ -65,7 +65,7 @@ const ESTADO_LABEL = {
 
 export default function EmpresaDashboardPage() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const tablaRef = useRef(null);
 
   const [metricas,      setMetricas]      = useState(null);

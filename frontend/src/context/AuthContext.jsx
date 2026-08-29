@@ -21,7 +21,7 @@
  * Uso en componentes: const { usuario, login, logout } = useAuth()
  */
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useState, useEffect, useCallback } from 'react';
 import { authService } from '../services/api';
 
 // Crea el contexto. El valor null indica que aún no fue inicializado
@@ -122,16 +122,5 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-/**
- * Hook personalizado para acceder al contexto de autenticación.
- * Lanza un error si se usa fuera de un AuthProvider.
- *
- * Uso: const { usuario, esAdmin } = useAuth()
- */
-export const useAuth = () => {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth debe usarse dentro de AuthProvider');
-  return ctx;
-};
-
+// El hook de consumo vive en src/hooks/useAuth.js (ver nota de Fast Refresh allí).
 export default AuthContext;

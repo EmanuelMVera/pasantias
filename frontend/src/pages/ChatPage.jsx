@@ -21,7 +21,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { mensajeService } from '../services/api';
 import Avatar from '../components/Avatar/Avatar';
 import Modal from '../components/Modal/Modal';
@@ -265,17 +265,6 @@ export default function ChatPage() {
   /* ── Scroll al último mensaje ──────────────────────────────────────────── */
   const scrollBottom = useCallback(() => {
     mensajesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
-
-  /* ── Cargar lista de conversaciones ────────────────────────────────────── */
-  const recargarConversaciones = useCallback(() => {
-    mensajeService
-      .getConversaciones()
-      .then(({ data }) => {
-        const lista = data.data ?? data ?? [];
-        setConversaciones(lista);
-      })
-      .catch(() => {});
   }, []);
 
   useEffect(() => {

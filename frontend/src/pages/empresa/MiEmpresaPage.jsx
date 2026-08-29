@@ -13,7 +13,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { empresaService } from '../../services/api';
-import { useEmpresa } from '../../context/EmpresaContext';
+import { useEmpresa } from '../../hooks/useEmpresa';
 
 const ESTADO_LABEL = {
   aprobada:  '✅ Aprobada',

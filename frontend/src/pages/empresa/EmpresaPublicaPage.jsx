@@ -11,7 +11,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { empresaService } from '../../services/api';
 
 export default function EmpresaPublicaPage() {
@@ -24,16 +24,17 @@ export default function EmpresaPublicaPage() {
   const [error,   setError]   = useState('');
 
   useEffect(() => {
-    setLoading(true);
-    setError('');
+    let vigente = true;
     empresaService.getPublico(empresaId)
-      .then(({ data: res }) => setData(res.data))
+      .then(({ data: res }) => { if (vigente) { setData(res.data); setError(''); } })
       .catch((err) => {
+        if (!vigente) return;
         const status = err.response?.status;
         if (status === 404) setError('Esta empresa no está disponible.');
         else setError('Error al cargar el perfil de la empresa.');
       })
-      .finally(() => setLoading(false));
+      .finally(() => { if (vigente) setLoading(false); });
+    return () => { vigente = false; };
   }, [empresaId]);
 
   if (loading) return <div className="page-container"><p className="msg">Cargando empresa...</p></div>;

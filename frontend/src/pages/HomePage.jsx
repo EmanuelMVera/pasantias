@@ -44,7 +44,7 @@ function ParticleCanvas() {
       canvas.height = canvas.offsetHeight;
     }
 
-    function createParticle(i) {
+    function createParticle() {
       const angle = Math.random() * Math.PI * 2;
       const radius = 80 + Math.random() * 320;
       const z = Math.random() * 2 - 1; // -1 a 1 (profundidad)
@@ -63,7 +63,7 @@ function ParticleCanvas() {
 
     function init() {
       resize();
-      particles = Array.from({ length: COUNT }, (_, i) => createParticle(i));
+      particles = Array.from({ length: COUNT }, () => createParticle());
     }
 
     function draw() {

@@ -39,12 +39,11 @@ export default function MisPostulacionesPage() {
   const [postulaciones, setPostulaciones] = useState([]);
   const [loading, setLoading]             = useState(true);
   const [filtroEstado, setFiltroEstado]   = useState('');
-  const [successMsg, setSuccessMsg]       = useState('');
+  const [successMsg]                      = useState('');
   const [pagination, setPagination]       = useState(null);
   const [conteoPorEstado, setConteoPorEstado] = useState({});
 
   const cargar = useCallback((pagina = 1) => {
-    setLoading(true);
     const params = { page: pagina, limit: 20 };
     if (filtroEstado) params.estado = filtroEstado;
     postulacionService.getMias(params)

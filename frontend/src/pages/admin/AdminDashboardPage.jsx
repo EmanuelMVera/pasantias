@@ -60,7 +60,7 @@ function ActividadFeed({ actividad }) {
 
 export default function AdminDashboardPage() {
   const [stats,                setStats]               = useState(null);
-  const [actividad,            setActividad]            = useState([]);
+  const [, setActividad]                               = useState([]);
   const [empresasPendientes,   setEmpresasPendientes]   = useState([]);
   const [reclutadoresPendientes, setReclutadoresPendientes] = useState([]);
   const [ofertasPendientes,    setOfertasPendientes]    = useState([]);
@@ -103,7 +103,7 @@ export default function AdminDashboardPage() {
       if (opRes.status === 'fulfilled') {
         setOfertasPendientes(opRes.value.data.data ?? opRes.value.data ?? []);
       }
-    } catch (err) {
+    } catch {
       setError('Error inesperado al cargar el panel.');
     } finally {
       setLoading(false);

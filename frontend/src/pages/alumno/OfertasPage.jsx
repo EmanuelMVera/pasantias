@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ofertaService } from '../../services/api';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import styles from './OfertasPage.module.css';
@@ -113,6 +113,9 @@ export default function OfertasPage() {
     }
   }, []);
 
+  // Solo carga inicial: los cambios de filtro se aplican con el botón Buscar
+  // (handleBuscar), no en cada tecla — por eso no depende de cargarOfertas.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { cargarOfertas(1); }, []);
 
   const handleFiltro  = (e) => setFiltros({ ...filtros, [e.target.name]: e.target.value });

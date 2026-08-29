@@ -19,36 +19,37 @@
  * Uso: const { empresa, rolInterno, esAdminEmpresa, esReclutador } = useEmpresa()
  */
 
-import { createContext, useContext, useState, useEffect } from 'react';
-import { useAuth } from './AuthContext';
+import { createContext, useState, useEffect } from 'react';
+import { useAuth } from '../hooks/useAuth';
 import { empresaService } from '../services/api';
 
 const EmpresaContext = createContext(null);
 
 export const EmpresaProvider = ({ children }) => {
   const { usuario } = useAuth();
+  const esEmpresa = usuario?.rol === 'empresa';
+
   const [empresa, setEmpresa]       = useState(null);
   const [rolInterno, setRolInterno] = useState(null);
-  const [loading, setLoading]       = useState(false);
+  // Arranca en true: mientras `usuario` no esté resuelto el valor se enmascara
+  // abajo (`esEmpresa && loading`), y para un usuario empresa el primer render
+  // ya refleja "cargando" sin necesidad de un setState síncrono en el effect.
+  const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
 
   useEffect(() => {
-    if (!usuario || usuario.rol !== 'empresa') {
-      setEmpresa(null);
-      setRolInterno(null);
-      setError(null);
-      return;
-    }
+    // Si el usuario no es de tipo empresa no hay nada que resolver; el estado
+    // "vacío" se deriva abajo en `value` (no hace falta setState acá).
+    if (!esEmpresa) return;
 
     let cancelado = false;
-    setLoading(true);
-    setError(null);
 
     empresaService.getMiEmpresa()
       .then(({ data }) => {
         if (cancelado) return;
         setEmpresa(data.data ?? null);
         setRolInterno(data.rolEnEquipo ?? null);
+        setError(null);
       })
       .catch((err) => {
         if (cancelado) return;
@@ -59,30 +60,21 @@ export const EmpresaProvider = ({ children }) => {
       });
 
     return () => { cancelado = true; };
-  }, [usuario?.id, usuario?.rol]);
+  }, [usuario?.id, esEmpresa]);
 
+  // Estado derivado: si el usuario no es empresa, el contexto expone valores
+  // vacíos aunque queden restos de una sesión anterior en el state.
   const value = {
-    empresa,
-    rolInterno,
-    esAdminEmpresa: rolInterno === 'admin_empresa',
-    esReclutador:   rolInterno === 'reclutador',
-    loading,
-    error,
+    empresa:        esEmpresa ? empresa : null,
+    rolInterno:     esEmpresa ? rolInterno : null,
+    esAdminEmpresa: esEmpresa && rolInterno === 'admin_empresa',
+    esReclutador:   esEmpresa && rolInterno === 'reclutador',
+    loading:        esEmpresa && loading,
+    error:          esEmpresa ? error : null,
   };
 
   return <EmpresaContext.Provider value={value}>{children}</EmpresaContext.Provider>;
 };
 
-/**
- * Hook para acceder al contexto de empresa/rol interno.
- * Lanza un error si se usa fuera de un EmpresaProvider.
- *
- * Uso: const { rolInterno, esAdminEmpresa, esReclutador } = useEmpresa()
- */
-export const useEmpresa = () => {
-  const ctx = useContext(EmpresaContext);
-  if (!ctx) throw new Error('useEmpresa debe usarse dentro de EmpresaProvider');
-  return ctx;
-};
-
+// El hook de consumo vive en src/hooks/useEmpresa.js (ver nota de Fast Refresh allí).
 export default EmpresaContext;

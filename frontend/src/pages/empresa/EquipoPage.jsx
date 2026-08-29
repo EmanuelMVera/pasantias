@@ -14,7 +14,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { empresaService } from '../../services/api';
-import { useEmpresa } from '../../context/EmpresaContext';
+import { useEmpresa } from '../../hooks/useEmpresa';
 import Avatar from '../../components/Avatar/Avatar';
 import Modal from '../../components/Modal/Modal';
 import styles from './EquipoPage.module.css';
@@ -22,9 +22,6 @@ import styles from './EquipoPage.module.css';
 /* ── Helpers ─────────────────────────────────────────────────────────────────── */
 const ROL_COLORS = { admin_empresa: '#7c3aed', reclutador: '#0891b2' };
 function rolColor(rol) { return ROL_COLORS[rol] ?? '#64748b'; }
-function rolLabel(rol) {
-  return { admin_empresa: 'Administrador', reclutador: 'Reclutador' }[rol] ?? rol;
-}
 function formatFecha(iso) {
   if (!iso) return 'Nunca';
   return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });

@@ -10,7 +10,7 @@
  * confirmaciones, buscadores) sigue viviendo en cada pantalla como children.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import styles from './Modal.module.css';
 
 export default function Modal({
@@ -25,7 +25,7 @@ export default function Modal({
   children,
 }) {
   const panelRef = useRef(null);
-  const headerTitleId = useRef(`modal-title-${Math.random().toString(36).slice(2)}`);
+  const headerTitleId = useId();
 
   useEffect(() => {
     if (!closeOnEscape) return;
@@ -39,7 +39,7 @@ export default function Modal({
   }, []);
 
   const dialogProps = title
-    ? { 'aria-labelledby': headerTitleId.current }
+    ? { 'aria-labelledby': headerTitleId }
     : { 'aria-label': ariaLabel };
 
   return (
@@ -56,7 +56,7 @@ export default function Modal({
       >
         {title && (
           <div className={styles.header}>
-            <h3 id={headerTitleId.current}>{title}</h3>
+            <h3 id={headerTitleId}>{title}</h3>
             <button className={styles.close} onClick={onClose} aria-label="Cerrar">✕</button>
           </div>
         )}
