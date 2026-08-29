@@ -1,0 +1,12 @@
+{
+  "password": "Test1234!",
+  "alumno":        { "email": "alumno.e2e@itb.test",         "nombre": "Ana",    "apellido": "Alumna" },
+  "alumno2":       { "email": "alumno2.e2e@itb.test",        "nombre": "Beto",   "apellido": "Becario" },
+  "adminEmpresa":  { "email": "admin-empresa.e2e@itb.test",  "nombre": "Carla",  "apellido": "Cerda" },
+  "reclutador":    { "email": "reclutador.e2e@itb.test",     "nombre": "Rita",   "apellido": "Reclu" },
+  "admin":         { "email": "admin.e2e@itb.test",          "nombre": "Admin",  "apellido": "E2E" },
+  "empresa":       { "razonSocial": "E2E Talent SA", "cuit": "30111111118" },
+  "ofertaActiva":    { "titulo": "Pasantía Backend E2E" },
+  "ofertaPendiente": { "titulo": "Pasantía Data E2E (pendiente)" },
+  "solicitud":       { "razonSocial": "Nuevos Horizontes SRL", "cuit": "30222222227" }
+}

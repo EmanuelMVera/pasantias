@@ -17,6 +17,7 @@
     "db:reset:dev": "node src/utils/resetDev.js",
     "db:backfill:archivos": "node src/utils/backfillArchivos.js",
     "logs:archivar": "node src/utils/archivarActivityLogs.js",
+    "e2e:seed": "node scripts/seed-e2e.js",
     "test": "jest --runInBand"
   },
   "keywords": [],

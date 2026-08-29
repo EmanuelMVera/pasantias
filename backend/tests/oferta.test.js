@@ -46,6 +46,29 @@ describe('OFERTA', () => {
     expect(res.status).toBe(404);
   });
 
+  test('crear oferta con campos numéricos/fecha vacíos ("") no rompe (se guardan como null)', async () => {
+    const { usuarioAdmin, passwordPlana } = await crearEmpresaConAdmin();
+    idsUsuarios.push(usuarioAdmin.id);
+    const token = await loginYObtenerToken(usuarioAdmin.email, passwordPlana);
+
+    const res = await request(app)
+      .post('/api/ofertas')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        titulo: 'Pasantía con campos opcionales vacíos',
+        descripcion: 'Descripción de prueba.',
+        tipoPuesto: 'pasante',
+        salario: '',
+        fechaPublicacion: '',
+        fechaLimite: '',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.salario).toBeNull();
+    expect(res.body.data.fechaPublicacion).toBeNull();
+    expect(res.body.data.fechaLimite).toBeNull();
+  });
+
   test('el listado público no incluye ofertas sin moderar', async () => {
     const { usuarioAdmin, empresa } = await crearEmpresaConAdmin();
     idsUsuarios.push(usuarioAdmin.id);

@@ -72,10 +72,11 @@ exports.createOferta = async (req, res) => {
     return res.status(403).json({ success: false, message: 'Tu empresa aún no fue aprobada.' });
   }
 
-  const { error, campos } = ofertaService.validarCamposPuesto(req.body);
+  const body = ofertaService.sanitizarCamposOpcionales(req.body);
+  const { error, campos } = ofertaService.validarCamposPuesto(body);
   if (error) return res.status(400).json({ success: false, message: error });
 
-  const oferta = await Oferta.create({ ...req.body, ...campos, empresaId: empresa.id, moderada: false });
+  const oferta = await Oferta.create({ ...body, ...campos, empresaId: empresa.id, moderada: false });
 
   ofertaService.notificarAdminsNuevaOferta(oferta, empresa); // fire-and-forget
 
@@ -91,10 +92,11 @@ exports.updateOferta = async (req, res) => {
   const oferta = await Oferta.findOne({ where: { id: req.params.id, empresaId: empresa.id } });
   if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
 
-  const { error, campos } = ofertaService.validarCamposPuesto(req.body);
+  const body = ofertaService.sanitizarCamposOpcionales(req.body);
+  const { error, campos } = ofertaService.validarCamposPuesto(body);
   if (error) return res.status(400).json({ success: false, message: error });
 
-  await oferta.update({ ...req.body, ...campos });
+  await oferta.update({ ...body, ...campos });
   return res.json({ success: true, data: oferta });
 };
 

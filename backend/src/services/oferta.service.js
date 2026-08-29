@@ -9,6 +9,23 @@ const logger = require('../utils/logger');
 const TIPOS_PUESTO_VALIDOS = ['pasante', 'trainee', 'junior'];
 const CARRERAS_VALIDAS = require('../data/catalogos.json').carreras;
 
+// Campos numéricos / de fecha que el formulario del frontend envía como ''
+// (string vacío) cuando el usuario los deja en blanco. Postgres rechaza '' para
+// columnas integer/date con un 22P02 → 500. Normalizamos '' → null antes de crear.
+const CAMPOS_OPCIONALES_VACIABLES = ['salario', 'fechaPublicacion', 'fechaLimite'];
+
+/**
+ * Devuelve una copia del body con los campos opcionales numéricos/fecha que
+ * llegaron como '' convertidos a null.
+ */
+function sanitizarCamposOpcionales(body) {
+  const out = { ...body };
+  for (const campo of CAMPOS_OPCIONALES_VACIABLES) {
+    if (out[campo] === '') out[campo] = null;
+  }
+  return out;
+}
+
 /**
  * Valida y normaliza los campos de tipo puesto/experiencia de una oferta.
  * @returns {{ error: string|null, campos: object }}
@@ -159,6 +176,7 @@ async function notificarAdminsNuevaOferta(oferta, empresa) {
 
 module.exports = {
   validarCamposPuesto,
+  sanitizarCamposOpcionales,
   obtenerRecomendadas,
   obtenerRecomendadasDashboard,
   notificarAdminsNuevaOferta,

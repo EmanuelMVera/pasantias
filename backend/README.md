@@ -162,6 +162,28 @@ El esquema se versiona con migraciones (`backend/migrations/NNN-*.js`), runner
 - **`npm run db:backup`**: `pg_dump -Fc` a `backend/backups/` (gitignored) + verificación. Es lo que se restore-testea antes de migrar y la copia portable fuera del server.
 - **Trimestral**: ejercicio de disaster-recovery (restore completo end-to-end).
 
+## 8d. Tests E2E (TEST-02)
+
+Además de la suite de Jest (`npm test` — API a nivel HTTP), hay **smoke tests E2E
+con Playwright** que ejercitan los flujos críticos de punta a punta en un
+navegador real (login + cookie de sesión, guards de rol, front consumiendo la API).
+
+- **Ubicación**: `e2e/` y `playwright.config.js` en la **raíz** del repo (no en `backend/`).
+- **13 flujos / 4 roles**: alumno (ver oferta → postularse → Mis Postulaciones),
+  reclutador (crear oferta → candidatos → sin acciones de admin_empresa),
+  admin_empresa (editar empresa → gestionar equipo), admin (moderar oferta →
+  aprobar solicitud).
+- **Datos reproducibles**: `backend/scripts/seed-e2e.js` (`npm run e2e:seed`) recrea
+  y siembra una base **dedicada** `pasantias_db_e2e` (aborta si `DB_NAME` no
+  termina en `_e2e` — nunca toca dev/prod). Corre solo en `globalSetup`, antes de
+  levantar los servidores, así cada corrida parte de un estado idéntico.
+- **Cómo correr** (desde la raíz): `npm run e2e` (levanta back `:5000` con
+  `NODE_ENV=test` + front `:5173`, siembra y corre Chromium). `npm run e2e:ui`
+  para depurar; `npm run e2e:report` abre el HTML.
+- **CI**: job `e2e` en `.github/workflows/ci.yml` (sube `playwright-report/` como
+  artifact si falla).
+- **No** apunta a producción ni pretende cubrir toda la UI.
+
 ## 9. Cómo explicarlo en una exposición
 - "El backend es la parte que corre en el servidor: recibe pedidos del frontend, consulta la base de datos y devuelve respuestas.
 - Tiene rutas en `src/routes`, lógica en `src/controllers`, y datos en `src/models`.
