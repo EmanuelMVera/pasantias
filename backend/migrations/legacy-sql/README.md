@@ -1,9 +1,10 @@
 # Migraciones legacy (pre-baseline) — referencia histórica, NO ejecutar
 
-Esta carpeta contiene los 13 scripts `.sql` que se usaron para evolucionar el
-esquema manualmente entre abril y junio de 2026, antes de adoptar Sequelize
-CLI como mecanismo formal de migraciones (ver `../000-baseline.js` y
-`../README.md`).
+Esta carpeta contiene los 13 scripts `.sql` (numerados 001–013) que se usaron
+para evolucionar el esquema manualmente entre abril y junio de 2026, antes de
+adoptar un runner formal de migraciones (ver `../000-baseline.js` y
+`../README.md`). El runner actual es **Umzug** (`../../scripts/migrate.js`);
+originalmente se adoptó Sequelize CLI y luego se reemplazó en DB-01.
 
 ## Por qué se movieron acá
 
@@ -26,11 +27,10 @@ CLI como mecanismo formal de migraciones (ver `../000-baseline.js` y
 
 ## Qué reemplaza a esto
 
-`../000-baseline.js` (migración de Sequelize CLI) representa el esquema
-**actual** de la aplicación tal como lo definen los modelos en
-`backend/src/models/`, incluyendo la limpieza de los residuos mencionados
-arriba. A partir de esa migración, todo cambio de esquema se hace con
-`npx sequelize-cli migration:generate` + `npm run db:migrate`, no con
+`../000-baseline.js` representa el esquema **actual** de la aplicación tal como
+lo definen los modelos en `backend/src/models/`, incluyendo la limpieza de los
+residuos mencionados arriba. A partir de esa migración, todo cambio de esquema
+se hace con `npm run db:migrate:create <nombre>` + `npm run db:migrate`, no con
 scripts `.sql` sueltos.
 
 ## Uso de este contenido

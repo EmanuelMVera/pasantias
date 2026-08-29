@@ -1,109 +1,188 @@
-# Backend
+# Backend — API REST
 
-## 1. ¿Qué es el backend de este proyecto?
-- El backend es la parte que corre en el servidor (no en el navegador).
-- Maneja la lógica de la aplicación, los datos y la conexión con la base de datos.
-- Su rol es recibir las solicitudes del frontend, trabajar con la base de datos y enviar respuestas.
+API del Sistema de Gestión de Pasantías. Recibe pedidos del frontend, aplica la
+lógica de negocio, habla con PostgreSQL y responde JSON.
 
-## 2. Objetivo del backend
-- Resuelve el problema de guardar y recuperar información segura (usuarios, ofertas, postulaciones).
-- Sin backend, el frontend no podría validar usuarios ni consultar datos reales.
-- Diferencia simple:
-  - Backend = 'motor' o cerebro que procesa datos.
-  - Frontend = cara visible donde el usuario hace clic.
+> Instalación y puesta en marcha: ver el [`README.md`](../README.md) de la raíz.
+> Este documento describe la **arquitectura** del backend.
 
-## 3. Tecnologías y lenguajes usados
-- Node.js: permite ejecutar JavaScript fuera del navegador, en el servidor.
-- Express: framework que organiza rutas y responde peticiones HTTP (GET, POST, etc.).
-- PostgreSQL: base de datos donde se guardan usuarios, ofertas, postulaciones, etc.
-- Sequelize: librería llamada ORM que ayuda a usar la base de datos con código en lugar de escribir SQL directo.
-- JWT (`jsonwebtoken`): usa tokens (fichas seguras) para saber si un usuario está logueado.
-- Bcryptjs: guarda contraseñas de forma segura encriptada.
-- Multer: maneja archivos subidos (por ejemplo, currículums).
-- dotenv: lee variables secretas desde `.env`, como la URL de la DB y la clave JWT.
+---
 
-## 4. Estructura de carpetas
-Árbol principal:
-- backend/
-  - .env
-  - package.json
-  - src/
-    - app.js
-    - server.js
-    - config/
-      - database.js
-    - controllers/
-      - auth.controller.js
-      - oferta.controller.js
-      - postulacion.controller.js
-    - middleware/
-      - auth.middleware.js
-    - models/
-      - index.js
-      - empresa.model.js
-      - notificacion.model.js
-      - oferta.model.js
-      - perfil.model.js
-      - postulacion.model.js
-      - usuario.model.js
-    - routes/
-      - auth.routes.js
-      - user.routes.js
-      - empresa.routes.js
-      - oferta.routes.js
-      - postulacion.routes.js
-      - admin.routes.js
-      - notificacion.routes.js
-    - utils/
-      - seed.js
+## 1. Stack
 
-Explicación simple:
-- `src/app.js`: configura el servidor, CORS, rutas y errores.
-- `src/server.js`: arranca el servidor y la conexión a la base de datos.
-- `src/config/database.js`: datos de conexión a PostgreSQL.
-- `src/routes/`: define qué URL existe y qué controlador responde.
-- `src/controllers/`: lógica de cada acción (login, crear oferta, postular).
-- `src/middleware/`: funciones que se ejecutan antes de los controladores (por ejemplo, verifica el token).
-- `src/models/`: descripción de tablas y relaciones entre ellas.
-- `src/utils/seed.js`: datos de ejemplo para iniciar la DB (semillas).
+| Pieza | Para qué |
+|---|---|
+| **Node.js + Express 5** | Servidor HTTP y routing |
+| **PostgreSQL** | Base de datos relacional |
+| **Sequelize 6** | ORM (modelos, asociaciones, queries) |
+| **Umzug 3** | Runner de migraciones (`scripts/migrate.js`) |
+| **jsonwebtoken** | JWT de sesión (viaja en cookie HttpOnly, SEC-02) |
+| **bcryptjs** | Hash de contraseñas |
+| **multer** | Subida de archivos (CV, cartas, fotos, logos) |
+| **helmet** + **express-rate-limit** | Hardening HTTP (SEC-02) |
+| **pino** + **pino-http** | Logging técnico estructurado + request-id (OPS-01) |
+| **nodemailer** | Emails (recuperación de acceso, notificaciones) |
+| **dotenv** | Variables de entorno desde `.env` |
 
-## 5. Archivos más importantes y función de cada uno
-- `src/server.js`: inicia el servicio y asegura la conexión a PostgreSQL.
-- `src/app.js`: configura rutas y seguridad básica del servidor.
-- `src/config/database.js`: dice a Sequelize cómo llegar a la base de datos.
-- `src/routes/auth.routes.js`: rutas de autenticación (`/api/auth/login`). No hay registro público: los usuarios se cargan desde `/api/admin/usuarios` (alumno/egresado) o vía solicitud de empresa aprobada por el admin.
-- `src/controllers/auth.controller.js`: maneja login, recuperar contraseña.
-- `src/middleware/auth.middleware.js`: comprueba el token JWT y roles de usuario.
-- `src/models/index.js`: une modelos y define relaciones entre tablas.
-- `src/models/*.model.js`: cada archivo define una tabla específica (Usuario, Oferta, etc.).
-- `src/services` no existe en backend: la comunicación con frontend se hace con rutas API.
+Tests: **Jest** + **Supertest**.
 
-## 6. Cómo funciona el backend paso a paso
-1. El frontend hace una solicitud al servidor (por ejemplo, `POST /api/auth/login`).
-2. En `app.js`, Express recibe el pedido y lo manda a la ruta `auth.routes.js`.
-3. El route llama a la función adecuada en `auth.controller.js`.
-4. El controlador verifica datos y usa los modelos (Sequelize) para buscar/guardar en DB.
-5. Si la ruta necesita seguridad, `auth.middleware.verifyToken` comprueba el JWT primero.
-6. El backend responde con JSON, por ejemplo con `success: true` y datos del usuario.
+---
 
-## 7. Base de datos
-- Usa PostgreSQL (conf en `src/config/database.js`).
-- Sequelize mapea tablas a objetos JS.
-- Tablas importantes:
-  - `Usuario`: personas (alumno, empresa, admin).
-  - `Perfil`: información personal del alumno.
-  - `Empresa`: datos de empresas.
-  - `Oferta`: ofertas de pasantía.
-  - `Postulacion`: cada postulación a oferta.
-  - `Notificacion`: avisos para usuarios.
-- Relación ejemplo: una `Empresa` tiene muchas `Oferta`; una `Oferta` tiene muchas `Postulacion`.
+## 2. Estructura de `src/`
 
-## 8. Seguridad y autenticación
-- El proyecto tiene login con email/contraseña.
-- Se usa JWT (token) en `src/middleware/auth.middleware.js`.
-- Con token válido, el backend permite rutas protegidas; si no, devuelve error 401.
-- Roles (admin, empresa, alumno, egresado) se controlan en `authorizeRoles`.
-- Ejemplo: `/api/auth/me` es ruta protegida y devuelve usuario si el token es válido.
+```
+src/
+├── app.js              Express: pino-http, helmet, CORS, body limit, rate limit,
+│                       CSRF, estáticos de /uploads/public, montaje de rutas, health, error handler
+├── server.js           Arranque: sequelize.authenticate() + app.listen()  (NO sincroniza esquema)
+├── config/
+│   └── database.js     Instancia de Sequelize (lee DB_* del entorno)
+├── routes/             Un archivo por recurso. Define método + path + cadena de middlewares + handler
+├── controllers/        Capa HTTP: valida entrada, llama al service, arma la respuesta
+├── services/           Lógica de negocio (no conoce req/res). Aquí viven las reglas del dominio
+├── middleware/
+│   ├── auth.middleware.js      verifyToken, authorizeRoles
+│   ├── empresa.middleware.js   verifyEmpresaMember, authorizeEmpresaRoles (rol interno de empresa)
+│   ├── rateLimit.js            limiters por riesgo (auth, reset, uploads, público, write, global)
+│   ├── csrf.js                 doble submit cookie (se saltea en NODE_ENV=test)
+│   ├── validate.middleware.js  corre un validador antes del controller
+│   └── error.middleware.js     handler global: loguea y responde JSON uniforme
+├── models/
+│   ├── index.js        Carga los modelos y define TODAS las asociaciones
+│   └── *.model.js      Un archivo por tabla
+├── validators/         Validación de body por endpoint
+├── utils/              logger (pino), auditLog (registrarAuditoria), cookies, asyncHandler,
+│                       archivoImagen (validación por magic bytes), seeds, scripts de mantenimiento
+└── data/               Catálogos estáticos (carreras, rubros) en JSON
+```
+
+`migrations/`, `scripts/` y `tests/` están fuera de `src/`.
+
+---
+
+## 3. Recorrido de un request
+
+`POST /api/ofertas` (crear una oferta), por ejemplo:
+
+1. `app.js` → `pino-http` asigna `req.id` y setea `X-Request-Id`.
+2. helmet, CORS, `express.json({ limit: '100kb' })`, `apiLimiter`, `csrfProtection`.
+3. Router `/api/ofertas` → cadena de la ruta:
+   `verifyToken` (cookie `token` → `req.usuario`) →
+   `authorizeRoles('empresa')` →
+   `verifyEmpresaMember` (resuelve `req.empresa` y `req.miembroEmpresa`) →
+   `authorizeEmpresaRoles('admin_empresa', 'reclutador')`.
+4. `oferta.controller.createOferta` → normaliza el body → `oferta.service` valida
+   reglas → `Oferta.create(...)`.
+5. Efecto colateral: notifica a los admins (fire-and-forget).
+6. Respuesta `201 { success, message, data }`. Eventos sensibles → `registrarAuditoria`.
+7. Cualquier throw cae en `error.middleware`, que loguea con `req.log` y responde
+   un JSON uniforme (sin stack al cliente).
+
+---
+
+## 4. Autenticación y autorización
+
+- **Sesión**: al hacer login, el backend firma un JWT y lo manda en una **cookie
+  `token` HttpOnly** (SEC-02). El navegador la reenvía sola; el JS del frontend
+  nunca la ve. Fallback: header `Authorization: Bearer <token>` (clientes API, tests).
+- **`verifyToken`**: valida firma y `tokenVersion` (permite invalidar todas las
+  sesiones de un usuario al cambiar la contraseña), carga `req.usuario`.
+- **Roles de sistema** (`usuarios.rol`): `admin`, `alumno`, `egresado`, `empresa`.
+  Se chequean con `authorizeRoles(...)`.
+- **Roles internos de empresa** (`empresa_usuarios.rolInterno`): `admin_empresa`,
+  `reclutador`. Se chequean con `authorizeEmpresaRoles(...)` después de
+  `verifyEmpresaMember`.
+- **CSRF**: patrón double-submit cookie para requests con cookie de sesión
+  (`csrf.js`). Se saltea en `NODE_ENV=test`.
+- **Rate limiting** por riesgo (`rateLimit.js`): login `10/15min`, reset/solicitud
+  pública `5/h`, uploads `20/h`, writes `60/min`, techo global `API_RATE_MAX/15min`.
+  Se saltean en test (salvo `seguridad.test.js`, que setea `SEC_TESTS=1`).
+
+Matriz de permisos completa: [`../docs/ROLES-Y-PERMISOS.md`](../docs/ROLES-Y-PERMISOS.md).
+Equipo de empresa en detalle: [`MULTI_USUARIO_EMPRESA.md`](MULTI_USUARIO_EMPRESA.md).
+
+---
+
+## 5. Modelo de datos
+
+Tablas principales (`src/models/*.model.js`, asociaciones en `models/index.js`):
+
+| Tabla | Contenido |
+|---|---|
+| `usuarios` | Personas del sistema. `rol`, `activo`, `habilitado`, `tokenVersion`, soft delete. |
+| `perfiles` | Datos académicos/profesionales de un alumno/egresado (1–1 con `usuarios`). CV y carta. |
+| `empresas` | Datos de empresa. `estadoAprobacion`, `cuit` UNIQUE, auditoría de aprobación. |
+| `empresa_usuarios` | Membresía usuario↔empresa con `rolInterno` y `activo`. Fuente de verdad de permisos internos. |
+| `ofertas` | Publicaciones de pasantía. `estado`, `moderada`, `tipoPuesto`, fechas. Soft delete. |
+| `postulaciones` | Postulación de un alumno a una oferta. `estado` (embudo de selección). |
+| `postulacion_historial_estados` | Auditoría de cada cambio de estado de una postulación. |
+| `solicitudes_empresa` | Solicitud pública de alta de empresa. La aprueba un admin. |
+| `solicitudes_reclutador` | Solicitud de un `admin_empresa` para sumar un reclutador. La aprueba un admin. |
+| `archivos` | Metadata de archivos subidos (CV, carta, foto, logo) + control de acceso. |
+| `mensajes` | Chat directo entre usuarios. |
+| `notificaciones` | Avisos in-app. |
+| `activity_logs` | Log de auditoría inmutable (ver §Observabilidad). |
+
+Relaciones típicas: una `empresa` tiene muchas `ofertas`; una `oferta` tiene
+muchas `postulaciones`; un `usuario` puede pertenecer a varias `empresas` vía
+`empresa_usuarios`.
+
+El esquema se versiona con **migraciones** — nunca con `sync()`. Ver §7.
+
+---
+
+## 6. Endpoints (prefijos)
+
+| Prefijo | Recurso |
+|---|---|
+| `/api/auth` | Login, logout, `me`, forgot/reset/cambiar password |
+| `/api/users` | Perfil propio, subida de CV/carta/foto, perfil público |
+| `/api/students` | Dashboard del alumno |
+| `/api/ofertas` | Listado y detalle (**públicos**), recomendadas, CRUD de empresa |
+| `/api/postulaciones` | Postularse, "mis postulaciones", candidatos y embudo (empresa) |
+| `/api/empresas` | Panel corporativo, perfil de empresa, equipo, perfil público |
+| `/api/admin` | Todo el panel de administración (solo rol `admin`) |
+| `/api/solicitudes-empresa` | Alta pública de empresa |
+| `/api/notificaciones` | Notificaciones propias |
+| `/api/chat` | Mensajería directa |
+| `/api/archivos/:id` | Descarga autenticada de CV/cartas (autorización fina en el controller) |
+| `/api/health` | Health check |
+
+---
+
+## 7. Migraciones
+
+Runner **Umzug** (`scripts/migrate.js`). Estado en la tabla `SequelizeMeta`.
+`000-baseline.js` crea el esquema completo; `001`–`012` son incrementales.
+
+```bash
+npm run db:migrate            # aplica pendientes
+npm run db:migrate:status     # aplicadas + pendientes
+npm run db:migrate:down       # revierte la última
+npm run db:migrate:create x   # nueva migración desde plantilla
+```
+
+**Una migración ya aplicada no se edita nunca** — se crea una nueva. Detalle,
+lista completa 000–012, el tema de los ENUMs legacy (`profesor`, `propietario`,
+`gerente`, `viewer`) y las reglas de estilo: [`migrations/README.md`](migrations/README.md).
+
+---
+
+## 8. Seguridad y hardening (SEC-02 / SEC-03)
+
+- **helmet** con CSP mínima (API JSON, nada se renderiza como documento), HSTS en producción.
+- **CORS** con allowlist (`ALLOWED_ORIGINS`), `credentials: true` para la cookie.
+- **Body** solo JSON, límite 100 kB. Sin `urlencoded` (refuerzo anti-CSRF).
+- **Rate limiting** por riesgo + techo global.
+- **CSRF** double-submit cookie.
+- **Uploads** (SEC-03): tipo validado por *magic bytes*, no por extensión declarada;
+  tamaño máximo; nombre generado en el servidor; CV/cartas fuera de rutas servidas
+  estáticamente (solo `GET /api/archivos/:id` autenticado); avatares/logos en
+  `/uploads/public`.
+- **`trust proxy`** configurable (`TRUST_PROXY`) para tomar la IP real detrás de
+  un reverse proxy sin permitir spoofing.
+
+Variables asociadas: ver [`.env.example`](.env.example).
 
 ## 8b. Observabilidad y logs (OPS-01)
 
@@ -162,11 +241,24 @@ El esquema se versiona con migraciones (`backend/migrations/NNN-*.js`), runner
 - **`npm run db:backup`**: `pg_dump -Fc` a `backend/backups/` (gitignored) + verificación. Es lo que se restore-testea antes de migrar y la copia portable fuera del server.
 - **Trimestral**: ejercicio de disaster-recovery (restore completo end-to-end).
 
-## 8d. Tests E2E (TEST-02)
+## 8d. Tests
 
-Además de la suite de Jest (`npm test` — API a nivel HTTP), hay **smoke tests E2E
-con Playwright** que ejercitan los flujos críticos de punta a punta en un
-navegador real (login + cookie de sesión, guards de rol, front consumiendo la API).
+### Suite Jest + Supertest — `npm test`
+
+API a nivel HTTP: 17 suites (`tests/*.test.js`) — auth, admin, roles/multitenancy,
+ofertas, postulaciones, uploads, paginación, observabilidad, seguridad (rate limit +
+CSRF con `SEC_TESTS=1`), solicitudes de empresa, residuos legacy, chat, notificaciones…
+
+- `tests/setup/` crea y **migra** una base de test aislada (`DB_NAME_TEST` o
+  `${DB_NAME}_test`) antes de correr.
+- `tests/helpers/factories.js` arma usuarios/empresas/ofertas; `cleanup.js` los borra.
+- `--runInBand`: una sola conexión, sin condiciones de carrera entre suites.
+
+### Smoke tests E2E — `npm run e2e` (desde la raíz)
+
+Además de la suite de Jest, hay **smoke tests E2E con Playwright** que ejercitan
+los flujos críticos de punta a punta en un navegador real (login + cookie de
+sesión, guards de rol, front consumiendo la API).
 
 - **Ubicación**: `e2e/` y `playwright.config.js` en la **raíz** del repo (no en `backend/`).
 - **13 flujos / 4 roles**: alumno (ver oferta → postularse → Mis Postulaciones),
@@ -184,16 +276,32 @@ navegador real (login + cookie de sesión, guards de rol, front consumiendo la A
   artifact si falla).
 - **No** apunta a producción ni pretende cubrir toda la UI.
 
-## 9. Cómo explicarlo en una exposición
-- "El backend es la parte que corre en el servidor: recibe pedidos del frontend, consulta la base de datos y devuelve respuestas.
-- Tiene rutas en `src/routes`, lógica en `src/controllers`, y datos en `src/models`.
-- Usa PostgreSQL para guardar información, y JWT para proteger que solo usuarios logueados accedan.
-- Si el frontend pide ofertas, el backend usa `oferta.controller` y `Oferta` (Sequelize) para entregarlas."
-- Añadir: "arranca con `npm run dev`, se conecta a la DB, y está en `http://localhost:5000`." 
+### CI
 
-## 10. Resumen rápido
-- Backend = servidor que procesa información y guarda en PostgreSQL.
-- Organización clara: rutas, controladores, modelos, middleware y config.
-- Seguridad con JWT y roles para que cada tipo de usuario vea solo su parte.
-- Está diseñado así para separar responsabilidades y poder mantener el código ordenado.
+`.github/workflows/ci.yml` corre en cada push a `main` y cada PR: job **backend**
+(migrate up → down→up de reversibilidad → drift check de `schema.sql` → `npm test`),
+job **frontend** (`npm run lint` → `npm run build`), job **e2e** (Playwright).
 
+---
+
+## 9. Convenciones
+
+- **Controller** = HTTP; **service** = negocio. Un controller no arma queries
+  complejas; un service no toca `req`/`res`.
+- Respuesta uniforme: `{ success: boolean, message?, data?, pagination? }`.
+- Errores: `throw` (o `next(err)`) → `error.middleware`. No responder errores a mano
+  salvo validaciones de negocio esperables (400/403/404 con mensaje claro).
+- Paginación: `?page=&limit=` → `{ data, pagination: { page, limit, total, totalPages } }`
+  (`utils/pagination.js`).
+- Auditoría: toda acción sensible pasa por `registrarAuditoria`.
+- Variables de entorno: solo se leen vía `process.env` en `config/`, `app.js`,
+  middlewares y utils — no dispersas por los controllers.
+
+---
+
+## 10. Resumen
+
+Backend Express en capas (routes → controllers → services → models). PostgreSQL vía
+Sequelize, esquema por migraciones Umzug. Sesión en cookie HttpOnly + CSRF + rate
+limiting + helmet. Logging técnico (pino) separado del log de auditoría inmutable.
+Cubierto por Jest/Supertest y por smoke tests E2E de Playwright, todo en CI.

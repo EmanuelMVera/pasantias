@@ -3,9 +3,11 @@
  *
  * Usa Axios para hacer las peticiones a la API REST.
  * Configura automáticamente:
- * - La URL base del backend (desde variables de entorno)
- * - El token JWT en el header Authorization de cada request
- * - La redirección al login si el token expira (error 401)
+ * - La URL base del backend (VITE_API_URL o http://localhost:5000/api)
+ * - `withCredentials: true` → el navegador manda la cookie de sesión HttpOnly
+ *   (SEC-02); el token ya NO vive en localStorage ni se setea a mano
+ * - El header X-CSRF-Token (double-submit) en métodos que mutan estado
+ * - La redirección al login si la sesión expira (error 401)
  *
  * Exporta servicios agrupados por funcionalidad para usar en los componentes.
  */

@@ -8,8 +8,9 @@
  *
  * El esquema de la base de datos ya NO se sincroniza automáticamente acá
  * (se eliminó `sequelize.sync({ alter: true })`, EST-08 Fase 0). Todo
- * cambio de esquema se aplica con `npm run db:migrate` (Sequelize CLI),
- * en desarrollo igual que en producción — ver backend/migrations/README.md.
+ * cambio de esquema se aplica con `npm run db:migrate` (runner Umzug,
+ * scripts/migrate.js), en desarrollo igual que en producción — ver
+ * backend/migrations/README.md.
  */
 
 require('dotenv').config();         // Carga las variables de entorno (.env)

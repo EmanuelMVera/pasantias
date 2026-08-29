@@ -1,103 +1,129 @@
-# Frontend
+# Frontend — SPA
 
-## 1. ¿Qué es el frontend de este proyecto?
-- El frontend es la parte visual de la aplicación, lo que el usuario ve en el navegador.
-- Aquí se construye la interfaz con pantallas para alumnos, empresas y admin.
-- Permite iniciar sesión, ver ofertas, postularse, crear ofertas y revisar postulantes.
+Interfaz web del Sistema de Gestión de Pasantías. Single Page Application que
+consume la API REST del backend.
 
-## 2. Objetivo del frontend
-- Resuelve el problema de cómo un usuario interactúa con la aplicación.
-- Toma entradas del teclado/ratón y muestra datos de la app.
-- Rol: muestra datos y envía acciones al backend.
-- Diferencia simple:
-  - Frontend = pantalla y botones (lo que el usuario toca).
-  - Backend = lógica y datos (el "motor" escondido en el servidor).
+> Instalación y puesta en marcha: ver el [`README.md`](../README.md) de la raíz.
+> Este documento describe la **arquitectura** del frontend.
 
-## 3. Tecnologías y lenguajes usados
-- React (librería de JavaScript): construye la interfaz en partes llamadas componentes.
-- JavaScript: se usa para la lógica en el navegador.
-- Vite: herramienta que arranca el proyecto rápido en modo desarrollo.
-- CSS: estilos visuales de los textos, colores y posición de elementos.
-- Axios: librería que hace las llamadas al backend (pedir y enviar datos).
-- React Router (BrowserRouter, Routes, Route): maneja las páginas según la URL.
+---
 
-## 4. Estructura de carpetas
-Árbol principal (solo lo más relevante):
-- frontend/
-  - index.html
-  - package.json
-  - vite.config.js
-  - src/
-    - main.jsx
-    - App.jsx
-    - App.css
-    - index.css
-    - assets/
-    - components/
-    - context/
-    - pages/
-      - alumno/
-      - empresa/
-      - admin/
-      - auth/
-      - placeholder/
-    - services/
+## 1. Stack
 
-Explicación carpeta por carpeta:
-- `src/`: código fuente principal.
-- `components/`: piezas reutilizables (barra de navegación, mensajes, banner).
-- `context/`: guarda datos globales compartidos, en este caso `AuthContext` para usuario y token.
-- `pages/`: pantallas completas que se muestran según URL.
-  - `alumno/`: opciones para estudiantes (ofertas, perfil, postulaciones).
-  - `empresa/`: opciones para empresas (crear oferta, ver postulantes).
-  - `admin/`: panel de administración.
-  - `auth/`: login, registro, recuperación de contraseña.
-  - `placeholder/`: página en construcción.
-- `services/`: llamadas al backend usando `axios` (`api.js`).
-- `assets/`: aquí podrían ir imágenes u otros recursos.
+| Pieza | Para qué |
+|---|---|
+| **React 19** | Librería de UI por componentes |
+| **Vite 8** | Dev server + bundler |
+| **React Router 7** | Ruteo por URL (`BrowserRouter`) |
+| **Axios** | Cliente HTTP hacia la API (`src/services/api.js`) |
+| **Recharts** | Gráficos de los dashboards |
+| **ESLint 9** | Lint (`npm run lint`, bloqueante en CI) |
 
-## 5. Archivos más importantes y función de cada uno
-- `src/main.jsx`: punto de entrada. Arranca React y carga `App`.
-- `src/App.jsx`: define rutas y permisos para cada pantalla, y envuelve con `AuthProvider`.
-- `src/context/AuthContext.jsx`: maneja sesión de usuario (login, logout, token, usuario actual).
-- `src/services/api.js`: conecta con backend; contiene funciones para auth, ofertas, postulaciones, usuario, notificaciones y admin.
-- `src/pages/...`: contienen la lógica de cada sección de la app.
-  - Ejemplo: `OfertasPage.jsx` muestra oferta de trabajos y permite acciones.
-  - `EmpresaDashboardPage.jsx` y relacionados son para empresa.
-  - `AdminDashboardPage.jsx` es para administración.
-- `src/components/Navbar.jsx`, `TopBanner.jsx`, `MessageModal.jsx`: componentes decorativos o útiles en varias pantallas.
-- `src/App.css` y `src/index.css`: estilos globales.
+Sin librería de estado global: alcanza con Context + hooks. Estilos en CSS plano
+(módulos `*.module.css` + tokens globales en `src/styles/`).
 
-## 6. Cómo fluye el frontend
-1. Al abrir el proyecto en el navegador, `main.jsx` inicia React y pinta `App`.
-2. `App.jsx` crea rutas con React Router y usa `AuthProvider` para saber si hay usuario activo.
-3. Si el usuario no está logueado, va a `/login` (no hay registro público de alumno/egresado; solo empresas pueden autogestionar su alta vía `/registro-empresa`, con aprobación del admin).
-4. Después de login, dependiendo del rol, se redirige a `admin`, `empresa` o `alumno`.
-5. Dentro de cada página (por ejemplo `OfertasPage`) se muestran datos y botones.
-6. Si hace falta datos del backend, se llama a `services/api.js` con funciones como `ofertaService.getAll()`.
-7. Cuando llega la respuesta, React actualiza la pantalla con los datos nuevos.
+---
 
-## 7. Cómo se conecta con el backend
-- El proyecto usa `axios` en `src/services/api.js`.
-- Base de la API: `VITE_API_URL` o `http://localhost:5000/api`.
-- Se envía token en encabezados (`Authorization: Bearer ...`) automáticamente.
-- Ejemplo real de llamada:
-  - `ofertaService.getAll()` hace `GET /ofertas`.
-  - `authService.login({ email, password })` hace `POST /auth/login`.
-- El frontend pide datos (GET) y envía cambios (POST/PUT/PATCH/DELETE), el backend responde con JSON.
+## 2. Estructura de `src/`
 
-## 8. Cómo explicarlo en una exposición
-- "Este frontend está hecho con React y Vite. En el navegador, `main.jsx` carga `App`, que usa rutas para elegir la pantalla.
-- El `AuthContext` guarda el usuario y permite proteger páginas según rol (alumno, empresa, admin).
-- Para hablar con el servidor se usa `axios` en `services/api.js`, que organiza comandos como `login`, `getAll`, `postular`.
-- Cada carpeta tiene su función: `pages` son pantallas grandes, `components` son partes compartidas, `services` hacen los pedidos de datos." 
-- Menciona ejemplos: "si soy alumno, entro a `OfertasPage`; si soy empresa, voy a `EmpresaDashboardPage`."
-- Cierra con: "La idea es separar la vista del flujo de datos y usar componentes para no repetir código."
+```
+src/
+├── main.jsx              Monta React y envuelve la app en <BrowserRouter>
+├── App.jsx               <AuthProvider> + <EmpresaProvider> + <Routes> + ProtectedRoute
+├── pages/
+│   ├── auth/             LoginPage, ForgotPasswordPage, ResetPasswordPage, SolicitudEmpresaPage
+│   ├── alumno/           Dashboard, OfertasPage, OfertaDetallePage, MisPostulacionesPage, PerfilPage, PerfilPublicoPage
+│   ├── empresa/          Dashboard, CrearOfertaPage, PostulantesMiOfertaPage, EquipoPage, MiEmpresaPage, CandidatosEmpresaPage, SeguridadPage
+│   ├── admin/            AdminDashboardPage, AdminUsuariosPage, AdminOfertasPage, AdminSolicitudesPage, AdminLogsPage
+│   ├── HomePage.jsx      Landing pública
+│   ├── ChatPage.jsx      Mensajería
+│   └── NotificacionesPage.jsx
+├── components/           Navbar, NavbarPublic, Avatar, Modal, Paginacion, TopBanner
+├── context/
+│   ├── AuthContext.jsx     <AuthProvider> — usuario logueado, login/logout, helpers de rol
+│   └── EmpresaContext.jsx  <EmpresaProvider> — empresa y rol interno del usuario
+├── hooks/
+│   ├── useAuth.js          Consume AuthContext (archivo aparte por Fast Refresh)
+│   ├── useEmpresa.js       Consume EmpresaContext
+│   └── usePaginacion.js    Manejo de ?page= en listados
+├── services/
+│   └── api.js              Instancia axios + un *Service por recurso (authService, ofertaService…)
+├── constants/             postulacionEstados.js (labels/colores del embudo)
+├── utils/                 passwordStrength.js
+├── styles/                variables.css (tokens), globals.css
+└── assets/                imágenes / estáticos
+```
 
-## 9. Resumen rápido
-- El frontend es la interfaz para usuario en React.
-- Está organizado en rutas, componentes, contexto y servicios.
-- Se conecta al backend con axios y usa token para autenticación.
-- Resuelve el acceso, visualización y acciones (login, ver ofertas, postular, administrar).
-- Es fácil de explicar con el ciclo: arrancar → página → pedir datos → mostrar resultados.
+> Los hooks `useAuth` / `useEmpresa` viven en `src/hooks/` y **no** en el archivo
+> del context: así cada `*Context.jsx` exporta solo su Provider y Fast Refresh
+> (HMR) no recarga toda la app al editarlos (regla `react-refresh/only-export-components`).
 
+---
+
+## 3. Autenticación y guardias de ruta
+
+- **Sesión en cookie HttpOnly** (SEC-02). El frontend **no** guarda ningún token:
+  `api` usa `withCredentials: true` y el navegador manda la cookie sola. Al cargar
+  la app, `AuthContext` llama `GET /api/auth/me` — un 401 = "sin sesión".
+- **CSRF**: `api.js` lee la cookie del token CSRF y la reenvía como header
+  `X-CSRF-Token` en `POST/PUT/PATCH/DELETE` (double-submit).
+- **`ProtectedRoute`** (`App.jsx`): si no hay `usuario` redirige a `/`; si el rol
+  no está en `roles={[...]}` redirige también. Tras el login, cada rol aterriza en
+  su home (`getRutaInicio`): alumno/egresado → `/dashboard`, empresa → `/empresa`,
+  admin → `/admin`.
+- **`EmpresaContext` / `useEmpresa()`**: resuelve el rol interno
+  (`admin_empresa` / `reclutador`) una vez por sesión para **decidir qué mostrar**
+  (botones de gestión de equipo, edición del perfil de empresa…). No es autoridad
+  de permisos — el backend siempre revalida con `authorizeEmpresaRoles`.
+
+Rutas públicas (sin login): `/`, `/login`, `/registro-empresa`, `/forgot-password`,
+`/reset-password/:token`, y el listado/detalle de ofertas a nivel API.
+
+Matriz de permisos completa: [`../docs/ROLES-Y-PERMISOS.md`](../docs/ROLES-Y-PERMISOS.md).
+
+---
+
+## 4. Cómo se consume la API
+
+- Todo pasa por `src/services/api.js`. **Los componentes nunca llaman a axios
+  directo** — usan `ofertaService.getAll()`, `authService.login(...)`, etc.
+- `baseURL`: `import.meta.env.VITE_API_URL` o, por defecto, `http://localhost:5000/api`
+  (llamada absoluta al backend; **no** se usa el proxy de Vite).
+- Interceptor de respuesta: un `401` limpia la sesión y manda a `/login`.
+- Archivos privados (CV, cartas): no son URLs públicas. Se piden a
+  `GET /api/archivos/:id` como `blob` con `abrirArchivoPrivado()` y se abren/descargan
+  desde memoria (un `<a href>` plano no manda la cookie en una navegación).
+- Contrato de respuesta del backend: `{ success, message?, data?, pagination? }`.
+  Listados paginados: `?page=&limit=` → `pagination: { page, limit, total, totalPages }`
+  (componente `<Paginacion>` + `usePaginacion`).
+
+---
+
+## 5. Scripts
+
+| Script | Qué hace |
+|---|---|
+| `npm run dev` | Dev server de Vite en `:5173` (HMR) |
+| `npm run build` | Build de producción a `dist/` |
+| `npm run preview` | Sirve el `dist/` para probarlo |
+| `npm run lint` | ESLint sobre todo `src/` — **debe pasar** (gate de CI) |
+
+No hay tests unitarios de frontend; la cobertura end-to-end la dan los smoke tests
+de Playwright en [`../e2e/`](../e2e/) (levantan front + back reales).
+
+---
+
+## 6. Variables de entorno
+
+Solo una, opcional en local: **`VITE_API_URL`** (ver [`.env.example`](.env.example)).
+Si se omite, `api.js` usa `http://localhost:5000/api`. En producción se apunta a la
+URL pública del backend, incluyendo el prefijo `/api`.
+
+---
+
+## 7. Resumen
+
+SPA React + Vite. Ruteo con React Router y `ProtectedRoute` por rol. Sesión en
+cookie HttpOnly (sin token en el cliente) + CSRF double-submit. Toda la
+comunicación con el backend centralizada en `services/api.js`. Estado global
+acotado a dos contexts (auth y empresa). Lint bloqueante; E2E con Playwright.
