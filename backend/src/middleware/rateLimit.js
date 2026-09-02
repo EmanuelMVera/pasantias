@@ -55,6 +55,17 @@ const authLimiter = crearLimiter({
   message: 'Demasiados intentos de inicio de sesión. Probá de nuevo en unos minutos.',
 });
 
+// Login: techo por IP (independiente del email) para frenar el credential
+// stuffing que rota la cuenta en cada intento y así evade `authLimiter`.
+// Cuenta TODOS los requests (también los exitosos) — 40 / 15 min es holgado
+// para un uso legítimo desde una misma IP/NAT.
+const authIpLimiter = crearLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.AUTH_IP_RATE_MAX) || 40,
+  keyGenerator: (req) => req.ip,
+  message: 'Demasiados intentos de inicio de sesión desde esta conexión. Probá más tarde.',
+});
+
 // forgot/reset password: 5 / hora por IP (email-bombing + brute-force de token).
 const passwordResetLimiter = crearLimiter({
   windowMs: 60 * 60 * 1000,
@@ -97,6 +108,7 @@ const apiLimiter = crearLimiter({
 
 module.exports = {
   authLimiter,
+  authIpLimiter,
   passwordResetLimiter,
   publicWriteLimiter,
   uploadLimiter,

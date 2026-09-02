@@ -440,6 +440,13 @@
               "string",
               "null"
             ]
+          },
+          "ultimoAcceso": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -1979,7 +1986,7 @@
             ],
             "properties": {
               "usuario": {
-                "$ref": "#/components/schemas/Usuario"
+                "$ref": "#/components/schemas/UsuarioResumen"
               }
             }
           }

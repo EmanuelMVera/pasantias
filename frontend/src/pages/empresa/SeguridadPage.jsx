@@ -8,12 +8,16 @@
  */
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
 import { calcularFortalezaPassword } from '../../utils/passwordStrength';
 import styles from './SeguridadPage.module.css';
 
 export default function SeguridadPage() {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
   const [form, setForm] = useState({
     passwordActual:      '',
     nuevaPassword:       '',
@@ -66,10 +70,16 @@ export default function SeguridadPage() {
 
     try {
       await authService.cambiarPassword(form.passwordActual, form.nuevaPassword);
+      // El backend invalida la sesión actual (borra la cookie + tokenVersion++).
+      // Hay que cerrar sesión en el cliente y mandar al login, si no la SPA
+      // queda "logueada" en falso hasta el próximo 401.
       setEstado('ok');
-      setMensaje('✅ Contraseña actualizada correctamente.');
-      // Limpiar el formulario
+      setMensaje('✅ Contraseña actualizada. Volvé a iniciar sesión con la nueva contraseña.');
       setForm({ passwordActual: '', nuevaPassword: '', confirmarPassword: '' });
+      setTimeout(async () => {
+        await logout();
+        navigate('/login', { replace: true });
+      }, 1800);
     } catch (err) {
       setEstado('error');
       setMensaje(err.response?.data?.message ?? 'Error al cambiar la contraseña. Intentá de nuevo.');

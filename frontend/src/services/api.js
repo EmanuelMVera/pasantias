@@ -67,12 +67,35 @@ api.interceptors.request.use((config) => {
 });
 
 // ── Interceptor de response ───────────────────────────────────────────────────
-// 401 (sesión inválida/expirada) → redirige al login. No hay token local que borrar.
+// 401 (sesión inválida/expirada). No hay token local que borrar, pero sí:
+//  1. avisar a AuthContext para que limpie `usuario` (si no, una ruta pública
+//     con `usuario` stale rebota a una ruta protegida);
+//  2. en rutas no públicas, redirigir a /login con recarga dura (rehace todo
+//     el estado limpiamente).
+//
+// Excepciones (NO redirigir ni limpiar):
+// - Requests marcadas con `skipAuthRedirect` (el sondeo inicial /auth/me, cuyo
+//   401 sólo significa "visitante anónimo").
+// - Rutas públicas: sólo se limpia el estado, sin redirect.
+const RUTAS_PUBLICAS = ['/', '/login', '/registro-empresa', '/forgot-password', '/reset-password'];
+
+function enRutaPublica() {
+  const path = window.location.pathname;
+  // Match exacto o segmento completo — nunca un prefijo suelto (`/login-x` no
+  // es pública).
+  return RUTAS_PUBLICAS.some((r) => path === r || path.startsWith(r + '/'));
+}
+
+// AuthContext registra acá su limpiador de sesión al montar.
+let onSesionExpirada = null;
+export function setSesionExpiradaHandler(fn) { onSesionExpirada = fn; }
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 && !window.location.pathname.startsWith('/login')) {
-      window.location.href = '/login';
+    if (error.response?.status === 401 && !error.config?.skipAuthRedirect) {
+      if (typeof onSesionExpirada === 'function') onSesionExpirada();
+      if (!enRutaPublica()) window.location.href = '/login';
     }
     return Promise.reject(error);
   }
@@ -83,7 +106,8 @@ api.interceptors.response.use(
 export const authService = {
   login: (data) => api.post('/auth/login', data),
   logout: () => api.post('/auth/logout'),
-  me: () => api.get('/auth/me'),
+  // El 401 de este sondeo sólo significa "no hay sesión"; no debe redirigir.
+  me: () => api.get('/auth/me', { skipAuthRedirect: true }),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
   resetPassword: (token, password) => api.post(`/auth/reset-password/${token}`, { password }),
   cambiarPassword: (passwordActual, nuevaPassword) =>
@@ -219,7 +243,7 @@ export const empresaService = {
   getDashboard:          () => api.get('/empresas/dashboard'),
   getMisOfertas:         (params) => api.get('/empresas/mis-ofertas', { params }),
   getMiEmpresa:          () => api.get('/empresas/mi-empresa'),
-  getPublico:            (empresaId) => api.get(`/empresas/${empresaId}`), // Perfil público de empresa
+  getPublico:            (empresaId) => api.get(`/empresas/${empresaId}`), // Perfil de empresa (datos públicos, pero requiere sesión)
   updateMiEmpresa:       (data) => api.put('/empresas/mi-empresa', data),
   // SEC-03: el logo se sube como imagen (JPG/PNG/WEBP), solo admin_empresa.
   subirLogo:             (formData) => api.post('/empresas/mi-empresa/logo', formData, {

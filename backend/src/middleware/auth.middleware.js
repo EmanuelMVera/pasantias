@@ -39,10 +39,17 @@ const verifyToken = async (req, res, next) => {
     return res.status(401).json({ success: false, message: 'Token requerido.' });
   }
 
+  // Verifica y decodifica el token. Sólo un token malo/expirado es 401; un
+  // fallo de DB más abajo es un 500 y va al manejador global (antes se
+  // reportaba como "Token inválido", ocultando la caída real).
+  let decoded;
   try {
-    // Verifica y decodifica el token usando la clave secreta
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({ success: false, message: 'Token inválido o expirado.' });
+  }
 
+  try {
     // Busca el usuario en la DB, excluyendo campos sensibles
     const usuario = await Usuario.findByPk(decoded.id, {
       attributes: { exclude: ['password', 'tokenReset', 'tokenResetExpira'] },
@@ -70,7 +77,7 @@ const verifyToken = async (req, res, next) => {
     req.usuario = usuario;
     next();
   } catch (err) {
-    return res.status(401).json({ success: false, message: 'Token inválido o expirado.' });
+    return next(err);
   }
 };
 

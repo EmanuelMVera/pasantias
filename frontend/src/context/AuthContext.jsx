@@ -12,9 +12,10 @@
  * Estructura del objeto usuario:
  * {
  *   id, nombre, apellido, email, rol,
- *   telefono, ubicacion, fotoPerfil, ultimoAcceso,
- *   razonSocial (solo empresa)
+ *   telefono, ubicacion, fotoPerfil, ultimoAcceso
  * }
+ * (la razón social de la empresa NO vive acá — se resuelve vía EmpresaContext /
+ * GET /api/empresas/mi-empresa; este contexto solo conoce el usuario de sistema)
  *
  * Roles soportados: alumno | egresado | empresa | admin
  *
@@ -22,7 +23,7 @@
  */
 
 import { createContext, useState, useEffect, useCallback } from 'react';
-import { authService } from '../services/api';
+import { authService, setSesionExpiradaHandler } from '../services/api';
 
 // Crea el contexto. El valor null indica que aún no fue inicializado
 const AuthContext = createContext(null);
@@ -46,8 +47,6 @@ function normalizarUsuario(raw) {
     ubicacion:    raw.ubicacion   ?? null,
     fotoPerfil:   raw.fotoPerfil  ?? null,
     ultimoAcceso: raw.ultimoAcceso ?? null,
-    // Campos específicos por rol
-    razonSocial:  raw.razonSocial ?? null,
   };
 }
 
@@ -65,6 +64,14 @@ export const AuthProvider = ({ children }) => {
       .then(({ data }) => setUsuario(normalizarUsuario(data.usuario)))
       .catch(() => setUsuario(null)) // 401 → sin sesión
       .finally(() => setLoading(false));
+  }, []);
+
+  // El interceptor de api.js llama a esto cuando cualquier request devuelve 401
+  // (sesión expirada/revocada): limpia el estado para que la UI no siga
+  // mostrando al usuario como logueado.
+  useEffect(() => {
+    setSesionExpiradaHandler(() => setUsuario(null));
+    return () => setSesionExpiradaHandler(null);
   }, []);
 
   /**

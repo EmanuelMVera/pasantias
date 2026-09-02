@@ -13,6 +13,8 @@ const logger = require('../utils/logger');
  * - MulterError (rechazo de archivo por tamaño — el rechazo por tipo ya se
  *   lanza como HttpError desde el fileFilter): 400 con mensaje claro, nunca
  *   500 — un archivo demasiado grande es un error esperable, no interno.
+ * - Errores de `express.json()` (body no parseable / demasiado grande): 400 /
+ *   413 — son entrada inválida del cliente, no una falla del servidor.
  * - Cualquier otro error: nunca se reenvía `err.message` ni el stack al
  *   cliente — solo un mensaje genérico fijo + el `requestId` para que el
  *   usuario pueda citarlo a soporte. El detalle real (con stack) se loguea
@@ -23,6 +25,14 @@ const errorMiddleware = (err, req, res, next) => {
     const resp = { success: false, message: err.message };
     if (err.code) resp.code = err.code;
     return res.status(err.statusCode).json(resp);
+  }
+
+  // body-parser (express.json): JSON malformado o cuerpo sobre el límite.
+  if (err.type === 'entity.parse.failed' || (err instanceof SyntaxError && 'body' in err)) {
+    return res.status(400).json({ success: false, message: 'El cuerpo de la solicitud no es JSON válido.' });
+  }
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ success: false, message: 'El cuerpo de la solicitud es demasiado grande.' });
   }
 
   if (err instanceof multer.MulterError) {

@@ -9,8 +9,8 @@
  * tal como estaba antes del refactor (deliberado, ver plan REF-ADMIN-01).
  */
 
-const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
+const { hashPassword } = require('./auth.service');
 const { Usuario, Perfil, Empresa, EmpresaUsuario, ConfiguracionInstitucional } = require('../models');
 const HttpError = require('../utils/httpError');
 const { buildPagination } = require('../utils/pagination');
@@ -99,7 +99,7 @@ async function crearUsuario({ nombre, apellido, email, password, rol, telefono, 
   const existe = await Usuario.findOne({ where: { email } });
   if (existe) throw new HttpError(400, 'Ya existe un usuario con ese email.');
 
-  const hash = await bcrypt.hash(password, 10);
+  const hash = await hashPassword(password);
   const nuevo = await Usuario.create({
     nombre, apellido, email, password: hash, rol,
     telefono: telefono || null, ubicacion: ubicacion || null,
@@ -151,7 +151,7 @@ async function actualizarUsuario(id, body, { actorUsuarioId, ip, requestId }) {
   if (activo    !== undefined) updateData.activo    = activo;
   if (telefono  !== undefined) updateData.telefono  = telefono;
   if (ubicacion !== undefined) updateData.ubicacion = ubicacion;
-  if (password) updateData.password = await bcrypt.hash(password, 10);
+  if (password) updateData.password = await hashPassword(password);
 
   const antes = { rol: usuario.rol, activo: usuario.activo };
   await usuario.update(updateData);

@@ -65,8 +65,10 @@ function NotifCard({ notif, onLeer, onEliminar }) {
 
   const handleClick = async () => {
     if (!notif.leida) await onLeer(notif.id);
+    // Solo rutas internas relativas: nunca una URL absoluta ni un path externo
+    // (evita navegar fuera de la SPA o caer al fallback → home).
     const url = notif.accionURL || notif.enlace;
-    if (url) navigate(url);
+    if (url && url.startsWith('/') && !url.startsWith('//')) navigate(url);
   };
 
   return (

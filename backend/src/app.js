@@ -32,6 +32,19 @@ const { apiLimiter } = require('./middleware/rateLimit');
 const app = express();
 const isProd = process.env.NODE_ENV === 'production';
 
+// ── Chequeos de config de cookies en producción (SEC-02) ──────────────────────
+// La cookie de sesión se rompe silenciosamente si el front y el back están en
+// dominios distintos y falta SameSite=None (+ Secure). Y COOKIE_SECURE=false
+// deja pasar una cookie de sesión sin Secure en prod.
+if (isProd) {
+  if ((process.env.COOKIE_SAMESITE || 'lax').toLowerCase() !== 'none') {
+    logger.warn('COOKIE_SAMESITE no es "none": si el frontend está en otro dominio, el navegador no enviará la cookie de sesión en requests cross-site.');
+  }
+  if (process.env.COOKIE_SECURE === 'false') {
+    logger.warn('COOKIE_SECURE=false en producción: la cookie de sesión viajará sin el flag Secure.');
+  }
+}
+
 // ── trust proxy (SEC-02) ──────────────────────────────────────────────────────
 // Necesario detrás de un reverse proxy / Cloudflare Tunnel para que `req.ip`
 // (y por lo tanto el rate limiting y ActivityLog.ip) tomen la IP real del
@@ -142,6 +155,13 @@ app.use('/api/archivos',      require('./routes/archivo.routes'));       // SEC-
 // ── Health Check ──────────────────────────────────────────────────────────────
 // Endpoint simple para verificar que el servidor está activo (útil para monitoreo)
 app.get('/api/health', (req, res) => res.json({ status: 'OK', timestamp: new Date() }));
+
+// ── 404 de la API ─────────────────────────────────────────────────────────────
+// Cualquier /api/* que no matcheó ninguna ruta: respuesta JSON con la misma
+// forma que el resto de los errores (sin esto, Express contesta su HTML por defecto).
+app.use('/api', (req, res) => {
+  res.status(404).json({ success: false, message: 'Recurso no encontrado.' });
+});
 
 // ── Manejador global de errores ───────────────────────────────────────────────
 app.use(errorMiddleware);

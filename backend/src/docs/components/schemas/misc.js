@@ -22,7 +22,9 @@ module.exports = {
     ['token', 'usuario'],
   ),
 
-  AuthMeResponse: wrap({ usuario: { $ref: '#/components/schemas/Usuario' } }, ['usuario']),
+  // `/auth/me` devuelve la misma forma reducida que el login (menos el token) —
+  // nunca el modelo Sequelize completo.
+  AuthMeResponse: wrap({ usuario: { $ref: '#/components/schemas/UsuarioResumen' } }, ['usuario']),
 
   ForgotPasswordResponse: wrap(
     {

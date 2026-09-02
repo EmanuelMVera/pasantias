@@ -2,15 +2,15 @@
  * EmpresaPublicaPage.jsx — Vista pública del perfil de una empresa.
  *
  * Ruta: /empresa/:empresaId
- * Roles: alumno, egresado, empresa
- * Consume: GET /api/empresas/:id
+ * Roles: alumno, egresado, empresa, admin
+ * Consume: GET /api/empresas/:id (requiere sesión)
  *
  * Muestra info pública de la empresa (solo si estadoAprobacion='aprobada')
  * y sus ofertas activas. El botón Contactar solo aparece para alumnos/egresados.
  */
 
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { empresaService } from '../../services/api';
 
@@ -19,11 +19,16 @@ export default function EmpresaPublicaPage() {
   const { usuario } = useAuth();
   const navigate = useNavigate();
 
+  // El param es siempre un id numérico. Un valor no numérico (typo, subruta
+  // inexistente que igual matchea esta ruta) → al fallback, no a un fetch basura.
+  const idValido = /^\d+$/.test(empresaId ?? '');
+
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
 
   useEffect(() => {
+    if (!idValido) return;
     let vigente = true;
     empresaService.getPublico(empresaId)
       .then(({ data: res }) => { if (vigente) { setData(res.data); setError(''); } })
@@ -35,7 +40,9 @@ export default function EmpresaPublicaPage() {
       })
       .finally(() => { if (vigente) setLoading(false); });
     return () => { vigente = false; };
-  }, [empresaId]);
+  }, [empresaId, idValido]);
+
+  if (!idValido) return <Navigate to="/" replace />;
 
   if (loading) return <div className="page-container"><p className="msg">Cargando empresa...</p></div>;
 
@@ -52,7 +59,9 @@ export default function EmpresaPublicaPage() {
   if (!data) return null;
 
   const { ofertas = [] } = data;
-  const puedeContactar = ['alumno', 'egresado'].includes(usuario?.rol);
+  // El detalle de oferta (/ofertas/:id) y el chat solo están habilitados para
+  // alumnos/egresados; para empresa/admin las ofertas se listan sin enlace.
+  const esAlumnoEgresado = ['alumno', 'egresado'].includes(usuario?.rol);
 
   return (
     <div className="page-container">
@@ -97,7 +106,7 @@ export default function EmpresaPublicaPage() {
         </div>
 
         {/* Acciones */}
-        {puedeContactar && data.usuarioId && (
+        {esAlumnoEgresado && data.usuarioId && (
           <button
             className="btn-primary"
             onClick={() => navigate(`/chat/${data.usuarioId}`)}
@@ -142,38 +151,51 @@ export default function EmpresaPublicaPage() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {ofertas.map((o) => (
-              <Link
-                key={o.id}
-                to={`/ofertas/${o.id}`}
-                style={{
-                  display: 'block', padding: '1rem 1.25rem',
-                  background: 'var(--card-bg)', borderRadius: '10px',
-                  textDecoration: 'none', color: 'inherit',
-                  border: '1.5px solid var(--border)',
-                  transition: 'border-color 0.15s',
-                }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--primary)'}
-                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <strong style={{ fontSize: '1rem' }}>{o.titulo}</strong>
-                  {o.tipoPuesto && (
-                    <span className={`badge badge-puesto badge-${o.tipoPuesto}`} style={{ fontSize: '0.75rem' }}>
-                      {o.tipoPuesto === 'pasante' ? '🎓 Pasante' : o.tipoPuesto === 'trainee' ? '🌱 Trainee' : '💼 Junior'}
-                    </span>
-                  )}
-                </div>
-                <div style={{ marginTop: '0.3rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                  {o.area     && <span>📂 {o.area}</span>}
-                  {o.modalidad && <span>🏢 {o.modalidad}</span>}
-                  {o.ciudad   && <span>📍 {o.ciudad}</span>}
-                  {o.fechaLimite && (
-                    <span>📅 Hasta {new Date(o.fechaLimite).toLocaleDateString('es-AR')}</span>
-                  )}
-                </div>
-              </Link>
-            ))}
+            {ofertas.map((o) => {
+              const cardStyle = {
+                display: 'block', padding: '1rem 1.25rem',
+                background: 'var(--card-bg)', borderRadius: '10px',
+                textDecoration: 'none', color: 'inherit',
+                border: '1.5px solid var(--border)',
+                transition: 'border-color 0.15s',
+              };
+              const contenido = (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <strong style={{ fontSize: '1rem' }}>{o.titulo}</strong>
+                    {o.tipoPuesto && (
+                      <span className={`badge badge-puesto badge-${o.tipoPuesto}`} style={{ fontSize: '0.75rem' }}>
+                        {o.tipoPuesto === 'pasante' ? '🎓 Pasante' : o.tipoPuesto === 'trainee' ? '🌱 Trainee' : '💼 Junior'}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ marginTop: '0.3rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    {o.area     && <span>📂 {o.area}</span>}
+                    {o.modalidad && <span>🏢 {o.modalidad}</span>}
+                    {o.ciudad   && <span>📍 {o.ciudad}</span>}
+                    {o.fechaLimite && (
+                      <span>📅 Hasta {new Date(o.fechaLimite).toLocaleDateString('es-AR')}</span>
+                    )}
+                  </div>
+                </>
+              );
+
+              // Solo alumno/egresado puede abrir /ofertas/:id → para el resto la
+              // tarjeta es informativa, no un enlace muerto que rebota.
+              return esAlumnoEgresado ? (
+                <Link
+                  key={o.id}
+                  to={`/ofertas/${o.id}`}
+                  style={cardStyle}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--primary)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+                >
+                  {contenido}
+                </Link>
+              ) : (
+                <div key={o.id} style={cardStyle}>{contenido}</div>
+              );
+            })}
           </div>
         )}
       </section>

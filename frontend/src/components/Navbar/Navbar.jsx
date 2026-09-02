@@ -65,9 +65,12 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setMenuOpen(false);
-    logout();
+    // Esperar a que se limpie la sesión ANTES de navegar: si no, `usuario`
+    // sigue presente, AppRoutes rebota a la home del rol y esa página dispara
+    // fetches que terminan en 401 → hard redirect a /login.
+    await logout();
     navigate('/');
   };
 
@@ -110,12 +113,10 @@ export default function Navbar() {
 
   const esActivo = (to) => {
     if (to === '/') return location.pathname === '/';
-    // Exact match primero
-    if (location.pathname === to) return true;
-    // Solo usar startsWith para rutas con parámetros dinámicos (contienen ':')
-    // Ej: /empresa/postulantes/:ofertaId — el link es /empresa/postulantes
-    if (to.endsWith('/:') || to.includes('/:')) return location.pathname.startsWith(to.split('/:')[0]);
-    return false;
+    // Match exacto o subruta (ej: estando en /empresa/nueva-oferta, "Panel"
+    // (/empresa) queda activo). Es solo estilo; que "Panel" y "+ Nueva Oferta"
+    // queden ambos marcados en esa ruta es aceptable.
+    return location.pathname === to || location.pathname.startsWith(to + '/');
   };
 
 

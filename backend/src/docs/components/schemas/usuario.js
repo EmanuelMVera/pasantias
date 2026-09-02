@@ -12,7 +12,7 @@ module.exports = {
   // (Sequelize row menos campos sensibles).
   Usuario: base,
 
-  // Forma reducida que devuelve el login y algunos listados.
+  // Forma reducida que devuelven el login, `/auth/me` y algunos listados.
   UsuarioResumen: {
     type: 'object',
     properties: {
@@ -24,6 +24,7 @@ module.exports = {
       telefono: { type: ['string', 'null'] },
       ubicacion: { type: ['string', 'null'] },
       fotoPerfil: { type: ['string', 'null'] },
+      ultimoAcceso: { type: ['string', 'null'], format: 'date-time' },
     },
   },
 };

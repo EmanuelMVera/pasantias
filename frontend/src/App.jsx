@@ -22,6 +22,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import { EmpresaProvider } from './context/EmpresaContext';
+import { getRutaInicio, ROLES_VALIDOS } from './utils/rutas';
 
 
 // Páginas públicas (accesibles sin login)
@@ -104,22 +105,6 @@ const ProtectedRoute = ({ children, roles, redirectTo = '/' }) => {
 };
 
 /**
- * Obtiene la ruta de inicio según el rol del usuario.
- * Centraliza la lógica de redirección post-login.
- * @param {string} rol - Rol del usuario autenticado
- * @returns {string} Ruta de redirección
- */
-function getRutaInicio(rol) {
-  switch (rol) {
-    case 'admin':    return '/admin';
-    case 'empresa':  return '/empresa';
-    case 'alumno':
-    case 'egresado':
-    default:         return '/dashboard';
-  }
-}
-
-/**
  * AppRoutes — Define todas las rutas de la aplicación.
  *
  * La ruta raíz "/" redirige automáticamente según el rol del usuario:
@@ -129,7 +114,26 @@ function getRutaInicio(rol) {
  * - alumno/egresado → /dashboard
  */
 function AppRoutes() {
-  const { usuario } = useAuth();
+  const { usuario, loading, logout } = useAuth();
+
+  // Mientras se resuelve la sesión inicial no se renderiza ninguna ruta: evita
+  // el flash de HomePage/Login a un usuario ya autenticado (y que un componente
+  // con fetch en el mount dispare un 401 en la ventana del sondeo).
+  if (loading) return (
+    <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
+      Cargando...
+    </div>
+  );
+
+  // Sesión con un rol que no reconocemos: no hay home válida → cortar el posible
+  // loop de redirección y ofrecer cerrar sesión.
+  const rolInvalido = usuario && !ROLES_VALIDOS.includes(usuario.rol);
+  if (rolInvalido) return (
+    <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
+      <p>Tu cuenta no tiene un rol válido para acceder al sistema.</p>
+      <button className="btn-primary" onClick={() => logout()}>Cerrar sesión</button>
+    </div>
+  );
 
   return (
     <Routes>
@@ -260,13 +264,13 @@ function AppRoutes() {
       {/* ── Perfiles públicos (alumno/egresado, empresa) ── */}
       {/* /perfil/:usuarioId — vista pública de un alumno o egresado */}
       <Route path="/perfil/:usuarioId" element={
-        <ProtectedRoute roles={['alumno', 'egresado', 'empresa']}>
+        <ProtectedRoute roles={['alumno', 'egresado', 'empresa', 'admin']}>
           <PerfilPublicoPage />
         </ProtectedRoute>
       } />
       {/* /empresa/:empresaId — vista pública de una empresa (DESPUÉS de todas las rutas fijas /empresa/...) */}
       <Route path="/empresa/:empresaId" element={
-        <ProtectedRoute roles={['alumno', 'egresado', 'empresa']}>
+        <ProtectedRoute roles={['alumno', 'egresado', 'empresa', 'admin']}>
           <EmpresaPublicaPage />
         </ProtectedRoute>
       } />

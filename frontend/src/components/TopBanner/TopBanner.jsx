@@ -14,20 +14,12 @@ export default function TopBanner() {
   return (
     <div className={styles.topBanner}>
       <div className={styles.topBannerInner}>
-        {/* Enlace que envuelve el logo institucional */}
-        <a
-          href="#"
-          target="_blank"
-          rel="noopener noreferrer"
-          className={styles.topBannerLink}
-        >
-          {/* Logo de la UOM Avellaneda */}
-          <img
-            src="/logo-uom-avellaneda.png"
-            alt="Unión Obrera Metalúrgica — Sección Avellaneda"
-            className={styles.topBannerImg}
-          />
-        </a>
+        {/* Logo de la UOM Avellaneda (sin enlace: no hay destino institucional) */}
+        <img
+          src="/logo-uom-avellaneda.png"
+          alt="Unión Obrera Metalúrgica — Sección Avellaneda"
+          className={styles.topBannerImg}
+        />
       </div>
     </div>
   );

@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { userService, abrirArchivoPrivado } from '../../services/api';
 import Avatar from '../../components/Avatar/Avatar';
@@ -38,7 +38,12 @@ export default function PerfilPublicoPage() {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
 
+  // El param es siempre un id numérico; un valor no numérico (typo, subruta
+  // inexistente que igual matchea /perfil/:usuarioId) va al fallback.
+  const idValido = /^\d+$/.test(usuarioId ?? '');
+
   useEffect(() => {
+    if (!idValido) return;
     let vigente = true;
     userService.getPerfilPublico(usuarioId)
       .then(({ data: res }) => { if (vigente) { setData(res.data); setError(''); } })
@@ -51,7 +56,9 @@ export default function PerfilPublicoPage() {
       })
       .finally(() => { if (vigente) setLoading(false); });
     return () => { vigente = false; };
-  }, [usuarioId]);
+  }, [usuarioId, idValido]);
+
+  if (!idValido) return <Navigate to="/" replace />;
 
   if (loading) return <div className="page-container"><p className="msg">Cargando perfil...</p></div>;
 

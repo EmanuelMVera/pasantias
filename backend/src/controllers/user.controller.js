@@ -177,8 +177,9 @@ const getPerfilPublico = async (req, res) => {
     ],
   });
 
-  // visibilidadPerfil es BOOLEAN: false → privado
-  if (perfil && perfil.visibilidadPerfil === false) {
+  // visibilidadPerfil es BOOLEAN: false → privado. El admin del sistema puede
+  // ver cualquier perfil (moderación); el resto respeta la preferencia.
+  if (perfil && perfil.visibilidadPerfil === false && req.usuario?.rol !== 'admin') {
     const err = new HttpError(403, 'Este perfil es privado.');
     err.code = 'PERFIL_PRIVADO';
     throw err;

@@ -15,6 +15,9 @@ const generarToken = (usuario) =>
 // Hash del token de recupero — se persiste esto, nunca el token en claro.
 const hashTokenReset = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
+// Forma pública del usuario que ve el frontend (login y /auth/me devuelven
+// exactamente esto — nunca el modelo Sequelize crudo, que filtraría
+// tokenVersion, habilitado, timestamps, etc.).
 const serializarUsuario = (usuario) => ({
   id: usuario.id,
   nombre: usuario.nombre,
@@ -24,6 +27,7 @@ const serializarUsuario = (usuario) => ({
   telefono: usuario.telefono || null,
   ubicacion: usuario.ubicacion || null,
   fotoPerfil: usuario.fotoPerfil || null,
+  ultimoAcceso: usuario.ultimoAcceso || null,
 });
 
 const hashPassword = (plain) => bcrypt.hash(plain, 12);

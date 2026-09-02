@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { getRutaInicio } from '../../utils/rutas';
 import styles from './LoginPage.module.css';
 
 export default function LoginPage() {
@@ -55,9 +56,7 @@ export default function LoginPage() {
       }
       // ----------------------------
 
-      if (usuario.rol === 'admin') navigate('/admin');
-      else if (usuario.rol === 'empresa') navigate('/empresa');
-      else navigate('/dashboard'); // alumno / egresado
+      navigate(getRutaInicio(usuario.rol), { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || 'Error al iniciar sesión.');
     } finally {

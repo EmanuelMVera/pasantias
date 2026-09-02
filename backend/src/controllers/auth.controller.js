@@ -80,7 +80,7 @@ exports.login = async (req, res) => {
  * Devuelve los datos del usuario actualmente autenticado.
  */
 exports.me = async (req, res) => {
-  return res.json({ success: true, usuario: req.usuario });
+  return res.json({ success: true, usuario: authService.serializarUsuario(req.usuario) });
 };
 
 // ── Logout ────────────────────────────────────────────────────────────────────
