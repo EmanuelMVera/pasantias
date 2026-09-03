@@ -115,7 +115,7 @@
 
 /* Cuando hay panel de detalle abierto, usamos 2 columnas */
 .layout:has(.detallePanel) {
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
 }
 
 .listPanel {
@@ -482,6 +482,37 @@
     max-height: none;
   }
 }
+
+/* ── Reclutadores solicitados (panel de detalle) ─────────────────────────── */
+.reclNota {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.reclList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.reclItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.88rem;
+  background: #f0f6fc;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.reclItem a { color: var(--primary); word-break: break-word; }
+.reclItemSep { color: var(--text-muted); }
+.reclItemNombre { font-weight: 600; }
 
 @media (max-width: 768px) {
   .statsRow {
