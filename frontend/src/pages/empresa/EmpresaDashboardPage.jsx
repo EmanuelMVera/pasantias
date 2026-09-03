@@ -14,6 +14,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { empresaService, ofertaService } from '../../services/api';
 import { useEmpresa } from '../../hooks/useEmpresa';
 import Paginacion from '../../components/Paginacion/Paginacion';
+import Toast from '../../components/ui/Toast';
+import { useToast } from '../../hooks/useToast';
 import styles from './EmpresaDashboardPage.module.css';
 
 /**
@@ -81,6 +83,7 @@ export default function EmpresaDashboardPage() {
   // esto evita mostrarle un botón que dice "Editar" cuando en su caso es
   // de solo lectura). FE-05: viene de EmpresaContext, no de este fetch.
   const { esReclutador } = useEmpresa();
+  const { toast, showToast } = useToast();
 
   const cargarMetricas = useCallback(async () => {
     setError('');
@@ -137,7 +140,7 @@ export default function EmpresaDashboardPage() {
       // Si hay filtro por estado activo, la fila puede haber salido de la página
       if (filtroOferta) cargarOfertas(filtroOferta, pageOfertas);
     } catch {
-      alert('Error al cambiar el estado de la oferta. Intentá de nuevo.');
+      showToast('Error al cambiar el estado de la oferta. Intentá de nuevo.', 'error');
     } finally {
       setGuardando(null);
     }
@@ -145,6 +148,7 @@ export default function EmpresaDashboardPage() {
 
   return (
     <div className="page-container">
+      <Toast toast={toast} />
 
       {/* ── Cabecera ─────────────────────────────────────────────────────── */}
       <div className="dashboard-header">
@@ -161,7 +165,7 @@ export default function EmpresaDashboardPage() {
 
 
       {/* Error global */}
-      {error && <p className="error-msg" style={{ marginBottom: '1.5rem' }}>⚠️ {error}</p>}
+      {error && <p className={`error-msg ${styles.errorGlobal}`}>⚠️ {error}</p>}
 
       {/* ── Tarjetas de métricas ──────────────────────────────────────────── */}
       {loading ? (
@@ -173,8 +177,8 @@ export default function EmpresaDashboardPage() {
           {METRIC_CARDS.map(({ key, label, icon, color, action }) => (
             <button
               key={key}
-              className={styles.metricCard}
-              style={{ '--card-color': color, cursor: 'pointer', textAlign: 'center', border: 'none', background: 'var(--card-bg, #fff)' }}
+              className={`${styles.metricCard} ${styles.metricCardBtn}`}
+              style={{ '--card-color': color }}
               onClick={() => action({ navigate, setFiltroOferta, tablaRef })}
               title={`Ver ${label.toLowerCase()}`}
             >
@@ -187,15 +191,16 @@ export default function EmpresaDashboardPage() {
       )}
 
       {/* ── Tabla de ofertas propias ──────────────────────────────────────── */}
-      <div className="dashboard-header" style={{ marginTop: '2rem' }} ref={tablaRef}>
-        <h2 style={{ margin: 0 }}>Mis Ofertas</h2>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+      <div className={`dashboard-header ${styles.subHeader}`} ref={tablaRef}>
+        <h2>Mis Ofertas</h2>
+        <div className={styles.subHeaderRight}>
           {filtroOferta && (
-            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+            <span className={styles.filtroTag}>
               Filtrando: <strong>{filtroOferta}</strong>
               <button
-                style={{ marginLeft: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                className={styles.filtroTagClose}
                 onClick={() => setFiltroOferta('')}
+                aria-label="Quitar filtro"
               >✕</button>
             </span>
           )}
@@ -260,7 +265,7 @@ export default function EmpresaDashboardPage() {
                   </td>
                   <td className={styles.centrado}>{o.cantidadVacantes ?? '—'}</td>
                   <td className={styles.centrado}>
-                    <strong style={{ color: o.totalPostulaciones > 0 ? 'var(--primary)' : 'var(--text-muted)' }}>
+                    <strong className={`${styles.postuladosCount} ${o.totalPostulaciones > 0 ? styles.tienen : ''}`}>
                       {o.totalPostulaciones ?? 0}
                     </strong>
                   </td>
@@ -300,16 +305,14 @@ export default function EmpresaDashboardPage() {
                         )}
                         {o.estado === 'rechazada' && (
                           <span
-                            style={{ fontSize: '0.8rem', color: '#e74c3c', fontStyle: 'italic' }}
+                            className={`${styles.estadoNota} ${styles.rechazada}`}
                             title="Contactá al administrador para más información."
                           >
                             Revisada por admin
                           </span>
                         )}
                         {o.estado === 'cerrada' && (
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                            —
-                          </span>
+                          <span className={styles.estadoNota}>—</span>
                         )}
                       </>
                     )}

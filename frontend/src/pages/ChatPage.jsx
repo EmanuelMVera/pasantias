@@ -25,6 +25,8 @@ import { useAuth } from '../hooks/useAuth';
 import { mensajeService } from '../services/api';
 import Avatar from '../components/Avatar/Avatar';
 import Modal from '../components/Modal/Modal';
+import Toast from '../components/ui/Toast';
+import { useToast } from '../hooks/useToast';
 import styles from './ChatPage.module.css';
 
 const POLL_INTERVAL = 10_000; // ms
@@ -246,6 +248,7 @@ export default function ChatPage() {
   const [enviando,        setEnviando]        = useState(false);
   const [errorConvs,      setErrorConvs]      = useState('');
   const [modalAbierto,    setModalAbierto]    = useState(false);
+  const { toast, showToast } = useToast();
 
   const mensajesEndRef = useRef(null);
   const mensajesAreaRef = useRef(null);
@@ -375,7 +378,7 @@ export default function ChatPage() {
       );
     } catch {
       setNuevoMensaje(texto);
-      alert('No se pudo enviar el mensaje. Intentá de nuevo.');
+      showToast('No se pudo enviar el mensaje. Intentá de nuevo.', 'error');
     } finally {
       setEnviando(false);
       inputRef.current?.focus();
@@ -413,6 +416,8 @@ export default function ChatPage() {
 
   return (
     <>
+      <Toast toast={toast} />
+
       {/* Modal de nuevo chat */}
       {modalAbierto && (
         <NuevoChatModal
@@ -524,16 +529,6 @@ export default function ChatPage() {
                       className={styles.verPerfilBtn}
                       onClick={() => navigate(perfilUrl)}
                       title="Ver perfil"
-                      style={{
-                        marginLeft: 'auto',
-                        padding: '4px 12px',
-                        fontSize: '0.78rem',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border, #e2e8f0)',
-                        background: 'transparent',
-                        color: 'var(--primary, #0073AD)',
-                        cursor: 'pointer',
-                      }}
                     >
                       Ver perfil
                     </button>
@@ -542,17 +537,6 @@ export default function ChatPage() {
                       className={styles.verPerfilBtn}
                       disabled
                       title="Perfil no disponible"
-                      style={{
-                        marginLeft: 'auto',
-                        padding: '4px 12px',
-                        fontSize: '0.78rem',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border, #e2e8f0)',
-                        background: 'transparent',
-                        color: 'var(--text-muted, #64748b)',
-                        cursor: 'not-allowed',
-                        opacity: 0.5,
-                      }}
                     >
                       Ver perfil
                     </button>
