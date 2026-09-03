@@ -83,7 +83,7 @@
   gap: 0.5rem;
   background: rgba(0, 115, 173, 0.18);
   border: 1px solid rgba(88, 172, 250, 0.3);
-  color: #a0d8f8;
+  color: #cde9fb;
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -490,7 +490,7 @@
 }
 
 .ctaNoteLink:hover {
-  color: #a0d8f8;
+  color: #cde9fb;
   text-decoration: underline;
 }
 

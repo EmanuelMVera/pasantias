@@ -78,10 +78,13 @@ function NotifCard({ notif, onLeer, onEliminar }) {
       onClick={handleClick}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && handleClick()}
+      aria-label={`${notif.titulo}${notif.leida ? '' : ' (sin leer)'}`}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); }
+      }}
     >
       {/* Ícono del tipo */}
-      <div className={styles.notifIcon} style={{ background: `${tipo.color}18`, color: tipo.color }}>
+      <div className={styles.notifIcon} style={{ background: `${tipo.color}18`, color: tipo.color }} aria-hidden="true">
         {tipo.icon}
       </div>
 
@@ -111,17 +114,19 @@ function NotifCard({ notif, onLeer, onEliminar }) {
           <button
             className={styles.btnLeer}
             title="Marcar como leída"
+            aria-label="Marcar como leída"
             onClick={() => onLeer(notif.id)}
           >
-            ✓
+            <span aria-hidden="true">✓</span>
           </button>
         )}
         <button
           className={styles.btnEliminar}
           title="Eliminar notificación"
+          aria-label="Eliminar notificación"
           onClick={() => onEliminar(notif.id)}
         >
-          ✕
+          <span aria-hidden="true">✕</span>
         </button>
       </div>
 

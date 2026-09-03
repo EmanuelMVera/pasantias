@@ -126,6 +126,7 @@ export default function SeguridadPage() {
                 type="button"
                 className={styles.toggleVer}
                 onClick={() => toggleMostrar('actual')}
+                aria-label={mostrar.actual ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 title={mostrar.actual ? 'Ocultar' : 'Ver'}
               >
                 {mostrar.actual ? '🙈' : '👁️'}
@@ -155,6 +156,7 @@ export default function SeguridadPage() {
                 type="button"
                 className={styles.toggleVer}
                 onClick={() => toggleMostrar('nueva')}
+                aria-label={mostrar.nueva ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 title={mostrar.nueva ? 'Ocultar' : 'Ver'}
               >
                 {mostrar.nueva ? '🙈' : '👁️'}
@@ -204,6 +206,7 @@ export default function SeguridadPage() {
                 type="button"
                 className={styles.toggleVer}
                 onClick={() => toggleMostrar('confirmar')}
+                aria-label={mostrar.confirmar ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 title={mostrar.confirmar ? 'Ocultar' : 'Ver'}
               >
                 {mostrar.confirmar ? '🙈' : '👁️'}

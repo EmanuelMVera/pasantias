@@ -60,19 +60,19 @@
 /* ── Botón Empresa ──────────────────────────────────────────────── */
 .btnEmpresa {
   background: transparent;
-  color: #0073AD !important;
+  color: var(--primary) !important;
   padding: 0.65rem 1.25rem;
   border-radius: 8px;
   text-decoration: none;
   font-weight: 600;
   font-size: 0.9rem;
   display: inline-block;
-  border: 1.5px solid #0073AD;
+  border: 1.5px solid var(--primary);
   transition: all 0.25s ease;
 }
 
 .btnEmpresa:hover {
-  background-color: #0073AD;
+  background-color: var(--primary);
   color: #ffffff !important;
   transform: translateY(-1px);
   box-shadow: 0 6px 14px rgba(0, 115, 173, 0.25);

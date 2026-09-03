@@ -321,6 +321,11 @@ export default function AdminSolicitudesPage() {
                         key={s.id}
                         className={`${styles.fila} ${detalle?.id === s.id ? styles.filaActiva : ''}`}
                         onClick={() => setDetalle(s)}
+                        tabIndex={0}
+                        aria-label={`Ver detalle de ${s.razonSocial}`}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetalle(s); }
+                        }}
                       >
                         <td className={styles.idCell}>#{s.id}</td>
                         <td>
