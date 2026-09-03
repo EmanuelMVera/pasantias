@@ -287,6 +287,15 @@ select { cursor: pointer; }
   margin-top: 0.5rem;
 }
 
+.success-msg {
+  color: #1a7a4a;
+  font-size: 0.9rem;
+  background: #d5f5e3;
+  border: 1px solid #a3e4c1;
+  border-radius: var(--radius);
+  padding: 0.6rem 1rem;
+}
+
 /* ── Page Container ──────────────────────────────────────────────────────── */
 .page-container {
   max-width: var(--maxw-page);
