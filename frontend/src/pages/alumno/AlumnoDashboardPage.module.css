@@ -363,10 +363,10 @@
     font-size: 1.4rem;
   }
   .metricsGrid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .quickGrid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .recCard {
     flex-direction: column;

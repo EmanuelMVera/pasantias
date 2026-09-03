@@ -151,6 +151,6 @@
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .statsGrid { grid-template-columns: repeat(2, 1fr); }
+  .statsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pendienteCard { flex-direction: column; align-items: flex-start; }
 }
