@@ -56,3 +56,4 @@ coverage/
 /test-results/
 /blob-report/
 /e2e/.auth/
+_shots.mjs
