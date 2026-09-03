@@ -34,8 +34,41 @@ export default function Modal({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onClose, closeOnEscape]);
 
+  /* Foco inicial dentro del panel + trap de Tab + restaurar el foco al cerrar. */
   useEffect(() => {
-    panelRef.current?.focus();
+    const disparador = document.activeElement;
+    const panel = panelRef.current;
+
+    const focusables = () =>
+      panel
+        ? [...panel.querySelectorAll(
+            'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          )].filter((el) => el.offsetParent !== null)
+        : [];
+
+    const primero = focusables()[0];
+    (primero || panel)?.focus();
+
+    const onKeyDown = (e) => {
+      if (e.key !== 'Tab') return;
+      const f = focusables();
+      if (f.length === 0) { e.preventDefault(); return; }
+      const first = f[0];
+      const last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    panel?.addEventListener('keydown', onKeyDown);
+    return () => {
+      panel?.removeEventListener('keydown', onKeyDown);
+      if (disparador instanceof HTMLElement) disparador.focus();
+    };
   }, []);
 
   const dialogProps = title
