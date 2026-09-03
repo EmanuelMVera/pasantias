@@ -14,6 +14,8 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { empresaService } from '../../services/api';
 import { useEmpresa } from '../../hooks/useEmpresa';
+import PageContainer from '../../components/ui/PageContainer';
+import styles from './MiEmpresaPage.module.css';
 
 const ESTADO_LABEL = {
   aprobada:  '✅ Aprobada',
@@ -48,34 +50,9 @@ function ToastExito({ mensaje, onClose }) {
   }, [onClose]);
 
   return (
-    <div
-      role="status"
-      style={{
-        position: 'fixed',
-        top: '1.25rem',
-        right: '1.25rem',
-        zIndex: 1200,
-        background: '#16a34a',
-        color: '#fff',
-        padding: '0.75rem 1.25rem',
-        borderRadius: 10,
-        fontWeight: 600,
-        fontSize: '0.92rem',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.6rem',
-        animation: 'fadeInDown 0.25s ease',
-      }}
-    >
+    <div role="status" className={styles.toast}>
       ✓ {mensaje}
-      <button
-        onClick={onClose}
-        style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 700, marginLeft: 4 }}
-        aria-label="Cerrar"
-      >
-        ✕
-      </button>
+      <button onClick={onClose} className={styles.toastClose} aria-label="Cerrar">✕</button>
     </div>
   );
 }
@@ -179,7 +156,7 @@ export default function MiEmpresaPage() {
   if (loading || loadingRol) return <p className="msg">Cargando...</p>;
 
   return (
-    <div className="page-container" style={{ maxWidth: 720 }}>
+    <PageContainer size="form">
 
       {/* Toast de éxito */}
       {showToast && (
@@ -189,7 +166,7 @@ export default function MiEmpresaPage() {
         />
       )}
 
-      <div className="dashboard-header">
+      <div className={`dashboard-header ${styles.header}`}>
         <div>
           <Link to="/empresa" className="btn-back">← Volver al panel</Link>
           <h1>Perfil de empresa</h1>
@@ -200,56 +177,40 @@ export default function MiEmpresaPage() {
 
       {/* Aviso de solo lectura para reclutadores */}
       {!esAdmin && (
-        <div style={{
-          marginBottom: '1.25rem',
-          padding: '0.75rem 1rem',
-          background: '#fef9c3',
-          border: '1px solid #fbbf24',
-          borderRadius: 8,
-          fontSize: '0.88rem',
-          color: '#92400e',
-        }}>
+        <div className={styles.avisoLectura}>
           🔒 Solo el <strong>administrador de empresa</strong> puede modificar estos datos.
           Estás viendo el perfil en modo lectura.
         </div>
       )}
 
       {/* Datos de solo lectura */}
-      <section style={{
-        marginBottom: '2rem',
-        padding: '1rem 1.25rem',
-        background: 'var(--card-bg, #f8fafc)',
-        borderRadius: 10,
-        border: '1px solid var(--border)',
-      }}>
-        <h3 style={{ marginTop: 0, fontSize: '0.95rem', color: 'var(--text-muted)' }}>
-          Datos institucionales (solo lectura)
-        </h3>
-        <dl style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '0.4rem 1rem', margin: 0, fontSize: '0.9rem' }}>
-          <dt style={{ fontWeight: 600 }}>Razón Social</dt>
-          <dd style={{ margin: 0 }}>{empresa?.razonSocial ?? '—'}</dd>
-          <dt style={{ fontWeight: 600 }}>CUIT</dt>
-          <dd style={{ margin: 0 }}>{empresa?.cuit ?? '—'}</dd>
-          <dt style={{ fontWeight: 600 }}>Estado</dt>
-          <dd style={{ margin: 0 }}>{ESTADO_LABEL[empresa?.estadoAprobacion] ?? empresa?.estadoAprobacion ?? '—'}</dd>
+      <section className={styles.readonlyBox}>
+        <h3 className={styles.readonlyTitle}>Datos institucionales (solo lectura)</h3>
+        <dl className={styles.dl}>
+          <dt>Razón Social</dt>
+          <dd>{empresa?.razonSocial ?? '—'}</dd>
+          <dt>CUIT</dt>
+          <dd>{empresa?.cuit ?? '—'}</dd>
+          <dt>Estado</dt>
+          <dd>{ESTADO_LABEL[empresa?.estadoAprobacion] ?? empresa?.estadoAprobacion ?? '—'}</dd>
         </dl>
-        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.75rem', marginBottom: 0 }}>
+        <p className={styles.readonlyHint}>
           Para modificar la razón social o el CUIT, contactate con el administrador del sistema.
         </p>
       </section>
 
       {/* Logo — solo admin_empresa (SEC-03: subida de imagen validada) */}
       {esAdmin && (
-        <section style={{ marginBottom: '2rem' }}>
-          <h3 style={{ fontSize: '0.95rem', marginBottom: '0.75rem' }}>Logo de la empresa</h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+        <section className={styles.logoSection}>
+          <h3 className={styles.logoTitle}>Logo de la empresa</h3>
+          <div className={styles.logoRow}>
             {empresa?.logo && (
               <img
                 key={empresa.logo}
                 src={empresa.logo}
                 alt="Logo actual"
                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                style={{ width: 80, height: 80, objectFit: 'contain', border: '1px solid var(--border)', borderRadius: 8, padding: 4 }}
+                className={styles.logoImg}
               />
             )}
             <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoChange} />
@@ -257,7 +218,7 @@ export default function MiEmpresaPage() {
               {subiendoLogo ? 'Subiendo...' : 'Subir logo'}
             </button>
           </div>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>JPG, PNG o WEBP. Máximo 2 MB.</span>
+          <span className={styles.logoHint}>JPG, PNG o WEBP. Máximo 2 MB.</span>
         </section>
       )}
 
@@ -288,11 +249,7 @@ export default function MiEmpresaPage() {
           <div className="form-group">
             <label htmlFor="sitioWeb">
               Sitio web
-              {esAdmin && (
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 400, marginLeft: '0.4rem' }}>
-                  (ej: www.empresa.com)
-                </span>
-              )}
+              {esAdmin && <span className={styles.labelHint}>(ej: www.empresa.com)</span>}
             </label>
             <input
               id="sitioWeb" name="sitioWeb"
@@ -336,7 +293,7 @@ export default function MiEmpresaPage() {
 
         {/* Botones solo para admin_empresa */}
         {esAdmin && (
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+          <div className={styles.acciones}>
             <button type="submit" className="btn-primary" disabled={guardando}>
               {guardando ? 'Guardando...' : '✓ Guardar cambios'}
             </button>
@@ -347,13 +304,13 @@ export default function MiEmpresaPage() {
         )}
 
         {!esAdmin && (
-          <div style={{ marginTop: '1.5rem' }}>
+          <div className={styles.acciones}>
             <button type="button" className="btn-secondary" onClick={() => navigate('/empresa')}>
               ← Volver al panel
             </button>
           </div>
         )}
       </form>
-    </div>
+    </PageContainer>
   );
 }

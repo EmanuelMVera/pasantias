@@ -10,10 +10,14 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Navigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { userService, abrirArchivoPrivado } from '../../services/api';
 import Avatar from '../../components/Avatar/Avatar';
+import Card from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import EmptyState from '../../components/ui/EmptyState';
+import styles from './PerfilPublicoPage.module.css';
 
 const DISPONIBILIDAD_LABEL = {
   inmediata:     'Disponibilidad inmediata',
@@ -65,10 +69,7 @@ export default function PerfilPublicoPage() {
   if (error) return (
     <div className="page-container">
       <button onClick={() => navigate(-1)} className="btn-back">← Volver</button>
-      <div style={{ marginTop: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-        <span style={{ fontSize: '3rem' }}>🔒</span>
-        <p style={{ marginTop: '1rem', fontSize: '1.1rem' }}>{error}</p>
-      </div>
+      <EmptyState icon="🔒" title={error} />
     </div>
   );
 
@@ -85,169 +86,141 @@ export default function PerfilPublicoPage() {
       <button onClick={() => navigate(-1)} className="btn-back">← Volver</button>
 
       {/* ── Header ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '1.5rem',
-        padding: '1.5rem', background: 'var(--card-bg)', borderRadius: '12px',
-        marginBottom: '1.5rem', flexWrap: 'wrap',
-      }}>
-        {/* Avatar */}
-        <Avatar
-          src={fotoSrc}
-          nombre={data.nombre}
-          apellido={data.apellido}
-          size={80}
-        />
+      <div className={styles.header}>
+        <Avatar src={fotoSrc} nombre={data.nombre} apellido={data.apellido} size={80} />
 
-        {/* Info principal */}
-        <div style={{ flex: 1, minWidth: 200 }}>
-          <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{data.nombre} {data.apellido}</h1>
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className={styles.headerInfo}>
+          <h1 className={styles.headerName}>{data.nombre} {data.apellido}</h1>
+          <div className={styles.headerMeta}>
             <span className={`badge badge-${data.rol}`}>{rolLabel}</span>
             {perfil?.carrera && (
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+              <span className={styles.headerCarrera}>
                 {perfil.carrera}{perfil.anioEgreso ? ` · Egresado ${perfil.anioEgreso}` : ''}
               </span>
             )}
           </div>
           {data.ubicacion && (
-            <p style={{ margin: '0.3rem 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              📍 {data.ubicacion}
-            </p>
+            <p className={styles.headerUbicacion}>📍 {data.ubicacion}</p>
           )}
         </div>
 
-        {/* Acciones */}
         {puedeContactar && (
-          <button
-            className="btn-primary"
-            onClick={() => navigate(`/chat/${usuarioId}`)}
-            style={{ flexShrink: 0 }}
-          >
-            💬 Contactar
-          </button>
+          <div className={styles.headerAcciones}>
+            <Button variant="primary" onClick={() => navigate(`/chat/${usuarioId}`)}>
+              💬 Contactar
+            </Button>
+          </div>
         )}
       </div>
 
       {/* ── Sin perfil ── */}
       {!perfil && (
-        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--card-bg)', borderRadius: '10px' }}>
-          Este usuario aún no completó su perfil.
-        </div>
+        <Card>
+          <p style={{ textAlign: 'center', color: 'var(--text-muted)', margin: 0 }}>
+            Este usuario aún no completó su perfil.
+          </p>
+        </Card>
       )}
 
       {perfil && (
         <>
-          {/* ── Sobre mí ── */}
           {perfil.descripcion && (
-            <section style={{ background: 'var(--card-bg)', borderRadius: '10px', padding: '1.25rem', marginBottom: '1rem' }}>
-              <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Sobre mí</h2>
-              <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{perfil.descripcion}</p>
-            </section>
+            <Card as="section" title="Sobre mí">
+              <p className={styles.prosa}>{perfil.descripcion}</p>
+            </Card>
           )}
 
-          {/* ── Intereses y disponibilidad ── */}
           {(perfil.areaInteres || perfil.disponibilidad) && (
-            <section style={{ background: 'var(--card-bg)', borderRadius: '10px', padding: '1.25rem', marginBottom: '1rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+            <Card as="section" bodyClassName={styles.filaDatos}>
               {perfil.areaInteres && (
-                <div>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Área de interés</span>
-                  <p style={{ margin: '0.25rem 0 0', fontWeight: 600 }}>{perfil.areaInteres}</p>
+                <div className={styles.dato}>
+                  <span className={styles.datoLabel}>Área de interés</span>
+                  <p className={styles.datoValor}>{perfil.areaInteres}</p>
                 </div>
               )}
               {perfil.disponibilidad && (
-                <div>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Disponibilidad</span>
+                <div className={styles.dato}>
+                  <span className={styles.datoLabel}>Disponibilidad</span>
                   <p style={{ margin: '0.25rem 0 0' }}>
-                    <span style={{
-                      background: DISPONIBILIDAD_COLOR[perfil.disponibilidad] ?? '#7f8c8d',
-                      color: '#fff', borderRadius: '12px', padding: '2px 10px', fontSize: '0.85rem', fontWeight: 600,
-                    }}>
+                    <span
+                      className={styles.dispBadge}
+                      style={{ background: DISPONIBILIDAD_COLOR[perfil.disponibilidad] ?? '#7f8c8d' }}
+                    >
                       {DISPONIBILIDAD_LABEL[perfil.disponibilidad] ?? perfil.disponibilidad}
                     </span>
                   </p>
                 </div>
               )}
-            </section>
+            </Card>
           )}
 
-          {/* ── Habilidades ── */}
           {perfil.habilidades?.length > 0 && (
-            <section style={{ background: 'var(--card-bg)', borderRadius: '10px', padding: '1.25rem', marginBottom: '1rem' }}>
-              <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Habilidades</h2>
+            <Card as="section" title="Habilidades">
               <div className="tags">
                 {perfil.habilidades.map(h => <span key={h} className="tag">{h}</span>)}
               </div>
-            </section>
+            </Card>
           )}
 
-          {/* ── Idiomas ── */}
           {perfil.idiomas?.length > 0 && (
-            <section style={{ background: 'var(--card-bg)', borderRadius: '10px', padding: '1.25rem', marginBottom: '1rem' }}>
-              <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Idiomas</h2>
+            <Card as="section" title="Idiomas">
               <div className="tags">
-                {perfil.idiomas.map(i => <span key={i} className="tag" style={{ background: '#f0f6fc', color: '#0073AD' }}>{i}</span>)}
+                {perfil.idiomas.map(i => (
+                  <span key={i} className={`tag ${styles.tagIdioma}`}>{i}</span>
+                ))}
               </div>
-            </section>
+            </Card>
           )}
 
-          {/* ── Certificaciones ── */}
           {perfil.certificaciones?.length > 0 && (
-            <section style={{ background: 'var(--card-bg)', borderRadius: '10px', padding: '1.25rem', marginBottom: '1rem' }}>
-              <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Certificaciones</h2>
-              <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+            <Card as="section" title="Certificaciones">
+              <ul className={styles.lista}>
                 {perfil.certificaciones.map(c => <li key={c}>{c}</li>)}
               </ul>
-            </section>
+            </Card>
           )}
 
-          {/* ── Experiencia laboral ── */}
           {perfil.experienciaLaboral && (
-            <section style={{ background: 'var(--card-bg)', borderRadius: '10px', padding: '1.25rem', marginBottom: '1rem' }}>
-              <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Experiencia laboral</h2>
-              <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{perfil.experienciaLaboral}</p>
-            </section>
+            <Card as="section" title="Experiencia laboral">
+              <p className={styles.prosa}>{perfil.experienciaLaboral}</p>
+            </Card>
           )}
 
-          {/* ── Proyectos ── */}
           {perfil.proyectos && (
-            <section style={{ background: 'var(--card-bg)', borderRadius: '10px', padding: '1.25rem', marginBottom: '1rem' }}>
-              <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Proyectos</h2>
-              <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{perfil.proyectos}</p>
-            </section>
+            <Card as="section" title="Proyectos">
+              <p className={styles.prosa}>{perfil.proyectos}</p>
+            </Card>
           )}
 
-          {/* ── Redes y CV ── */}
           {(perfil.linkedin || perfil.github || perfil.portfolio || perfil.cvArchivoId) && (
-            <section style={{ background: 'var(--card-bg)', borderRadius: '10px', padding: '1.25rem', marginBottom: '1rem' }}>
-              <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Redes y contacto</h2>
-              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <Card as="section" title="Redes y contacto">
+              <div className={styles.enlaces}>
                 {perfil.linkedin && (
-                  <a href={perfil.linkedin} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ fontSize: '0.85rem' }}>
+                  <Button variant="secondary" href={perfil.linkedin} target="_blank" rel="noopener noreferrer" className={styles.enlace}>
                     💼 LinkedIn
-                  </a>
+                  </Button>
                 )}
                 {perfil.github && (
-                  <a href={perfil.github} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ fontSize: '0.85rem' }}>
+                  <Button variant="secondary" href={perfil.github} target="_blank" rel="noopener noreferrer" className={styles.enlace}>
                     🐙 GitHub
-                  </a>
+                  </Button>
                 )}
                 {perfil.portfolio && (
-                  <a href={perfil.portfolio} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ fontSize: '0.85rem' }}>
+                  <Button variant="secondary" href={perfil.portfolio} target="_blank" rel="noopener noreferrer" className={styles.enlace}>
                     🌐 Portfolio
-                  </a>
+                  </Button>
                 )}
                 {perfil.cvArchivoId && (
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    style={{ fontSize: '0.85rem' }}
+                  <Button
+                    variant="primary"
+                    className={styles.enlace}
                     onClick={() => abrirArchivoPrivado(perfil.cvArchivoId, { nombreArchivo: 'CV.pdf' })}
                   >
                     📄 Descargar CV
-                  </button>
+                  </Button>
                 )}
               </div>
-            </section>
+            </Card>
           )}
         </>
       )}

@@ -1,0 +1,139 @@
+/* MiEmpresaPage.module.css — perfil de empresa (ver / editar). */
+
+.toast {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 1200;
+  background: #16a34a;
+  color: #fff;
+  padding: 0.75rem 1.25rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  animation: toastIn 0.25s ease;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.toastClose {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+.header > div {
+  min-width: 0;
+}
+
+.avisoLectura {
+  margin-bottom: 1.25rem;
+  padding: 0.75rem 1rem;
+  background: #fef9c3;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  color: #92400e;
+}
+
+.readonlyBox {
+  margin-bottom: 2rem;
+  padding: 1rem 1.25rem;
+  background: var(--bg-card);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.readonlyTitle {
+  margin-top: 0;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.dl {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 0.4rem 1rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.dl dt { font-weight: 600; }
+.dl dd { margin: 0; }
+
+.readonlyHint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0.75rem 0 0;
+}
+
+.logoSection {
+  margin-bottom: 2rem;
+}
+
+.logoTitle {
+  font-size: 0.95rem;
+  margin-bottom: 0.75rem;
+}
+
+.logoRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.logoImg {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.logoHint {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.labelHint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 0.4rem;
+}
+
+.acciones {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 600px) {
+  .dl {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+
+  .dl dt { margin-top: 0.5rem; }
+
+  .toast {
+    left: 1rem;
+    right: 1rem;
+    top: 1rem;
+  }
+}

@@ -342,4 +342,30 @@
   .userName {
     display: none;
   }
+
+  /* Apretar la barra para que quepa en teléfonos angostos (evita ~46px de
+     scroll horizontal que arrastraba a todas las páginas autenticadas). */
+  .navbarInner {
+    gap: 0.5rem;
+    padding: 0 0.75rem;
+  }
+
+  .navbarActions {
+    gap: 0.35rem;
+  }
+
+  .notifBadge {
+    padding: 0.25rem 0.5rem;
+  }
+
+  .userMenu {
+    padding: 0.35rem 0.4rem;
+    gap: 0.35rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .navbarBrand span:not(.brandIcon) {
+    display: none;   /* deja solo el 🎓 en pantallas muy chicas */
+  }
 }

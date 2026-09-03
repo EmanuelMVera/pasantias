@@ -1,2 +1,110 @@
-/* Estilos específicos de CrearOfertaPage */
-/* Agregar aquí estilos propios de esta página cuando se necesiten */
+/* CrearOfertaPage.module.css — formulario de publicación de oferta. */
+
+.tipoGrid {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tipoCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--bg-card);
+  flex: 1 1 180px;
+  min-width: 180px;
+}
+
+.tipoCardActiva {
+  border-color: var(--primary);
+  background: #f0f8ff;
+}
+
+.tipoCard input {
+  margin-top: 2px;
+  width: auto;
+}
+
+.tipoNombre {
+  color: #1e293b;
+}
+
+.tipoCardActiva .tipoNombre {
+  color: var(--primary);
+}
+
+.tipoDesc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0.2rem 0 0;
+  line-height: 1.4;
+}
+
+.checkLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.checkLabel input { width: auto; }
+
+.checkLabelDisabled {
+  cursor: not-allowed;
+}
+
+.hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.labelHint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 0.5rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border: 1.5px solid var(--border);
+  border-radius: 99px;
+  cursor: pointer;
+  background: var(--bg-card);
+  font-size: 0.85rem;
+  color: #475569;
+  font-weight: 400;
+  user-select: none;
+}
+
+.chipActiva {
+  border-color: var(--primary);
+  background: #f0f8ff;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.chip input { display: none; }
+
+.acciones {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}

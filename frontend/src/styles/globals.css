@@ -50,13 +50,18 @@ a:hover {
   gap: 0.4rem;
 }
 
-.form-group label {
+.form-group label,
+.form-group .form-group-label {
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--secondary);
   text-transform: uppercase;
   letter-spacing: 0.6px;
 }
+
+/* Encabezado de un grupo de controles (radios/checkboxes) que no rotula un
+   único input — se usa <span> en vez de <label> para no romper la semántica. */
+.form-group .form-group-label { display: block; }
 
 .form-row {
   display: grid;

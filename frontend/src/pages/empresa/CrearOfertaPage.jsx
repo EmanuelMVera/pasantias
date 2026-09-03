@@ -16,6 +16,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ofertaService } from '../../services/api';
+import styles from './CrearOfertaPage.module.css';
 
 // Carreras del instituto (lista canónica de catalogos.json)
 const CARRERAS_INSTITUTO = [
@@ -137,62 +138,48 @@ export default function CrearOfertaPage() {
 
         {/* ── Información principal ─────────────────────────────────────── */}
         <div className="form-group">
-          <label>Título del puesto *</label>
+          <label htmlFor="titulo">Título del puesto *</label>
           <input
-            name="titulo" value={form.titulo} onChange={handleChange} required
+            id="titulo" name="titulo" value={form.titulo} onChange={handleChange} required
             placeholder="Ej: Pasantía en Desarrollo Web"
           />
         </div>
 
         <div className="form-group">
-          <label>Descripción *</label>
+          <label htmlFor="descripcion">Descripción *</label>
           <textarea
-            name="descripcion" value={form.descripcion} onChange={handleChange} required
+            id="descripcion" name="descripcion" value={form.descripcion} onChange={handleChange} required
             rows={5} placeholder="Describí las responsabilidades y el contexto del puesto..."
           />
         </div>
 
         <div className="form-group">
-          <label>Requisitos</label>
+          <label htmlFor="requisitos">Requisitos</label>
           <textarea
-            name="requisitos" value={form.requisitos} onChange={handleChange}
+            id="requisitos" name="requisitos" value={form.requisitos} onChange={handleChange}
             rows={3} placeholder="Ej: Conocimientos básicos en React y Node.js..."
           />
         </div>
 
         {/* ── Tipo de puesto ────────────────────────────────────────────── */}
         <div className="form-group">
-          <label>Tipo de puesto *</label>
-          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+          <span className="form-group-label">Tipo de puesto *</span>
+          <div className={styles.tipoGrid}>
             {Object.entries(TIPO_PUESTO_CONFIG).map(([value, cfg]) => (
               <label
                 key={value}
-                style={{
-                  display:      'flex',
-                  alignItems:   'flex-start',
-                  gap:          '0.5rem',
-                  padding:      '0.75rem 1rem',
-                  border:       `2px solid ${form.tipoPuesto === value ? '#0073AD' : '#e2e8f0'}`,
-                  borderRadius: '8px',
-                  cursor:       'pointer',
-                  background:   form.tipoPuesto === value ? '#f0f8ff' : '#fff',
-                  flex:         '1 1 180px',
-                  minWidth:     '180px',
-                }}
+                className={`${styles.tipoCard} ${form.tipoPuesto === value ? styles.tipoCardActiva : ''}`}
               >
                 <input
                   type="radio" name="tipoPuesto" value={value}
                   checked={form.tipoPuesto === value}
                   onChange={() => handleTipoPuesto(value)}
-                  style={{ marginTop: '2px' }}
                 />
                 <div>
-                  <strong style={{ color: form.tipoPuesto === value ? '#0073AD' : '#1e293b' }}>
+                  <strong className={styles.tipoNombre}>
                     {cfg.emoji} {cfg.label}
                   </strong>
-                  <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0 0', lineHeight: 1.4 }}>
-                    {cfg.desc}
-                  </p>
+                  <p className={styles.tipoDesc}>{cfg.desc}</p>
                 </div>
               </label>
             ))}
@@ -201,9 +188,7 @@ export default function CrearOfertaPage() {
 
         {/* ── Experiencia ────────────────────────────────────────────────── */}
         <div className="form-group">
-          <label
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: tipoCfg.forzarSinExp ? 'not-allowed' : 'pointer' }}
-          >
+          <label className={`${styles.checkLabel} ${tipoCfg.forzarSinExp ? styles.checkLabelDisabled : ''}`}>
             <input
               type="checkbox"
               name="requiereExperiencia"
@@ -213,18 +198,16 @@ export default function CrearOfertaPage() {
             />
             Requiere experiencia previa
             {tipoCfg.forzarSinExp && (
-              <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                (no aplica para pasantes)
-              </span>
+              <span className={styles.hint}>(no aplica para pasantes)</span>
             )}
           </label>
         </div>
 
         {form.requiereExperiencia && (
           <div className="form-group">
-            <label>Detalle de experiencia requerida</label>
+            <label htmlFor="experienciaDetalle">Detalle de experiencia requerida</label>
             <textarea
-              name="experienciaDetalle" value={form.experienciaDetalle} onChange={handleChange}
+              id="experienciaDetalle" name="experienciaDetalle" value={form.experienciaDetalle} onChange={handleChange}
               rows={2} placeholder="Ej: Proyectos académicos comprobables o 6 meses de experiencia en área similar"
             />
           </div>
@@ -233,15 +216,15 @@ export default function CrearOfertaPage() {
         {/* ── Área + Modalidad ──────────────────────────────────────────── */}
         <div className="form-row">
           <div className="form-group">
-            <label>Área</label>
+            <label htmlFor="area">Área</label>
             <input
-              name="area" value={form.area} onChange={handleChange}
+              id="area" name="area" value={form.area} onChange={handleChange}
               placeholder="Ej: Programación, Marketing..."
             />
           </div>
           <div className="form-group">
-            <label>Modalidad de trabajo</label>
-            <select name="modalidad" value={form.modalidad} onChange={handleChange}>
+            <label htmlFor="modalidad">Modalidad de trabajo</label>
+            <select id="modalidad" name="modalidad" value={form.modalidad} onChange={handleChange}>
               <option value="presencial">Presencial</option>
               <option value="remoto">Remoto</option>
               <option value="hibrido">Híbrido</option>
@@ -251,8 +234,8 @@ export default function CrearOfertaPage() {
 
         <div className="form-row">
           <div className="form-group">
-            <label>Tipo de jornada</label>
-            <select name="modalidadExtendida" value={form.modalidadExtendida} onChange={handleChange}>
+            <label htmlFor="modalidadExtendida">Tipo de jornada</label>
+            <select id="modalidadExtendida" name="modalidadExtendida" value={form.modalidadExtendida} onChange={handleChange}>
               <option value="tiempo_completo">Tiempo completo</option>
               <option value="medio_tiempo">Medio tiempo</option>
               <option value="pasantia">Pasantía</option>
@@ -260,9 +243,9 @@ export default function CrearOfertaPage() {
             </select>
           </div>
           <div className="form-group">
-            <label>Ciudad</label>
+            <label htmlFor="ciudad">Ciudad</label>
             <input
-              name="ciudad" value={form.ciudad} onChange={handleChange}
+              id="ciudad" name="ciudad" value={form.ciudad} onChange={handleChange}
               placeholder="Ej: Avellaneda"
             />
           </div>
@@ -271,16 +254,16 @@ export default function CrearOfertaPage() {
         {/* ── Vacantes + Remuneración ───────────────────────────────────── */}
         <div className="form-row">
           <div className="form-group">
-            <label>Cantidad de vacantes</label>
+            <label htmlFor="cantidadVacantes">Cantidad de vacantes</label>
             <input
-              type="number" name="cantidadVacantes" value={form.cantidadVacantes}
+              id="cantidadVacantes" type="number" name="cantidadVacantes" value={form.cantidadVacantes}
               onChange={handleChange} min={1} max={999}
             />
           </div>
           <div className="form-group">
-            <label>Remuneración (visible)</label>
+            <label htmlFor="remuneracion">Remuneración (visible)</label>
             <input
-              name="remuneracion" value={form.remuneracion} onChange={handleChange}
+              id="remuneracion" name="remuneracion" value={form.remuneracion} onChange={handleChange}
               placeholder="Ej: A convenir / $200.000"
             />
           </div>
@@ -288,16 +271,16 @@ export default function CrearOfertaPage() {
 
         <div className="form-row">
           <div className="form-group">
-            <label>Salario estimado (interno)</label>
+            <label htmlFor="salario">Salario estimado (interno)</label>
             <input
-              name="salario" value={form.salario} onChange={handleChange}
+              id="salario" name="salario" value={form.salario} onChange={handleChange}
               placeholder="Ej: 150000"
             />
           </div>
           <div className="form-group">
-            <label>Beneficios</label>
+            <label htmlFor="beneficios">Beneficios</label>
             <input
-              name="beneficios" value={form.beneficios} onChange={handleChange}
+              id="beneficios" name="beneficios" value={form.beneficios} onChange={handleChange}
               placeholder="Ej: Capacitaciones, comedor, certificado"
             />
           </div>
@@ -306,49 +289,35 @@ export default function CrearOfertaPage() {
         {/* ── Fechas ────────────────────────────────────────────────────── */}
         <div className="form-row">
           <div className="form-group">
-            <label>Fecha de publicación</label>
-            <input type="date" name="fechaPublicacion" value={form.fechaPublicacion} onChange={handleChange} />
+            <label htmlFor="fechaPublicacion">Fecha de publicación</label>
+            <input id="fechaPublicacion" type="date" name="fechaPublicacion" value={form.fechaPublicacion} onChange={handleChange} />
           </div>
           <div className="form-group">
-            <label>Fecha límite de postulación</label>
-            <input type="date" name="fechaLimite" value={form.fechaLimite} onChange={handleChange} />
+            <label htmlFor="fechaLimite">Fecha límite de postulación</label>
+            <input id="fechaLimite" type="date" name="fechaLimite" value={form.fechaLimite} onChange={handleChange} />
           </div>
         </div>
 
         {/* ── Carreras destinatarias ────────────────────────────────────── */}
         <div className="form-group">
-          <label>
+          <span className="form-group-label">
             Carreras destinatarias
-            <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 400, marginLeft: '0.5rem' }}>
+            <span className={styles.labelHint}>
               (opcional — seleccioná las carreras a las que está orientada la oferta)
             </span>
-          </label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+          </span>
+          <div className={styles.chips}>
             {CARRERAS_INSTITUTO.map(carrera => {
               const activa = carrerasDestinatarias.includes(carrera);
               return (
                 <label
                   key={carrera}
-                  style={{
-                    display:      'flex',
-                    alignItems:   'center',
-                    gap:          '0.4rem',
-                    padding:      '0.35rem 0.75rem',
-                    border:       `1.5px solid ${activa ? '#0073AD' : '#e2e8f0'}`,
-                    borderRadius: '99px',
-                    cursor:       'pointer',
-                    background:   activa ? '#f0f8ff' : '#fff',
-                    fontSize:     '0.85rem',
-                    color:        activa ? '#0073AD' : '#475569',
-                    fontWeight:   activa ? 600 : 400,
-                    userSelect:   'none',
-                  }}
+                  className={`${styles.chip} ${activa ? styles.chipActiva : ''}`}
                 >
                   <input
                     type="checkbox"
                     checked={activa}
                     onChange={() => handleCarreraToggle(carrera)}
-                    style={{ display: 'none' }}
                   />
                   {activa ? '✓ ' : ''}{carrera}
                 </label>
@@ -360,7 +329,7 @@ export default function CrearOfertaPage() {
         {/* ── Error + Submit ────────────────────────────────────────────── */}
         {error && <p className="error-msg">{error}</p>}
 
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div className={styles.acciones}>
           <button type="submit" className="btn-primary" disabled={loading}>
             {loading ? 'Publicando...' : '✓ Publicar Oferta'}
           </button>
