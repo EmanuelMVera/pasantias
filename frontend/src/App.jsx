@@ -18,7 +18,7 @@
  * - egresado → /dashboard
  */
 
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import { EmpresaProvider } from './context/EmpresaContext';
@@ -282,6 +282,32 @@ function AppRoutes() {
 }
 
 /**
+ * Chrome — Estructura visual común (banner + navbar + contenido).
+ *
+ * El TopBanner institucional se oculta en las rutas de autenticación, que ya
+ * tienen su propia cabecera con logo (evita ~100px de banner duplicado).
+ */
+const RUTAS_SIN_BANNER = ['/login', '/registro-empresa', '/forgot-password', '/reset-password'];
+
+function Chrome() {
+  const { pathname } = useLocation();
+  const ocultarBanner = RUTAS_SIN_BANNER.some(
+    (r) => pathname === r || pathname.startsWith(r + '/'),
+  );
+
+  return (
+    <>
+      <a href="#contenido" className="skip-link">Saltar al contenido</a>
+      {!ocultarBanner && <TopBanner />}
+      <Navbar />
+      <main id="contenido">
+        <AppRoutes />
+      </main>
+    </>
+  );
+}
+
+/**
  * App — Componente principal que estructura la aplicación.
  * Provee el contexto de autenticación y el router a toda la app.
  */
@@ -290,9 +316,7 @@ export default function App() {
     <AuthProvider>
       <EmpresaProvider>
         <BrowserRouter>
-          <TopBanner />  {/* Banner institucional con logo (siempre visible) */}
-          <Navbar />     {/* Barra de navegación (se oculta si no hay sesión) */}
-          <AppRoutes />  {/* Sistema de rutas */}
+          <Chrome />
         </BrowserRouter>
       </EmpresaProvider>
     </AuthProvider>

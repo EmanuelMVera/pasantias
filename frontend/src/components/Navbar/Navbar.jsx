@@ -26,7 +26,9 @@ export default function Navbar() {
   const [prioridadAlta, setPrioridadAlta] = useState(false);
   const [mensajesNL, setMensajesNL] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef(null);
+  const navRef = useRef(null);
 
   /* ── Recargar contadores al cambiar de ruta ──────────────────────────── */
   useEffect(() => {
@@ -64,6 +66,23 @@ export default function Navbar() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  /* ── Menú móvil: Escape, click fuera y bloqueo de scroll ─────────────── */
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e) => { if (e.key === 'Escape') setMobileOpen(false); };
+    const onClick = (e) => {
+      if (navRef.current && !navRef.current.contains(e.target)) setMobileOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onClick);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onClick);
+      document.body.style.overflow = '';
+    };
+  }, [mobileOpen]);
 
   const handleLogout = async () => {
     setMenuOpen(false);
@@ -128,16 +147,16 @@ export default function Navbar() {
       : '';
 
   return (
-    <nav className={styles.navbar}>
+    <nav className={styles.navbar} ref={navRef}>
       <div className={styles.navbarInner}>
 
         {/* Logo */}
         <Link to="/" className={styles.navbarBrand}>
-          <span className={styles.brandIcon}>🎓</span>
+          <span className={styles.brandIcon} aria-hidden="true">🎓</span>
           <span>SisPasantías</span>
         </Link>
 
-        {/* Links de navegación */}
+        {/* Links de navegación (desktop) */}
         <div className={styles.navbarLinks}>
           {links.map((l) => (
             <Link
@@ -153,6 +172,17 @@ export default function Navbar() {
         {/* Acciones del usuario */}
         <div className={styles.navbarActions}>
 
+          {/* Botón menú móvil (visible solo en pantallas chicas vía CSS) */}
+          <button
+            className={styles.navbarToggle}
+            onClick={() => setMobileOpen((v) => !v)}
+            aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
+            aria-expanded={mobileOpen}
+            aria-controls="nav-mobile"
+          >
+            <span aria-hidden="true">{mobileOpen ? '✕' : '☰'}</span>
+          </button>
+
           {/* Badge de mensajes no leídos — oculto para admin del sistema */}
           {usuario.rol !== 'admin' && (
             <Link
@@ -160,8 +190,9 @@ export default function Navbar() {
               className={`${styles.iconBadgeBtn} ${mensajesNL > 0 ? styles.iconBadgeActive : ''}`}
               title={mensajesNL > 0 ? `${mensajesNL} mensaje${mensajesNL !== 1 ? 's' : ''} sin leer` : 'Chat'}
               aria-label="Chat"
+              onClick={() => setMobileOpen(false)}
             >
-              💬
+              <span aria-hidden="true">💬</span>
               {mensajesNL > 0 && (
                 <span className={styles.iconBadgeCount}>{mensajesNL > 9 ? '9+' : mensajesNL}</span>
               )}
@@ -172,17 +203,17 @@ export default function Navbar() {
           <button
             className={`${styles.notifBadge} ${notifColor}`}
             title={noLeidas > 0 ? `${noLeidas} notificación${noLeidas !== 1 ? 'es' : ''} sin leer` : 'Notificaciones'}
-            onClick={() => navigate('/notificaciones')}
+            onClick={() => { setMobileOpen(false); navigate('/notificaciones'); }}
             aria-label="Notificaciones"
           >
-            🔔{noLeidas > 0 && <> {noLeidas > 9 ? '9+' : noLeidas}</>}
+            <span aria-hidden="true">🔔</span>{noLeidas > 0 && <> {noLeidas > 9 ? '9+' : noLeidas}</>}
           </button>
 
           {/* Menú usuario */}
           <div
             ref={menuRef}
             className={styles.userMenu}
-            onClick={() => setMenuOpen(!menuOpen)}
+            onClick={() => { setMenuOpen(!menuOpen); setMobileOpen(false); }}
             aria-haspopup="true"
             aria-expanded={menuOpen}
           >
@@ -242,6 +273,22 @@ export default function Navbar() {
           </div>
         </div>
       </div>
+
+      {/* ── Panel de navegación móvil ──────────────────────────────────── */}
+      {mobileOpen && (
+        <div className={styles.navbarMobilePanel} id="nav-mobile">
+          {links.map((l) => (
+            <Link
+              key={l.to}
+              to={l.to}
+              className={`${styles.navLink} ${esActivo(l.to) ? styles.active : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              {l.label}
+            </Link>
+          ))}
+        </div>
+      )}
     </nav>
   );
 }

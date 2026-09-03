@@ -79,6 +79,47 @@
   margin-left: auto;
 }
 
+/* ── Botón menú móvil ────────────────────────────────────────────────────── */
+.navbarToggle {
+  display: none;   /* solo visible en el media query de abajo */
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.navbarToggle:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* ── Panel de navegación móvil ───────────────────────────────────────────── */
+.navbarMobilePanel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--secondary);
+  border-bottom: 3px solid var(--primary);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.75rem 1rem 1rem;
+  animation: slideDown 0.15s ease;
+  z-index: 150;
+}
+
+.navbarMobilePanel .navLink {
+  padding: 0.7rem 0.9rem;
+  font-size: 0.9rem;
+}
+
 /* ── Botón icono con badge (chat) ────────────────────────────────────────── */
 .iconBadgeBtn {
   position: relative;
@@ -285,11 +326,19 @@
 .badge-cerrada         { background: #7f8c8d; }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
-@media (max-width: 640px) {
+/* Los links inline no entran cómodos por debajo de ~900px (sobre todo los de
+   admin); ahí se reemplazan por el botón ☰ + panel desplegable. */
+@media (max-width: 900px) {
   .navbarLinks {
     display: none;
   }
 
+  .navbarToggle {
+    display: flex;
+  }
+}
+
+@media (max-width: 640px) {
   .userName {
     display: none;
   }
