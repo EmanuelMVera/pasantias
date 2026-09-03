@@ -27,6 +27,12 @@
   --text:          #222222;
   --text-muted:    #5a6a7a;
 
+  /* Alias de compatibilidad: varios componentes referencian estos nombres con
+     fallback (var(--card-bg, ...) / var(--text-primary, ...)). Definirlos evita
+     que caigan al fallback (p. ej. tarjetas con fondo transparente). */
+  --card-bg:       var(--bg-card);
+  --text-primary:  var(--text);
+
   /* ── Sombras ─────────────────────────────────────────────────────────────── */
   --shadow:        0 2px 16px rgba(0, 115, 173, 0.10);
   --shadow-card:   0 1px 6px rgba(45, 62, 80, 0.10);
@@ -38,4 +44,21 @@
   --space-lg:  1.5rem;
   --space-xl:  2rem;
   --space-2xl: 2.5rem;
+
+  /* ── Anchos máximos de layout ────────────────────────────────────────────── */
+  --maxw-page:   1100px;  /* .page-container por defecto */
+  --maxw-narrow: 780px;   /* detalle de oferta, lecturas largas */
+  --maxw-form:   720px;   /* formularios (perfil, mi empresa) */
+  --maxw-card:   460px;   /* tarjetas de auth (login) */
+
+  /* Alto aproximado del chrome (TopBanner + Navbar). Se usa para dimensionar
+     zonas a pantalla completa como el chat sin adivinar el valor en cada CSS. */
+  --chrome-min-h: 158px;
+
+  /* ── Breakpoints canónicos ───────────────────────────────────────────────── */
+  /* @media no acepta var(): esto es documentación. Usar estos 3 valores en los
+     media queries nuevos salvo que romper la paridad desktop obligue a otro.
+       --bp-sm: 480px   (teléfono)
+       --bp-md: 768px   (tablet)
+       --bp-lg: 1024px  (desktop chico) */
 }
