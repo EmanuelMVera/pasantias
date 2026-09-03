@@ -33,6 +33,33 @@ const ESTADO_SOLICITUD = {
   rechazado:  { label: 'Rechazado',  color: '#dc2626', bg: '#fee2e2' },
 };
 
+/* ── Modal de confirmación (suspender / quitar / recuperación) ──────────────── */
+function ConfirmModal({
+  title, icon, iconBg, miembro, nota, notaTone = 'warn',
+  confirmLabel, confirmTone = 'danger', onConfirm, onClose,
+}) {
+  const nombre = miembro.usuario?.nombre ?? miembro.nombre ?? '';
+  const apellido = miembro.usuario?.apellido ?? '';
+  const email = miembro.usuario?.email ?? miembro.email;
+
+  return (
+    <Modal title={title} onClose={onClose} maxWidth={420}>
+      <div className={styles.confirmHead}>
+        <div className={styles.confirmIcon} style={{ background: iconBg }} aria-hidden="true">{icon}</div>
+        <p className={styles.confirmName}>{nombre} {apellido}</p>
+        <p className={styles.confirmEmail}>{email}</p>
+      </div>
+      <div className={`${styles.confirmNota} ${styles[`nota_${notaTone}`]}`}>{nota}</div>
+      <div className={styles.confirmActions}>
+        <button className={styles.btnSecondary} onClick={onClose}>Cancelar</button>
+        <button className={`${styles.confirmBtn} ${styles[`confirmBtn_${confirmTone}`]}`} onClick={onConfirm}>
+          {confirmLabel}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 /* ── Modal: Solicitar reclutador ────────────────────────────────────────────── */
 function ModalSolicitarReclutador({ onClose, onEnviada }) {
   const [form, setForm] = useState({ nombre: '', apellido: '', email: '' });
@@ -242,13 +269,13 @@ function SolicitudRow({ sol }) {
   return (
     <tr>
       <td><strong>{sol.nombre}</strong></td>
-      <td style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{sol.email}</td>
+      <td className={`${styles.cellMuted} cell-break`}>{sol.email}</td>
       <td>
-        <span style={{ background: est.bg, color: est.color, padding: '3px 10px', borderRadius: 99, fontSize: '0.8rem', fontWeight: 600 }}>
+        <span className={styles.estadoPill} style={{ background: est.bg, color: est.color }}>
           {est.label}
         </span>
       </td>
-      <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+      <td className={styles.cellFecha}>
         {new Date(sol.createdAt).toLocaleDateString('es-AR')}
       </td>
     </tr>
@@ -376,7 +403,7 @@ export default function EquipoPage() {
         <div>
           <Link to="/empresa" className="btn-back">← Volver al panel</Link>
           <h1>Gestión del equipo</h1>
-          <p style={{ color: 'var(--text-muted)', marginTop: '0.25rem', fontSize: '0.9rem' }}>
+          <p className={styles.subtitulo}>
             Administrá los accesos y roles de tu equipo de reclutadores.
           </p>
         </div>
@@ -512,161 +539,52 @@ export default function EquipoPage() {
 
       {/* Modal confirmar suspender / reactivar */}
       {modalSuspender && (
-        <Modal
+        <ConfirmModal
           title={modalSuspender.activo ? '🔒 Suspender cuenta' : '🔓 Reactivar cuenta'}
+          icon={modalSuspender.activo ? '🔒' : '🔓'}
+          iconBg={modalSuspender.activo ? '#fee2e2' : '#dcfce7'}
+          miembro={modalSuspender}
+          notaTone={modalSuspender.activo ? 'warn' : 'success'}
+          nota={modalSuspender.activo
+            ? '⚠️ Al suspender, el usuario no podrá iniciar sesión hasta que se reactive. Sus datos y acciones previas se conservan.'
+            : '✅ Al reactivar, el usuario recuperará el acceso al sistema con su rol actual.'}
+          confirmTone={modalSuspender.activo ? 'danger' : 'success'}
+          confirmLabel={modalSuspender.activo ? '🔒 Sí, suspender' : '🔓 Sí, reactivar'}
+          onConfirm={confirmarToggle}
           onClose={() => setModalSuspender(null)}
-          maxWidth={420}
-        >
-            {/* Avatar + nombre centrado */}
-            <div style={{ textAlign: 'center', padding: '1.5rem 1.5rem 0' }}>
-              <div style={{
-                width: 64, height: 64, borderRadius: '50%', margin: '0 auto 0.75rem',
-                background: modalSuspender.activo ? '#fee2e2' : '#dcfce7',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '1.8rem',
-              }}>
-                {modalSuspender.activo ? '🔒' : '🔓'}
-              </div>
-              <p style={{ fontWeight: 600, fontSize: '1rem', marginBottom: '0.25rem' }}>
-                {(modalSuspender.usuario?.nombre ?? modalSuspender.nombre ?? '')} {modalSuspender.usuario?.apellido ?? ''}
-              </p>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-                {modalSuspender.usuario?.email ?? modalSuspender.email}
-              </p>
-            </div>
-
-            {/* Mensaje contextual */}
-            <div style={{
-              margin: '0 1.5rem 1.5rem',
-              padding: '0.9rem 1rem',
-              borderRadius: '8px',
-              background: modalSuspender.activo ? '#fff7ed' : '#f0fdf4',
-              border: `1px solid ${modalSuspender.activo ? '#fed7aa' : '#bbf7d0'}`,
-              fontSize: '0.88rem',
-              color: modalSuspender.activo ? '#92400e' : '#166534',
-            }}>
-              {modalSuspender.activo
-                ? '⚠️ Al suspender, el usuario no podrá iniciar sesión hasta que se reactive. Sus datos y acciones previas se conservan.'
-                : '✅ Al reactivar, el usuario recuperará el acceso al sistema con su rol actual.'
-              }
-            </div>
-
-            <div className={styles.modalActions}>
-              <button className={styles.btnSecondary} onClick={() => setModalSuspender(null)}>Cancelar</button>
-              <button
-                onClick={confirmarToggle}
-                style={{
-                  background: modalSuspender.activo ? '#dc2626' : '#16a34a',
-                  color: '#fff', border: 'none', borderRadius: '8px',
-                  padding: '0.6rem 1.4rem', fontWeight: 600, cursor: 'pointer',
-                  fontSize: '0.9rem',
-                }}
-              >
-                {modalSuspender.activo ? '🔒 Sí, suspender' : '🔓 Sí, reactivar'}
-              </button>
-            </div>
-        </Modal>
+        />
       )}
 
       {/* Modal confirmar quitar del equipo (desvincular) */}
       {modalEliminar && (
-        <Modal title="🗑️ Quitar del equipo" onClose={() => setModalEliminar(null)} maxWidth={420}>
-            <div style={{ textAlign: 'center', padding: '1.5rem 1.5rem 0' }}>
-              <div style={{
-                width: 64, height: 64, borderRadius: '50%', margin: '0 auto 0.75rem',
-                background: '#fee2e2',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '1.8rem',
-              }}>
-                🗑️
-              </div>
-              <p style={{ fontWeight: 600, fontSize: '1rem', marginBottom: '0.25rem' }}>
-                {(modalEliminar.usuario?.nombre ?? modalEliminar.nombre ?? '')} {modalEliminar.usuario?.apellido ?? ''}
-              </p>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-                {modalEliminar.usuario?.email ?? modalEliminar.email}
-              </p>
-            </div>
-
-            <div style={{
-              margin: '0 1.5rem 1.5rem',
-              padding: '0.9rem 1rem',
-              borderRadius: '8px',
-              background: '#fff7ed',
-              border: '1px solid #fed7aa',
-              fontSize: '0.88rem',
-              color: '#92400e',
-            }}>
-              ⚠️ A diferencia de suspender, para que vuelva a tener acceso vas a tener que
-              solicitar su alta de nuevo desde "Solicitar reclutador". Sus datos y postulaciones
-              gestionadas se conservan.
-            </div>
-
-            <div className={styles.modalActions}>
-              <button className={styles.btnSecondary} onClick={() => setModalEliminar(null)}>Cancelar</button>
-              <button
-                onClick={confirmarEliminar}
-                style={{
-                  background: '#dc2626',
-                  color: '#fff', border: 'none', borderRadius: '8px',
-                  padding: '0.6rem 1.4rem', fontWeight: 600, cursor: 'pointer',
-                  fontSize: '0.9rem',
-                }}
-              >
-                🗑️ Sí, quitar del equipo
-              </button>
-            </div>
-        </Modal>
+        <ConfirmModal
+          title="🗑️ Quitar del equipo"
+          icon="🗑️"
+          iconBg="#fee2e2"
+          miembro={modalEliminar}
+          notaTone="warn"
+          nota='⚠️ A diferencia de suspender, para que vuelva a tener acceso vas a tener que solicitar su alta de nuevo desde "Solicitar reclutador". Sus datos y postulaciones gestionadas se conservan.'
+          confirmTone="danger"
+          confirmLabel="🗑️ Sí, quitar del equipo"
+          onConfirm={confirmarEliminar}
+          onClose={() => setModalEliminar(null)}
+        />
       )}
 
       {/* Modal confirmar envío de recuperación de acceso (EST-10) */}
       {modalRecuperacion && (
-        <Modal title="🔑 Enviar recuperación de acceso" onClose={() => setModalRecuperacion(null)} maxWidth={420}>
-            <div style={{ textAlign: 'center', padding: '1.5rem 1.5rem 0' }}>
-              <div style={{
-                width: 64, height: 64, borderRadius: '50%', margin: '0 auto 0.75rem',
-                background: '#eff6ff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '1.8rem',
-              }}>
-                📧
-              </div>
-              <p style={{ fontWeight: 600, fontSize: '1rem', marginBottom: '0.25rem' }}>
-                {(modalRecuperacion.usuario?.nombre ?? modalRecuperacion.nombre ?? '')} {modalRecuperacion.usuario?.apellido ?? ''}
-              </p>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-                {modalRecuperacion.usuario?.email ?? modalRecuperacion.email}
-              </p>
-            </div>
-
-            <div style={{
-              margin: '0 1.5rem 1.5rem',
-              padding: '0.9rem 1rem',
-              borderRadius: '8px',
-              background: '#eff6ff',
-              border: '1px solid #bfdbfe',
-              fontSize: '0.88rem',
-              color: '#1e40af',
-            }}>
-              ℹ️ Le vamos a enviar un email con un link para que establezca su propia
-              contraseña. Vos no la vas a ver ni a elegir en ningún momento.
-            </div>
-
-            <div className={styles.modalActions}>
-              <button className={styles.btnSecondary} onClick={() => setModalRecuperacion(null)}>Cancelar</button>
-              <button
-                onClick={confirmarRecuperacion}
-                style={{
-                  background: '#2563eb',
-                  color: '#fff', border: 'none', borderRadius: '8px',
-                  padding: '0.6rem 1.4rem', fontWeight: 600, cursor: 'pointer',
-                  fontSize: '0.9rem',
-                }}
-              >
-                📧 Sí, enviar recuperación
-              </button>
-            </div>
-        </Modal>
+        <ConfirmModal
+          title="🔑 Enviar recuperación de acceso"
+          icon="📧"
+          iconBg="#eff6ff"
+          miembro={modalRecuperacion}
+          notaTone="info"
+          nota="ℹ️ Le vamos a enviar un email con un link para que establezca su propia contraseña. Vos no la vas a ver ni a elegir en ningún momento."
+          confirmTone="info"
+          confirmLabel="📧 Sí, enviar recuperación"
+          onConfirm={confirmarRecuperacion}
+          onClose={() => setModalRecuperacion(null)}
+        />
       )}
     </div>
   );
