@@ -239,6 +239,17 @@ select { cursor: pointer; }
   outline-offset: 2px;
 }
 
+/* ── Estado de carga a nivel app ─────────────────────────────────────────── */
+.app-loading {
+  text-align: center;
+  padding: 4rem 1.5rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
 /* ── Skip link (accesibilidad) ───────────────────────────────────────────── */
 .skip-link {
   position: absolute;
@@ -331,6 +342,43 @@ select { cursor: pointer; }
 .filtros-form select { flex: 1; min-width: 160px; }
 
 .filtros-form .btn-primary { flex: 0 0 auto; }
+
+/* ── Filtros tipo chip ───────────────────────────────────────────────────── */
+/* Patrón repetido (candidatos, ofertas admin, notificaciones): fila de botones
+   pill que actúan como filtro. Clase global para unificar el look. */
+.filter-chips {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.filter-chip {
+  padding: 0.35rem 0.9rem;
+  border-radius: 99px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 400;
+  font-family: var(--font-primary);
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.filter-chip:hover { border-color: var(--primary); }
+
+.filter-chip.is-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.filter-chip:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
 
 /* ── Ofertas Grid ────────────────────────────────────────────────────────── */
 .ofertas-grid {

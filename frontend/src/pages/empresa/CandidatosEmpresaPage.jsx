@@ -13,7 +13,10 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { empresaService } from '../../services/api';
 import Avatar from '../../components/Avatar/Avatar';
 import Paginacion from '../../components/Paginacion/Paginacion';
+import TableResponsive from '../../components/ui/TableResponsive';
+import EmptyState from '../../components/ui/EmptyState';
 import { getEstadoInfo } from '../../constants/postulacionEstados';
+import styles from './CandidatosEmpresaPage.module.css';
 
 // Labels en plural para las tabs de filtro — los `value` son los estados
 // canónicos de constants/postulacionEstados.js (fuente de color/label/emoji).
@@ -75,30 +78,22 @@ export default function CandidatosEmpresaPage() {
         <div>
           <Link to="/empresa" className="btn-back">← Volver al panel</Link>
           <h1>Candidatos</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
+          <p className={styles.subtitulo}>
             Todos los postulantes de todas tus ofertas.
           </p>
         </div>
       </div>
 
       {/* Tabs de filtro */}
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+      <div className="filter-chips">
         {ESTADOS_TABS.map(tab => {
           const n = tab.value === '' ? totalTodos : (conteoPorEstado[tab.value] ?? 0);
           return (
             <button
               key={tab.value}
               onClick={() => handleTab(tab.value)}
-              style={{
-                padding: '0.35rem 0.9rem',
-                borderRadius: 99,
-                border: `1.5px solid ${estadoParam === tab.value ? 'var(--primary)' : 'var(--border)'}`,
-                background: estadoParam === tab.value ? 'var(--primary)' : 'transparent',
-                color: estadoParam === tab.value ? '#fff' : 'var(--text)',
-                cursor: 'pointer',
-                fontSize: '0.85rem',
-                fontWeight: estadoParam === tab.value ? 600 : 400,
-              }}
+              className={`filter-chip ${estadoParam === tab.value ? 'is-active' : ''}`}
+              aria-pressed={estadoParam === tab.value}
             >
               {tab.label} ({n})
             </button>
@@ -111,13 +106,12 @@ export default function CandidatosEmpresaPage() {
       {loading ? (
         <p className="msg">Cargando candidatos...</p>
       ) : candidatos.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-          <span style={{ fontSize: '2rem' }}>📭</span>
-          <p>No hay candidatos{estadoParam ? ` en estado "${estadoParam}"` : ''} por el momento.</p>
-        </div>
+        <EmptyState
+          icon="📭"
+          title={`No hay candidatos${estadoParam ? ` en estado "${estadoParam}"` : ''} por el momento.`}
+        />
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table className="tabla">
+        <TableResponsive minWidth={720}>
             <thead>
               <tr>
                 <th>Candidato</th>
@@ -131,43 +125,43 @@ export default function CandidatosEmpresaPage() {
             <tbody>
               {candidatos.map(p => (
                 <tr key={p.id}>
-                  <td style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'nowrap' }}>
-                    <Avatar
-                      src={p.usuario?.fotoPerfil}
-                      nombre={p.usuario?.nombre}
-                      apellido={p.usuario?.apellido}
-                      size={32}
-                      style={{ fontSize: '0.85rem', verticalAlign: 'middle', marginRight: '0.5rem' }}
-                    />
-                    {p.usuario?.id ? (
-                      <Link to={`/perfil/${p.usuario.id}`} style={{ color: 'inherit', textDecoration: 'underline' }}>
-                        <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>
-                      </Link>
-                    ) : (
-                      <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>
-                    )}
-                  </td>
-                  <td style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>{p.usuario?.email}</td>
                   <td>
-                    <span style={{ fontSize: '0.9rem' }}>{p.oferta?.titulo ?? '—'}</span>
-                    {p.oferta?.area && <small style={{ display: 'block', color: 'var(--text-muted)' }}>{p.oferta.area}</small>}
+                    <div className={styles.celdaCandidato}>
+                      <Avatar
+                        src={p.usuario?.fotoPerfil}
+                        nombre={p.usuario?.nombre}
+                        apellido={p.usuario?.apellido}
+                        size={32}
+                        style={{ fontSize: '0.85rem' }}
+                      />
+                      {p.usuario?.id ? (
+                        <Link to={`/perfil/${p.usuario.id}`} className={styles.linkPerfil}>
+                          <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>
+                        </Link>
+                      ) : (
+                        <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>
+                      )}
+                    </div>
+                  </td>
+                  <td className={`${styles.celdaEmail} cell-break`}>{p.usuario?.email}</td>
+                  <td>
+                    <span className={styles.ofertaTitulo}>{p.oferta?.titulo ?? '—'}</span>
+                    {p.oferta?.area && <small className={styles.ofertaArea}>{p.oferta.area}</small>}
                   </td>
                   <td>
                     {(() => {
                       const info = getEstadoInfo(p.estado);
                       return (
-                        <span style={{
-                          padding: '2px 8px', borderRadius: 99, fontSize: '0.8rem',
-                          background: info.color + '22',
-                          color: info.color,
-                          fontWeight: 600,
-                        }}>
+                        <span
+                          className={styles.estadoPill}
+                          style={{ background: info.color + '22', color: info.color }}
+                        >
                           {info.emoji} {info.label}
                         </span>
                       );
                     })()}
                   </td>
-                  <td style={{ fontSize: '0.85rem' }}>{formatFecha(p.updatedAt)}</td>
+                  <td className={styles.celdaFecha}>{formatFecha(p.updatedAt)}</td>
                   <td>
                     {p.oferta?.id && (
                       <Link to={`/empresa/postulantes/${p.oferta.id}`} className="btn-small">
@@ -178,8 +172,7 @@ export default function CandidatosEmpresaPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+        </TableResponsive>
       )}
 
       {!loading && (

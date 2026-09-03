@@ -1,0 +1,40 @@
+/* CandidatosEmpresaPage.module.css — vista consolidada de candidatos. */
+
+.subtitulo {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+
+.celdaCandidato {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: nowrap;
+}
+
+.linkPerfil {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.celdaEmail {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.ofertaTitulo { font-size: 0.9rem; }
+
+.ofertaArea {
+  display: block;
+  color: var(--text-muted);
+}
+
+.celdaFecha { font-size: 0.85rem; }
+
+.estadoPill {
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}

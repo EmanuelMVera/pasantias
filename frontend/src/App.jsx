@@ -87,11 +87,7 @@ const ProtectedRoute = ({ children, roles, redirectTo = '/' }) => {
   const { usuario, loading } = useAuth();
 
   // Esperar a que se resuelva la sesión inicial
-  if (loading) return (
-    <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
-      Cargando...
-    </div>
-  );
+  if (loading) return <div className="app-loading">Cargando...</div>;
 
   // Sin sesión → redirige al inicio
   if (!usuario) return <Navigate to={redirectTo} replace />;
@@ -119,17 +115,13 @@ function AppRoutes() {
   // Mientras se resuelve la sesión inicial no se renderiza ninguna ruta: evita
   // el flash de HomePage/Login a un usuario ya autenticado (y que un componente
   // con fetch en el mount dispare un 401 en la ventana del sondeo).
-  if (loading) return (
-    <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
-      Cargando...
-    </div>
-  );
+  if (loading) return <div className="app-loading">Cargando...</div>;
 
   // Sesión con un rol que no reconocemos: no hay home válida → cortar el posible
   // loop de redirección y ofrecer cerrar sesión.
   const rolInvalido = usuario && !ROLES_VALIDOS.includes(usuario.rol);
   if (rolInvalido) return (
-    <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
+    <div className="app-loading">
       <p>Tu cuenta no tiene un rol válido para acceder al sistema.</p>
       <button className="btn-primary" onClick={() => logout()}>Cerrar sesión</button>
     </div>

@@ -201,36 +201,23 @@ export default function PostulantesMiOfertaPage() {
                           style={{ fontWeight: 800 }}
                         />
                         <div className={styles.candidatoInfo}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <div className={styles.nombreRow}>
                             <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>
                             {ESTADOS_HABILITAN_CHAT.includes(normalizarEstado(p.estado)) && p.usuario?.id && (
                               <button
+                                className={styles.btnContactar}
                                 onClick={() => navigate(`/chat/${p.usuario.id}`)}
                                 title="Contactar a este candidato"
-                                style={{
-                                  display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                                  background: col?.color ?? '#2563eb', color: '#fff',
-                                  border: 'none', borderRadius: '20px',
-                                  padding: '2px 10px', fontSize: '0.75rem',
-                                  fontWeight: 600, cursor: 'pointer',
-                                  whiteSpace: 'nowrap',
-                                }}
+                                style={col?.color ? { background: col.color } : undefined}
                               >
                                 💬 Contactar
                               </button>
                             )}
                             {p.usuario?.id && (
                               <button
+                                className={styles.btnVerPerfil}
                                 onClick={() => navigate(`/perfil/${p.usuario.id}`)}
                                 title="Ver perfil del candidato"
-                                style={{
-                                  display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                                  background: '#f1f5f9', color: '#475569',
-                                  border: '1px solid #cbd5e1', borderRadius: '20px',
-                                  padding: '2px 10px', fontSize: '0.75rem',
-                                  fontWeight: 600, cursor: 'pointer',
-                                  whiteSpace: 'nowrap',
-                                }}
                               >
                                 👤 Ver perfil
                               </button>
