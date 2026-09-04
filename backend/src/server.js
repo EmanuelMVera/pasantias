@@ -17,6 +17,14 @@ require('dotenv').config();         // Carga las variables de entorno (.env)
 const app = require('./app');       // Importa la aplicación Express ya configurada
 const { sequelize } = require('./models'); // Importa la instancia de Sequelize
 const logger = require('./utils/logger');
+const { seedPresentacionSiFalta } = require('./utils/seedPresentacion');
+
+// Si está activado (por defecto: solo en desarrollo), al arrancar se verifica
+// que el escenario de demo para la presentación esté cargado y, si falta, se
+// siembra. Nunca en producción salvo que se fuerce con SEED_PRESENTACION_ON_BOOT=true.
+const SEED_ON_BOOT = process.env.SEED_PRESENTACION_ON_BOOT
+  ? process.env.SEED_PRESENTACION_ON_BOOT === 'true'
+  : process.env.NODE_ENV === 'development';
 
 // Puerto donde escucha el servidor (por defecto 5000 si no está en .env)
 const PORT = process.env.PORT || 5000;
@@ -30,6 +38,12 @@ async function startServer() {
     // Verifica que la conexión con PostgreSQL esté funcionando
     await sequelize.authenticate();
     logger.info('Conexión a PostgreSQL establecida');
+
+    // Escenario de demo: carga las semillas de presentación si faltan.
+    // No bloquea el arranque si algo falla (la función traga sus errores).
+    if (SEED_ON_BOOT) {
+      await seedPresentacionSiFalta(logger);
+    }
 
     // Inicia el servidor HTTP en el puerto definido
     app.listen(PORT, () => {

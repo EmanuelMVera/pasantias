@@ -23,6 +23,13 @@
  * Uso:
  *   npm run db:seed:presentacion      (desde backend/)
  *   node src/utils/seedPresentacion.js
+ *
+ * Además, el servidor lo invoca al arrancar vía `seedPresentacionSiFalta()`:
+ * si el escenario no está cargado, lo siembra automáticamente. Ese chequeo
+ * está activo por defecto solo en desarrollo (NODE_ENV=development) y se puede
+ * forzar/desactivar con la variable SEED_PRESENTACION_ON_BOOT=true|false.
+ *
+ * Exporta: escenarioExiste(), ejecutarSeedPresentacion({ verbose }), seedPresentacionSiFalta(logger)
  */
 
 'use strict';
@@ -64,6 +71,11 @@ const SOLICITUD_EMPRESA_EMAIL = 'registro@nubecode.demo';
 
 const OUR_EMAILS = [ADMIN.email, EMP_ADMIN.email, RECLUTA.email, ALUMNO.email];
 
+// Log de progreso: ruidoso cuando se corre como script (`npm run db:seed:presentacion`),
+// silencioso cuando lo invoca el arranque del servidor (ver seedPresentacionSiFalta).
+let VERBOSE = true;
+const say = (...args) => { if (VERBOSE) console.log(...args); };
+
 // ── Helpers de fechas ───────────────────────────────────────────────────────
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -77,7 +89,7 @@ function daysAgo(days, hour = 10) {
 // ── Limpieza del escenario anterior ─────────────────────────────────────────
 
 async function limpiar(transaction) {
-  console.log('ℹ️  Limpiando escenario de presentación anterior (si existe)...');
+  say('ℹ️  Limpiando escenario de presentación anterior (si existe)...');
 
   const users = await Usuario.findAll({
     where: { email: { [Op.in]: OUR_EMAILS } },
@@ -146,7 +158,7 @@ async function sembrar(transaction) {
   const base = { password: hash, activo: true, habilitado: true };
 
   // 1. USUARIOS ─────────────────────────────────────────────────────────────
-  console.log('🚀 Creando usuarios...');
+  say('🚀 Creando usuarios...');
 
   const admin = await Usuario.create({
     ...base,
@@ -201,7 +213,7 @@ async function sembrar(transaction) {
   }, { transaction });
 
   // 2. ARCHIVOS (CV del alumno + logo de la empresa) ────────────────────────
-  console.log('🚀 Creando archivos (CV / logo)...');
+  say('🚀 Creando archivos (CV / logo)...');
 
   const cvArchivo = await Archivo.create({
     usuarioPropietarioId: alumno.id,
@@ -226,7 +238,7 @@ async function sembrar(transaction) {
   }, { transaction });
 
   // 3. PERFIL DEL ALUMNO ────────────────────────────────────────────────────
-  console.log('🚀 Creando perfil del alumno...');
+  say('🚀 Creando perfil del alumno...');
 
   await Perfil.create({
     usuarioId: alumno.id,
@@ -266,7 +278,7 @@ async function sembrar(transaction) {
   }, { transaction });
 
   // 4. EMPRESA + EQUIPO ────────────────────────────────────────────────────
-  console.log('🚀 Creando empresa y equipo...');
+  say('🚀 Creando empresa y equipo...');
 
   const empresa = await Empresa.create({
     usuarioId: empAdmin.id,
@@ -305,7 +317,7 @@ async function sembrar(transaction) {
   }, { transaction });
 
   // 5. OFERTAS ─────────────────────────────────────────────────────────────
-  console.log('🚀 Creando ofertas...');
+  say('🚀 Creando ofertas...');
 
   const carrerasIT = [
     'Tecnicatura Superior en Programación',
@@ -473,7 +485,7 @@ async function sembrar(transaction) {
   }
 
   // 6. POSTULACIONES ───────────────────────────────────────────────────────
-  console.log('🚀 Creando postulaciones + historial de estados...');
+  say('🚀 Creando postulaciones + historial de estados...');
 
   // Helper: crea la postulación y su cadena de historial en una sola pasada.
   async function postular({ usuario, oferta, estado, cartaPresentacion, notasEmpresa, cadena, diasBase, cvId }) {
@@ -605,7 +617,7 @@ async function sembrar(transaction) {
   }
 
   // 7. SOLICITUDES (reclutador + empresa) ──────────────────────────────────
-  console.log('🚀 Creando solicitudes pendientes...');
+  say('🚀 Creando solicitudes pendientes...');
 
   await SolicitudReclutador.create({
     empresaId: empresa.id,
@@ -650,7 +662,7 @@ async function sembrar(transaction) {
   }, { transaction });
 
   // 8. MENSAJES / CHAT ─────────────────────────────────────────────────────
-  console.log('🚀 Creando conversaciones de chat...');
+  say('🚀 Creando conversaciones de chat...');
 
   async function conversacion(pares) {
     // pares: [{ de, a, texto, dias, hora, leido }]
@@ -709,7 +721,7 @@ async function sembrar(transaction) {
   }
 
   // 9. NOTIFICACIONES ──────────────────────────────────────────────────────
-  console.log('🚀 Creando notificaciones...');
+  say('🚀 Creando notificaciones...');
 
   async function notif(data) {
     await Notificacion.create({
@@ -751,7 +763,7 @@ async function sembrar(transaction) {
   await notif({ usuarioId: admin.id, tipo: 'sistema', titulo: 'Resumen de actividad', mensaje: 'En los últimos 7 días: 14 nuevas postulaciones, 2 ofertas publicadas y 1 empresa pendiente de aprobación.', prioridad: 'baja', accionURL: '/admin', leida: true, createdAt: daysAgo(1, 8) });
 
   // 10. ACTIVITY LOGS (auditoría) ──────────────────────────────────────────
-  console.log('🚀 Creando registros de auditoría...');
+  say('🚀 Creando registros de auditoría...');
 
   async function log(data) {
     await ActivityLog.create({ ip: '190.220.14.7', ...data, createdAt: data.createdAt || daysAgo(1) }, { transaction });
@@ -783,40 +795,110 @@ async function sembrar(transaction) {
   return { admin, empAdmin, reclutador, alumno, empresa, ofertas };
 }
 
-// ── Runner ──────────────────────────────────────────────────────────────────
+// ── API pública ─────────────────────────────────────────────────────────────
 
-(async () => {
+/**
+ * ¿Ya está cargado el escenario de presentación?
+ * Se considera presente si existen el admin del sistema y la empresa demo.
+ */
+async function escenarioExiste() {
+  const [admin, empresa] = await Promise.all([
+    Usuario.findOne({ where: { email: ADMIN.email }, attributes: ['id'], paranoid: false }),
+    Empresa.findOne({ where: { razonSocial: RAZON_SOCIAL }, attributes: ['id'], paranoid: false }),
+  ]);
+  return Boolean(admin && empresa);
+}
+
+/**
+ * Ejecuta el seed completo (limpia el escenario anterior y lo recrea) dentro
+ * de una transacción. Idempotente. Devuelve un resumen.
+ *
+ * @param {object}  [opts]
+ * @param {boolean} [opts.verbose=false]  imprime el progreso paso a paso
+ */
+async function ejecutarSeedPresentacion({ verbose = false } = {}) {
+  VERBOSE = verbose;
   const transaction = await sequelize.transaction();
   try {
-    await sequelize.authenticate();
-    console.log(`✅ Conectado a "${process.env.DB_NAME}".`);
-
     await limpiar(transaction);
     const r = await sembrar(transaction);
-
     await transaction.commit();
 
-    const totalPost = await Postulacion.count({ where: { ofertaId: { [Op.in]: Object.values(r.ofertas).map((o) => o.id) } } });
+    const totalPost = await Postulacion.count({
+      where: { ofertaId: { [Op.in]: Object.values(r.ofertas).map((o) => o.id) } },
+    });
 
-    console.log('\n✨ Escenario de presentación creado ✨\n');
-    console.log('  Credenciales (contraseña para los 4: ' + PASSWORD + ')');
-    console.log('  ┌─────────────────────────────────────────────────────────────');
-    console.log(`  │ Admin del sistema     ${ADMIN.email}`);
-    console.log(`  │ Admin de empresa      ${EMP_ADMIN.email}   (${RAZON_SOCIAL})`);
-    console.log(`  │ Reclutador            ${RECLUTA.email}`);
-    console.log(`  │ Alumno                ${ALUMNO.email}`);
-    console.log('  └─────────────────────────────────────────────────────────────');
-    console.log(`  Empresa:        ${r.empresa.razonSocial} (aprobada) — CUIT ${r.empresa.cuit}`);
-    console.log(`  Ofertas:        ${Object.keys(r.ofertas).length} (activa/moderada, activa sin moderar, pausada, cerrada, rechazada)`);
-    console.log(`  Postulaciones:  ${totalPost} (4 del alumno demo con historial completo)`);
-    console.log(`  Chats:          5 conversaciones (20 mensajes) entre todos los roles`);
-    console.log(`  Notificaciones: 21 (todos los tipos y prioridades)`);
-    console.log(`  Solicitudes:    1 de reclutador (pendiente) + 1 de empresa (pendiente)`);
-    console.log(`  Auditoría:      22 registros en activity_logs\n`);
-    process.exit(0);
+    return {
+      password: PASSWORD,
+      cuentas: [
+        { rol: 'Admin del sistema', email: ADMIN.email },
+        { rol: 'Admin de empresa', email: EMP_ADMIN.email },
+        { rol: 'Reclutador', email: RECLUTA.email },
+        { rol: 'Alumno', email: ALUMNO.email },
+      ],
+      empresa: r.empresa.razonSocial,
+      ofertas: Object.keys(r.ofertas).length,
+      postulaciones: totalPost,
+    };
   } catch (err) {
     await transaction.rollback();
-    console.error('❌ Error ejecutando seedPresentacion:', err);
-    process.exit(1);
+    throw err;
   }
-})();
+}
+
+/**
+ * Hook de arranque: si el escenario no está cargado, lo crea. Nunca lanza —
+ * un fallo del seed no debe impedir que el servidor levante.
+ *
+ * @param {import('pino').Logger} [logger]
+ */
+async function seedPresentacionSiFalta(logger = console) {
+  try {
+    if (await escenarioExiste()) {
+      logger.info?.('Escenario de presentación ya cargado — se omite el seed');
+      return;
+    }
+    logger.info?.('Escenario de presentación ausente — sembrando...');
+    const resumen = await ejecutarSeedPresentacion({ verbose: false });
+    logger.info?.(
+      { empresa: resumen.empresa, ofertas: resumen.ofertas, postulaciones: resumen.postulaciones },
+      `Escenario de presentación creado (login demo: ${OUR_EMAILS.join(', ')} — pass ${resumen.password})`
+    );
+  } catch (err) {
+    logger.warn?.({ err }, 'No se pudo sembrar el escenario de presentación (el servidor sigue igual)');
+  }
+}
+
+module.exports = { escenarioExiste, ejecutarSeedPresentacion, seedPresentacionSiFalta };
+
+// ── CLI: node src/utils/seedPresentacion.js ─────────────────────────────────
+
+if (require.main === module) {
+  (async () => {
+    try {
+      await sequelize.authenticate();
+      console.log(`✅ Conectado a "${process.env.DB_NAME}".`);
+      const r = await ejecutarSeedPresentacion({ verbose: true });
+
+      console.log('\n✨ Escenario de presentación creado ✨\n');
+      console.log('  Credenciales (contraseña para los 4: ' + r.password + ')');
+      console.log('  ┌─────────────────────────────────────────────────────────────');
+      console.log(`  │ Admin del sistema     ${ADMIN.email}`);
+      console.log(`  │ Admin de empresa      ${EMP_ADMIN.email}   (${RAZON_SOCIAL})`);
+      console.log(`  │ Reclutador            ${RECLUTA.email}`);
+      console.log(`  │ Alumno                ${ALUMNO.email}`);
+      console.log('  └─────────────────────────────────────────────────────────────');
+      console.log(`  Empresa:        ${r.empresa} (aprobada) — CUIT ${EMPRESA_CUIT}`);
+      console.log(`  Ofertas:        ${r.ofertas} (activa/moderada, activa sin moderar, pausada, cerrada, rechazada)`);
+      console.log(`  Postulaciones:  ${r.postulaciones} (4 del alumno demo con historial completo)`);
+      console.log(`  Chats:          5 conversaciones (20 mensajes) entre todos los roles`);
+      console.log(`  Notificaciones: 21 (todos los tipos y prioridades)`);
+      console.log(`  Solicitudes:    1 de reclutador (pendiente) + 1 de empresa (pendiente)`);
+      console.log(`  Auditoría:      22 registros en activity_logs\n`);
+      process.exit(0);
+    } catch (err) {
+      console.error('❌ Error ejecutando seedPresentacion:', err);
+      process.exit(1);
+    }
+  })();
+}
