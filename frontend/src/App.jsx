@@ -18,7 +18,7 @@
  * - egresado → /dashboard
  */
 
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import { EmpresaProvider } from './context/EmpresaContext';
@@ -87,11 +87,7 @@ const ProtectedRoute = ({ children, roles, redirectTo = '/' }) => {
   const { usuario, loading } = useAuth();
 
   // Esperar a que se resuelva la sesión inicial
-  if (loading) return (
-    <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
-      Cargando...
-    </div>
-  );
+  if (loading) return <div className="app-loading">Cargando...</div>;
 
   // Sin sesión → redirige al inicio
   if (!usuario) return <Navigate to={redirectTo} replace />;
@@ -119,17 +115,13 @@ function AppRoutes() {
   // Mientras se resuelve la sesión inicial no se renderiza ninguna ruta: evita
   // el flash de HomePage/Login a un usuario ya autenticado (y que un componente
   // con fetch en el mount dispare un 401 en la ventana del sondeo).
-  if (loading) return (
-    <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
-      Cargando...
-    </div>
-  );
+  if (loading) return <div className="app-loading">Cargando...</div>;
 
   // Sesión con un rol que no reconocemos: no hay home válida → cortar el posible
   // loop de redirección y ofrecer cerrar sesión.
   const rolInvalido = usuario && !ROLES_VALIDOS.includes(usuario.rol);
   if (rolInvalido) return (
-    <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
+    <div className="app-loading">
       <p>Tu cuenta no tiene un rol válido para acceder al sistema.</p>
       <button className="btn-primary" onClick={() => logout()}>Cerrar sesión</button>
     </div>
@@ -282,6 +274,32 @@ function AppRoutes() {
 }
 
 /**
+ * Chrome — Estructura visual común (banner + navbar + contenido).
+ *
+ * El TopBanner institucional se oculta en las rutas de autenticación, que ya
+ * tienen su propia cabecera con logo (evita ~100px de banner duplicado).
+ */
+const RUTAS_SIN_BANNER = ['/login', '/registro-empresa', '/forgot-password', '/reset-password'];
+
+function Chrome() {
+  const { pathname } = useLocation();
+  const ocultarBanner = RUTAS_SIN_BANNER.some(
+    (r) => pathname === r || pathname.startsWith(r + '/'),
+  );
+
+  return (
+    <>
+      <a href="#contenido" className="skip-link">Saltar al contenido</a>
+      {!ocultarBanner && <TopBanner />}
+      <Navbar />
+      <main id="contenido">
+        <AppRoutes />
+      </main>
+    </>
+  );
+}
+
+/**
  * App — Componente principal que estructura la aplicación.
  * Provee el contexto de autenticación y el router a toda la app.
  */
@@ -290,9 +308,7 @@ export default function App() {
     <AuthProvider>
       <EmpresaProvider>
         <BrowserRouter>
-          <TopBanner />  {/* Banner institucional con logo (siempre visible) */}
-          <Navbar />     {/* Barra de navegación (se oculta si no hay sesión) */}
-          <AppRoutes />  {/* Sistema de rutas */}
+          <Chrome />
         </BrowserRouter>
       </EmpresaProvider>
     </AuthProvider>

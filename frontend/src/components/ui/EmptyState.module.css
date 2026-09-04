@@ -1,0 +1,30 @@
+.wrap {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 2.5rem 1rem;
+}
+
+.icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+.title {
+  font-size: 1.1rem;
+  margin: 0;
+  color: var(--text);
+}
+
+.hint {
+  font-size: 0.9rem;
+  margin: 0.4rem 0 0;
+}
+
+.actions {
+  margin-top: 1.25rem;
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}

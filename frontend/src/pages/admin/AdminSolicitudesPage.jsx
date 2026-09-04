@@ -321,6 +321,11 @@ export default function AdminSolicitudesPage() {
                         key={s.id}
                         className={`${styles.fila} ${detalle?.id === s.id ? styles.filaActiva : ''}`}
                         onClick={() => setDetalle(s)}
+                        tabIndex={0}
+                        aria-label={`Ver detalle de ${s.razonSocial}`}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetalle(s); }
+                        }}
                       >
                         <td className={styles.idCell}>#{s.id}</td>
                         <td>
@@ -520,17 +525,17 @@ export default function AdminSolicitudesPage() {
                   <h4 className={styles.detalleSectionTitle}>
                     👥 Reclutadores solicitados ({recls.length})
                   </h4>
-                  <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                  <p className={styles.reclNota}>
                     Al aprobar esta solicitud se crearán como solicitudes de reclutador pendientes.
                   </p>
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <ul className={styles.reclList}>
                     {recls.map((r, i) => (
-                      <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem', background: '#f0f6fc', borderRadius: '6px', padding: '6px 10px' }}>
-                        <span style={{ fontWeight: 600 }}>
+                      <li key={i} className={styles.reclItem}>
+                        <span className={styles.reclItemNombre}>
                           {[r.nombre, r.apellido].filter(Boolean).join(' ')}
                         </span>
-                        <span style={{ color: '#64748b' }}>·</span>
-                        <a href={`mailto:${r.email}`} style={{ color: '#0073AD' }}>{r.email}</a>
+                        <span className={styles.reclItemSep}>·</span>
+                        <a href={`mailto:${r.email}`}>{r.email}</a>
                       </li>
                     ))}
                   </ul>

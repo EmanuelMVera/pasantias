@@ -1,0 +1,21 @@
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: var(--shadow-card);
+}
+
+.title {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--secondary);
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 1rem 1.1rem;
+  }
+}

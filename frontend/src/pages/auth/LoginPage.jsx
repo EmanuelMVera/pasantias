@@ -29,6 +29,21 @@ export default function LoginPage() {
     navigate("/");
   }
 
+  // Credenciales de demo para la presentación. Al hacer clic se autocompleta
+  // el formulario (misma contraseña para los 4 usuarios del escenario demo).
+  const DEMO_PASSWORD = 'Demo1234!';
+  const DEMO_CUENTAS = [
+    { rol: 'Admin del sistema', email: 'sistema@demo.com' },
+    { rol: 'Admin de empresa', email: 'empresa@demo.com' },
+    { rol: 'Reclutador', email: 'reclutador@demo.com' },
+    { rol: 'Alumno / Egresado', email: 'alumno@demo.com' },
+  ];
+
+  const usarCuentaDemo = (email) => {
+    setForm((prev) => ({ ...prev, email, password: DEMO_PASSWORD }));
+    setError('');
+  };
+
   // const handleChange = (e) =>
   //   setForm({ ...form, [e.target.name]: e.target.value });
   //Modificacion Abril
@@ -208,6 +223,29 @@ export default function LoginPage() {
                 Registrarse
               </Link>
             </p>
+
+            {/* Cuadro de credenciales para la demo / presentación */}
+            <div className={styles.demoBox}>
+              <p className={styles.demoBoxTitle}>Cuentas de demo</p>
+              <ul className={styles.demoList}>
+                {DEMO_CUENTAS.map((c) => (
+                  <li key={c.email}>
+                    <button
+                      type="button"
+                      className={styles.demoItem}
+                      onClick={() => usarCuentaDemo(c.email)}
+                      title="Usar esta cuenta"
+                    >
+                      <span className={styles.demoRol}>{c.rol}</span>
+                      <span className={styles.demoEmail}>{c.email}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className={styles.demoBoxHint}>
+                Contraseña para las 4: <code>{DEMO_PASSWORD}</code>
+              </p>
+            </div>
           </div>
         </main>
       </div>

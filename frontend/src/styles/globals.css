@@ -50,13 +50,18 @@ a:hover {
   gap: 0.4rem;
 }
 
-.form-group label {
+.form-group label,
+.form-group .form-group-label {
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--secondary);
   text-transform: uppercase;
   letter-spacing: 0.6px;
 }
+
+/* Encabezado de un grupo de controles (radios/checkboxes) que no rotula un
+   único input — se usa <span> en vez de <label> para no romper la semántica. */
+.form-group .form-group-label { display: block; }
 
 .form-row {
   display: grid;
@@ -221,6 +226,51 @@ select { cursor: pointer; }
   color: var(--primary);
 }
 
+/* Anillo de foco visible y consistente para todos los botones de clase global.
+   Solo aparece con navegación por teclado (:focus-visible), no al hacer click. */
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.btn-small:focus-visible,
+.btn-warn:focus-visible,
+.btn-ok:focus-visible,
+.btn-danger:focus-visible,
+.btn-back:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ── Estado de carga a nivel app ─────────────────────────────────────────── */
+.app-loading {
+  text-align: center;
+  padding: 4rem 1.5rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* ── Skip link (accesibilidad) ───────────────────────────────────────────── */
+.skip-link {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translateY(-120%);
+  background: var(--primary);
+  color: #fff;
+  padding: 0.6rem 1rem;
+  border-radius: 0 0 var(--radius) 0;
+  font-weight: 700;
+  z-index: 1000;
+  transition: transform 0.15s;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+  text-decoration: none;
+  color: #fff;
+}
+
 /* ── Messages ────────────────────────────────────────────────────────────── */
 .error-msg {
   color: #a93226;
@@ -237,15 +287,27 @@ select { cursor: pointer; }
   margin-top: 0.5rem;
 }
 
+.success-msg {
+  color: #1a7a4a;
+  font-size: 0.9rem;
+  background: #d5f5e3;
+  border: 1px solid #a3e4c1;
+  border-radius: var(--radius);
+  padding: 0.6rem 1rem;
+}
+
 /* ── Page Container ──────────────────────────────────────────────────────── */
 .page-container {
-  max-width: 1100px;
+  max-width: var(--maxw-page);
+  width: 100%;
   margin: 0 auto;
-  padding: 2.5rem 1.5rem;
+  /* En desktop resuelve a los 2.5rem / 1.5rem de siempre; en pantallas
+     angostas el padding lateral baja hasta 1rem para no comerse el ancho. */
+  padding: clamp(1.25rem, 4vw, 2.5rem) clamp(1rem, 4vw, 1.5rem);
 }
 
 .page-container h1 {
-  font-size: 1.9rem;
+  font-size: clamp(1.4rem, 1rem + 1.6vw, 1.9rem);
   font-weight: 800;
   margin-bottom: 1.5rem;
   color: var(--secondary);
@@ -263,6 +325,8 @@ select { cursor: pointer; }
 /* ── Dashboard Header ────────────────────────────────────────────────────── */
 .dashboard-header {
   display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1.5rem;
@@ -288,10 +352,49 @@ select { cursor: pointer; }
 
 .filtros-form .btn-primary { flex: 0 0 auto; }
 
+/* ── Filtros tipo chip ───────────────────────────────────────────────────── */
+/* Patrón repetido (candidatos, ofertas admin, notificaciones): fila de botones
+   pill que actúan como filtro. Clase global para unificar el look. */
+.filter-chips {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.filter-chip {
+  padding: 0.35rem 0.9rem;
+  border-radius: 99px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 400;
+  font-family: var(--font-primary);
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.filter-chip:hover { border-color: var(--primary); }
+
+.filter-chip.is-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.filter-chip:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 /* ── Ofertas Grid ────────────────────────────────────────────────────────── */
 .ofertas-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  /* min(100%, 300px) evita que la pista de 300px provoque scroll horizontal
+     en teléfonos angostos; en desktop el layout es idéntico. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
   gap: 1.5rem;
 }
 
@@ -458,6 +561,28 @@ select { cursor: pointer; }
 .cv-section h2 { font-size: 1.1rem; font-weight: 700; margin: 0; color: var(--secondary); }
 
 /* ── Tabla ───────────────────────────────────────────────────────────────── */
+/* Envoltorio estándar para tablas anchas: scroll horizontal contenido dentro
+   de la tarjeta en vez de desbordar la página. Reemplaza los wrappers ad hoc
+   y los `overflow-x` inline repartidos por los paneles de admin/empresa. */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+}
+
+.table-wrap .tabla {
+  min-width: 640px;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Permite que celdas con texto largo sin espacios (emails, URLs) corten en vez
+   de ensanchar la columna. */
+.cell-break { word-break: break-word; overflow-wrap: anywhere; }
+
 .tabla {
   width: 100%;
   border-collapse: collapse;
@@ -561,10 +686,31 @@ details summary { cursor: pointer; color: var(--primary); font-size: 0.85rem; ma
 .strength-label { font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .form-row { grid-template-columns: 1fr; }
   .filtros-form { flex-direction: column; }
+  .filtros-form input,
+  .filtros-form select { min-width: 0; width: 100%; }
   .postulacion-card { flex-direction: column; align-items: flex-start; }
-  .dashboard-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
-  .page-container h1 { font-size: 1.4rem; }
+  .candidato-card { flex-direction: column; align-items: stretch; }
+  .candidato-estado { align-self: flex-start; }
+  .dashboard-header { flex-direction: column; align-items: flex-start; }
+}
+
+@media (max-width: 480px) {
+  .oferta-section { padding: 1rem 1.1rem; }
+  .postulacion-card,
+  .candidato-card { padding: 1rem 1.1rem; }
+}
+
+/* Respeta la preferencia del sistema de reducir animaciones. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .oferta-card:hover,
+  .btn-primary:hover { transform: none; }
 }

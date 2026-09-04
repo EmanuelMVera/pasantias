@@ -11,6 +11,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminService } from '../../services/api';
 import Paginacion from '../../components/Paginacion/Paginacion';
+import TableResponsive from '../../components/ui/TableResponsive';
+import styles from './AdminOfertasPage.module.css';
 
 const ESTADO_COLOR = {
   activa:    '#27ae60',
@@ -98,27 +100,26 @@ export default function AdminOfertasPage() {
       {/* ── Cabecera ── */}
       <div className="dashboard-header">
         <h1>Moderación de Ofertas</h1>
-        <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+        <span className={styles.headerCount}>
           {pendientes.length} pendiente{pendientes.length !== 1 ? 's' : ''} de revisión
         </span>
       </div>
 
-      {error   && <p className="error-msg" style={{ marginBottom: '1rem' }}>⚠️ {error}</p>}
-      {mensaje && <p className="success-msg" style={{ marginBottom: '1rem' }}>✅ {mensaje}</p>}
+      {error   && <p className={`error-msg ${styles.feedback}`}>⚠️ {error}</p>}
+      {mensaje && <p className={`success-msg ${styles.feedback}`}>✅ {mensaje}</p>}
 
       {/* ── Sección 1: Pendientes ── */}
-      <section style={{ marginBottom: '3rem' }}>
-        <h2 style={{ marginBottom: '1rem' }}>Pendientes de revisión</h2>
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Pendientes de revisión</h2>
 
         {loading ? (
           <p className="msg">Cargando...</p>
         ) : pendientes.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--card-bg)', borderRadius: '10px' }}>
+          <div className={styles.emptyBox}>
             No hay ofertas pendientes de moderación.
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="tabla">
+          <TableResponsive minWidth={760}>
               <thead>
                 <tr>
                   <th>Oferta</th>
@@ -132,26 +133,15 @@ export default function AdminOfertasPage() {
               </thead>
               <tbody>
                 {pendientes.map((o) => (
-                  <tr key={o.id} style={{ opacity: accionando === o.id ? 0.5 : 1 }}>
+                  <tr key={o.id} className={accionando === o.id ? styles.rowBusy : ''}>
                     <td>
                       <strong>{o.titulo}</strong>
-                      <span
-                        style={{
-                          marginLeft: '0.5rem',
-                          fontSize: '0.72rem',
-                          background: '#3498db',
-                          color: '#fff',
-                          borderRadius: '4px',
-                          padding: '1px 6px',
-                        }}
-                      >
-                        ⏳ Pendiente
-                      </span>
+                      <span className={styles.pendienteBadge}>⏳ Pendiente</span>
                     </td>
                     <td>{o.empresa?.razonSocial ?? '—'}</td>
                     <td>{o.area ?? '—'}</td>
                     <td>{o.modalidad ?? '—'}</td>
-                    <td style={{ whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
+                    <td className={styles.fechaCell}>
                       {o.createdAt ? new Date(o.createdAt).toLocaleDateString('es-AR') : '—'}
                     </td>
                     <td>
@@ -161,28 +151,25 @@ export default function AdminOfertasPage() {
                     </td>
                     <td>
                       {accionando === o.id ? (
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Procesando...</span>
+                        <span className={styles.procesando}>Procesando...</span>
                       ) : (
-                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        <div className={styles.acciones}>
                           <button
-                            className="btn-ok"
-                            style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+                            className={`btn-ok ${styles.btnSm}`}
                             onClick={() => handleAccion(o.id, 'aprobar')}
                             title="Aprobar: la oferta queda activa y moderada"
                           >
                             ✅ Aprobar
                           </button>
                           <button
-                            className="btn-warn"
-                            style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+                            className={`btn-warn ${styles.btnSm}`}
                             onClick={() => handleAccion(o.id, 'pausar')}
                             title="Pausar: la oferta queda inactiva pero moderada"
                           >
                             ⏸️ Pausar
                           </button>
                           <button
-                            className="btn-danger"
-                            style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+                            className={`btn-danger ${styles.btnSm}`}
                             onClick={() => handleAccion(o.id, 'rechazar')}
                             title="Rechazar: la empresa es notificada"
                           >
@@ -194,38 +181,32 @@ export default function AdminOfertasPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+          </TableResponsive>
         )}
       </section>
 
       {/* ── Sección 2: Historial por estado ── */}
       <section>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-          <h2 style={{ margin: 0 }}>Historial de ofertas</h2>
-          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-            {FILTROS.map((f) => (
-              <button
-                key={f}
-                onClick={() => setFiltroEstado(f)}
-                style={{
-                  padding: '4px 12px',
-                  borderRadius: '20px',
-                  border: '1.5px solid',
-                  borderColor: filtroEstado === f ? (ESTADO_COLOR[f] ?? 'var(--primary)') : 'var(--border)',
-                  background: filtroEstado === f ? (ESTADO_COLOR[f] ?? 'var(--primary)') : 'transparent',
-                  color: filtroEstado === f ? '#fff' : 'var(--text)',
-                  cursor: 'pointer',
-                  fontSize: '0.82rem',
-                  fontWeight: filtroEstado === f ? 700 : 400,
-                  transition: 'all 0.15s',
-                }}
-              >
-                {f === 'todas' ? 'Todas' : ESTADO_LABEL[f]}
-              </button>
-            ))}
+        <div className={styles.histHead}>
+          <h2>Historial de ofertas</h2>
+          <div className={styles.histFiltros}>
+            {FILTROS.map((f) => {
+              const activo = filtroEstado === f;
+              const color = ESTADO_COLOR[f] ?? 'var(--primary)';
+              return (
+                <button
+                  key={f}
+                  onClick={() => setFiltroEstado(f)}
+                  className={`${styles.histFiltro} ${activo ? styles.histFiltroActivo : ''}`}
+                  style={activo ? { background: color, borderColor: color } : undefined}
+                  aria-pressed={activo}
+                >
+                  {f === 'todas' ? 'Todas' : ESTADO_LABEL[f]}
+                </button>
+              );
+            })}
           </div>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginLeft: 'auto' }}>
+          <span className={styles.histCount}>
             {loadingHist ? '...' : `${paginationHist?.total ?? ofertasFiltradas.length} resultado${(paginationHist?.total ?? ofertasFiltradas.length) !== 1 ? 's' : ''}`}
           </span>
         </div>
@@ -233,12 +214,11 @@ export default function AdminOfertasPage() {
         {loadingHist ? (
           <p className="msg">Cargando historial...</p>
         ) : ofertasFiltradas.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--card-bg)', borderRadius: '10px' }}>
+          <div className={styles.emptyBox}>
             No hay ofertas para el filtro seleccionado.
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="tabla">
+          <TableResponsive minWidth={860}>
               <thead>
                 <tr>
                   <th>Oferta</th>
@@ -253,22 +233,11 @@ export default function AdminOfertasPage() {
               </thead>
               <tbody>
                 {ofertasFiltradas.map((o) => (
-                  <tr key={o.id} style={{ opacity: accionando === o.id ? 0.5 : 1 }}>
+                  <tr key={o.id} className={accionando === o.id ? styles.rowBusy : ''}>
                     <td>
                       <strong>{o.titulo}</strong>
                       {!o.moderada && (
-                        <span
-                          style={{
-                            marginLeft: '0.5rem',
-                            fontSize: '0.72rem',
-                            background: '#3498db',
-                            color: '#fff',
-                            borderRadius: '4px',
-                            padding: '1px 6px',
-                          }}
-                        >
-                          ⏳ Pendiente
-                        </span>
+                        <span className={styles.pendienteBadge}>⏳ Pendiente</span>
                       )}
                     </td>
                     <td>{o.empresa?.razonSocial ?? '—'}</td>
@@ -279,21 +248,20 @@ export default function AdminOfertasPage() {
                         {ESTADO_LABEL[o.estado] ?? o.estado}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'center' }}>
+                    <td className={styles.moderadaCell}>
                       {o.moderada ? '✅' : '⏳'}
                     </td>
-                    <td style={{ whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
+                    <td className={styles.fechaCell}>
                       {o.createdAt ? new Date(o.createdAt).toLocaleDateString('es-AR') : '—'}
                     </td>
                     <td>
                       {accionando === o.id ? (
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Procesando...</span>
+                        <span className={styles.procesando}>Procesando...</span>
                       ) : (
-                        <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                        <div className={styles.acciones}>
                           {o.estado !== 'activa' && (
                             <button
-                              className="btn-ok"
-                              style={{ fontSize: '0.75rem', padding: '3px 8px' }}
+                              className={`btn-ok ${styles.btnXs}`}
                               onClick={() => handleAccion(o.id, 'aprobar')}
                             >
                               Aprobar
@@ -301,8 +269,7 @@ export default function AdminOfertasPage() {
                           )}
                           {o.estado !== 'pausada' && (
                             <button
-                              className="btn-warn"
-                              style={{ fontSize: '0.75rem', padding: '3px 8px' }}
+                              className={`btn-warn ${styles.btnXs}`}
                               onClick={() => handleAccion(o.id, 'pausar')}
                             >
                               Pausar
@@ -310,8 +277,7 @@ export default function AdminOfertasPage() {
                           )}
                           {o.estado !== 'rechazada' && (
                             <button
-                              className="btn-danger"
-                              style={{ fontSize: '0.75rem', padding: '3px 8px' }}
+                              className={`btn-danger ${styles.btnXs}`}
                               onClick={() => handleAccion(o.id, 'rechazar')}
                             >
                               Rechazar
@@ -319,8 +285,7 @@ export default function AdminOfertasPage() {
                           )}
                           {o.estado !== 'cerrada' && (
                             <button
-                              className="btn-secondary"
-                              style={{ fontSize: '0.75rem', padding: '3px 8px' }}
+                              className={`btn-secondary ${styles.btnXs}`}
                               onClick={() => handleAccion(o.id, 'cerrar')}
                             >
                               Cerrar
@@ -332,8 +297,7 @@ export default function AdminOfertasPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+          </TableResponsive>
         )}
 
         {!loadingHist && (

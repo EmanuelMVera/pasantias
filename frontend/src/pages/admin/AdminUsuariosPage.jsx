@@ -324,47 +324,48 @@ export default function AdminUsuariosPage() {
 
               <div className={styles.formRow}>
                 <div className="form-group">
-                  <label>Nombre *</label>
-                  <input name="nombre" value={form.nombre} onChange={handleChange} required />
+                  <label htmlFor="u-nombre">Nombre *</label>
+                  <input id="u-nombre" name="nombre" value={form.nombre} onChange={handleChange} required />
                 </div>
                 <div className="form-group">
-                  <label>Apellido *</label>
-                  <input name="apellido" value={form.apellido} onChange={handleChange} required />
+                  <label htmlFor="u-apellido">Apellido *</label>
+                  <input id="u-apellido" name="apellido" value={form.apellido} onChange={handleChange} required />
                 </div>
               </div>
 
               <div className="form-group">
-                <label>Email *</label>
-                <input name="email" type="email" value={form.email} onChange={handleChange} required />
+                <label htmlFor="u-email">Email *</label>
+                <input id="u-email" name="email" type="email" value={form.email} onChange={handleChange} required />
               </div>
 
               <div className="form-group">
-                <label>{modal === 'crear' ? 'Contraseña *' : 'Nueva contraseña (dejar vacío para no cambiar)'}</label>
-                <input name="password" type="password" value={form.password} onChange={handleChange} required={modal === 'crear'} placeholder={modal === 'editar' ? '••••••••' : ''} />
+                <label htmlFor="u-password">{modal === 'crear' ? 'Contraseña *' : 'Nueva contraseña (dejar vacío para no cambiar)'}</label>
+                <input id="u-password" name="password" type="password" value={form.password} onChange={handleChange} required={modal === 'crear'} placeholder={modal === 'editar' ? '••••••••' : ''} />
               </div>
 
               <div className={styles.formRow}>
                 <div className="form-group">
-                  <label>Rol *</label>
-                  <select name="rol" value={form.rol} onChange={handleChange} required>
+                  <label htmlFor="u-rol">Rol *</label>
+                  <select id="u-rol" name="rol" value={form.rol} onChange={handleChange} required>
                     {ROLES.map((r) => <option key={r} value={r}>{ROL_BADGE[r]?.label ?? r}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Teléfono</label>
-                  <input name="telefono" value={form.telefono} onChange={handleChange} placeholder="+54 11 1234-5678" />
+                  <label htmlFor="u-telefono">Teléfono</label>
+                  <input id="u-telefono" name="telefono" value={form.telefono} onChange={handleChange} placeholder="+54 11 1234-5678" />
                 </div>
               </div>
 
               <div className="form-group">
-                <label>Ubicación</label>
-                <input name="ubicacion" value={form.ubicacion} onChange={handleChange} placeholder="Ciudad, Provincia" />
+                <label htmlFor="u-ubicacion">Ubicación</label>
+                <input id="u-ubicacion" name="ubicacion" value={form.ubicacion} onChange={handleChange} placeholder="Ciudad, Provincia" />
               </div>
 
               {(form.rol === 'alumno' || form.rol === 'egresado') && (
                 <div className="form-group">
-                  <label>Legajo *</label>
+                  <label htmlFor="u-legajo">Legajo *</label>
                   <input
+                    id="u-legajo"
                     name="legajo"
                     value={form.legajo}
                     onChange={handleChange}

@@ -293,35 +293,35 @@ export default function PerfilPage() {
         <FormSection title="Datos Académicos" icon="🎓">
           <div className="form-row">
             <div className="form-group">
-              <label>Carrera</label>
-              <input name="carrera" value={form.carrera || ''} onChange={handleChange}
+              <label htmlFor="pf-carrera">Carrera</label>
+              <input id="pf-carrera" name="carrera" value={form.carrera || ''} onChange={handleChange}
                 placeholder="Ej: Ingeniería en Sistemas" />
             </div>
             <div className="form-group">
-              <label>Año de Egreso</label>
-              <input type="number" name="anioEgreso" value={form.anioEgreso || ''}
+              <label htmlFor="pf-anioEgreso">Año de Egreso</label>
+              <input type="number" id="pf-anioEgreso" name="anioEgreso" value={form.anioEgreso || ''}
                 onChange={handleChange} placeholder="2024" min="1990" max="2035" />
             </div>
           </div>
           <div className="form-group">
-            <label>Descripción / Resumen Profesional</label>
-            <textarea name="descripcion" value={form.descripcion || ''} onChange={handleChange}
+            <label htmlFor="pf-descripcion">Descripción / Resumen Profesional</label>
+            <textarea id="pf-descripcion" name="descripcion" value={form.descripcion || ''} onChange={handleChange}
               rows={4} placeholder="Describí tu perfil, fortalezas y objetivos profesionales..." />
           </div>
           <div className="form-group">
-            <label>Área de Interés</label>
-            <input name="areaInteres" value={form.areaInteres || ''} onChange={handleChange}
+            <label htmlFor="pf-areaInteres">Área de Interés</label>
+            <input id="pf-areaInteres" name="areaInteres" value={form.areaInteres || ''} onChange={handleChange}
               placeholder="Ej: Desarrollo Web, Data Science, Redes..." />
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label>Teléfono de contacto</label>
-              <input name="telefono" value={form.telefono || ''} onChange={handleChange}
+              <label htmlFor="pf-telefono">Teléfono de contacto</label>
+              <input id="pf-telefono" name="telefono" value={form.telefono || ''} onChange={handleChange}
                 placeholder="Ej: +54 9 11 1234-5678" />
             </div>
             <div className="form-group">
-              <label>Ubicación (ciudad / provincia)</label>
-              <input name="ubicacion" value={form.ubicacion || ''} onChange={handleChange}
+              <label htmlFor="pf-ubicacion">Ubicación (ciudad / provincia)</label>
+              <input id="pf-ubicacion" name="ubicacion" value={form.ubicacion || ''} onChange={handleChange}
                 placeholder="Ej: Buenos Aires, Argentina" />
             </div>
           </div>
@@ -331,25 +331,25 @@ export default function PerfilPage() {
         <FormSection title="Redes y Portfolio" icon="🌐">
           <div className="form-row">
             <div className="form-group">
-              <label>LinkedIn</label>
-              <input name="linkedin" value={form.linkedin || ''} onChange={handleChange}
+              <label htmlFor="pf-linkedin">LinkedIn</label>
+              <input id="pf-linkedin" name="linkedin" value={form.linkedin || ''} onChange={handleChange}
                 placeholder="https://linkedin.com/in/tu-perfil" />
             </div>
             <div className="form-group">
-              <label>GitHub</label>
-              <input name="github" value={form.github || ''} onChange={handleChange}
+              <label htmlFor="pf-github">GitHub</label>
+              <input id="pf-github" name="github" value={form.github || ''} onChange={handleChange}
                 placeholder="https://github.com/tu-usuario" />
             </div>
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label>Portfolio / Sitio web</label>
-              <input name="portfolio" value={form.portfolio || ''} onChange={handleChange}
+              <label htmlFor="pf-portfolio">Portfolio / Sitio web</label>
+              <input id="pf-portfolio" name="portfolio" value={form.portfolio || ''} onChange={handleChange}
                 placeholder="https://mi-portfolio.com" />
             </div>
             <div className="form-group">
-              <label>Otras redes sociales</label>
-              <input name="redesSociales" value={form.redesSociales || ''} onChange={handleChange}
+              <label htmlFor="pf-redesSociales">Otras redes sociales</label>
+              <input id="pf-redesSociales" name="redesSociales" value={form.redesSociales || ''} onChange={handleChange}
                 placeholder="Twitter, Behance, etc." />
             </div>
           </div>
@@ -438,20 +438,20 @@ export default function PerfilPage() {
             </div>
           </div>
           <div className="form-group">
-            <label>Experiencia Laboral</label>
-            <textarea name="experienciaLaboral" value={form.experienciaLaboral || ''}
+            <label htmlFor="pf-experienciaLaboral">Experiencia Laboral</label>
+            <textarea id="pf-experienciaLaboral" name="experienciaLaboral" value={form.experienciaLaboral || ''}
               onChange={handleChange} rows={4}
               placeholder="Describí tus trabajos previos, roles y responsabilidades..." />
           </div>
           <div className="form-group">
-            <label>Proyectos Destacados</label>
-            <textarea name="proyectos" value={form.proyectos || ''}
+            <label htmlFor="pf-proyectos">Proyectos Destacados</label>
+            <textarea id="pf-proyectos" name="proyectos" value={form.proyectos || ''}
               onChange={handleChange} rows={3}
               placeholder="Proyectos propios, académicos o freelance relevantes..." />
           </div>
           <div className="form-group">
-            <label>Certificaciones y Cursos</label>
-            <textarea name="certificaciones" value={form.certificaciones || ''}
+            <label htmlFor="pf-certificaciones">Certificaciones y Cursos</label>
+            <textarea id="pf-certificaciones" name="certificaciones" value={form.certificaciones || ''}
               onChange={handleChange} rows={3}
               placeholder="Ej: AWS Cloud Practitioner, Scrum Master, etc." />
           </div>
@@ -461,8 +461,8 @@ export default function PerfilPage() {
         <FormSection title="Preferencias Laborales" icon="🎯">
           <div className="form-row">
             <div className="form-group">
-              <label>Disponibilidad</label>
-              <select name="disponibilidad" value={form.disponibilidad || 'inmediata'}
+              <label htmlFor="pf-disponibilidad">Disponibilidad</label>
+              <select id="pf-disponibilidad" name="disponibilidad" value={form.disponibilidad || 'inmediata'}
                 onChange={handleChange}>
                 <option value="inmediata">Inmediata</option>
                 <option value="1_mes">En 1 mes</option>
@@ -471,20 +471,20 @@ export default function PerfilPage() {
               </select>
             </div>
             <div className="form-group">
-              <label>Salario Pretendido (mensual)</label>
-              <input name="salarioPretendido" value={form.salarioPretendido || ''}
+              <label htmlFor="pf-salarioPretendido">Salario Pretendido (mensual)</label>
+              <input id="pf-salarioPretendido" name="salarioPretendido" value={form.salarioPretendido || ''}
                 onChange={handleChange} placeholder="Ej: $300.000 - $400.000 ARS" />
             </div>
           </div>
           <div className="form-group">
-            <label>Preferencias Laborales</label>
-            <textarea name="preferenciasLaborales" value={form.preferenciasLaborales || ''}
+            <label htmlFor="pf-preferenciasLaborales">Preferencias Laborales</label>
+            <textarea id="pf-preferenciasLaborales" name="preferenciasLaborales" value={form.preferenciasLaborales || ''}
               onChange={handleChange} rows={2}
               placeholder="Modalidad preferida, tipo de empresa, sector, etc." />
           </div>
           <div className="form-group">
-            <label>Visibilidad del Perfil</label>
-            <select name="visibilidadPerfil" value={form.visibilidadPerfil || 'publica'}
+            <label htmlFor="pf-visibilidadPerfil">Visibilidad del Perfil</label>
+            <select id="pf-visibilidadPerfil" name="visibilidadPerfil" value={form.visibilidadPerfil || 'publica'}
               onChange={handleChange}>
               <option value="publica">Público — visible para todas las empresas</option>
               <option value="privada">Privado — solo yo puedo verlo</option>

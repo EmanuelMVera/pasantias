@@ -13,6 +13,10 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { empresaService } from '../../services/api';
+import Card from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import EmptyState from '../../components/ui/EmptyState';
+import styles from './EmpresaPublicaPage.module.css';
 
 export default function EmpresaPublicaPage() {
   const { empresaId } = useParams();
@@ -49,10 +53,7 @@ export default function EmpresaPublicaPage() {
   if (error) return (
     <div className="page-container">
       <button onClick={() => navigate(-1)} className="btn-back">← Volver</button>
-      <div style={{ marginTop: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-        <span style={{ fontSize: '3rem' }}>🏢</span>
-        <p style={{ marginTop: '1rem', fontSize: '1.1rem' }}>{error}</p>
-      </div>
+      <EmptyState icon="🏢" title={error} />
     </div>
   );
 
@@ -68,28 +69,16 @@ export default function EmpresaPublicaPage() {
       <button onClick={() => navigate(-1)} className="btn-back">← Volver</button>
 
       {/* ── Header ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '1.5rem',
-        padding: '1.5rem', background: 'var(--card-bg)', borderRadius: '12px',
-        marginBottom: '1.5rem', flexWrap: 'wrap',
-      }}>
-        {/* Logo o inicial */}
-        <div style={{
-          width: 80, height: 80, borderRadius: '12px',
-          background: 'var(--primary)', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', fontSize: '2rem', color: '#fff',
-          flexShrink: 0, overflow: 'hidden',
-        }}>
+      <div className={styles.header}>
+        <div className={styles.logo}>
           {data.logo
-            ? <img src={data.logo} alt={data.razonSocial} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '4px' }} />
-            : data.razonSocial?.[0]?.toUpperCase()
-          }
+            ? <img src={data.logo} alt={data.razonSocial} className={styles.logoImg} />
+            : data.razonSocial?.[0]?.toUpperCase()}
         </div>
 
-        {/* Info principal */}
-        <div style={{ flex: 1, minWidth: 200 }}>
-          <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{data.razonSocial}</h1>
-          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.4rem', flexWrap: 'wrap', alignItems: 'center', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+        <div className={styles.headerInfo}>
+          <h1 className={styles.headerName}>{data.razonSocial}</h1>
+          <div className={styles.headerMeta}>
             {data.rubro && <span>🏭 {data.rubro}</span>}
             {data.ciudad && <span>📍 {data.ciudad}</span>}
           </div>
@@ -98,78 +87,62 @@ export default function EmpresaPublicaPage() {
               href={data.sitioWeb}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ display: 'inline-block', marginTop: '0.4rem', fontSize: '0.85rem', color: 'var(--primary)' }}
+              className={styles.headerWeb}
             >
               🌐 {data.sitioWeb}
             </a>
           )}
         </div>
 
-        {/* Acciones */}
         {esAlumnoEgresado && data.usuarioId && (
-          <button
-            className="btn-primary"
-            onClick={() => navigate(`/chat/${data.usuarioId}`)}
-            style={{ flexShrink: 0 }}
-          >
-            💬 Contactar
-          </button>
+          <div className={styles.headerAcciones}>
+            <Button variant="primary" onClick={() => navigate(`/chat/${data.usuarioId}`)}>
+              💬 Contactar
+            </Button>
+          </div>
         )}
       </div>
 
       {/* ── Descripción ── */}
       {data.descripcion && (
-        <section style={{ background: 'var(--card-bg)', borderRadius: '10px', padding: '1.25rem', marginBottom: '1rem' }}>
-          <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Sobre la empresa</h2>
-          <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{data.descripcion}</p>
-        </section>
+        <Card as="section" title="Sobre la empresa">
+          <p className={styles.prosa}>{data.descripcion}</p>
+        </Card>
       )}
 
       {/* ── Contacto ── */}
       {(data.direccion || data.telefono) && (
-        <section style={{ background: 'var(--card-bg)', borderRadius: '10px', padding: '1.25rem', marginBottom: '1rem' }}>
-          <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Contacto</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.9rem' }}>
+        <Card as="section" title="Contacto">
+          <div className={styles.contacto}>
             {data.direccion && <span>📌 {data.direccion}</span>}
             {data.telefono  && <span>📞 {data.telefono}</span>}
           </div>
-        </section>
+        </Card>
       )}
 
       {/* ── Ofertas activas ── */}
       <section>
-        <h2 style={{ marginBottom: '1rem', fontSize: '1.15rem' }}>
+        <h2 className={styles.ofertasHead}>
           Ofertas activas
-          <span style={{ marginLeft: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 400 }}>
-            ({ofertas.length})
-          </span>
+          <span className={styles.ofertasCount}>({ofertas.length})</span>
         </h2>
 
         {ofertas.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--card-bg)', borderRadius: '10px' }}>
-            Esta empresa no tiene ofertas activas en este momento.
-          </div>
+          <EmptyState title="Esta empresa no tiene ofertas activas en este momento." />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div className={styles.ofertasList}>
             {ofertas.map((o) => {
-              const cardStyle = {
-                display: 'block', padding: '1rem 1.25rem',
-                background: 'var(--card-bg)', borderRadius: '10px',
-                textDecoration: 'none', color: 'inherit',
-                border: '1.5px solid var(--border)',
-                transition: 'border-color 0.15s',
-              };
               const contenido = (
                 <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <strong style={{ fontSize: '1rem' }}>{o.titulo}</strong>
+                  <div className={styles.ofertaTop}>
+                    <strong className={styles.ofertaTitulo}>{o.titulo}</strong>
                     {o.tipoPuesto && (
                       <span className={`badge badge-puesto badge-${o.tipoPuesto}`} style={{ fontSize: '0.75rem' }}>
                         {o.tipoPuesto === 'pasante' ? '🎓 Pasante' : o.tipoPuesto === 'trainee' ? '🌱 Trainee' : '💼 Junior'}
                       </span>
                     )}
                   </div>
-                  <div style={{ marginTop: '0.3rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  <div className={styles.ofertaMeta}>
                     {o.area     && <span>📂 {o.area}</span>}
                     {o.modalidad && <span>🏢 {o.modalidad}</span>}
                     {o.ciudad   && <span>📍 {o.ciudad}</span>}
@@ -183,17 +156,11 @@ export default function EmpresaPublicaPage() {
               // Solo alumno/egresado puede abrir /ofertas/:id → para el resto la
               // tarjeta es informativa, no un enlace muerto que rebota.
               return esAlumnoEgresado ? (
-                <Link
-                  key={o.id}
-                  to={`/ofertas/${o.id}`}
-                  style={cardStyle}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--primary)'}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-                >
+                <Link key={o.id} to={`/ofertas/${o.id}`} className={styles.ofertaCard}>
                   {contenido}
                 </Link>
               ) : (
-                <div key={o.id} style={cardStyle}>{contenido}</div>
+                <div key={o.id} className={styles.ofertaCard}>{contenido}</div>
               );
             })}
           </div>

@@ -214,6 +214,81 @@
   font-weight: 700;
 }
 
+/* ── Cuadro de cuentas demo (presentación) ───────────────────────────────── */
+.demoBox {
+  margin-top: 1.4rem;
+  padding: 0.9rem 1rem 1rem;
+  border: 1px dashed #b8c4d0;
+  border-radius: 12px;
+  background: #f6f9fc;
+}
+
+.demoBoxTitle {
+  margin: 0 0 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #5b6b7b;
+}
+
+.demoList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.demoItem {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid #dde5ec;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-primary);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.demoItem:hover {
+  border-color: var(--primary);
+  background: #eef5fb;
+}
+
+.demoRol {
+  font-size: 0.82rem;
+  color: #5b6b7b;
+  flex-shrink: 0;
+}
+
+.demoEmail {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--secondary);
+  word-break: break-all;
+}
+
+.demoBoxHint {
+  margin: 0.7rem 0 0;
+  font-size: 0.82rem;
+  color: #5b6b7b;
+}
+
+.demoBoxHint code {
+  background: #e6edf4;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: #2f3b46;
+}
+
 /* ── Animación ───────────────────────────────────────────────────────────── */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(12px); }

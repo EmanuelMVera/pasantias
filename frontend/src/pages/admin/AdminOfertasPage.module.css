@@ -1,0 +1,102 @@
+/* AdminOfertasPage.module.css — moderación de ofertas. */
+
+.headerCount {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.feedback { margin-bottom: 1rem; }
+
+.section { margin-bottom: 3rem; }
+
+.sectionTitle { margin-bottom: 1rem; }
+
+.emptyBox {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.rowBusy { opacity: 0.5; }
+
+.pendienteBadge {
+  margin-left: 0.5rem;
+  font-size: 0.72rem;
+  background: #3498db;
+  color: #fff;
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.fechaCell {
+  white-space: nowrap;
+  font-size: 0.82rem;
+}
+
+.moderadaCell { text-align: center; }
+
+.procesando {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.acciones {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.btnSm {
+  font-size: 0.8rem;
+  padding: 4px 10px;
+}
+
+.btnXs {
+  font-size: 0.75rem;
+  padding: 3px 8px;
+}
+
+/* ── Historial: cabecera con filtros ─────────────────────────────────────── */
+.histHead {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.histHead h2 { margin: 0; }
+
+.histFiltros {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.histFiltro {
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 400;
+  font-family: var(--font-primary);
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.histFiltroActivo {
+  color: #fff;
+  font-weight: 700;
+}
+
+.histCount {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin-left: auto;
+}

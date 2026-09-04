@@ -3,7 +3,10 @@
 /* ── Layout principal (dos columnas) ─────────────────────────────────────── */
 .chatLayout {
   display: flex;
-  height: calc(100vh - 120px); /* descuenta TopBanner + Navbar */
+  /* dvh (no vh) para que la barra de direcciones del navegador móvil no tape
+     la barra de input; descuenta el chrome (TopBanner + Navbar). */
+  height: calc(100dvh - var(--chrome-min-h));
+  min-height: 420px;
   max-width: 1200px;
   margin: 0 auto;
   border: 1px solid var(--border);
@@ -312,11 +315,31 @@
 
 .burbujaLeido { font-size: 0.75rem; }
 
+/* ── Botón "Ver perfil" (header del chat) ────────────────────────────────── */
+.verPerfilBtn {
+  margin-left: auto;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.verPerfilBtn:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* ── Input bar ───────────────────────────────────────────────────────────── */
 .inputBar {
   display: flex;
   gap: 0.6rem;
   padding: 0.85rem 1.25rem;
+  padding-bottom: max(0.85rem, env(safe-area-inset-bottom));
   background: var(--bg-card);
   border-top: 1px solid var(--border);
   align-items: center;
@@ -364,7 +387,8 @@
 /* ── Responsive (móvil) ──────────────────────────────────────────────────── */
 @media (max-width: 700px) {
   .chatLayout {
-    height: calc(100vh - 110px);
+    /* En móvil el TopBanner es más bajo (~72px) + Navbar 58px. */
+    height: calc(100dvh - 130px);
     border-radius: 0;
     border-left: none;
     border-right: none;
