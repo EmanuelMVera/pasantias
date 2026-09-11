@@ -13,6 +13,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '../../.env') }
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 
+const { bloquearSiProd } = require('./seedGuards');
 const models = require('../models');
 const {
   sequelize,
@@ -126,6 +127,11 @@ async function destroyIfModel(model, options) {
 }
 
 async function seedDemo() {
+  // DEPLOY-01: este seed borra usuarios con email `%@itbeltran.com.ar` (el
+  // dominio institucional) con `Usuario.destroy({ force: true })`. BLOQUEADO en
+  // producción sin excepción — usar db:seed:admin / db:seed:presentacion.
+  bloquearSiProd('db:seed:demo');
+
   const hash = await bcrypt.hash(DEFAULT_PASSWORD, 12);
   const transaction = await sequelize.transaction();
 

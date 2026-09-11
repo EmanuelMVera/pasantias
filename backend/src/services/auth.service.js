@@ -2,14 +2,15 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { enviarEmail } = require('../utils/mailer');
+const { config } = require('../config/env');
 
 // tokenVersion viaja en el payload del JWT: verifyToken la compara contra
 // usuarios.tokenVersion en cada request. Incrementar la columna (cambio de
 // contraseña, "cerrar sesión en todos los dispositivos") invalida de golpe
 // cualquier token viejo, sin necesidad de una tabla de sesiones (EST-08 §5.3).
 const generarToken = (usuario) =>
-  jwt.sign({ id: usuario.id, rol: usuario.rol, tokenVersion: usuario.tokenVersion ?? 0 }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  jwt.sign({ id: usuario.id, rol: usuario.rol, tokenVersion: usuario.tokenVersion ?? 0 }, config.jwt.secret, {
+    expiresIn: config.jwt.expiresIn,
   });
 
 // Hash del token de recupero — se persiste esto, nunca el token en claro.
@@ -37,7 +38,9 @@ const compararPassword = (plain, hash) => bcrypt.compare(plain, hash);
 const generarTokenReset = () => crypto.randomBytes(32).toString('hex');
 
 const enviarEmailReset = async (email, token) => {
-  const resetUrl = `${process.env.CLIENT_URL}/reset-password/${token}`;
+  // config.urls.client ya viene normalizada (sin barra final) y con default de
+  // desarrollo — así el link nunca queda `undefined/reset-password/...`.
+  const resetUrl = `${config.urls.client}/reset-password/${token}`;
   await enviarEmail({
     to: email,
     subject: 'Recupero de contraseña',

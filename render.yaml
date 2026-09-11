@@ -1,0 +1,125 @@
+# render.yaml — Blueprint de Render para el backend de SisPasantías (DEPLOY-01).
+#
+# Cómo usarlo:
+#   Render Dashboard → New → Blueprint → conectar este repo. Render lee este
+#   archivo, crea el servicio y PIDE los valores de las variables marcadas
+#   `sync: false` (las secretas / específicas del despliegue).
+#
+# NO contiene ningún secreto.
+#
+# Primer deploy (una sola vez): cambiar temporalmente el buildCommand a
+#   npm ci && npm run db:migrate && npm run db:seed:admin
+# (db:seed:admin es idempotente). Después volver a
+#   npm ci && npm run db:migrate
+#
+# El frontend NO va acá — va en Vercel (ver frontend/vercel.json y docs/DEPLOYMENT.md).
+
+services:
+  - type: web
+    name: sispasantias-api
+    runtime: node
+    rootDir: backend
+    # 'free' hace spin-down tras ~15 min sin tráfico → la primera request luego
+    # de dormir tarda unos segundos (cold start). Cambiar a un plan pago para
+    # evitarlo. No cambia nada del código.
+    plan: free
+    buildCommand: npm ci && npm run db:migrate
+    startCommand: npm start
+    healthCheckPath: /api/health
+    # Recomendado: deploy manual, después de un backup de Neon (ver DEPLOYMENT.md).
+    autoDeploy: false
+    envVars:
+      # ── Node ──────────────────────────────────────────────────────────────
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+
+      # ── Base de datos (Neon) ──────────────────────────────────────────────
+      # Usar la connection string *pooled* de Neon (…-pooler…?sslmode=require).
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_SSL
+        value: "true"
+      - key: DB_POOL_MAX
+        value: "5"
+
+      # ── Auth / sesión ─────────────────────────────────────────────────────
+      # node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COOKIE_SAMESITE
+        value: lax
+      - key: COOKIE_DOMAIN
+        value: ""
+      # Render está detrás de su propio proxy → 1 (para req.ip / rate limit / auditoría).
+      - key: TRUST_PROXY
+        value: "1"
+
+      # ── URLs ──────────────────────────────────────────────────────────────
+      # https://<tu-frontend>.vercel.app  (o tu dominio propio)
+      - key: CLIENT_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      # URL pública de ESTE servicio de Render (https://sispasantias-api.onrender.com).
+      - key: PUBLIC_URL
+        sync: false
+
+      # ── Almacenamiento (Cloudflare R2 / S3) ───────────────────────────────
+      - key: STORAGE_BACKEND
+        value: s3
+      - key: S3_REGION
+        value: auto
+      - key: S3_KEY_PREFIX
+        value: sispasantias
+      - key: S3_FORCE_PATH_STYLE
+        value: "false"
+      # https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_PUBLIC_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      # Dominio público del bucket público (r2.dev o dominio propio), sin barra final.
+      - key: S3_PUBLIC_BASE_URL
+        sync: false
+
+      # ── Email ─────────────────────────────────────────────────────────────
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_SECURE
+        value: "false"
+      - key: EMAIL_REQUIRED
+        value: "false"
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+
+      # ── Seed del admin (primer deploy) ────────────────────────────────────
+      - key: SEED_ADMIN_EMAIL
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+
+      # ── Flags ─────────────────────────────────────────────────────────────
+      - key: SEED_PRESENTACION_ON_BOOT
+        value: "false"
+      - key: ENABLE_API_DOCS
+        value: "false"
+      - key: LOG_LEVEL
+        value: info

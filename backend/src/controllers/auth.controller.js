@@ -16,15 +16,10 @@
 const { Usuario } = require('../models');
 const authService = require('../services/auth.service');
 const HttpError = require('../utils/httpError');
-const { cookieOptionsToken } = require('../utils/cookies');
+const { cookieOptionsToken, cookieClearOptions } = require('../utils/cookies');
+const { config } = require('../config/env');
 const { registrarAuditoria } = require('../utils/auditLog');
 const logger = require('../utils/logger');
-
-// Opciones para borrar la cookie (mismas que al setearla salvo maxAge).
-const cookieClearOptions = () => {
-  const { maxAge, ...rest } = cookieOptionsToken();
-  return rest;
-};
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 /**
@@ -125,9 +120,12 @@ exports.forgotPassword = async (req, res) => {
 
   // Solo FUERA de producción, y sin SMTP configurado, se expone el token para
   // facilitar pruebas locales. En producción NUNCA se devuelve ni se loguea
-  // (SEC-02): filtraría tokens de reset si faltara EMAIL_USER.
-  if (process.env.NODE_ENV !== 'production' && !process.env.EMAIL_USER) {
-    (req.log || logger).debug({ email }, `token de recupero (dev): ${token}`);
+  // (SEC-02): filtraría tokens de reset si faltara EMAIL_USER. El token va como
+  // campo (no interpolado en el mensaje) para que la redacción de pino lo tape
+  // también en dev. NODE_ENV se lee en vivo (no config.isProd) porque la suite
+  // lo cambia a mitad de test para verificar justamente que no se filtra.
+  if (process.env.NODE_ENV !== 'production' && !config.email.configured) {
+    (req.log || logger).debug({ email, devToken: token }, 'token_recupero_dev');
     return res.json({
       success: true,
       message: 'Token generado (modo desarrollo — email no configurado).',

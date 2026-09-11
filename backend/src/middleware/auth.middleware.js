@@ -16,6 +16,7 @@
 const jwt = require('jsonwebtoken');
 const { Usuario } = require('../models');
 const { parseCookies } = require('../utils/cookies');
+const { config } = require('../config/env');
 const logger = require('../utils/logger');
 
 /**
@@ -44,7 +45,7 @@ const verifyToken = async (req, res, next) => {
   // reportaba como "Token inválido", ocultando la caída real).
   let decoded;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
+    decoded = jwt.verify(token, config.jwt.secret);
   } catch (err) {
     return res.status(401).json({ success: false, message: 'Token inválido o expirado.' });
   }

@@ -4,11 +4,17 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // Salida del build (lo que Vercel publica). Explícito aunque sea el default.
+  build: {
+    outDir: 'dist',
+  },
   server: {
     host: true,
     allowedHosts: true,
     proxy: {
-      // Redirige /api y /uploads al backend local — así solo se necesita 1 túnel
+      // DEV: redirige /api y /uploads al backend local — así el navegador
+      // siempre habla same-origin (igual que en producción con el rewrite de
+      // Vercel). En producción esto lo hace frontend/vercel.json.
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,

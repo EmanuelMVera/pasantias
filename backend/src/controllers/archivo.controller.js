@@ -1,7 +1,7 @@
 'use strict';
 
-const fs = require('fs');
 const archivoService = require('../services/archivo.service');
+const storage = require('../services/storage');
 const { contentDisposition } = require('../utils/archivoNombre');
 const logger = require('../utils/logger');
 
@@ -13,13 +13,19 @@ const INLINE_OK = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/
  * Sirve un archivo privado (CV, carta de recomendación) solo si el
  * solicitante es el propietario, un admin del sistema, o una empresa que
  * recibió una postulación real de ese candidato (SEC-01).
+ *
+ * DEPLOY-01: el archivo se stremea desde el backend que corresponda según
+ * `Archivo.backend` (`local` = disco, `s3` = R2/S3). Nunca se redirige a una
+ * URL pública ni se firma una URL — la autorización de arriba se respeta 100%.
  */
 exports.descargar = async (req, res) => {
   try {
     const archivo = await archivoService.autorizarYObtenerArchivo(req.params.id, req.usuario);
-    const rutaAbsoluta = archivoService.resolverRutaSegura(archivo.claveAlmacenamiento);
 
-    const mime = archivo.mimeType || 'application/octet-stream';
+    const adapter = storage.get(archivo.backend);
+    const { stream, contentType } = await adapter.getObjectStream(archivo.claveAlmacenamiento, { area: 'private' });
+
+    const mime = archivo.mimeType || contentType || 'application/octet-stream';
     const disposition = INLINE_OK.has(mime) ? 'inline' : 'attachment';
 
     res.setHeader('Content-Type', mime);
@@ -28,12 +34,15 @@ exports.descargar = async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
 
-    const stream = fs.createReadStream(rutaAbsoluta);
-    stream.on('error', () => {
+    stream.on('error', (err) => {
       if (!res.headersSent) res.status(500).json({ success: false, message: 'Error al leer el archivo.' });
+      else res.destroy(err);
     });
     stream.pipe(res);
   } catch (error) {
+    if (error.notFound) {
+      return res.status(404).json({ success: false, message: 'El archivo ya no existe en el almacenamiento.' });
+    }
     if (error.statusCode) {
       return res.status(error.statusCode).json({ success: false, message: error.message });
     }

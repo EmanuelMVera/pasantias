@@ -8,6 +8,7 @@ const {
 } = require('../models');
 const HttpError = require('../utils/httpError');
 const { enviarEmail } = require('../utils/mailer');
+const { config } = require('../config/env');
 const { crearNotificacion } = require('../utils/notificador');
 const { registrarAuditoria } = require('../utils/auditLog');
 const logger = require('../utils/logger');
@@ -93,7 +94,7 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }) 
       }).catch((e) => logger.error({ err: e }, 'notif_aprobacion_reclutador_fallo'));
     }
 
-    const loginUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/login`;
+    const loginUrl = `${config.urls.client}/login`;
 
     // Email al reclutador con credenciales
     enviarEmail({

@@ -43,7 +43,8 @@ describe('SEC-03 — Subida de imágenes', () => {
       .attach('foto', PNG, { filename: 'mi foto.png', contentType: 'image/png' });
 
     expect(res.status).toBe(200);
-    expect(res.body.fotoPerfil).toMatch(/^https?:\/\/.+\/uploads\/public\/foto_\d+_\d+\.png$/);
+    // DEPLOY-01: la key ahora es aleatoria (UUID), sin el id del usuario.
+    expect(res.body.fotoPerfil).toMatch(/^https?:\/\/.+\/uploads\/public\/foto_[0-9a-f-]+\.png$/);
     archivosPublicos.push(bn(res.body.fotoPerfil));
 
     const perfil = await Perfil.findOne({ where: { usuarioId: usuario.id }, attributes: ['fotoPerfil'] });
@@ -64,7 +65,7 @@ describe('SEC-03 — Subida de imágenes', () => {
     idsUsuarios.push(usuario.id);
     const token = await loginYObtenerToken(usuario.email, passwordPlana);
 
-    const antes = fs.readdirSync(PUBLIC_DIR).filter((f) => f.startsWith(`foto_${usuario.id}_`));
+    const antes = fs.readdirSync(PUBLIC_DIR).filter((f) => f.startsWith('foto_'));
     const res = await request(app)
       .post('/api/users/perfil/foto')
       .set('Authorization', `Bearer ${token}`)
@@ -72,7 +73,8 @@ describe('SEC-03 — Subida de imágenes', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/no coincide/i);
-    const despues = fs.readdirSync(PUBLIC_DIR).filter((f) => f.startsWith(`foto_${usuario.id}_`));
+    // memoryStorage + validación previa: nada se sube si los magic bytes fallan.
+    const despues = fs.readdirSync(PUBLIC_DIR).filter((f) => f.startsWith('foto_'));
     expect(despues).toEqual(antes);
   });
 
@@ -156,7 +158,7 @@ describe('SEC-03 — Subida de imágenes', () => {
       .set('Authorization', `Bearer ${tokenAdmin}`)
       .attach('logo', JPEG, { filename: 'logo.jpg', contentType: 'image/jpeg' });
     expect(ok.status).toBe(200);
-    expect(ok.body.logo).toMatch(/\/uploads\/public\/logo_\d+_\d+\.jpg$/);
+    expect(ok.body.logo).toMatch(/\/uploads\/public\/logo_[0-9a-f-]+\.jpg$/);
     archivosPublicos.push(bn(ok.body.logo));
     const emp = await Empresa.findByPk(empresa.id, { attributes: ['logo'] });
     expect(emp.logo).toBe(ok.body.logo);

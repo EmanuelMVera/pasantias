@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * archivo.service.js — Autorización y resolución de archivos privados (SEC-01).
+ * archivo.service.js — Autorización de acceso a archivos privados (SEC-01).
  *
  * Reglas de acceso a un `Archivo` privado (cv | carta_recomendacion), en orden,
  * la primera que matchea gana:
@@ -17,12 +17,10 @@
  * mismo criterio de no-filtrado que ya usa auth.controller.js::forgotPassword.
  */
 
-const path = require('path');
-const fs = require('fs');
 const { Archivo, Postulacion, Oferta, EmpresaUsuario, Empresa } = require('../models');
 const HttpError = require('../utils/httpError');
-
-const UPLOADS_ROOT = path.join(__dirname, '../../uploads');
+// El guard de path traversal (resolverRutaSegura) y UPLOADS_ROOT están en
+// storage/paths.js — los usa storage/local.adapter.js al servir/borrar.
 
 // Misma resolución que empresa.service.js::resolverEmpresaDelRequest, pero
 // sin depender de verifyEmpresaMember (este endpoint también lo usan
@@ -70,22 +68,4 @@ async function autorizarYObtenerArchivo(archivoId, usuarioSolicitante) {
   throw new HttpError(404, 'Archivo no encontrado.');
 }
 
-/**
- * Resuelve la ruta absoluta en disco a partir de claveAlmacenamiento,
- * garantizando que el resultado quede dentro de UPLOADS_ROOT (guarda contra
- * path traversal — claveAlmacenamiento viene de la base de datos, no se
- * confía en que sea siempre benigno).
- */
-function resolverRutaSegura(claveAlmacenamiento) {
-  const relativa = claveAlmacenamiento.replace(/^\/?uploads\/?/, '');
-  const absoluta = path.normalize(path.join(UPLOADS_ROOT, relativa));
-  if (!absoluta.startsWith(UPLOADS_ROOT + path.sep) && absoluta !== UPLOADS_ROOT) {
-    throw new HttpError(400, 'Ruta de archivo inválida.');
-  }
-  if (!fs.existsSync(absoluta)) {
-    throw new HttpError(404, 'El archivo ya no existe en el servidor.');
-  }
-  return absoluta;
-}
-
-module.exports = { autorizarYObtenerArchivo, resolverRutaSegura, UPLOADS_ROOT };
+module.exports = { autorizarYObtenerArchivo };

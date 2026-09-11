@@ -1,49 +1,54 @@
 const crypto = require('crypto');
-const fs = require('fs');
 const { Perfil, Usuario, Archivo } = require('../models');
 const HttpError = require('../utils/httpError');
-const { firmaCoincide, sanitizarNombreOriginal } = require('../utils/archivoNombre');
+const { EXT_POR_MIME, firmaCoincide, sanitizarNombreOriginal } = require('../utils/archivoNombre');
 const { procesarSubidaImagen } = require('../services/archivoImagen.service');
+const storage = require('../services/storage');
 const logger = require('../utils/logger');
 
 /**
  * SEC-02: verifica que el CONTENIDO del archivo coincida con el mimetype que
- * declaró el cliente (multer solo mira el header multipart, falsificable).
- * Si no coincide, borra el archivo del disco y lanza 400 (propaga a
- * error.middleware). Devuelve el buffer ya leído para reusarlo en el hash.
+ * declaró el cliente (multer solo mira el header multipart, falsificable). Con
+ * memoryStorage el archivo está en `req.file.buffer` — no hay temp file que
+ * limpiar. Devuelve el buffer para reusarlo en el hash y la subida.
  */
 function validarContenidoArchivo(req) {
-  const buffer = fs.readFileSync(req.file.path);
+  const buffer = req.file.buffer;
   if (!firmaCoincide(buffer, req.file.mimetype)) {
-    try { fs.rmSync(req.file.path, { force: true }); } catch { /* nada */ }
     throw new HttpError(400, 'El contenido del archivo no coincide con su tipo declarado.');
   }
   return buffer;
 }
 
-// Crea la fila de metadata en `archivos` para un archivo recién subido por
-// multer (EST-08 §5.4) y devuelve su id, para que el caller lo vincule desde
-// Perfil.cvArchivoId/cartaArchivoId (SEC-01) — el acceso real ya no pasa por
-// la ruta STRING/URL directa, sino por GET /api/archivos/:id.
-// Soft-fail deliberado: si falla el registro de metadata, la subida del
-// archivo en sí no debe fallar (REF-ERR-01: se mantiene igual).
+// Sube el archivo privado al backend activo (DEPLOY-01) y registra su fila
+// `archivos` (EST-08 §5.4 / SEC-01). El acceso real va por GET /api/archivos/:id.
+// AUTORITATIVO: si falla el registro de metadata, se borra el objeto recién
+// subido y se propaga el error — nunca queda un objeto sin referencia ni una
+// referencia inválida en DB.
 async function registrarArchivo(req, tipo, buffer) {
+  const ext = EXT_POR_MIME[req.file.mimetype] || '.bin';
+  const key = storage.keyFor('private', { tipo, ext });
+
+  await storage.primary.putObject({
+    key, body: buffer, contentType: req.file.mimetype, area: 'private',
+  });
+
   try {
-    const hash = crypto.createHash('sha256').update(buffer).digest('hex');
     const archivo = await Archivo.create({
       usuarioPropietarioId: req.usuario.id,
       tipo,
       nombreOriginal: sanitizarNombreOriginal(req.file.originalname, req.file.mimetype),
-      claveAlmacenamiento: `/uploads/${req.file.filename}`,
+      claveAlmacenamiento: key,
       mimeType: req.file.mimetype,
-      tamanioBytes: req.file.size,
-      hashSha256: hash,
-      backend: 'local',
+      tamanioBytes: buffer.length,
+      hashSha256: crypto.createHash('sha256').update(buffer).digest('hex'),
+      backend: storage.primaryName,
     });
-    return archivo.id;
+    return { archivoId: archivo.id, key };
   } catch (err) {
-    logger.error({ err }, 'archivo_metadata_no_registrada');
-    return null;
+    await storage.primary.deleteObject(key, { area: 'private' }).catch((e) =>
+      logger.warn({ err: { name: e.name, message: e.message } }, 'cleanup_archivo_tras_fallo_db'));
+    throw err;
   }
 }
 
@@ -128,8 +133,9 @@ const updatePerfil = async (req, res) => {
 const uploadCv = async (req, res) => {
   if (!req.file) throw new HttpError(400, 'No se subió ningún archivo.');
   const buffer = validarContenidoArchivo(req);
-  const cvPath = `/uploads/${req.file.filename}`;
-  const cvArchivoId = await registrarArchivo(req, 'cv', buffer);
+  const { archivoId: cvArchivoId, key: cvPath } = await registrarArchivo(req, 'cv', buffer);
+  // cvPath: string legacy que postulacionService.validarPostulacion necesita
+  // truthy; el acceso real es por cvArchivoId → GET /api/archivos/:id.
   await Perfil.update({ cvPath, cvArchivoId }, { where: { usuarioId: req.usuario.id } });
   return res.json({ success: true, message: 'CV subido correctamente.', cvPath, cvArchivoId });
 };
@@ -137,8 +143,7 @@ const uploadCv = async (req, res) => {
 const uploadCartaRecomendacion = async (req, res) => {
   if (!req.file) throw new HttpError(400, 'No se subió ningún archivo.');
   const buffer = validarContenidoArchivo(req);
-  const cartaRecomendacion = `/uploads/${req.file.filename}`;
-  const cartaArchivoId = await registrarArchivo(req, 'carta_recomendacion', buffer);
+  const { archivoId: cartaArchivoId, key: cartaRecomendacion } = await registrarArchivo(req, 'carta_recomendacion', buffer);
   await Perfil.update({ cartaRecomendacion, cartaArchivoId }, { where: { usuarioId: req.usuario.id } });
   return res.json({ success: true, message: 'Carta de recomendación subida correctamente.', cartaRecomendacion, cartaArchivoId });
 };

@@ -25,8 +25,16 @@ const fs = require('fs');
 const path = require('path');
 const { Umzug, SequelizeStorage } = require('umzug');
 const { Sequelize } = require('sequelize');
+const { config } = require('../src/config/env');
 const sequelize = require('../src/config/database');
 const logger = require('../src/utils/logger');
+
+// DEPLOY-01: fallar claro si no hay a dónde conectarse (Render corre esto en el
+// build; sin DATABASE_URL/DB_* el error de Sequelize sería mucho menos legible).
+if (!config.db.url && !config.db.name) {
+  logger.fatal('Falta configuración de base de datos: definí DATABASE_URL, o DB_HOST + DB_NAME + DB_USER + DB_PASSWORD.');
+  process.exit(1);
+}
 
 const MIGRATIONS_DIR = path.join(__dirname, '../migrations');
 const TEMPLATE = path.join(__dirname, '_migration-template.js');

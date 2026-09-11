@@ -18,6 +18,7 @@ const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
 
+const { config } = require('./config/env');
 const logger = require('./utils/logger');
 
 // Asegura que existan las carpetas de uploads antes de montar el estático o
@@ -30,28 +31,28 @@ const csrfProtection = require('./middleware/csrf');
 const { apiLimiter } = require('./middleware/rateLimit');
 
 const app = express();
-const isProd = process.env.NODE_ENV === 'production';
+const isProd = config.isProd;
 
 // ── Chequeos de config de cookies en producción (SEC-02) ──────────────────────
-// La cookie de sesión se rompe silenciosamente si el front y el back están en
-// dominios distintos y falta SameSite=None (+ Secure). Y COOKIE_SECURE=false
-// deja pasar una cookie de sesión sin Secure en prod.
+// Con el proxy same-origin de Vercel (/api/* → Render) la cookie es first-party
+// y SameSite=Lax es lo correcto. Los footguns reales en prod son: cookie de
+// sesión sin Secure, o SameSite=None sin Secure (el navegador la descarta).
 if (isProd) {
-  if ((process.env.COOKIE_SAMESITE || 'lax').toLowerCase() !== 'none') {
-    logger.warn('COOKIE_SAMESITE no es "none": si el frontend está en otro dominio, el navegador no enviará la cookie de sesión en requests cross-site.');
-  }
-  if (process.env.COOKIE_SECURE === 'false') {
+  if (!config.cookie.secure) {
     logger.warn('COOKIE_SECURE=false en producción: la cookie de sesión viajará sin el flag Secure.');
+  }
+  if (config.cookie.sameSite === 'none' && !config.cookie.secure) {
+    logger.warn('COOKIE_SAMESITE=none sin Secure: el navegador va a descartar la cookie de sesión.');
   }
 }
 
-// ── trust proxy (SEC-02) ──────────────────────────────────────────────────────
-// Necesario detrás de un reverse proxy / Cloudflare Tunnel para que `req.ip`
-// (y por lo tanto el rate limiting y ActivityLog.ip) tomen la IP real del
-// cliente del header X-Forwarded-For. NO setear si el backend recibe tráfico
-// directo — permitiría spoofear la IP.
-if (process.env.TRUST_PROXY) {
-  app.set('trust proxy', Number(process.env.TRUST_PROXY) || 1);
+// ── trust proxy (SEC-02 / DEPLOY-01) ──────────────────────────────────────────
+// Necesario detrás de un reverse proxy (Render, Cloudflare Tunnel, nginx) para
+// que `req.ip` — y con él el rate limiting y ActivityLog.ip — y `req.protocol`
+// tomen los valores reales de X-Forwarded-*. En Render: TRUST_PROXY=1.
+// NO setear si el backend recibe tráfico directo (permitiría spoofear la IP).
+if (config.trustProxy != null) {
+  app.set('trust proxy', config.trustProxy);
 }
 
 // ── Logging técnico + request id (OPS-01) ─────────────────────────────────────
@@ -87,9 +88,12 @@ app.use(helmet({
   referrerPolicy: { policy: 'no-referrer' },
 }));
 
-// ── CORS (SEC-02) ─────────────────────────────────────────────────────────────
-const allowlist = (process.env.ALLOWED_ORIGINS || process.env.CLIENT_URL || 'http://localhost:5173')
-  .split(',').map((s) => s.trim()).filter(Boolean);
+// ── CORS (SEC-02 / DEPLOY-01) ─────────────────────────────────────────────────
+// allowlist ya viene normalizada (sin barra final, sin duplicados) y validada
+// (URLs, HTTPS en prod, sin comodín) desde config/env.js. Con el proxy de Vercel
+// el navegador ve la API como same-origin y no manda `Origin`; CORS acá cubre el
+// dev local directo, herramientas server-to-server y un eventual dominio propio.
+const allowlist = config.urls.allowedOrigins;
 // Túneles trycloudflare: solo fuera de producción y con opt-in explícito.
 const allowTunnels = process.env.ALLOW_TUNNEL_ORIGINS === 'true' && !isProd;
 
@@ -117,12 +121,11 @@ app.use(express.json({ limit: '100kb' }));
 app.use('/api', apiLimiter);
 app.use(csrfProtection);
 
-// Archivos PÚBLICOS (avatares y logos subidos vía SEC-03). El mount es
-// `/uploads/public` → carpeta `uploads/public/` — así la URL guardada
-// (`/uploads/public/<archivo>`) coincide con la ruta servida y con lo que
-// espera archivo.service.js::resolverRutaSegura. Los CV y cartas viven en
-// `uploads/` (fuera de `public/`) y solo se sirven autenticados vía
-// GET /api/archivos/:id.
+// Archivos PÚBLICOS locales (avatares y logos con STORAGE_BACKEND=local, y URLs
+// locales legacy). El mount `/uploads/public` → carpeta `uploads/public/` — así
+// la URL guardada coincide con la ruta servida. Con STORAGE_BACKEND=s3 las
+// imágenes salen de S3_PUBLIC_BASE_URL y esta carpeta queda vacía (inofensivo).
+// Los CV y cartas NO se sirven acá — solo autenticados vía GET /api/archivos/:id.
 // SEC-03: sin listado de directorio, sin dotfiles; helmet ya aplica nosniff +
 // CSP `default-src 'none'` + CORP cross-origin a estas respuestas.
 app.use('/uploads/public', express.static(path.join(__dirname, '../uploads/public'), {

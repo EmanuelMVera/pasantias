@@ -54,7 +54,7 @@ async function seed() {
       });
       console.log('✅ Usuario admin creado:');
       console.log(`   📧 Email:    ${adminEmail}`);
-      if (!process.env.SEED_ADMIN_PASSWORD) {
+      if (!isProd && !process.env.SEED_ADMIN_PASSWORD) {
         console.log(`   🔑 Password: ${DEFAULT_PASSWORD}  ⚠️  cambiala tras el primer acceso`);
       } else {
         console.log('   🔑 Password: (la definida en SEED_ADMIN_PASSWORD)');

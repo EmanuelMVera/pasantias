@@ -47,4 +47,15 @@ function cookieOptionsCsrf() {
   return { ...cookieOptionsToken(), httpOnly: false };
 }
 
-module.exports = { parseCookies, cookieOptionsToken, cookieOptionsCsrf };
+/**
+ * Opciones para BORRAR la cookie de sesión (`res.clearCookie`). Deben coincidir
+ * exactamente con las de seteo salvo `maxAge` — si `path`/`domain`/`sameSite`/
+ * `secure` difieren, el navegador no borra la cookie (queda una sesión zombi).
+ * Punto único: antes esto estaba duplicado en auth.controller.js.
+ */
+function cookieClearOptions() {
+  const { maxAge, ...rest } = cookieOptionsToken();
+  return rest;
+}
+
+module.exports = { parseCookies, cookieOptionsToken, cookieOptionsCsrf, cookieClearOptions };

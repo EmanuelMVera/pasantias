@@ -18,6 +18,7 @@
 
 const nodemailer = require('nodemailer');
 const logger = require('./logger');
+const { config } = require('../config/env');
 
 // Transporter reutilizable (lazy init)
 let _transporter = null;
@@ -25,12 +26,14 @@ let _transporter = null;
 function getTransporter() {
   if (_transporter) return _transporter;
   _transporter = nodemailer.createTransport({
-    host:   process.env.EMAIL_HOST  || 'smtp.gmail.com',
-    port:   Number(process.env.EMAIL_PORT || 587),
-    secure: false,
+    host:   config.email.host,
+    port:   config.email.port,
+    // EMAIL_SECURE=true → TLS implícito (puerto 465). Default false → STARTTLS
+    // (puerto 587, Gmail).
+    secure: config.email.secure,
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+      user: config.email.user,
+      pass: config.email.pass,
     },
   });
   return _transporter;
@@ -43,13 +46,13 @@ function getTransporter() {
  */
 async function enviarEmail({ to, subject, html }) {
   try {
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    if (!config.email.configured) {
       logger.info({ to, subject }, 'email_dev_no_enviado');
       return;
     }
     const transporter = getTransporter();
     await transporter.sendMail({
-      from: `"SisPasantías" <${process.env.EMAIL_USER}>`,
+      from: config.email.from,
       to,
       subject,
       html,
@@ -67,7 +70,7 @@ async function enviarEmail({ to, subject, html }) {
 function htmlNotificacion({ titulo, mensaje, enlace }) {
   const btnHtml = enlace
     ? `<div style="margin-top:24px;text-align:center;">
-        <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}${enlace}"
+        <a href="${config.urls.client}${enlace}"
            style="background:#2563eb;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">
           Ver en SisPasantías →
         </a>

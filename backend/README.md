@@ -3,7 +3,9 @@
 API del Sistema de Gestión de Pasantías. Recibe pedidos del frontend, aplica la
 lógica de negocio, habla con PostgreSQL y responde JSON.
 
-> Instalación y puesta en marcha: ver el [`README.md`](../README.md) de la raíz.
+> Instalación y puesta en marcha local: ver el [`README.md`](../README.md) de la raíz.
+> **Despliegue a producción** (Neon + Render + Vercel + Cloudflare R2):
+> [`docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md).
 > Este documento describe la **arquitectura** del backend.
 
 ---
@@ -36,10 +38,14 @@ src/
 │                       CSRF, estáticos de /uploads/public, montaje de rutas, health, error handler
 ├── server.js           Arranque: sequelize.authenticate() + app.listen()  (NO sincroniza esquema)
 ├── config/
-│   └── database.js     Instancia de Sequelize (lee DB_* del entorno)
+│   ├── env.js          Config centralizada y validada (DEPLOY-01): lee y valida TODO
+│   │                   el entorno una vez; en producción aborta el arranque si falta algo
+│   └── database.js     Instancia de Sequelize: DATABASE_URL (Neon) o DB_* sueltos, SSL configurable
 ├── routes/             Un archivo por recurso. Define método + path + cadena de middlewares + handler
 ├── controllers/        Capa HTTP: valida entrada, llama al service, arma la respuesta
 ├── services/           Lógica de negocio (no conoce req/res). Aquí viven las reglas del dominio
+│   └── storage/        Abstracción de almacenamiento (DEPLOY-01): adapters `local` (disco) y
+│                       `s3` (AWS S3 / Cloudflare R2, AWS SDK v3). CV/cartas privados; fotos/logos públicos
 ├── middleware/
 │   ├── auth.middleware.js      verifyToken, authorizeRoles
 │   ├── empresa.middleware.js   verifyEmpresaMember, authorizeEmpresaRoles (rol interno de empresa)
@@ -52,7 +58,7 @@ src/
 │   └── *.model.js      Un archivo por tabla
 ├── validators/         Validación de body por endpoint
 ├── utils/              logger (pino), auditLog (registrarAuditoria), cookies, asyncHandler,
-│                       archivoImagen (validación por magic bytes), seeds, scripts de mantenimiento
+│                       archivoNombre (magic bytes), seeds + seedGuards (bloquean prod), mantenimiento
 └── data/               Catálogos estáticos (carreras, rubros) en JSON
 ```
 
@@ -176,13 +182,15 @@ lista completa 000–012, el tema de los ENUMs legacy (`profesor`, `propietario`
 - **Rate limiting** por riesgo + techo global.
 - **CSRF** double-submit cookie.
 - **Uploads** (SEC-03): tipo validado por *magic bytes*, no por extensión declarada;
-  tamaño máximo; nombre generado en el servidor; CV/cartas fuera de rutas servidas
-  estáticamente (solo `GET /api/archivos/:id` autenticado); avatares/logos en
-  `/uploads/public`.
+  tamaño máximo; `key` generada en el servidor (UUID, nunca el nombre del usuario);
+  multer con `memoryStorage` (sin temp files); CV/cartas privados (solo
+  `GET /api/archivos/:id` autenticado, streaming desde el backend correcto según
+  `Archivo.backend`); fotos/logos públicos.
 - **`trust proxy`** configurable (`TRUST_PROXY`) para tomar la IP real detrás de
-  un reverse proxy sin permitir spoofing.
+  un reverse proxy sin permitir spoofing. En Render: `TRUST_PROXY=1`.
 
-Variables asociadas: ver [`.env.example`](.env.example).
+Variables asociadas: ver [`.env.example`](.env.example). Despliegue completo,
+tabla de variables y checklist: [`docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md).
 
 ## 8b. Observabilidad y logs (OPS-01)
 

@@ -38,6 +38,8 @@ require('dotenv').config({ path: require('path').join(__dirname, '../../.env') }
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 
+const { config } = require('../config/env');
+const { bloquearSiProd } = require('./seedGuards');
 const models = require('../models');
 const {
   sequelize,
@@ -854,15 +856,24 @@ async function ejecutarSeedPresentacion({ verbose = false } = {}) {
  */
 async function seedPresentacionSiFalta(logger = console) {
   try {
+    // DEPLOY-01: nunca sembrar el escenario de demo en producción de forma
+    // automática, aunque SEED_PRESENTACION_ON_BOOT=true. Requiere la doble
+    // confirmación ALLOW_PRODUCTION_DEMO_SEED=true.
+    if (config.isProd && !config.seed.allowProductionDemoSeed) {
+      logger.warn?.('Escenario de presentación en producción: bloqueado (seteá ALLOW_PRODUCTION_DEMO_SEED=true para permitirlo).');
+      return;
+    }
     if (await escenarioExiste()) {
       logger.info?.('Escenario de presentación ya cargado — se omite el seed');
       return;
     }
     logger.info?.('Escenario de presentación ausente — sembrando...');
     const resumen = await ejecutarSeedPresentacion({ verbose: false });
+    // No loguear la contraseña demo en producción.
+    const passInfo = config.isProd ? '' : ` — pass ${resumen.password}`;
     logger.info?.(
       { empresa: resumen.empresa, ofertas: resumen.ofertas, postulaciones: resumen.postulaciones },
-      `Escenario de presentación creado (login demo: ${OUR_EMAILS.join(', ')} — pass ${resumen.password})`
+      `Escenario de presentación creado (login demo: ${OUR_EMAILS.join(', ')}${passInfo})`
     );
   } catch (err) {
     logger.warn?.({ err }, 'No se pudo sembrar el escenario de presentación (el servidor sigue igual)');
@@ -874,14 +885,20 @@ module.exports = { escenarioExiste, ejecutarSeedPresentacion, seedPresentacionSi
 // ── CLI: node src/utils/seedPresentacion.js ─────────────────────────────────
 
 if (require.main === module) {
+  // DEPLOY-01: crea usuarios y datos ficticios. En producción exige la doble
+  // confirmación ALLOW_PRODUCTION_DEMO_SEED=true.
+  bloquearSiProd('db:seed:presentacion', { overrideEnv: 'ALLOW_PRODUCTION_DEMO_SEED' });
+
   (async () => {
     try {
       await sequelize.authenticate();
-      console.log(`✅ Conectado a "${process.env.DB_NAME}".`);
+      console.log(`✅ Conectado a "${config.db.name || 'DATABASE_URL'}".`);
+      console.log('⚠️  Este seed crea usuarios y datos FICTICIOS. No borra usuarios reales.');
       const r = await ejecutarSeedPresentacion({ verbose: true });
+      const passMostrada = config.isProd ? '(ver docs/DEPLOYMENT.md)' : r.password;
 
       console.log('\n✨ Escenario de presentación creado ✨\n');
-      console.log('  Credenciales (contraseña para los 4: ' + r.password + ')');
+      console.log('  Credenciales (contraseña para los 4: ' + passMostrada + ')');
       console.log('  ┌─────────────────────────────────────────────────────────────');
       console.log(`  │ Admin del sistema     ${ADMIN.email}`);
       console.log(`  │ Admin de empresa      ${EMP_ADMIN.email}   (${RAZON_SOCIAL})`);

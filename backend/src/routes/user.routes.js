@@ -11,14 +11,12 @@
 
 const router = require('express').Router();
 const multer = require('multer');
-const path = require('path');
 const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
 const validate = require('../middleware/validate.middleware');
 const { validateUpdatePerfil } = require('../validators/user.validator');
 const HttpError = require('../utils/httpError');
 const asyncHandler = require('../utils/asyncHandler');
 const { uploadLimiter } = require('../middleware/rateLimit');
-const { EXT_POR_MIME } = require('../utils/archivoNombre');
 const { multerImagen } = require('../services/archivoImagen.service');
 const {
   getPerfil,
@@ -30,16 +28,11 @@ const {
 } = require('../controllers/user.controller');
 
 // ── Configuración de multer ───────────────────────────────────────────────────
-// SEC-02: la extensión del archivo guardado se deriva del mimetype VALIDADO
-// (EXT_POR_MIME), nunca de file.originalname (input del atacante).
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, '../../uploads')),
-  filename: (req, file, cb) => {
-    const prefix = file.fieldname === 'carta' ? 'carta' : 'cv';
-    const ext = EXT_POR_MIME[file.mimetype] || '.bin';
-    cb(null, `${prefix}_${req.usuario.id}_${Date.now()}${ext}`);
-  },
-});
+// DEPLOY-01: memoryStorage — el archivo va a memoria y de ahí al backend de
+// almacenamiento (local o S3/R2). No depende de temp files en disco (efímeros
+// en Render). El nombre/objeto lo genera server-side el storage (UUID), nunca
+// se usa file.originalname (input del atacante).
+const storage = multer.memoryStorage();
 
 // SEC-02: límites de multipart contra abuso (además del tamaño).
 const LIMITS = { fileSize: 5 * 1024 * 1024, files: 1, parts: 10, fields: 5 };
