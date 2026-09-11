@@ -144,9 +144,14 @@ jobs:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: pasantias_db_e2e
+      # Postgres local del job — nunca Neon.
+      DB_SSL: 'false'
+      DATABASE_URL: ''
       JWT_SECRET: e2e-secret
       NODE_ENV: test
       CI: 'true'
+      # Explícito: nunca R2/S3 en CI (CI-03).
+      STORAGE_BACKEND: local
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

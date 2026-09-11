@@ -71,6 +71,15 @@ async function startServer() {
     process.on('SIGINT', () => cerrar('SIGINT'));
   } catch (error) {
     logger.fatal({ err: error }, 'No se pudo iniciar el servidor');
+    // CI-03: cuando este proceso corre como `webServer` de Playwright, su
+    // stdout NO se reenvía al log de la corrida salvo DEBUG=pw:webserver o
+    // `stdout:'pipe'` — y con LOG_LEVEL=silent (uploads/E2E) `logger.fatal` de
+    // arriba tampoco imprime nada. El stderr, en cambio, Playwright SIEMPRE lo
+    // reenvía. Esta línea es la red de seguridad para que un fallo de arranque
+    // (DB inexistente, config inválida, etc.) quede visible en cualquier CI,
+    // sin depender del LOG_LEVEL. Solo el mensaje — nunca el stack completo —
+    // para no ser más ruidoso de lo necesario.
+    console.error(`[server] No se pudo iniciar el servidor: ${error?.message || error}`);
     process.exit(1); // Sale con código de error si algo falla
   }
 }

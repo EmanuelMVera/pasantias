@@ -22,8 +22,8 @@
   "scripts": {
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
     "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\"",
-    "e2e": "playwright test",
-    "e2e:ui": "playwright test --ui",
+    "e2e": "node scripts/run-e2e.js",
+    "e2e:ui": "node scripts/run-e2e.js --ui",
     "e2e:report": "playwright show-report",
     "e2e:seed": "npm --prefix backend run e2e:seed"
   }
