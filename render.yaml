@@ -123,3 +123,9 @@ services:
         value: "false"
       - key: LOG_LEVEL
         value: info
+
+      # ── Importación masiva de alumnos/egresados (CSV) ──────────────────────
+      - key: CSV_IMPORT_MAX_BYTES
+        value: "2097152"
+      - key: CSV_IMPORT_MAX_ROWS
+        value: "2000"

@@ -50,15 +50,26 @@ describe('EMPRESA EQUIPO', () => {
   test('reclutador recibe 403 en las rutas de gestión de equipo', async () => {
     const { usuarioAdmin, empresa } = await crearEmpresaConAdmin();
     idsUsuarios.push(usuarioAdmin.id);
-    const { usuarioReclutador, passwordPlana } = await agregarReclutador(empresa);
+    const { usuarioReclutador, membresia, passwordPlana } = await agregarReclutador(empresa);
     idsUsuarios.push(usuarioReclutador.id);
 
     const token = await loginYObtenerToken(usuarioReclutador.email, passwordPlana);
+    const auth = (req) => req.set('Authorization', `Bearer ${token}`);
 
-    const res = await request(app)
-      .post(`/api/empresas/equipo/${usuarioAdmin.id}/recuperacion`)
-      .set('Authorization', `Bearer ${token}`);
+    // Todas las rutas de gestión de equipo están restringidas a admin_empresa
+    // (authorizeEmpresaRoles('admin_empresa')) — un reclutador recibe 403 en
+    // TODAS, más allá de a quién apunten (recuperacion ya estaba cubierto;
+    // acá se completan las 4 que faltaban).
+    expect((await auth(request(app).get('/api/empresas/equipo/solicitudes'))).status).toBe(403);
 
-    expect(res.status).toBe(403);
+    expect((await auth(request(app).post('/api/empresas/equipo/solicitar'))
+      .send({ nombre: 'X', apellido: 'Y', email: 'nuevo-reclutador@test.local' })).status).toBe(403);
+
+    expect((await auth(request(app).patch(`/api/empresas/equipo/${membresia.id}`))
+      .send({ activo: false })).status).toBe(403);
+
+    expect((await auth(request(app).delete(`/api/empresas/equipo/${membresia.id}`))).status).toBe(403);
+
+    expect((await auth(request(app).post(`/api/empresas/equipo/${usuarioAdmin.id}/recuperacion`))).status).toBe(403);
   });
 });

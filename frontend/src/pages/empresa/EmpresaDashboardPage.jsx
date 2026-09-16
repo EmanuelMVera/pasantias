@@ -49,6 +49,13 @@ const METRIC_CARDS = [
   },
 ];
 
+// Orden de tarjetas para el reclutador: lo operativo (candidatos/entrevistas/
+// ofertas) primero — lo estratégico (equipo) al final. Ninguna tarjeta se
+// oculta (ambos roles tienen acceso legítimo a todos estos datos), solo
+// cambia el orden de lectura. admin_empresa mantiene el orden por defecto
+// (empresa/equipo primero).
+const ORDEN_RECLUTADOR = ['postulaciones', 'entrevistas', 'contrataciones', 'ofertasActivas', 'ofertasCerradas', 'miembrosEquipo'];
+
 /* Colores de badge por estado de oferta */
 const ESTADO_COLOR = {
   activa:    '#27ae60',
@@ -123,6 +130,10 @@ export default function EmpresaDashboardPage() {
   useEffect(() => { cargarMetricas(); }, [cargarMetricas]);
   useEffect(() => { cargarOfertas(filtroOferta, 1); }, [filtroOferta, cargarOfertas]);
 
+  const cards = esReclutador
+    ? ORDEN_RECLUTADOR.map((k) => METRIC_CARDS.find((c) => c.key === k))
+    : METRIC_CARDS;
+
   /* Cambia estado de una oferta (pausar / activar / cerrar) */
   const handleCambiarEstado = async (id, estado) => {
     setGuardando(id);
@@ -152,13 +163,15 @@ export default function EmpresaDashboardPage() {
 
       {/* ── Cabecera ─────────────────────────────────────────────────────── */}
       <div className="dashboard-header">
-        <h1>Panel de Empresa</h1>
+        <h1>{esReclutador ? 'Panel de Reclutamiento' : 'Panel de Empresa'}</h1>
         <div className={styles.headerActions}>
           <Link to="/empresa/mi-empresa" className="btn-secondary">
             {esReclutador ? '🏢 Ver empresa' : '🏢 Editar empresa'}
           </Link>
           <Link to="/empresa/seguridad"  className="btn-secondary">🔐 Seguridad</Link>
-          <Link to="/empresa/equipo"     className="btn-secondary">👥 Equipo</Link>
+          <Link to="/empresa/equipo"     className="btn-secondary">
+            {esReclutador ? '👥 Ver equipo' : '👥 Gestionar equipo'}
+          </Link>
           <Link to="/empresa/nueva-oferta" className="btn-primary">+ Nueva Oferta</Link>
         </div>
       </div>
@@ -170,11 +183,11 @@ export default function EmpresaDashboardPage() {
       {/* ── Tarjetas de métricas ──────────────────────────────────────────── */}
       {loading ? (
         <div className={styles.skeletonGrid}>
-          {METRIC_CARDS.map((c) => <div key={c.key} className={styles.skeletonCard} />)}
+          {cards.map((c) => <div key={c.key} className={styles.skeletonCard} />)}
         </div>
       ) : (
         <div className={styles.metricsGrid}>
-          {METRIC_CARDS.map(({ key, label, icon, color, action }) => (
+          {cards.map(({ key, label, icon, color, action }) => (
             <button
               key={key}
               className={`${styles.metricCard} ${styles.metricCardBtn}`}

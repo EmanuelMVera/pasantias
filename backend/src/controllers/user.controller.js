@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const { Perfil, Usuario, Archivo } = require('../models');
 const HttpError = require('../utils/httpError');
 const { EXT_POR_MIME, firmaCoincide, sanitizarNombreOriginal } = require('../utils/archivoNombre');
-const { procesarSubidaImagen } = require('../services/archivoImagen.service');
+const { procesarSubidaImagen, establecerUrlExterna } = require('../services/archivoImagen.service');
 const storage = require('../services/storage');
 const logger = require('../utils/logger');
 
@@ -149,11 +149,20 @@ const uploadCartaRecomendacion = async (req, res) => {
 };
 
 // SEC-03: subida de foto de perfil (imagen pública, validada, nombre server-side).
+// Acepta también una URL https externa en vez de un archivo (multer no toca
+// req.body cuando el Content-Type no es multipart — ver archivoImagen.service.js).
 const uploadFoto = async (req, res) => {
   const perfil = await Perfil.findOne({ where: { usuarioId: req.usuario.id }, attributes: ['fotoPerfil'] });
-  const { urlPublica, archivoId } = await procesarSubidaImagen({
-    req, tipo: 'foto_perfil', valorAnterior: perfil?.fotoPerfil,
-  });
+
+  let urlPublica;
+  let archivoId = null;
+  if (req.body?.urlExterna !== undefined) {
+    ({ urlPublica } = await establecerUrlExterna({ urlExterna: req.body.urlExterna, valorAnterior: perfil?.fotoPerfil }));
+  } else {
+    ({ urlPublica, archivoId } = await procesarSubidaImagen({
+      req, tipo: 'foto_perfil', valorAnterior: perfil?.fotoPerfil,
+    }));
+  }
 
   await Perfil.update({ fotoPerfil: urlPublica }, { where: { usuarioId: req.usuario.id } });
   // Sync a Usuario.fotoPerfil (lo usan AuthContext / Navbar / listados).

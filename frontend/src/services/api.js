@@ -120,6 +120,14 @@ export const solicitudEmpresaService = {
   crear: (data) => api.post('/solicitudes-empresa', data),
 };
 
+// ── Servicio de estado del escenario demo ─────────────────────────────────────
+// Funciones para /api/demo (pública, sin autenticación) — la usa LoginPage
+// para saber si el escenario de presentación está realmente cargado antes de
+// mostrar los botones de autocompletado.
+export const demoService = {
+  getStatus: () => api.get('/demo/status', { skipAuthRedirect: true }),
+};
+
 
 // ── Servicio de ofertas ───────────────────────────────────────────────────────
 // Funciones para los endpoints de /api/ofertas
@@ -153,10 +161,13 @@ export const userService = {
   subirCartaRecomendacion: (formData) => api.post('/users/perfil/carta-recomendacion', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
-  // SEC-03: la foto de perfil se sube como imagen (JPG/PNG/WEBP), ya no como URL.
+  // SEC-03: la foto de perfil se sube como imagen (JPG/PNG/WEBP), ya no como URL
+  // de texto libre. Alternativa: una URL https externa validada server-side
+  // (mismo endpoint, Content-Type JSON en vez de multipart).
   subirFoto: (formData) => api.post('/users/perfil/foto', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
+  establecerFotoUrl: (urlExterna) => api.post('/users/perfil/foto', { urlExterna }),
 };
 
 // ── Servicio de alumno/egresado (dashboard) ───────────────────────────────────
@@ -218,6 +229,16 @@ export const adminService = {
   getSolicitudesReclutador:      (params) => api.get('/admin/solicitudes-reclutador', { params }),
   aprobarSolicitudReclutador:    (id)     => api.patch(`/admin/solicitudes-reclutador/${id}/aprobar`),
   rechazarSolicitudReclutador:   (id, motivo) => api.patch(`/admin/solicitudes-reclutador/${id}/rechazar`, { motivo }),
+
+  // Importación masiva de alumnos/egresados por CSV
+  descargarPlantillaImportacion: () => api.get('/admin/importaciones/alumnos/plantilla', { responseType: 'blob' }),
+  previsualizarImportacionCsv:   (formData) => api.post('/admin/importaciones/alumnos', formData, {
+    params: { dryRun: true },
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  confirmarImportacionCsv:       (formData) => api.post('/admin/importaciones/alumnos', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
 };
 
 
@@ -246,9 +267,11 @@ export const empresaService = {
   getPublico:            (empresaId) => api.get(`/empresas/${empresaId}`), // Perfil de empresa (datos públicos, pero requiere sesión)
   updateMiEmpresa:       (data) => api.put('/empresas/mi-empresa', data),
   // SEC-03: el logo se sube como imagen (JPG/PNG/WEBP), solo admin_empresa.
+  // Alternativa: URL https externa validada server-side (mismo endpoint).
   subirLogo:             (formData) => api.post('/empresas/mi-empresa/logo', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
+  establecerLogoUrl:     (urlExterna) => api.post('/empresas/mi-empresa/logo', { urlExterna }),
   getCandidatos:         (params) => api.get('/empresas/candidatos', { params }),
   getEquipo:             () => api.get('/empresas/equipo'),
   editarMiembro:         (id, data) => api.patch(`/empresas/equipo/${id}`, data),

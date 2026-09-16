@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { adminService } from '../../services/api';
 import Modal from '../../components/Modal/Modal';
 import Paginacion from '../../components/Paginacion/Paginacion';
@@ -196,9 +197,12 @@ export default function AdminUsuariosPage() {
             {loading ? '...' : `${pagination?.total ?? usuarios.length} usuario${(pagination?.total ?? usuarios.length) !== 1 ? 's' : ''} encontrado${(pagination?.total ?? usuarios.length) !== 1 ? 's' : ''}`}
           </p>
         </div>
-        <button id="btn-crear-usuario" className="btn-primary" onClick={abrirCrear}>
-          + Nuevo Usuario
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <Link to="/admin/importaciones" className="btn-secondary">📥 Importar CSV</Link>
+          <button id="btn-crear-usuario" className="btn-primary" onClick={abrirCrear}>
+            + Nuevo Usuario
+          </button>
+        </div>
       </div>
 
       {/* Mensajes */}

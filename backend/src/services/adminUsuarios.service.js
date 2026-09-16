@@ -11,10 +11,11 @@
 
 const { Op } = require('sequelize');
 const { hashPassword } = require('./auth.service');
-const { Usuario, Perfil, Empresa, EmpresaUsuario, ConfiguracionInstitucional } = require('../models');
+const { Usuario, Perfil, Empresa, EmpresaUsuario } = require('../models');
 const HttpError = require('../utils/httpError');
 const { buildPagination } = require('../utils/pagination');
 const { registrarAuditoria } = require('../utils/auditLog');
+const { obtenerRegexLegajo, normalizarLegajo } = require('../utils/legajo');
 
 async function listarUsuarios({ rol, activo, q, page = 1, limit = 25, offset = 0 }) {
   const where = {};
@@ -70,10 +71,9 @@ async function _validarLegajoNuevo(legajo) {
   if (!legajo || !legajo.trim()) {
     throw new HttpError(400, 'El legajo es obligatorio para alumnos y egresados.');
   }
-  const legajoNormalizado = legajo.trim().toUpperCase();
+  const legajoNormalizado = normalizarLegajo(legajo);
 
-  const configRegex = await ConfiguracionInstitucional.findOne({ where: { clave: 'legajo.regex' } });
-  const regex = new RegExp(configRegex?.valor || '^[A-Z0-9-]{3,20}$');
+  const regex = await obtenerRegexLegajo();
   if (!regex.test(legajoNormalizado)) {
     throw new HttpError(400, 'El legajo no tiene un formato válido.');
   }
@@ -158,10 +158,9 @@ async function actualizarUsuario(id, body, { actorUsuarioId, ip, requestId }) {
 
   // legajo vive en Perfil, no en Usuario — solo aplica a alumno/egresado
   if (legajo !== undefined && ['alumno', 'egresado'].includes(usuario.rol)) {
-    const legajoNormalizado = legajo?.trim() ? legajo.trim().toUpperCase() : null;
+    const legajoNormalizado = normalizarLegajo(legajo) || null;
     if (legajoNormalizado) {
-      const configRegex = await ConfiguracionInstitucional.findOne({ where: { clave: 'legajo.regex' } });
-      const regex = new RegExp(configRegex?.valor || '^[A-Z0-9-]{3,20}$');
+      const regex = await obtenerRegexLegajo();
       if (!regex.test(legajoNormalizado)) {
         throw new HttpError(400, 'El legajo no tiene un formato válido.');
       }

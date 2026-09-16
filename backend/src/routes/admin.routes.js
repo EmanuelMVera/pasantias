@@ -23,8 +23,10 @@
 
 const router = require('express').Router();
 const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
+const { uploadLimiter } = require('../middleware/rateLimit');
 const asyncHandler = require('../utils/asyncHandler');
 const adminCtrl = require('../controllers/admin.controller');
+const { multerCsv } = require('../services/csvImportacion.service');
 
 // Shorthand para no repetir los middlewares en cada ruta
 const soloAdmin = [verifyToken, authorizeRoles('admin')];
@@ -65,5 +67,17 @@ router.patch('/solicitudes-empresa/:id/rechazar', ...soloAdmin, asyncHandler(adm
 router.get('/solicitudes-reclutador', ...soloAdmin, asyncHandler(adminCtrl.getSolicitudesReclutador));
 router.patch('/solicitudes-reclutador/:id/aprobar', ...soloAdmin, asyncHandler(adminCtrl.aprobarSolicitudReclutador));
 router.patch('/solicitudes-reclutador/:id/rechazar', ...soloAdmin, asyncHandler(adminCtrl.rechazarSolicitudReclutador));
+
+// ── Importación masiva de alumnos/egresados (CSV) ─────────────────────────────
+// Un único endpoint de import + ?dryRun=true (evita duplicar parsing/validación
+// en dos rutas). multerCsv usa memoryStorage — nada toca disco sin validar.
+router.get('/importaciones/alumnos/plantilla', ...soloAdmin, asyncHandler(adminCtrl.descargarPlantillaCsvAlumnos));
+router.post(
+  '/importaciones/alumnos',
+  ...soloAdmin,
+  uploadLimiter,
+  multerCsv.single('archivo'),
+  asyncHandler(adminCtrl.importarAlumnosCsv)
+);
 
 module.exports = router;

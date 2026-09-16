@@ -76,7 +76,9 @@ exports.createOferta = async (req, res) => {
   const { error, campos } = ofertaService.validarCamposPuesto(body);
   if (error) return res.status(400).json({ success: false, message: error });
 
-  const oferta = await Oferta.create({ ...body, ...campos, empresaId: empresa.id, moderada: false });
+  const oferta = await Oferta.create({
+    ...body, ...campos, empresaId: empresa.id, moderada: false, creadaPorUsuarioId: req.usuario.id,
+  });
 
   ofertaService.notificarAdminsNuevaOferta(oferta, empresa); // fire-and-forget
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { getRutaInicio } from '../../utils/rutas';
+import { demoService } from '../../services/api';
 import styles from './LoginPage.module.css';
 
 export default function LoginPage() {
@@ -30,14 +31,27 @@ export default function LoginPage() {
   }
 
   // Credenciales de demo para la presentación. Al hacer clic se autocompleta
-  // el formulario (misma contraseña para los 4 usuarios del escenario demo).
+  // el formulario (misma contraseña para las 3 cuentas del escenario demo).
+  // No es secreta: es la contraseña deliberadamente pública de esas 3 cuentas
+  // ficticias, mostrada en esta misma UI.
   const DEMO_PASSWORD = 'Demo1234!';
-  const DEMO_CUENTAS = [
-    { rol: 'Admin del sistema', email: 'sistema@demo.com' },
-    { rol: 'Admin de empresa', email: 'empresa@demo.com' },
-    { rol: 'Reclutador', email: 'reclutador@demo.com' },
-    { rol: 'Alumno / Egresado', email: 'alumno@demo.com' },
-  ];
+
+  // El bloque de demo NUNCA afirma que las cuentas existen si el escenario no
+  // fue cargado: se consulta el estado real de la base (GET /api/demo/status,
+  // fuente de verdad = seedPresentacion.js) en vez de mostrar una lista
+  // hardcodeada. Si el chequeo falla, se trata como "no disponible" (fail-closed).
+  const [demoInfo, setDemoInfo] = useState({ enabled: false, accounts: [] });
+  useEffect(() => {
+    let cancelado = false;
+    demoService.getStatus()
+      .then(({ data }) => {
+        if (!cancelado) setDemoInfo({ enabled: !!data.enabled, accounts: data.accounts || [] });
+      })
+      .catch(() => {
+        if (!cancelado) setDemoInfo({ enabled: false, accounts: [] });
+      });
+    return () => { cancelado = true; };
+  }, []);
 
   const usarCuentaDemo = (email) => {
     setForm((prev) => ({ ...prev, email, password: DEMO_PASSWORD }));
@@ -224,28 +238,34 @@ export default function LoginPage() {
               </Link>
             </p>
 
-            {/* Cuadro de credenciales para la demo / presentación */}
-            <div className={styles.demoBox}>
-              <p className={styles.demoBoxTitle}>Cuentas de demo</p>
-              <ul className={styles.demoList}>
-                {DEMO_CUENTAS.map((c) => (
-                  <li key={c.email}>
-                    <button
-                      type="button"
-                      className={styles.demoItem}
-                      onClick={() => usarCuentaDemo(c.email)}
-                      title="Usar esta cuenta"
-                    >
-                      <span className={styles.demoRol}>{c.rol}</span>
-                      <span className={styles.demoEmail}>{c.email}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <p className={styles.demoBoxHint}>
-                Contraseña para las 4: <code>{DEMO_PASSWORD}</code>
-              </p>
-            </div>
+            {/* Cuadro de credenciales para la demo / presentación — solo se
+                muestra si el escenario está realmente cargado en esta base. */}
+            {demoInfo.enabled && demoInfo.accounts.length > 0 && (
+              <div className={styles.demoBox}>
+                <p className={styles.demoBoxTitle}>Cuentas de demo</p>
+                <ul className={styles.demoList}>
+                  {demoInfo.accounts.map((c) => (
+                    <li key={c.email}>
+                      <button
+                        type="button"
+                        className={styles.demoItem}
+                        onClick={() => usarCuentaDemo(c.email)}
+                        title="Usar esta cuenta"
+                      >
+                        <span className={styles.demoRol}>{c.rol}</span>
+                        <span className={styles.demoEmail}>{c.email}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p className={styles.demoBoxHint}>
+                  Contraseña para las 3: <code>{DEMO_PASSWORD}</code>
+                </p>
+                <p className={styles.demoBoxHint}>
+                  Estas cuentas contienen datos ficticios para recorrer los distintos roles.
+                </p>
+              </div>
+            )}
           </div>
         </main>
       </div>

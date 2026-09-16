@@ -3,6 +3,7 @@ const request = require('supertest');
 const app = require('../src/app');
 const { crearAlumno } = require('./helpers/factories');
 const { limpiarUsuarios, cerrarConexion } = require('./helpers/cleanup');
+const { confirmarImportacion } = require('../src/services/csvImportacion.service');
 
 describe('AUTH', () => {
   const idsUsuarios = [];
@@ -90,5 +91,32 @@ describe('AUTH', () => {
 
     expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
+  });
+
+  test('7. el token de activación del import CSV funciona con POST /reset-password/:token (misma infraestructura)', async () => {
+    const suf = Date.now();
+    const csv = [
+      'legajo,nombre,apellido,email,rol,carrera,anioEgreso,telefono,ubicacion',
+      `ACT-${suf},Activacion,Test,activacion-${suf}@test.local,alumno,,,,`,
+    ].join('\n');
+
+    const resumen = await confirmarImportacion(Buffer.from(csv, 'utf8'), {
+      actorUsuarioId: null, ip: '127.0.0.1', requestId: 'test-activacion',
+    });
+    idsUsuarios.push(resumen.creados[0].id);
+    // Sin SMTP configurado (tests/setup/env.js vacía EMAIL_USER/PASS) y
+    // NODE_ENV=test !== production → devTokens viene en la respuesta.
+    const token = resumen.devTokens?.[0]?.devToken;
+    expect(typeof token).toBe('string');
+
+    const activar = await request(app)
+      .post(`/api/auth/reset-password/${token}`)
+      .send({ password: 'NuevaPassword123' });
+    expect(activar.status).toBe(200);
+
+    const login = await request(app)
+      .post('/api/auth/login')
+      .send({ email: `activacion-${suf}@test.local`, password: 'NuevaPassword123' });
+    expect(login.status).toBe(200);
   });
 });

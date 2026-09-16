@@ -168,4 +168,131 @@ describe('SEC-03 — Subida de imágenes', () => {
       .attach('logo', JPEG, { filename: 'logo.jpg', contentType: 'image/jpeg' });
     expect(denegado.status).toBe(403);
   });
+
+  // ── foto/logo por URL externa ───────────────────────────────────────────────
+  describe('URL externa (foto de perfil / logo de empresa)', () => {
+    const URL_EXTERNA = 'https://i.pravatar.cc/150?img=5';
+    const URL_EXTERNA_2 = 'https://ui-avatars.com/api/?name=Test';
+
+    test('foto por urlExterna https → 200, sin crear fila Archivo', async () => {
+      const { usuario, passwordPlana } = await crearAlumno();
+      idsUsuarios.push(usuario.id);
+      const token = await loginYObtenerToken(usuario.email, passwordPlana);
+
+      const antes = await Archivo.count();
+      const res = await request(app)
+        .post('/api/users/perfil/foto')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ urlExterna: URL_EXTERNA });
+
+      expect(res.status).toBe(200);
+      expect(res.body.fotoPerfil).toBe(URL_EXTERNA);
+      expect(res.body.archivoId).toBeNull();
+      expect(await Archivo.count()).toBe(antes);
+
+      const perfil = await Perfil.findOne({ where: { usuarioId: usuario.id }, attributes: ['fotoPerfil'] });
+      expect(perfil.fotoPerfil).toBe(URL_EXTERNA);
+    });
+
+    test('urlExterna con http (no https) → 400', async () => {
+      const { usuario, passwordPlana } = await crearAlumno();
+      idsUsuarios.push(usuario.id);
+      const token = await loginYObtenerToken(usuario.email, passwordPlana);
+
+      const res = await request(app)
+        .post('/api/users/perfil/foto')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ urlExterna: 'http://ejemplo.com/foto.png' });
+
+      expect(res.status).toBe(400);
+    });
+
+    test.each([
+      'https://localhost/foto.png',
+      'https://127.0.0.1/foto.png',
+      'https://169.254.169.254/latest/meta-data',
+      'https://192.168.1.5/foto.png',
+      'https://10.0.0.5/foto.png',
+      'data:image/png;base64,aaaa',
+      'javascript:alert(1)',
+      'file:///etc/passwd',
+    ])('urlExterna "%s" (host privado/protocolo no permitido) → 400', async (urlMaliciosa) => {
+      const { usuario, passwordPlana } = await crearAlumno();
+      idsUsuarios.push(usuario.id);
+      const token = await loginYObtenerToken(usuario.email, passwordPlana);
+
+      const res = await request(app)
+        .post('/api/users/perfil/foto')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ urlExterna: urlMaliciosa });
+
+      expect(res.status).toBe(400);
+    });
+
+    test('reemplazar un upload propio por urlExterna borra el objeto local anterior', async () => {
+      const { usuario, passwordPlana } = await crearAlumno();
+      idsUsuarios.push(usuario.id);
+      const token = await loginYObtenerToken(usuario.email, passwordPlana);
+
+      const subida = await request(app).post('/api/users/perfil/foto')
+        .set('Authorization', `Bearer ${token}`)
+        .attach('foto', PNG, { filename: 'a.png', contentType: 'image/png' });
+      expect(subida.status).toBe(200);
+      const nombreArchivo = bn(subida.body.fotoPerfil);
+      expect(fs.existsSync(path.join(PUBLIC_DIR, nombreArchivo))).toBe(true);
+
+      const porUrl = await request(app).post('/api/users/perfil/foto')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ urlExterna: URL_EXTERNA });
+      expect(porUrl.status).toBe(200);
+      expect(porUrl.body.fotoPerfil).toBe(URL_EXTERNA);
+
+      // El objeto local de la subida anterior se borró (best-effort, mismo
+      // mecanismo que el reemplazo upload→upload).
+      expect(fs.existsSync(path.join(PUBLIC_DIR, nombreArchivo))).toBe(false);
+      expect(await Archivo.count({ where: { claveAlmacenamiento: `/uploads/public/${nombreArchivo}` } })).toBe(0);
+    });
+
+    test('reemplazar una urlExterna por otra urlExterna no intenta borrar nada', async () => {
+      const { usuario, passwordPlana } = await crearAlumno();
+      idsUsuarios.push(usuario.id);
+      const token = await loginYObtenerToken(usuario.email, passwordPlana);
+
+      const primera = await request(app).post('/api/users/perfil/foto')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ urlExterna: URL_EXTERNA });
+      expect(primera.status).toBe(200);
+
+      const antes = await Archivo.count();
+      const segunda = await request(app).post('/api/users/perfil/foto')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ urlExterna: URL_EXTERNA_2 });
+
+      expect(segunda.status).toBe(200);
+      expect(segunda.body.fotoPerfil).toBe(URL_EXTERNA_2);
+      expect(await Archivo.count()).toBe(antes); // ninguna fila Archivo creada ni tocada
+    });
+
+    test('logo por urlExterna: 200 para admin_empresa, 403 para reclutador', async () => {
+      const { usuarioAdmin, empresa, passwordPlana } = await crearEmpresaConAdmin();
+      const { usuarioReclutador } = await agregarReclutador(empresa);
+      idsUsuarios.push(usuarioAdmin.id, usuarioReclutador.id);
+
+      const tokenAdmin = await loginYObtenerToken(usuarioAdmin.email, passwordPlana);
+      const tokenRecl = await loginYObtenerToken(usuarioReclutador.email, passwordPlana);
+
+      const ok = await request(app).post('/api/empresas/mi-empresa/logo')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({ urlExterna: URL_EXTERNA_2 });
+      expect(ok.status).toBe(200);
+      expect(ok.body.logo).toBe(URL_EXTERNA_2);
+      const emp = await Empresa.findByPk(empresa.id, { attributes: ['logo'] });
+      expect(emp.logo).toBe(URL_EXTERNA_2);
+
+      const denegado = await request(app).post('/api/empresas/mi-empresa/logo')
+        .set('Authorization', `Bearer ${tokenRecl}`)
+        .send({ urlExterna: URL_EXTERNA });
+      expect(denegado.status).toBe(403);
+    });
+  });
 });

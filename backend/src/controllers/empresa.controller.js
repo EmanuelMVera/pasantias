@@ -4,7 +4,7 @@ const { Empresa, Oferta } = require('../models');
 const empresaService = require('../services/empresa.service');
 const equipoService  = require('../services/empresaEquipo.service');
 const { parsePagination } = require('../utils/pagination');
-const { procesarSubidaImagen } = require('../services/archivoImagen.service');
+const { procesarSubidaImagen, establecerUrlExterna } = require('../services/archivoImagen.service');
 const { registrarAuditoria } = require('../utils/auditLog');
 
 // SEC-03: `logo` NO se edita por texto libre — se sube por
@@ -75,13 +75,21 @@ exports.updateMiEmpresa = async (req, res) => {
 };
 
 // SEC-03: subida del logo (imagen pública, validada, nombre server-side).
+// Acepta también una URL https externa en vez de un archivo (multer no toca
+// req.body cuando el Content-Type no es multipart — ver archivoImagen.service.js).
 exports.uploadLogo = async (req, res) => {
   const empresa = await _resolverEmpresa(req);
   if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
 
-  const { urlPublica, archivoId } = await procesarSubidaImagen({
-    req, tipo: 'logo_empresa', valorAnterior: empresa.logo,
-  });
+  let urlPublica;
+  let archivoId = null;
+  if (req.body?.urlExterna !== undefined) {
+    ({ urlPublica } = await establecerUrlExterna({ urlExterna: req.body.urlExterna, valorAnterior: empresa.logo }));
+  } else {
+    ({ urlPublica, archivoId } = await procesarSubidaImagen({
+      req, tipo: 'logo_empresa', valorAnterior: empresa.logo,
+    }));
+  }
   await empresa.update({ logo: urlPublica });
 
   return res.json({ success: true, message: 'Logo actualizado.', logo: urlPublica, archivoId });

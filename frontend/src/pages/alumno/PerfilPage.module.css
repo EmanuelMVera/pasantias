@@ -74,6 +74,12 @@
 }
 
 /* ── CV Upload ───────────────────────────────────────────────────────────── */
+.cvAviso {
+  color: var(--warning);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 .cvUpload {
   display: flex;
   align-items: center;

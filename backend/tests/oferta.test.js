@@ -1,7 +1,8 @@
 'use strict';
 const request = require('supertest');
 const app = require('../src/app');
-const { crearEmpresaConAdmin, crearOferta } = require('./helpers/factories');
+const { Oferta } = require('../src/models');
+const { crearEmpresaConAdmin, crearOferta, agregarReclutador } = require('./helpers/factories');
 const { limpiarUsuarios, cerrarConexion } = require('./helpers/cleanup');
 const { loginYObtenerToken } = require('./helpers/factories');
 
@@ -101,5 +102,46 @@ describe('OFERTA', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.empresa.cuit).toBeUndefined();
     expect(res.body.data.empresa.razonSocial).toBe(empresa.razonSocial);
+  });
+
+  // Migración 013: creadaPorUsuarioId es solo atribución/auditoría — no
+  // restringe visibilidad. Cualquier miembro de la empresa sigue viendo
+  // todas las ofertas, las haya creado quien las haya creado.
+  test('creadaPorUsuarioId queda seteado al creador y no filtra la visibilidad del otro rol', async () => {
+    const { usuarioAdmin, empresa, passwordPlana } = await crearEmpresaConAdmin();
+    idsUsuarios.push(usuarioAdmin.id);
+    const { usuarioReclutador, passwordPlana: passReclutador } = await agregarReclutador(empresa);
+    idsUsuarios.push(usuarioReclutador.id);
+
+    const tokenReclutador = await loginYObtenerToken(usuarioReclutador.email, passReclutador);
+
+    const res = await request(app)
+      .post('/api/ofertas')
+      .set('Authorization', `Bearer ${tokenReclutador}`)
+      .send({ titulo: 'Pasantía creada por el reclutador', descripcion: 'Descripción de prueba.' });
+
+    expect(res.status).toBe(201);
+    const ofertaId = res.body.data.id;
+
+    const oferta = await Oferta.findByPk(ofertaId, { attributes: ['creadaPorUsuarioId'] });
+    expect(oferta.creadaPorUsuarioId).toBe(usuarioReclutador.id);
+
+    // El admin_empresa (que no la creó) sigue viéndola en su listado.
+    const tokenAdmin = await loginYObtenerToken(usuarioAdmin.email, passwordPlana);
+    const misOfertas = await request(app)
+      .get('/api/empresas/mis-ofertas')
+      .set('Authorization', `Bearer ${tokenAdmin}`);
+    expect(misOfertas.status).toBe(200);
+    expect(misOfertas.body.data.map((o) => o.id)).toContain(ofertaId);
+  });
+
+  test('ofertas creadas antes de la migración 013 (sin creadaPorUsuarioId) quedan con NULL', async () => {
+    const { usuarioAdmin, empresa } = await crearEmpresaConAdmin();
+    idsUsuarios.push(usuarioAdmin.id);
+    // crearOferta() no setea creadaPorUsuarioId — simula una oferta histórica.
+    const oferta = await crearOferta(empresa);
+
+    const fresca = await Oferta.findByPk(oferta.id, { attributes: ['creadaPorUsuarioId'] });
+    expect(fresca.creadaPorUsuarioId).toBeNull();
   });
 });

@@ -26,6 +26,7 @@ const { Archivo } = require('../models');
 const storage = require('./storage');
 const { UPLOADS_ROOT } = require('./storage/paths');
 const { EXT_POR_MIME, firmaCoincide, sanitizarNombreOriginal } = require('../utils/archivoNombre');
+const { esUrlImagenExternaValida } = require('../validators/common.validator');
 
 // Solo relevante para el backend `local` (lo usan los tests).
 const PUBLIC_DIR = path.join(UPLOADS_ROOT, 'public');
@@ -114,4 +115,22 @@ async function procesarSubidaImagen({ req, tipo, valorAnterior }) {
   return { urlPublica, archivoId: archivo.id };
 }
 
-module.exports = { multerImagen, procesarSubidaImagen, rmArchivoAnterior, PUBLIC_DIR };
+/**
+ * Establece una URL EXTERNA (ajena a nuestro storage) como foto/logo — sin
+ * subir nada, sin crear fila Archivo, sin fetch server-side. Reutiliza
+ * rmArchivoAnterior/claveDesdeUrlPublica para borrar el objeto anterior SI Y
+ * SOLO SI era propio (R2/local): si el valor anterior también era una URL
+ * externa, claveDesdeUrlPublica ya devuelve null y rmArchivoAnterior no hace
+ * nada — mismo mecanismo, sin código nuevo de ese lado.
+ * @param {{ urlExterna: string, valorAnterior?: string }} opts
+ * @returns {Promise<{ urlPublica: string }>}
+ */
+async function establecerUrlExterna({ urlExterna, valorAnterior }) {
+  if (!esUrlImagenExternaValida(urlExterna)) {
+    throw new HttpError(400, 'La URL debe ser https, pública, y no puede apuntar a un host interno/privado.');
+  }
+  await rmArchivoAnterior(valorAnterior);
+  return { urlPublica: urlExterna.trim() };
+}
+
+module.exports = { multerImagen, procesarSubidaImagen, rmArchivoAnterior, establecerUrlExterna, PUBLIC_DIR };

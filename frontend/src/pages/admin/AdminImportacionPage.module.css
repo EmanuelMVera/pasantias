@@ -1,0 +1,89 @@
+.subtitle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+
+.card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--radius, 10px);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.card h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+.hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.hint code {
+  background: var(--surface-alt, #f1f5f9);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.82rem;
+}
+
+.fileRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.resumenGrid {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+
+.resumenItem {
+  font-size: 0.9rem;
+}
+
+.resumenItem.ok strong {
+  color: var(--success, #27ae60);
+}
+
+.resumenItem.err strong {
+  color: var(--danger, #e74c3c);
+}
+
+.tableWrap {
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.errCell {
+  color: var(--danger, #e74c3c);
+  font-size: 0.85rem;
+}
+
+.acciones {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.devTokensBox {
+  background: var(--warning-bg, #fff7ed);
+  border: 1px solid var(--warning, #e67e22);
+  border-radius: var(--radius, 8px);
+  padding: 1rem;
+  margin: 1rem 0;
+  font-size: 0.85rem;
+}
+
+.devTokensBox ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}

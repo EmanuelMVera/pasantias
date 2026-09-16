@@ -39,6 +39,7 @@ Empresa.belongsTo(Usuario, { foreignKey: 'usuarioId', as: 'usuario' });
 // ── Asociaciones — Oferta ─────────────────────────────────────────────────────
 Empresa.hasMany(Oferta, { foreignKey: 'empresaId', as: 'ofertas', onDelete: 'CASCADE' });
 Oferta.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
+Oferta.belongsTo(Usuario, { foreignKey: 'creadaPorUsuarioId', as: 'creadaPor' }); // migración 013
 
 // ── Asociaciones — Postulacion ────────────────────────────────────────────────
 Usuario.hasMany(Postulacion, { foreignKey: 'usuarioId', as: 'postulaciones', onDelete: 'CASCADE' });

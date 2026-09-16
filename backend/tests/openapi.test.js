@@ -26,6 +26,7 @@ const MOUNTS = {
   '/api/notificaciones': require('../src/routes/notificacion.routes'),
   '/api/solicitudes-empresa': require('../src/routes/solicitudEmpresa.routes'),
   '/api/archivos': require('../src/routes/archivo.routes'),
+  '/api/demo': require('../src/routes/demo.routes'),
 };
 
 // Endpoints reales que a propósito NO se documentan.

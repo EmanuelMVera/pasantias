@@ -4,7 +4,7 @@
 // misma combinación método + path.
 const files = [
   'auth', 'usuarios', 'alumno', 'empresas', 'ofertas', 'postulaciones',
-  'solicitudes', 'chat', 'notificaciones', 'admin', 'archivos',
+  'solicitudes', 'chat', 'notificaciones', 'admin', 'archivos', 'demo',
 ];
 
 const paths = {};

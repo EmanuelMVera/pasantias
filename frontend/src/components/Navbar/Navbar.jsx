@@ -13,6 +13,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useEmpresa } from '../../hooks/useEmpresa';
 import { notificacionService, mensajeService } from '../../services/api';
 import Avatar from '../Avatar/Avatar';
 import styles from './Navbar.module.css';
@@ -21,6 +22,9 @@ export default function Navbar() {
   const { usuario, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  // Gratis para usuarios no-empresa: EmpresaContext corta su fetch antes de
+  // pedir nada si `usuario.rol !== 'empresa'` — no duplica requests.
+  const { empresa, esAdminEmpresa, esReclutador } = useEmpresa();
 
   const [noLeidas, setNoLeidas] = useState(0);
   const [prioridadAlta, setPrioridadAlta] = useState(false);
@@ -115,6 +119,7 @@ export default function Navbar() {
     { to: '/admin/solicitudes', label: '📋 Solicitudes' },
     { to: '/admin/ofertas', label: '📣 Ofertas' },
     { to: '/admin/usuarios', label: '👥 Usuarios' },
+    { to: '/admin/importaciones', label: '📥 Importar' },
     { to: '/admin/logs', label: 'Historial de Accesos' },
   ];
 
@@ -129,6 +134,21 @@ export default function Navbar() {
   };
 
   const links = getLinks();
+
+  /* ── Identidad mostrada en el avatar/dropdown ────────────────────────── *
+   * admin_empresa se muestra representando a la EMPRESA (logo + razón
+   * social) — su responsabilidad es la cuenta corporativa. El reclutador se
+   * muestra como PERSONA (foto/nombre personal) — es un operativo del
+   * equipo, no "la empresa". El backend sigue siendo la única autoridad de
+   * permisos; esto es puramente identidad visual (EmpresaContext ya lo
+   * documenta así). */
+  const esVistaEmpresaAdmin = usuario.rol === 'empresa' && esAdminEmpresa;
+  const esVistaReclutador = usuario.rol === 'empresa' && esReclutador;
+
+  const avatarSrc = esVistaEmpresaAdmin ? (empresa?.logo || null) : usuario.fotoPerfil;
+  const avatarNombre = esVistaEmpresaAdmin ? (empresa?.razonSocial || usuario.nombre) : usuario.nombre;
+  const avatarApellido = esVistaEmpresaAdmin ? '' : usuario.apellido;
+  const nombrePrincipal = esVistaEmpresaAdmin ? (empresa?.razonSocial || usuario.nombre) : usuario.nombre;
 
   const esActivo = (to) => {
     if (to === '/') return location.pathname === '/';
@@ -217,30 +237,51 @@ export default function Navbar() {
             aria-haspopup="true"
             aria-expanded={menuOpen}
           >
-            {/* Avatar */}
+            {/* Avatar — logo de empresa para admin_empresa, foto personal para el resto */}
             <Avatar
-              src={usuario.fotoPerfil}
-              nombre={usuario.nombre}
-              apellido={usuario.apellido}
+              src={avatarSrc}
+              nombre={avatarNombre}
+              apellido={avatarApellido}
               size={30}
               style={{ fontSize: '0.82rem', border: '2px solid rgba(255, 255, 255, 0.3)' }}
             />
-            <span className={styles.userName}>{usuario.nombre}</span>
+            <span className={styles.userName}>{nombrePrincipal}</span>
             <span className={styles.arrow}>{menuOpen ? '▴' : '▾'}</span>
 
             {/* Dropdown */}
             {menuOpen && (
               <div className={styles.dropdown}>
-                {/* Nombre completo */}
-                <span className={styles.dropdownName}>
-                  {usuario.nombre} {usuario.apellido}
-                </span>
-                <span className={styles.dropdownInfo}>{usuario.email}</span>
-
-                {/* Badge de rol */}
-                <span className={`${styles.dropdownRole} badge badge-${usuario.rol}`}>
-                  {usuario.rol}
-                </span>
+                {esVistaEmpresaAdmin ? (
+                  <>
+                    <span className={styles.dropdownName}>{empresa?.razonSocial || 'Mi empresa'}</span>
+                    <span className={styles.dropdownInfo}>Responsable: {usuario.nombre} {usuario.apellido}</span>
+                    <span className={styles.dropdownInfo}>{usuario.email}</span>
+                    <span className={`${styles.dropdownRole} badge badge-${usuario.rol}`}>
+                      Administrador de empresa
+                    </span>
+                  </>
+                ) : esVistaReclutador ? (
+                  <>
+                    <span className={styles.dropdownName}>{usuario.nombre} {usuario.apellido}</span>
+                    <span className={styles.dropdownInfo}>{usuario.email}</span>
+                    {empresa?.razonSocial && (
+                      <span className={styles.dropdownInfo}>🏢 {empresa.razonSocial}</span>
+                    )}
+                    <span className={`${styles.dropdownRole} badge badge-${usuario.rol}`}>
+                      Reclutador
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className={styles.dropdownName}>
+                      {usuario.nombre} {usuario.apellido}
+                    </span>
+                    <span className={styles.dropdownInfo}>{usuario.email}</span>
+                    <span className={`${styles.dropdownRole} badge badge-${usuario.rol}`}>
+                      {usuario.rol}
+                    </span>
+                  </>
+                )}
 
                 {/* Datos adicionales */}
                 {usuario.telefono && (

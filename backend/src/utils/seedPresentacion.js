@@ -1,24 +1,38 @@
 /**
  * seedPresentacion.js — Escenario de demo para la presentación del sistema.
  *
- * Crea 4 usuarios con credenciales fáciles de recordar y los "llena" con un
- * escenario coherente y navegable de punta a punta:
+ * Crea EXACTAMENTE 3 usuarios con credenciales fáciles de recordar y los
+ * "llena" con un escenario coherente y navegable de punta a punta:
  *
- *   sistema@demo.com     → Administrador del sistema (rol admin)
  *   empresa@demo.com     → Administrador de empresa (rol empresa / admin_empresa)
  *   reclutador@demo.com  → Reclutador de esa misma empresa (rol empresa / reclutador)
  *   alumno@demo.com      → Alumno con perfil completo (rol alumno)
  *
- * Además siembra: 1 empresa aprobada + logo, 7 ofertas en todos los estados
- * (activa/moderada, activa sin moderar, pausada, cerrada, rechazada), CV del
- * alumno como Archivo, ~14 postulaciones (4 del alumno demo con historial de
- * estados completo + un pool de candidatos reales para el reclutador),
- * conversaciones de chat entre todos los roles, notificaciones de todos los
- * tipos, solicitudes de reclutador y de empresa pendientes, y registros de
- * auditoría (activity_logs).
+ * Deliberadamente NO crea ningún usuario con rol admin: el administrador real
+ * del sistema se crea únicamente con `npm run db:seed:admin`, nunca usa la
+ * contraseña demo, y no participa de este escenario (ni chats, ni
+ * notificaciones, ni auditoría, ni como aprobador de la empresa/ofertas
+ * demo — esos campos de auditoría quedan en NULL, mismo criterio que
+ * `Empresa.aprobadaPorUsuarioId` ya nullable).
+ *
+ * Tampoco crea archivos ficticios: no hay fila `Archivo` para CV ni logo (los
+ * bytes no existirían en Render/R2 real). El logo de la empresa demo es una
+ * URL https externa estable (ver LOGO_EMPRESA_URL); el alumno demo queda sin
+ * CV cargado (el perfil lo indica explícitamente en la UI).
+ *
+ * Además siembra: 1 empresa aprobada + logo por URL externa, 7 ofertas en
+ * todos los estados (activa/moderada, activa sin moderar, pausada, cerrada,
+ * rechazada), postulaciones (4 del alumno demo con historial de estados
+ * completo + un pool de candidatos reales para el reclutador), conversaciones
+ * de chat entre los 3 roles, notificaciones de todos los tipos, solicitudes
+ * de reclutador y de empresa pendientes, y registros de auditoría
+ * (activity_logs).
  *
  * Es IDEMPOTENTE: cada corrida borra su propio escenario anterior (por email /
  * razón social) y lo vuelve a crear. No toca el resto de los datos demo.
+ * Además, antes de sembrar, limpia de forma segura una eventual cuenta legacy
+ * `sistema@demo.com` (rol admin) dejada por una versión anterior de este
+ * seed — nunca toca ningún otro admin real (ver limpiarLegacySistemaDemo).
  *
  * Uso:
  *   npm run db:seed:presentacion      (desde backend/)
@@ -29,7 +43,9 @@
  * está activo por defecto solo en desarrollo (NODE_ENV=development) y se puede
  * forzar/desactivar con la variable SEED_PRESENTACION_ON_BOOT=true|false.
  *
- * Exporta: escenarioExiste(), ejecutarSeedPresentacion({ verbose }), seedPresentacionSiFalta(logger)
+ * Exporta: escenarioExiste(), ejecutarSeedPresentacion({ verbose }), seedPresentacionSiFalta(logger),
+ *          EMP_ADMIN, RECLUTA, ALUMNO (única fuente de verdad de los emails demo — la consume
+ *          también GET /api/demo/status, ver controllers/demo.controller.js).
  */
 
 'use strict';
@@ -60,9 +76,13 @@ const {
 
 // ── Constantes del escenario ────────────────────────────────────────────────
 
-const PASSWORD = 'Demo1234!';
+const PASSWORD = 'Demo1234!'; // solo para las 3 cuentas demo — el admin real nunca la usa
 
-const ADMIN     = { email: 'sistema@demo.com',    nombre: 'Sofía',    apellido: 'Administradora' };
+// Residuo de una versión anterior de este seed (creaba un 4º usuario, admin
+// demo público). Se usa SOLO para limpiarlo si quedó de una corrida vieja —
+// nunca se vuelve a crear (ver limpiarLegacySistemaDemo).
+const LEGACY_ADMIN_EMAIL = 'sistema@demo.com';
+
 const EMP_ADMIN = { email: 'empresa@demo.com',    nombre: 'Carolina', apellido: 'Méndez' };
 const RECLUTA   = { email: 'reclutador@demo.com', nombre: 'Diego',    apellido: 'Herrera' };
 const ALUMNO    = { email: 'alumno@demo.com',     nombre: 'Martín',   apellido: 'Gómez' };
@@ -71,7 +91,13 @@ const RAZON_SOCIAL = 'Delta Innovación IT';
 const EMPRESA_CUIT = '30712345689';
 const SOLICITUD_EMPRESA_EMAIL = 'registro@nubecode.demo';
 
-const OUR_EMAILS = [ADMIN.email, EMP_ADMIN.email, RECLUTA.email, ALUMNO.email];
+// URL https externa estable para el logo de la empresa demo — nunca un
+// objeto R2 ni una fila Archivo (sección 5 del pedido: sin almacenar
+// recursos demo en el storage real). ui-avatars.com genera un logo simple a
+// partir del nombre, sin depender de un servicio de fotos de stock.
+const LOGO_EMPRESA_URL = 'https://ui-avatars.com/api/?name=Delta+Innovacion&background=1e3a5f&color=fff&size=150&bold=true&format=png';
+
+const OUR_EMAILS = [EMP_ADMIN.email, RECLUTA.email, ALUMNO.email];
 
 // Log de progreso: ruidoso cuando se corre como script (`npm run db:seed:presentacion`),
 // silencioso cuando lo invoca el arranque del servidor (ver seedPresentacionSiFalta).
@@ -88,9 +114,46 @@ function daysAgo(days, hour = 10) {
   return d;
 }
 
+// ── Limpieza de la cuenta legacy "sistema@demo.com" ─────────────────────────
+
+/**
+ * Limpia de forma segura una cuenta `sistema@demo.com` (rol admin) dejada por
+ * una versión anterior de este seed. El índice único `usuarios_email_lower_unique`
+ * (migración 001) garantiza que ese email es global en toda la tabla
+ * `usuarios` — el match por email exacto ya es inequívoco. Exigir además
+ * `rol:'admin'` es una defensa adicional: si alguna vez existiera una fila
+ * con ese email pero otro rol, esta función no la toca. Nunca borra ningún
+ * otro admin — el filtro siempre es por ese email exacto.
+ */
+async function limpiarLegacySistemaDemo(transaction) {
+  const legacy = await Usuario.findOne({
+    where: { email: LEGACY_ADMIN_EMAIL, rol: 'admin' },
+    paranoid: false, // por si una corrida vieja lo dejó soft-deleted
+    transaction,
+  });
+  if (!legacy) return;
+
+  say(`ℹ️  Encontrada cuenta legacy "${LEGACY_ADMIN_EMAIL}" (id=${legacy.id}) de una versión anterior del seed. Limpiando...`);
+
+  await Mensaje.destroy({ where: { [Op.or]: [{ emisorId: legacy.id }, { receptorId: legacy.id }] }, transaction });
+  await Notificacion.destroy({ where: { usuarioId: legacy.id }, transaction });
+  await ActivityLog.destroy({ where: { usuarioId: legacy.id }, transaction });
+
+  // Defensivo/explícito: Empresa.aprobadaPorUsuarioId ya es ON DELETE SET NULL
+  // (migración 008) y Oferta.creadaPorUsuarioId también (migración 013), así
+  // que el destroy de abajo ya lo haría solo — esto documenta la intención y
+  // no depende de que esa regla de FK no cambie en el futuro.
+  await Empresa.update({ aprobadaPorUsuarioId: null }, { where: { aprobadaPorUsuarioId: legacy.id }, transaction });
+  await Oferta.update({ creadaPorUsuarioId: null }, { where: { creadaPorUsuarioId: legacy.id }, transaction });
+
+  await Usuario.destroy({ where: { id: legacy.id }, transaction, force: true });
+  say(`✅ Cuenta legacy "${LEGACY_ADMIN_EMAIL}" eliminada.`);
+}
+
 // ── Limpieza del escenario anterior ─────────────────────────────────────────
 
 async function limpiar(transaction) {
+  await limpiarLegacySistemaDemo(transaction);
   say('ℹ️  Limpiando escenario de presentación anterior (si existe)...');
 
   const users = await Usuario.findAll({
@@ -162,19 +225,6 @@ async function sembrar(transaction) {
   // 1. USUARIOS ─────────────────────────────────────────────────────────────
   say('🚀 Creando usuarios...');
 
-  const admin = await Usuario.create({
-    ...base,
-    rol: 'admin',
-    nombre: ADMIN.nombre,
-    apellido: ADMIN.apellido,
-    email: ADMIN.email,
-    telefono: '11-4000-1000',
-    ubicacion: 'Avellaneda, Buenos Aires',
-    fotoPerfil: 'https://i.pravatar.cc/150?img=47',
-    ultimoAcceso: daysAgo(0, 9),
-    createdAt: daysAgo(120),
-  }, { transaction });
-
   const empAdmin = await Usuario.create({
     ...base,
     rol: 'empresa',
@@ -214,31 +264,6 @@ async function sembrar(transaction) {
     createdAt: daysAgo(60),
   }, { transaction });
 
-  // 2. ARCHIVOS (CV del alumno + logo de la empresa) ────────────────────────
-  say('🚀 Creando archivos (CV / logo)...');
-
-  const cvArchivo = await Archivo.create({
-    usuarioPropietarioId: alumno.id,
-    tipo: 'cv',
-    nombreOriginal: 'CV - Martin Gomez.pdf',
-    claveAlmacenamiento: 'uploads/private/cv/demo-alumno-martin-gomez.pdf',
-    mimeType: 'application/pdf',
-    tamanioBytes: 184320,
-    backend: 'local',
-    createdAt: daysAgo(20),
-  }, { transaction });
-
-  const logoArchivo = await Archivo.create({
-    usuarioPropietarioId: empAdmin.id,
-    tipo: 'logo_empresa',
-    nombreOriginal: 'delta-innovacion-logo.png',
-    claveAlmacenamiento: 'uploads/public/logo-delta-innovacion.png',
-    mimeType: 'image/png',
-    tamanioBytes: 40960,
-    backend: 'local',
-    createdAt: daysAgo(45),
-  }, { transaction });
-
   // 3. PERFIL DEL ALUMNO ────────────────────────────────────────────────────
   say('🚀 Creando perfil del alumno...');
 
@@ -257,8 +282,9 @@ async function sembrar(transaction) {
     linkedin: 'https://linkedin.com/in/martin-gomez-dev',
     github: 'https://github.com/martingomez-dev',
     portfolio: 'https://martingomez.dev',
-    cvPath: cvArchivo.claveAlmacenamiento,
-    cvArchivoId: cvArchivo.id,
+    // Sin CV ficticio: cvPath/cvArchivoId quedan null. El perfil muestra un
+    // aviso genérico de CV faltante (frontend/src/pages/alumno/PerfilPage.jsx),
+    // igual que para cualquier usuario real sin CV cargado.
     fotoPerfil: 'https://i.pravatar.cc/150?img=12',
     areaInteres: 'Desarrollo Web',
     disponibilidad: 'inmediata',
@@ -295,9 +321,12 @@ async function sembrar(transaction) {
     telefono: '11-4555-2200',
     direccion: 'Av. Mitre 750, piso 3',
     ciudad: 'Avellaneda',
-    logo: logoArchivo.claveAlmacenamiento,
+    // Logo por URL https externa (sección 5 del pedido): no crea objeto R2 ni
+    // fila Archivo. `aprobadaPorUsuarioId` queda null: el escenario demo es
+    // independiente del admin real (nunca expone quién aprobó realmente).
+    logo: LOGO_EMPRESA_URL,
     estadoAprobacion: 'aprobada',
-    aprobadaPorUsuarioId: admin.id,
+    aprobadaPorUsuarioId: null,
     aprobadaEn: daysAgo(44, 11),
     createdAt: daysAgo(45),
   }, { transaction });
@@ -530,7 +559,6 @@ async function sembrar(transaction) {
     oferta: ofertas.frontend,
     estado: 'entrevista',
     diasBase: 12,
-    cvId: cvArchivo.id,
     cartaPresentacion:
       'Hola, me interesa mucho esta pasantía. Vengo trabajando con React en mis proyectos ' +
       '(gestor de turnos, clon de Trello) y me gustaría crecer en un equipo con code review y mentoría. ' +
@@ -544,7 +572,6 @@ async function sembrar(transaction) {
     oferta: ofertas.backend,
     estado: 'en_revision',
     diasBase: 5,
-    cvId: cvArchivo.id,
     cartaPresentacion:
       'Me postulo a la pasantía de backend. Hice una API REST con Node, Express y PostgreSQL para mi ' +
       'proyecto final, con autenticación JWT y tests. Quiero profundizar en buenas prácticas de backend.',
@@ -556,7 +583,6 @@ async function sembrar(transaction) {
     oferta: ofertas.qa,
     estado: 'contratado',
     diasBase: 20,
-    cvId: cvArchivo.id,
     cartaPresentacion:
       'Me interesa iniciarme en QA. Soy detallista y ya programo, así que la parte de automatización ' +
       'con Playwright me entusiasma. Disponibilidad inmediata.',
@@ -707,14 +733,7 @@ async function sembrar(transaction) {
     { de: empAdmin, a: reclutador, texto: 'Perfecto. También llegó una solicitud de Lucía Ferrari para sumarse como reclutadora, la reviso yo.', dias: 5, hora: 18, leido: false },
   ]);
 
-  // 8d. Admin del sistema ↔ Admin empresa — soporte / moderación
-  await conversacion([
-    { de: empAdmin, a: admin, texto: 'Hola, buenas. Publicamos una oferta de "Pasante en Análisis de Datos" y sigue como pendiente. ¿La pueden revisar? Gracias.', dias: 2, hora: 9 },
-    { de: admin, a: empAdmin, texto: 'Hola Carolina. Sí, la tengo en la cola de moderación. La reviso hoy y te confirmo. La de Ciberseguridad la rechacé porque el detalle de tareas era muy escueto; pueden volver a cargarla con más información.', dias: 2, hora: 10 },
-    { de: empAdmin, a: admin, texto: 'Entendido, la rehacemos con más detalle. ¡Gracias por la rapidez!', dias: 1, hora: 12, leido: false },
-  ]);
-
-  // 8e. Reclutador ↔ candidato del pool — mensaje corto
+  // 8d. Reclutador ↔ candidato del pool — mensaje corto
   if (poolAlumnos[0]) {
     await conversacion([
       { de: reclutador, a: poolAlumnos[0], texto: `Hola ${poolAlumnos[0].nombre}, gracias por postularte a Frontend. Quedaste preseleccionado/a, en los próximos días te contactamos para coordinar una entrevista.`, dias: 5, hora: 11 },
@@ -759,11 +778,6 @@ async function sembrar(transaction) {
   await notif({ usuarioId: reclutador.id, tipo: 'oferta', titulo: 'Tu oferta está pendiente de moderación', mensaje: '"Pasante en Análisis de Datos" fue enviada y espera la aprobación del administrador del sistema.', accionURL: '/empresa', createdAt: daysAgo(2, 10) });
   await notif({ usuarioId: reclutador.id, tipo: 'chat', titulo: 'Nuevo mensaje de Martín Gómez', mensaje: 'Confirmó la entrevista técnica del jueves.', accionURL: '/chat', createdAt: daysAgo(7, 18) });
 
-  // 9d. Admin del sistema
-  await notif({ usuarioId: admin.id, tipo: 'sistema', titulo: 'Nueva solicitud de registro de empresa', mensaje: 'NubeCode SRL solicitó registrarse en la plataforma. Revisá la solicitud para aprobarla o rechazarla.', tipoVisual: 'warning', prioridad: 'alta', accionURL: '/admin/solicitudes', createdAt: daysAgo(1, 16) });
-  await notif({ usuarioId: admin.id, tipo: 'oferta', titulo: 'Oferta pendiente de moderación', mensaje: 'Delta Innovación IT publicó "Pasante en Análisis de Datos". Requiere revisión antes de ser visible.', tipoVisual: 'warning', prioridad: 'alta', accionURL: '/admin/ofertas', createdAt: daysAgo(2, 9) });
-  await notif({ usuarioId: admin.id, tipo: 'sistema', titulo: 'Resumen de actividad', mensaje: 'En los últimos 7 días: 14 nuevas postulaciones, 2 ofertas publicadas y 1 empresa pendiente de aprobación.', prioridad: 'baja', accionURL: '/admin', leida: true, createdAt: daysAgo(1, 8) });
-
   // 10. ACTIVITY LOGS (auditoría) ──────────────────────────────────────────
   say('🚀 Creando registros de auditoría...');
 
@@ -771,19 +785,11 @@ async function sembrar(transaction) {
     await ActivityLog.create({ ip: '190.220.14.7', ...data, createdAt: data.createdAt || daysAgo(1) }, { transaction });
   }
 
-  await log({ usuarioId: admin.id, accion: 'login', entidad: 'usuario', entidadId: admin.id, detalle: { rol: 'admin' }, createdAt: daysAgo(45, 8) });
-  await log({ usuarioId: admin.id, accion: 'aprobar_empresa', entidad: 'empresa', entidadId: empresa.id, detalle: { razonSocial: RAZON_SOCIAL, cuit: EMPRESA_CUIT }, createdAt: daysAgo(44, 11) });
-  await log({ usuarioId: admin.id, accion: 'crear_usuario', entidad: 'usuario', entidadId: empAdmin.id, detalle: { rol: 'empresa', motivo: 'Alta admin_empresa al aprobar la empresa' }, createdAt: daysAgo(44, 11) });
-  await log({ usuarioId: admin.id, accion: 'aprobar_solicitud_reclutador', entidad: 'usuario', entidadId: reclutador.id, detalle: { empresaId: empresa.id, email: RECLUTA.email }, createdAt: daysAgo(30, 10) });
   await log({ usuarioId: reclutador.id, accion: 'login', entidad: 'usuario', entidadId: reclutador.id, createdAt: daysAgo(30, 10) });
   await log({ usuarioId: reclutador.id, accion: 'crear_oferta', entidad: 'oferta', entidadId: ofertas.frontend.id, detalle: { titulo: ofertas.frontend.titulo }, createdAt: daysAgo(25, 9) });
-  await log({ usuarioId: admin.id, accion: 'aprobar_oferta', entidad: 'oferta', entidadId: ofertas.frontend.id, detalle: { titulo: ofertas.frontend.titulo }, createdAt: daysAgo(24, 13) });
   await log({ usuarioId: reclutador.id, accion: 'crear_oferta', entidad: 'oferta', entidadId: ofertas.qa.id, detalle: { titulo: ofertas.qa.titulo }, createdAt: daysAgo(22, 9) });
-  await log({ usuarioId: admin.id, accion: 'aprobar_oferta', entidad: 'oferta', entidadId: ofertas.qa.id, createdAt: daysAgo(22, 12) });
   await log({ usuarioId: reclutador.id, accion: 'crear_oferta', entidad: 'oferta', entidadId: ofertas.backend.id, detalle: { titulo: ofertas.backend.titulo }, createdAt: daysAgo(18, 9) });
-  await log({ usuarioId: admin.id, accion: 'aprobar_oferta', entidad: 'oferta', entidadId: ofertas.backend.id, createdAt: daysAgo(18, 12) });
   await log({ usuarioId: reclutador.id, accion: 'crear_oferta', entidad: 'oferta', entidadId: ofertas.ciber.id, detalle: { titulo: ofertas.ciber.titulo }, createdAt: daysAgo(6, 9) });
-  await log({ usuarioId: admin.id, accion: 'rechazar_oferta', entidad: 'oferta', entidadId: ofertas.ciber.id, detalle: { motivo: 'Detalle de tareas insuficiente' }, createdAt: daysAgo(5, 16) });
   await log({ usuarioId: reclutador.id, accion: 'crear_oferta', entidad: 'oferta', entidadId: ofertas.datos.id, detalle: { titulo: ofertas.datos.titulo }, createdAt: daysAgo(2, 10) });
   await log({ usuarioId: alumno.id, accion: 'login', entidad: 'usuario', entidadId: alumno.id, detalle: { rol: 'alumno' }, createdAt: daysAgo(20, 20) });
   await log({ usuarioId: alumno.id, accion: 'postular', entidad: 'oferta', entidadId: ofertas.qa.id, detalle: { titulo: ofertas.qa.titulo }, createdAt: daysAgo(20, 11) });
@@ -794,21 +800,22 @@ async function sembrar(transaction) {
   await log({ usuarioId: empAdmin.id, accion: 'login', entidad: 'usuario', entidadId: empAdmin.id, detalle: { rol: 'empresa' }, createdAt: daysAgo(1, 17) });
   await log({ usuarioId: empAdmin.id, accion: 'cerrar_oferta', entidad: 'oferta', entidadId: ofertas.ux.id, detalle: { titulo: ofertas.ux.titulo, motivo: 'Vacante cubierta' }, createdAt: daysAgo(20, 15) });
 
-  return { admin, empAdmin, reclutador, alumno, empresa, ofertas };
+  return { empAdmin, reclutador, alumno, empresa, ofertas };
 }
 
 // ── API pública ─────────────────────────────────────────────────────────────
 
 /**
  * ¿Ya está cargado el escenario de presentación?
- * Se considera presente si existen el admin del sistema y la empresa demo.
+ * Se considera presente si existen el admin_empresa demo y la empresa demo
+ * (nunca depende de un admin — el escenario es independiente del admin real).
  */
 async function escenarioExiste() {
-  const [admin, empresa] = await Promise.all([
-    Usuario.findOne({ where: { email: ADMIN.email }, attributes: ['id'], paranoid: false }),
+  const [empAdmin, empresa] = await Promise.all([
+    Usuario.findOne({ where: { email: EMP_ADMIN.email }, attributes: ['id'], paranoid: false }),
     Empresa.findOne({ where: { razonSocial: RAZON_SOCIAL }, attributes: ['id'], paranoid: false }),
   ]);
-  return Boolean(admin && empresa);
+  return Boolean(empAdmin && empresa);
 }
 
 /**
@@ -833,7 +840,6 @@ async function ejecutarSeedPresentacion({ verbose = false } = {}) {
     return {
       password: PASSWORD,
       cuentas: [
-        { rol: 'Admin del sistema', email: ADMIN.email },
         { rol: 'Admin de empresa', email: EMP_ADMIN.email },
         { rol: 'Reclutador', email: RECLUTA.email },
         { rol: 'Alumno', email: ALUMNO.email },
@@ -880,7 +886,16 @@ async function seedPresentacionSiFalta(logger = console) {
   }
 }
 
-module.exports = { escenarioExiste, ejecutarSeedPresentacion, seedPresentacionSiFalta };
+module.exports = {
+  escenarioExiste,
+  ejecutarSeedPresentacion,
+  seedPresentacionSiFalta,
+  // Única fuente de verdad de las cuentas demo — la consume también
+  // GET /api/demo/status (controllers/demo.controller.js) sin duplicar la lista.
+  EMP_ADMIN,
+  RECLUTA,
+  ALUMNO,
+};
 
 // ── CLI: node src/utils/seedPresentacion.js ─────────────────────────────────
 
@@ -898,20 +913,21 @@ if (require.main === module) {
       const passMostrada = config.isProd ? '(ver docs/DEPLOYMENT.md)' : r.password;
 
       console.log('\n✨ Escenario de presentación creado ✨\n');
-      console.log('  Credenciales (contraseña para los 4: ' + passMostrada + ')');
+      console.log('  Credenciales (contraseña para las 3: ' + passMostrada + ')');
       console.log('  ┌─────────────────────────────────────────────────────────────');
-      console.log(`  │ Admin del sistema     ${ADMIN.email}`);
       console.log(`  │ Admin de empresa      ${EMP_ADMIN.email}   (${RAZON_SOCIAL})`);
       console.log(`  │ Reclutador            ${RECLUTA.email}`);
       console.log(`  │ Alumno                ${ALUMNO.email}`);
       console.log('  └─────────────────────────────────────────────────────────────');
+      console.log('  (El administrador real del sistema NO forma parte de este escenario —');
+      console.log('   se crea únicamente con `npm run db:seed:admin`, ver docs/DEPLOYMENT.md.)');
       console.log(`  Empresa:        ${r.empresa} (aprobada) — CUIT ${EMPRESA_CUIT}`);
       console.log(`  Ofertas:        ${r.ofertas} (activa/moderada, activa sin moderar, pausada, cerrada, rechazada)`);
       console.log(`  Postulaciones:  ${r.postulaciones} (4 del alumno demo con historial completo)`);
-      console.log(`  Chats:          5 conversaciones (20 mensajes) entre todos los roles`);
-      console.log(`  Notificaciones: 21 (todos los tipos y prioridades)`);
+      console.log('  Chats:          4 conversaciones (17 mensajes) entre las 3 cuentas demo');
+      console.log('  Notificaciones: 18 (todos los tipos y prioridades)');
       console.log(`  Solicitudes:    1 de reclutador (pendiente) + 1 de empresa (pendiente)`);
-      console.log(`  Auditoría:      22 registros en activity_logs\n`);
+      console.log('  Auditoría:      14 registros en activity_logs\n');
       process.exit(0);
     } catch (err) {
       console.error('❌ Error ejecutando seedPresentacion:', err);

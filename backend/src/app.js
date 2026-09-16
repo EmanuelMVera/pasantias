@@ -154,6 +154,7 @@ app.use('/api/admin',         require('./routes/admin.routes'));        // Panel
 app.use('/api/notificaciones',    require('./routes/notificacion.routes'));     // Notificaciones del sistema
 app.use('/api/solicitudes-empresa', require('./routes/solicitudEmpresa.routes')); // v1.5 — Solicitudes de registro de empresa
 app.use('/api/archivos',      require('./routes/archivo.routes'));       // SEC-01 — CV/cartas privados, autenticado
+app.use('/api/demo',          require('./routes/demo.routes'));          // Estado público del escenario de presentación
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 // Endpoint simple para verificar que el servidor está activo (útil para monitoreo)

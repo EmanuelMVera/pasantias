@@ -1,5 +1,5 @@
 'use strict';
-const { operation, ok, paginated, message, file, REF } = require('../helpers');
+const { operation, ok, paginated, message, okRaw, file, REF } = require('../helpers');
 
 const T = 'admin';
 const ROLES = ['admin'];
@@ -198,5 +198,40 @@ module.exports = {
       description: 'El body no puede faltar por completo (body vacío → 500). `motivo` es opcional.',
       csrf: true, params: ['id'], body: 'MotivoRechazo', errors: ['400', '404', '500'],
       responses: { 200: message() } }),
+  },
+
+  // ── Importación masiva de alumnos/egresados (CSV) ──────────────────────────
+  '/api/admin/importaciones/alumnos/plantilla': {
+    get: adminOp({ id: 'adminImportacionPlantilla', summary: 'Descargar la plantilla CSV de importación',
+      description: 'CSV UTF-8 con BOM. Columnas: legajo,nombre,apellido,email,rol,carrera,anioEgreso,telefono,ubicacion.',
+      responses: { 200: file('text/csv', 'Plantilla con 1 fila de ejemplo alumno y 1 egresado.') } }),
+  },
+  '/api/admin/importaciones/alumnos': {
+    post: adminOp({
+      id: 'adminImportacionAlumnos', summary: 'Importar alumnos/egresados desde CSV',
+      description:
+        'Con `?dryRun=true` solo analiza el archivo (no escribe nada) y devuelve el detalle fila por fila. ' +
+        'Sin ese query param, confirma: crea Usuario+Perfil por cada fila válida dentro de una transacción, ' +
+        'nunca recibe contraseñas (genera un token de activación de un solo uso por usuario y lo envía por ' +
+        'email — reutiliza el mismo flujo que POST /api/auth/reset-password/{token}). `devTokens` solo aparece ' +
+        'fuera de producción y sin SMTP configurado.',
+      csrf: true,
+      query: [{ name: 'dryRun', in: 'query', schema: { type: 'string', enum: ['true'] } }],
+      body: { type: 'object', required: ['archivo'], properties: { archivo: { type: 'string', format: 'binary' } } },
+      bodyContentType: 'multipart/form-data',
+      errors: ['400'],
+      responses: {
+        200: okRaw({
+          dryRun: { type: 'boolean' },
+          totalFilas: { type: 'integer' },
+          validas: { type: 'integer' },
+          invalidas: { type: 'integer' },
+          totalCreados: { type: 'integer', description: 'Solo cuando dryRun no fue true.' },
+          creados: { type: 'array', items: { type: 'object' }, description: 'Solo cuando dryRun no fue true.' },
+          filas: { type: 'array', items: { type: 'object' }, description: 'Detalle por fila (solo en dry-run).' },
+          devTokens: { type: 'array', items: { type: 'object' }, description: 'Solo fuera de producción y sin SMTP configurado.' },
+        }, ['dryRun', 'totalFilas']),
+      },
+    }),
   },
 };

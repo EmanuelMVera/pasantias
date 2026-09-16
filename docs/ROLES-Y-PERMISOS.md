@@ -120,6 +120,7 @@ es autoridad de permisos).
 | Empresas pendientes: listar / aprobar / rechazar | — | ✅ | — | — | — |
 | Ofertas: listar todas / ver pendientes / moderar | — | ✅ | — | — | — |
 | Logs de auditoría: ver / exportar | — | ✅ | — | — | — |
+| Importación masiva de alumnos/egresados por CSV (plantilla, dry-run, confirmar) | — | ✅ | — | — | — |
 
 ### Chat, notificaciones, archivos privados
 

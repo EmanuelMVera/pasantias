@@ -210,6 +210,13 @@ function loadConfig(raw = process.env) {
       allowProductionDemoSeed: raw.ALLOW_PRODUCTION_DEMO_SEED === 'true',
     },
 
+    csvImport: {
+      maxBytes: raw.CSV_IMPORT_MAX_BYTES != null && String(raw.CSV_IMPORT_MAX_BYTES).trim() !== ''
+        ? Number(raw.CSV_IMPORT_MAX_BYTES) : 2 * 1024 * 1024,
+      maxRows: raw.CSV_IMPORT_MAX_ROWS != null && String(raw.CSV_IMPORT_MAX_ROWS).trim() !== ''
+        ? Number(raw.CSV_IMPORT_MAX_ROWS) : 2000,
+    },
+
     warnings,
     // guardado sin normalizar solo para mensajes de error legibles
     _raw: {
@@ -261,6 +268,12 @@ function validateConfig(c) {
   }
   if (c.email.required && !c.email.configured) {
     errors.push('EMAIL_REQUIRED=true pero faltan EMAIL_USER y/o EMAIL_PASS.');
+  }
+  if (!Number.isInteger(c.csvImport.maxBytes) || c.csvImport.maxBytes < 1) {
+    errors.push('CSV_IMPORT_MAX_BYTES debe ser un entero >= 1.');
+  }
+  if (!Number.isInteger(c.csvImport.maxRows) || c.csvImport.maxRows < 1) {
+    errors.push('CSV_IMPORT_MAX_ROWS debe ser un entero >= 1.');
   }
 
   // ALLOWED_ORIGINS: nunca comodín con credentials

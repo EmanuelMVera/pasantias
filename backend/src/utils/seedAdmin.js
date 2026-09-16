@@ -41,6 +41,8 @@ async function seed() {
 
     if (existe) {
       console.log('ℹ️  El usuario administrador ya existe:', adminEmail);
+      console.log('   La contraseña NO fue modificada (este script nunca actualiza una contraseña existente).');
+      console.log('   Para resetearla: usá "Olvidé mi contraseña" en /login (flujo de reset por email).');
     } else {
       const hash = await bcrypt.hash(adminPassword, 12);
       await Usuario.create({

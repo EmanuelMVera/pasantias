@@ -170,7 +170,12 @@ producción real):
 ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:presentacion
 ```
 Sin `ALLOW_PRODUCTION_DEMO_SEED=true`, el script **aborta** si `NODE_ENV=production`.
-Crea usuarios y datos **ficticios** (`*@demo.com` / `Demo1234!`); no borra usuarios reales.
+Crea **exactamente 3** usuarios ficticios — `empresa@demo.com`, `reclutador@demo.com`,
+`alumno@demo.com` (password `Demo1234!`) — más una empresa/ofertas/postulaciones/chats
+coherentes. No borra usuarios reales. **El admin real nunca forma parte de este escenario**:
+no lo crea, no usa `Demo1234!`, no aparece en `LoginPage` ni en `GET /api/demo/status`. Después
+de usarlo una vez, **eliminá `ALLOW_PRODUCTION_DEMO_SEED`** de las variables de entorno del
+servicio — no debe quedar seteada de forma permanente.
 
 ---
 
@@ -220,6 +225,8 @@ Leyenda: **S** = secreta · **R** = requerida en producción · **O** = opcional
 | `ENABLE_API_DOCS` | Render | O | `false` | `true` expone Swagger UI en `/api/docs`. | |
 | `LOG_LEVEL` | Render | O | `info` | `debug` también logea el SQL. | |
 | `NODE_VERSION` | Render | O | `22` | Versión de Node en Render. | |
+| `CSV_IMPORT_MAX_BYTES` | Render | O | `2097152` | Tamaño máx. del CSV de importación de alumnos/egresados (bytes). Default 2 MB. | |
+| `CSV_IMPORT_MAX_ROWS` | Render | O | `2000` | Filas máx. por archivo CSV de importación. | |
 | `VITE_API_URL` | Vercel | R | `/api` | Con el proxy same-origin. Dev: `http://localhost:5000/api`. | |
 
 ---
@@ -231,7 +238,13 @@ cd backend
 
 npm run db:migrate            # aplica las pendientes (Umzug, pg_advisory_lock)
 npm run db:migrate:status     # ejecutadas + pendientes
-npm run db:seed:admin         # crea el admin (idempotente; prod exige SEED_ADMIN_*)
+npm run db:seed:admin         # crea el admin — SOLO si no existe; si el email ya existe,
+                               # NO actualiza la contraseña (correr de nuevo con otra
+                               # SEED_ADMIN_PASSWORD no la cambia). Para resetearla, usá
+                               # "Olvidé mi contraseña" en /login.
+npm run db:admin:status -- --email=admin@tudominio.edu   # diagnóstico de solo lectura:
+                               # existe/no existe, rol, activo, habilitado, deletedAt.
+                               # Nunca muestra el hash. No modifica nada.
 
 # Solo staging/demo — nunca en la producción real:
 ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:presentacion
@@ -252,6 +265,11 @@ Detalle del runner y reglas de migraciones nuevas: `backend/migrations/README.md
   con email `@itbeltran.com.ar` y hace `destroy({ force: true })`).
 - **No** poner `SEED_PRESENTACION_ON_BOOT=true` en producción. Aunque se ponga, el seed
   de demo no corre sin `ALLOW_PRODUCTION_DEMO_SEED=true`.
+- El **admin real nunca forma parte** del seed de presentación — se crea exclusivamente
+  con `db:seed:admin`, nunca usa la contraseña `Demo1234!`, y no aparece en `LoginPage` ni
+  en `GET /api/demo/status` (que solo refleja las 3 cuentas demo, nunca un admin).
+- Después de correr `db:seed:presentacion` en un entorno con `ALLOW_PRODUCTION_DEMO_SEED=true`,
+  **eliminá esa variable** de inmediato — no debe quedar seteada de forma permanente.
 - **No** guardar uploads en el filesystem de Render (efímero) → usar `STORAGE_BACKEND=s3`.
 - **No** poner secretos en variables `VITE_*` (van al bundle público).
 - **No** subir `.env` al repo (está gitignored).
@@ -327,6 +345,11 @@ Después del deploy final, contra la URL de Vercel:
       carga la SPA, no 404.
 - [ ] En Render: **Manual Deploy** (o reiniciar el servicio) → volver a probar login y
       **descargar un CV subido antes** → la DB y los archivos de R2 **persisten**.
+- [ ] `GET /api/demo/status` → `enabled:false` si no se cargó el escenario de presentación
+      (o `true` con exactamente 3 cuentas, ninguna admin, si se cargó a propósito).
+- [ ] Como admin, `GET /admin/importaciones` → descargar plantilla, previsualizar un CSV
+      de prueba (dry-run) y confirmar → el usuario creado recibe el email de activación
+      (o, sin SMTP, aparece en `devTokens` — nunca en producción).
 
 ---
 
@@ -348,3 +371,12 @@ Después del deploy final, contra la URL de Vercel:
   / `EMAIL_FROM`).
 - El backend `s3` se probó contra el AWS SDK **mockeado** (`backend/tests/storage.test.js`),
   no contra un bucket R2 real.
+- **Frontend sin suite de tests automatizada** (solo Playwright E2E, con su propio seed
+  independiente en `e2e/`). Los cambios de UI (Navbar, LoginPage, panel de importación CSV)
+  se verifican manualmente — ver checklist de la sección 10.
+- **Identidad visual del admin_empresa en el Navbar:** mientras `EmpresaContext` resuelve su
+  único fetch por sesión, hay un instante en que se muestran los datos personales del usuario
+  en vez del logo/razón social de la empresa. Imperceptible en la práctica; no tiene skeleton
+  dedicado.
+- **Reporte de errores de la importación CSV** se genera en el cliente a partir del resultado
+  del dry-run ya en memoria (no hay un endpoint dedicado para descargarlo aparte).

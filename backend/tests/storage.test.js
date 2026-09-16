@@ -297,3 +297,41 @@ describe('storage — backend s3 (AWS SDK mockeado)', () => {
     }
   });
 });
+
+// ── esUrlImagenExternaValida — validador de URL externa (foto/logo) ──────────
+// Función pura, sin dependencia de storage/S3 — no necesita el mock de arriba.
+describe('esUrlImagenExternaValida', () => {
+  const { esUrlImagenExternaValida } = require('../src/validators/common.validator');
+
+  test.each([
+    'https://i.pravatar.cc/150?img=5',
+    'https://ui-avatars.com/api/?name=Test',
+    'https://sub.dominio.com.ar/foto.png',
+  ])('%s → válida', (url) => {
+    expect(esUrlImagenExternaValida(url)).toBe(true);
+  });
+
+  test.each([
+    [undefined, 'undefined'],
+    [null, 'null'],
+    [123, 'no-string'],
+    ['', 'vacía'],
+    ['http://ejemplo.com/foto.png', 'http (no https)'],
+    ['ftp://ejemplo.com/foto.png', 'protocolo ftp'],
+    ['data:image/png;base64,aaaa', 'data:'],
+    ['javascript:alert(1)', 'javascript:'],
+    ['file:///etc/passwd', 'file:'],
+    ['https://localhost/foto.png', 'localhost'],
+    ['https://127.0.0.1/foto.png', 'loopback IPv4'],
+    ['https://169.254.169.254/latest/meta-data', 'metadata de nube (link-local)'],
+    ['https://192.168.1.5/foto.png', 'IP privada 192.168.x.x'],
+    ['https://10.0.0.5/foto.png', 'IP privada 10.x.x.x'],
+    ['https://172.16.0.5/foto.png', 'IP privada 172.16-31.x.x'],
+    ['https://user:pass@ejemplo.com/foto.png', 'URL con userinfo embebido'],
+    ['https://noesundominio/foto.png', 'hostname sin punto'],
+    [`https://ejemplo.com/${'a'.repeat(260)}.png`, 'URL de más de 255 caracteres'],
+    ['no-es-una-url', 'string no parseable como URL'],
+  ])('%s (%s) → inválida', (url) => {
+    expect(esUrlImagenExternaValida(url)).toBe(false);
+  });
+});

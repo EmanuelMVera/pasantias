@@ -10,6 +10,7 @@
 const { Usuario, Empresa, Oferta, Postulacion, Notificacion, ActivityLog } = require('../models');
 const { Op } = require('sequelize');
 const { buildPagination } = require('../utils/pagination');
+const { escaparCeldaCsv } = require('../utils/csv');
 
 async function obtenerDashboardGeneral() {
   const [
@@ -123,8 +124,14 @@ async function exportarLogsCSV({ accion, usuarioId, entidad, desde, hasta }) {
     const u = l.usuario;
     const nombreUsuario = u ? `${u.nombre} ${u.apellido}` : 'Sistema';
     const email = u ? u.email : '';
-    const detalle = l.detalle ? JSON.stringify(l.detalle).replace(/"/g, '""') : '';
-    return [l.id, new Date(l.createdAt).toISOString(), l.accion, l.entidad || '', l.entidadId || '', nombreUsuario, email, l.ip || '', `"${detalle}"`].join(',');
+    const detalle = l.detalle ? JSON.stringify(l.detalle) : '';
+    // Cada celda pasa por escaparCeldaCsv: nombre/email/entidad pueden venir
+    // de datos controlados por el usuario (ej. alguien se registró con un
+    // nombre que empieza con "=") — sin esto, abrir el CSV en Excel/Sheets
+    // podría ejecutar una fórmula (CSV injection).
+    return [l.id, new Date(l.createdAt).toISOString(), l.accion, l.entidad || '', l.entidadId || '', nombreUsuario, email, l.ip || '', detalle]
+      .map(escaparCeldaCsv)
+      .join(',');
   });
 
   return header + rows.join('\n');

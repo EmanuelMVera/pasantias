@@ -505,7 +505,7 @@ export default function PerfilPage() {
       {/* ── 5. Currículum Vitae ────────────────────────────────────────── */}
       <div className="cv-section">
         <h2>Currículum Vitae</h2>
-        {perfil?.cvArchivoId && (
+        {perfil?.cvArchivoId ? (
           <p>
             CV actual:{' '}
             <button
@@ -515,6 +515,10 @@ export default function PerfilPage() {
             >
               📄 Ver CV actual
             </button>
+          </p>
+        ) : (
+          <p className={styles.cvAviso}>
+            ⚠️ No cargaste tu CV todavía. Las empresas no van a poder verlo hasta que subas uno.
           </p>
         )}
         <div className={styles.cvUpload}>

@@ -75,6 +75,10 @@
     {
       "name": "archivos",
       "description": "Descarga autenticada de archivos privados"
+    },
+    {
+      "name": "demo",
+      "description": "Estado público del escenario de presentación"
     }
   ],
   "externalDocs": {
@@ -940,6 +944,9 @@
               "vistas": {
                 "type": "integer"
               },
+              "creadaPorUsuarioId": {
+                "type": "integer"
+              },
               "createdAt": {
                 "type": "string",
                 "format": "date-time"
@@ -1079,6 +1086,9 @@
           "fechaLimite": {
             "type": "string",
             "format": "date-time"
+          },
+          "creadaPorUsuarioId": {
+            "type": "integer"
           }
         }
       },
@@ -1158,6 +1168,9 @@
           "fechaLimite": {
             "type": "string",
             "format": "date-time"
+          },
+          "creadaPorUsuarioId": {
+            "type": "integer"
           }
         }
       },
@@ -6753,6 +6766,162 @@
         }
       }
     },
+    "/api/admin/importaciones/alumnos/plantilla": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminImportacionPlantilla",
+        "summary": "Descargar la plantilla CSV de importación",
+        "responses": {
+          "200": {
+            "description": "Plantilla con 1 fila de ejemplo alumno y 1 egresado.",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "CSV UTF-8 con BOM. Columnas: legajo,nombre,apellido,email,rol,carrera,anioEgreso,telefono,ubicacion.\n\n**Roles:** admin"
+      }
+    },
+    "/api/admin/importaciones/alumnos": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminImportacionAlumnos",
+        "summary": "Importar alumnos/egresados desde CSV",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "dryRun",
+                        "totalFilas"
+                      ],
+                      "properties": {
+                        "dryRun": {
+                          "type": "boolean"
+                        },
+                        "totalFilas": {
+                          "type": "integer"
+                        },
+                        "validas": {
+                          "type": "integer"
+                        },
+                        "invalidas": {
+                          "type": "integer"
+                        },
+                        "totalCreados": {
+                          "type": "integer",
+                          "description": "Solo cuando dryRun no fue true."
+                        },
+                        "creados": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          },
+                          "description": "Solo cuando dryRun no fue true."
+                        },
+                        "filas": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          },
+                          "description": "Detalle por fila (solo en dry-run)."
+                        },
+                        "devTokens": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          },
+                          "description": "Solo fuera de producción y sin SMTP configurado."
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Con `?dryRun=true` solo analiza el archivo (no escribe nada) y devuelve el detalle fila por fila. Sin ese query param, confirma: crea Usuario+Perfil por cada fila válida dentro de una transacción, nunca recibe contraseñas (genera un token de activación de un solo uso por usuario y lo envía por email — reutiliza el mismo flujo que POST /api/auth/reset-password/{token}). `devTokens` solo aparece fuera de producción y sin SMTP configurado.\n\n**Roles:** admin",
+        "parameters": [
+          {
+            "name": "dryRun",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "archivo"
+                ],
+                "properties": {
+                  "archivo": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/archivos/{id}": {
       "get": {
         "tags": [
@@ -6800,6 +6969,66 @@
             }
           }
         ]
+      }
+    },
+    "/api/demo/status": {
+      "get": {
+        "tags": [
+          "demo"
+        ],
+        "operationId": "demoStatus",
+        "summary": "Estado público del escenario de presentación",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "enabled",
+                        "accounts"
+                      ],
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "accounts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "rol": {
+                                "type": "string"
+                              },
+                              "email": {
+                                "type": "string",
+                                "format": "email"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Público, sin autenticación. Refleja el estado real de la base (vía `escenarioExiste()`) — nunca afirma que las cuentas demo existen si el seed de presentación no corrió.",
+        "security": []
       }
     }
   }

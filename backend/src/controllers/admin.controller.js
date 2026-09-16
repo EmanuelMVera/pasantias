@@ -16,6 +16,8 @@ const adminModeracionService = require('../services/adminModeracion.service');
 const { SolicitudEmpresa, SolicitudReclutador, Empresa } = require('../models');
 const solicitudEmpresaService = require('../services/solicitudEmpresa.service');
 const solicitudReclutadorService = require('../services/solicitudReclutador.service');
+const csvImportacionService = require('../services/csvImportacion.service');
+const HttpError = require('../utils/httpError');
 const { parsePagination, buildPagination, groupCount } = require('../utils/pagination');
 
 // ── Dashboard / métricas ──────────────────────────────────────────────────────
@@ -225,4 +227,27 @@ exports.rechazarSolicitudReclutador = async (req, res) => {
     req.body.motivo
   );
   return res.json({ success: true, message: 'Solicitud rechazada. Notificación enviada a la empresa.' });
+};
+
+// ── Importación masiva de alumnos/egresados (CSV) ─────────────────────────────
+
+exports.descargarPlantillaCsvAlumnos = async (req, res) => {
+  const csv = csvImportacionService.generarPlantillaCsv();
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="plantilla-importacion-alumnos.csv"');
+  return res.send(String.fromCharCode(0xFEFF) + csv); // BOM para que Excel lo abra bien
+};
+
+exports.importarAlumnosCsv = async (req, res) => {
+  if (!req.file) throw new HttpError(400, 'No se subió ningún archivo CSV.');
+
+  if (req.query.dryRun === 'true') {
+    const analisis = await csvImportacionService.analizarCsv(req.file.buffer);
+    return res.json({ success: true, dryRun: true, ...analisis });
+  }
+
+  const resumen = await csvImportacionService.confirmarImportacion(req.file.buffer, {
+    actorUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id,
+  });
+  return res.status(201).json({ success: true, dryRun: false, ...resumen });
 };

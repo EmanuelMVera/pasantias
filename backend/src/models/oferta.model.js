@@ -144,6 +144,18 @@ module.exports = (sequelize) => {
     // Contador de vistas de la oferta (se incrementa en cada consulta de detalle)
     vistas: { type: DataTypes.INTEGER, defaultValue: 0 },
 
+    // ── Auditoría ─────────────────────────────────────────────────────────
+
+    // Quién (qué miembro del equipo) creó la oferta — solo atribución/auditoría,
+    // no restringe visibilidad: cualquier miembro de la empresa sigue viendo
+    // todas sus ofertas. Nullable: ofertas históricas anteriores a este campo
+    // (migración 013) quedan en NULL. ON DELETE SET NULL (ver migración).
+    creadaPorUsuarioId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: { model: 'usuarios', key: 'id' },
+    },
+
   }, {
     tableName: 'ofertas', // Nombre exacto de la tabla en PostgreSQL
     timestamps: true,     // Agrega automáticamente createdAt y updatedAt
