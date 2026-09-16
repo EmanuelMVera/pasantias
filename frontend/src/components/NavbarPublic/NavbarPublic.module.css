@@ -105,3 +105,53 @@
   transform: translateY(0);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
+
+/* ── Texto corto del botón "Empresa" — solo visible en mobile ─────────── */
+.btnEmpresaShort {
+  display: none;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────
+   Mismos breakpoints canónicos que Navbar.module.css (640/480px). Sin esto,
+   "🏢 Registrarse como empresa" + "Iniciar Sesión" no entran en una barra de
+   70px de alto en mobile y desbordan el contenedor (nunca hacen wrap: la
+   barra es sticky y de alto fijo). */
+@media (max-width: 640px) {
+  .navbarPublicInner {
+    padding: 0 0.75rem;
+  }
+
+  .navbarPublicActions {
+    gap: 0.4rem;
+  }
+
+  .brandSubtitle {
+    display: none; /* deja solo "SisPasantías", sin el subtítulo */
+  }
+
+  .btnEmpresa,
+  .btnLogin {
+    padding: 0.55rem 0.75rem;
+    font-size: 0.82rem;
+  }
+
+  .btnEmpresaFull {
+    display: none;
+  }
+
+  .btnEmpresaShort {
+    display: inline;
+  }
+}
+
+@media (max-width: 380px) {
+  .brandIcon {
+    font-size: 1.5rem;
+  }
+
+  .btnEmpresa,
+  .btnLogin {
+    padding: 0.5rem 0.6rem;
+    font-size: 0.78rem;
+  }
+}

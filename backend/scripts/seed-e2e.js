@@ -7,7 +7,13 @@
  * migra y siembra un set FIJO y chico de datos, tomando los emails/títulos de
  * `e2e/fixtures.json` para que specs y seed coincidan.
  *
- * Guard: aborta si `DB_NAME` no termina en `_e2e` — nunca toca dev ni prod.
+ * Guards (no se pueden saltear con flags):
+ * - El nombre de la base SIEMPRE termina en `_e2e`. Si `DB_NAME` no lo hace,
+ *   se deriva (`pasantias_db` → `pasantias_db_e2e`) — nunca opera sobre el
+ *   nombre tal cual si no cumple el sufijo.
+ * - Aborta si `DB_HOST` no es localhost/127.0.0.1/::1 (mismo criterio que
+ *   resetDev.js) — el DROP/CREATE DATABASE nunca corre contra un host
+ *   remoto (Neon u otro), sin importar qué nombre tenga la base.
  * Uso: DB_NAME=pasantias_db_e2e node scripts/seed-e2e.js   (o `npm run e2e:seed`)
  */
 
@@ -18,6 +24,13 @@ const { execFileSync } = require('child_process');
 const { Client } = require('pg');
 const fx = require('../../e2e/fixtures.json');
 
+const HOSTS_PERMITIDOS = new Set(['localhost', '127.0.0.1', '::1']);
+const hostE2E = process.env.DB_HOST || 'localhost';
+if (!HOSTS_PERMITIDOS.has(hostE2E)) {
+  console.error(`❌ seed-e2e abortado: DB_HOST="${hostE2E}" no está en la allowlist local (${[...HOSTS_PERMITIDOS].join(', ')}). Este script nunca debe correr contra un host remoto (Neon u otro).`);
+  process.exit(1);
+}
+
 // La base E2E SIEMPRE termina en `_e2e` (nunca dev ni prod). Si DB_NAME no lo
 // hace, se deriva (`pasantias_db` → `pasantias_db_e2e`) y se re-exporta para
 // que el subproceso de migración y el singleton de modelos la usen.
@@ -26,7 +39,7 @@ if (!DB.endsWith('_e2e')) DB = `${DB}_e2e`;
 process.env.DB_NAME = DB;
 
 const conn = {
-  host: process.env.DB_HOST || 'localhost',
+  host: hostE2E,
   port: process.env.DB_PORT || 5432,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,

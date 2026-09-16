@@ -94,4 +94,10 @@ describe('seeds — abortan en producción (subproceso real)', () => {
     expect(r.ok).toBe(false);
     expect(r.stderr + r.stdout).toMatch(/SEED_ADMIN_EMAIL|SEED_ADMIN_PASSWORD/);
   });
+
+  test('scripts/seed-e2e.js → rechaza un DB_HOST remoto (nunca toca Neon u otro host no local)', () => {
+    const r = correr('scripts/seed-e2e.js', { DB_HOST: 'remote-host.example.com' });
+    expect(r.ok).toBe(false);
+    expect(r.stderr + r.stdout).toMatch(/allowlist local/);
+  });
 });

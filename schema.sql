@@ -70,7 +70,8 @@ CREATE TYPE public.enum_activity_logs_accion AS ENUM (
     'aprobar_solicitud_reclutador',
     'rechazar_solicitud_reclutador',
     'sistema',
-    'solicitar_recuperacion_miembro'
+    'solicitar_recuperacion_miembro',
+    'importar_alumnos_csv'
 );
 
 
@@ -464,6 +465,7 @@ CREATE TABLE public.ofertas (
     "createdAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "deletedAt" timestamp with time zone,
+    "creadaPorUsuarioId" integer,
     CONSTRAINT chk_ofertas_estado CHECK (((estado)::text = ANY ((ARRAY['activa'::character varying, 'pausada'::character varying, 'rechazada'::character varying, 'cerrada'::character varying])::text[])))
 );
 
@@ -1137,6 +1139,13 @@ CREATE INDEX idx_ofertas_carreras_gin ON public.ofertas USING gin ("carrerasDest
 
 
 --
+-- Name: idx_ofertas_creada_por; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ofertas_creada_por ON public.ofertas USING btree ("creadaPorUsuarioId") WHERE ("creadaPorUsuarioId" IS NOT NULL);
+
+
+--
 -- Name: idx_ofertas_empresa_estado; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1360,6 +1369,14 @@ ALTER TABLE ONLY public.mensajes
 
 ALTER TABLE ONLY public.notificaciones
     ADD CONSTRAINT "notificaciones_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES public.usuarios(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ofertas ofertas_creadaPorUsuarioId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ofertas
+    ADD CONSTRAINT "ofertas_creadaPorUsuarioId_fkey" FOREIGN KEY ("creadaPorUsuarioId") REFERENCES public.usuarios(id) ON DELETE SET NULL;
 
 
 --

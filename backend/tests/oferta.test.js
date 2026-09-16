@@ -135,6 +135,27 @@ describe('OFERTA', () => {
     expect(misOfertas.body.data.map((o) => o.id)).toContain(ofertaId);
   });
 
+  test('un creadaPorUsuarioId enviado por el cliente en el body se ignora — sale exclusivamente de req.usuario.id', async () => {
+    const { usuarioAdmin: adminA, passwordPlana: passA } = await crearEmpresaConAdmin();
+    idsUsuarios.push(adminA.id);
+    const { usuarioAdmin: adminB } = await crearEmpresaConAdmin(); // ajeno, otra empresa
+    idsUsuarios.push(adminB.id);
+
+    const tokenA = await loginYObtenerToken(adminA.email, passA);
+    const res = await request(app)
+      .post('/api/ofertas')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({
+        titulo: 'Intento de suplantar al creador',
+        descripcion: 'Descripción de prueba.',
+        creadaPorUsuarioId: adminB.id, // intento de asociar a un usuario ajeno
+      });
+
+    expect(res.status).toBe(201);
+    const oferta = await Oferta.findByPk(res.body.data.id, { attributes: ['creadaPorUsuarioId'] });
+    expect(oferta.creadaPorUsuarioId).toBe(adminA.id); // nunca adminB.id
+  });
+
   test('ofertas creadas antes de la migración 013 (sin creadaPorUsuarioId) quedan con NULL', async () => {
     const { usuarioAdmin, empresa } = await crearEmpresaConAdmin();
     idsUsuarios.push(usuarioAdmin.id);

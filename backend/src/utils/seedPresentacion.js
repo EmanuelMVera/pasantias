@@ -11,9 +11,11 @@
  * Deliberadamente NO crea ningún usuario con rol admin: el administrador real
  * del sistema se crea únicamente con `npm run db:seed:admin`, nunca usa la
  * contraseña demo, y no participa de este escenario (ni chats, ni
- * notificaciones, ni auditoría, ni como aprobador de la empresa/ofertas
- * demo — esos campos de auditoría quedan en NULL, mismo criterio que
- * `Empresa.aprobadaPorUsuarioId` ya nullable).
+ * notificaciones, ni auditoría, ni como aprobador de la empresa). `Empresa.
+ * aprobadaPorUsuarioId` queda en NULL (independiente del admin real).
+ * `Oferta.creadaPorUsuarioId` SÍ queda poblado — pero solo con empAdmin o
+ * reclutador, nunca con un admin (ver CREADA_POR más abajo, coherente con la
+ * línea de tiempo y con activity_logs).
  *
  * Tampoco crea archivos ficticios: no hay fila `Archivo` para CV ni logo (los
  * bytes no existirían en Render/R2 real). El logo de la empresa demo es una
@@ -476,9 +478,11 @@ async function sembrar(transaction) {
       moderada: true,
       vistas: 203,
       cantidadVacantes: 1,
-      fechaPublicacion: daysAgo(70),
+      // 43 (no 70): la empresa/admin_empresa existen desde hace 45 días (ver
+      // Empresa.createdAt más arriba) — la oferta no puede ser anterior a eso.
+      fechaPublicacion: daysAgo(43),
       fechaLimite: daysAgo(20),
-      createdAt: daysAgo(70),
+      createdAt: daysAgo(43),
     },
     {
       key: 'ciber',
@@ -501,6 +505,18 @@ async function sembrar(transaction) {
     },
   ];
 
+  // creadaPorUsuarioId coherente con la narrativa (activity_logs más abajo
+  // atribuye "crear_oferta" al reclutador para estas 5) y con la línea de
+  // tiempo: 'soporte' (hace 35 días) y 'ux' (hace 70) son ANTERIORES a que el
+  // reclutador se sumara al equipo (hace 30 días, ver EmpresaUsuario arriba),
+  // así que esas dos solo pueden haberlas creado el admin_empresa.
+  const CREADA_POR = {
+    frontend: 'reclutador', backend: 'reclutador', qa: 'reclutador',
+    datos: 'reclutador', ciber: 'reclutador',
+    soporte: 'empAdmin', ux: 'empAdmin',
+  };
+  const AUTORES = { reclutador, empAdmin };
+
   const ofertas = {};
   for (const def of ofertaDefs) {
     const { key, ...data } = def;
@@ -511,6 +527,7 @@ async function sembrar(transaction) {
       requiereExperiencia: false,
       nivelExperiencia: 'sin_experiencia',
       carrerasDestinatarias: carrerasIT,
+      creadaPorUsuarioId: AUTORES[CREADA_POR[key]].id,
       ...data,
     }, { transaction });
   }
@@ -594,7 +611,7 @@ async function sembrar(transaction) {
     usuario: alumno,
     oferta: ofertas.ux,
     estado: 'rechazado',
-    diasBase: 55,
+    diasBase: 40, // posterior a la publicación de la oferta (hace 43 días)
     cartaPresentacion:
       'Aunque mi foco es desarrollo, tengo interés en UX y manejo básico de Figma. Me gustaría ' +
       'aprender del proceso de diseño de producto.',
@@ -758,7 +775,7 @@ async function sembrar(transaction) {
   await notif({ usuarioId: alumno.id, tipo: 'estado', titulo: 'Avanzaste a Entrevista', mensaje: 'Tu postulación a "Pasante en Desarrollo Frontend (React)" en Delta Innovación IT pasó a estado Entrevista.', tipoVisual: 'success', prioridad: 'alta', accionURL: '/mis-postulaciones', leida: true, createdAt: daysAgo(9, 9) });
   await notif({ usuarioId: alumno.id, tipo: 'chat', titulo: 'Nuevo mensaje de Diego Herrera', mensaje: 'Tenés un mensaje nuevo sobre la coordinación de tu entrevista.', accionURL: '/chat', createdAt: daysAgo(8, 14) });
   await notif({ usuarioId: alumno.id, tipo: 'estado', titulo: '¡Fuiste contratado!', mensaje: 'Felicitaciones: fuiste seleccionado para la pasantía "Trainee en QA y Automatización de Pruebas".', tipoVisual: 'success', prioridad: 'urgente', accionURL: '/mis-postulaciones', createdAt: daysAgo(4, 10) });
-  await notif({ usuarioId: alumno.id, tipo: 'estado', titulo: 'Actualización en tu postulación', mensaje: 'Tu postulación a "Pasante en Diseño UX/UI" fue actualizada a estado Rechazado.', tipoVisual: 'warning', accionURL: '/mis-postulaciones', leida: true, createdAt: daysAgo(53, 12) });
+  await notif({ usuarioId: alumno.id, tipo: 'estado', titulo: 'Actualización en tu postulación', mensaje: 'Tu postulación a "Pasante en Diseño UX/UI" fue actualizada a estado Rechazado.', tipoVisual: 'warning', accionURL: '/mis-postulaciones', leida: true, createdAt: daysAgo(38, 12) });
   await notif({ usuarioId: alumno.id, tipo: 'oferta', titulo: 'Nueva oferta compatible con tu perfil', mensaje: 'Se publicó "Pasante en Desarrollo Backend (Node.js)", compatible con tu área de interés (Desarrollo Web).', accionURL: '/ofertas', createdAt: daysAgo(18, 8) });
   await notif({ usuarioId: alumno.id, tipo: 'sistema', titulo: 'Completá tu perfil', mensaje: 'Los perfiles completos reciben hasta 3× más respuestas de las empresas. Revisá tu CV y tus habilidades.', prioridad: 'baja', accionURL: '/perfil', createdAt: daysAgo(30, 10) });
 
@@ -774,15 +791,18 @@ async function sembrar(transaction) {
   await notif({ usuarioId: reclutador.id, tipo: 'sistema', titulo: 'Te sumaron al equipo', mensaje: 'Ahora sos parte del equipo de Delta Innovación IT como reclutador. Ya podés crear ofertas y gestionar candidatos.', tipoVisual: 'success', accionURL: '/empresa', leida: true, createdAt: daysAgo(30, 10) });
   await notif({ usuarioId: reclutador.id, tipo: 'postulacion', titulo: 'Nueva postulación recibida', mensaje: 'Martín Gómez se postuló a "Trainee en QA y Automatización de Pruebas".', tipoVisual: 'success', accionURL: `/empresa/postulantes/${ofertas.qa.id}`, leida: true, createdAt: daysAgo(20, 11) });
   await notif({ usuarioId: reclutador.id, tipo: 'postulacion', titulo: 'Nueva postulación recibida', mensaje: 'Recibiste una nueva postulación para "Pasante en Desarrollo Frontend (React)".', tipoVisual: 'success', accionURL: `/empresa/postulantes/${ofertas.frontend.id}`, createdAt: daysAgo(6, 9) });
-  await notif({ usuarioId: reclutador.id, tipo: 'oferta', titulo: 'Oferta próxima a vencer', mensaje: '"Trainee en QA y Automatización de Pruebas" cierra en 5 días. Revisá las postulaciones pendientes.', tipoVisual: 'warning', prioridad: 'alta', accionURL: `/empresa/ofertas`, createdAt: daysAgo(1, 9) });
+  await notif({ usuarioId: reclutador.id, tipo: 'oferta', titulo: 'Oferta próxima a vencer', mensaje: '"Trainee en QA y Automatización de Pruebas" cierra en 5 días. Revisá las postulaciones pendientes.', tipoVisual: 'warning', prioridad: 'alta', accionURL: '/empresa', createdAt: daysAgo(1, 9) });
   await notif({ usuarioId: reclutador.id, tipo: 'oferta', titulo: 'Tu oferta está pendiente de moderación', mensaje: '"Pasante en Análisis de Datos" fue enviada y espera la aprobación del administrador del sistema.', accionURL: '/empresa', createdAt: daysAgo(2, 10) });
   await notif({ usuarioId: reclutador.id, tipo: 'chat', titulo: 'Nuevo mensaje de Martín Gómez', mensaje: 'Confirmó la entrevista técnica del jueves.', accionURL: '/chat', createdAt: daysAgo(7, 18) });
 
   // 10. ACTIVITY LOGS (auditoría) ──────────────────────────────────────────
   say('🚀 Creando registros de auditoría...');
 
+  // 203.0.113.0/24 (TEST-NET-3, RFC 5737): rango reservado exclusivamente
+  // para documentación/ejemplos — nunca una IP real/routeable.
+  const IP_DEMO = '203.0.113.10';
   async function log(data) {
-    await ActivityLog.create({ ip: '190.220.14.7', ...data, createdAt: data.createdAt || daysAgo(1) }, { transaction });
+    await ActivityLog.create({ ip: IP_DEMO, ...data, createdAt: data.createdAt || daysAgo(1) }, { transaction });
   }
 
   await log({ usuarioId: reclutador.id, accion: 'login', entidad: 'usuario', entidadId: reclutador.id, createdAt: daysAgo(30, 10) });

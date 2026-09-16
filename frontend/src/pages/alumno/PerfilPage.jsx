@@ -90,8 +90,12 @@ function FormSection({ title, icon, children }) {
   );
 }
 
+// Email de la cuenta demo del alumno (seedPresentacion.js::ALUMNO) — solo se
+// usa para mostrar un aviso más específico; no afecta ninguna regla real.
+const ALUMNO_DEMO_EMAIL = 'alumno@demo.com';
+
 export default function PerfilPage() {
-  const { actualizarUsuario } = useAuth();
+  const { usuario, actualizarUsuario } = useAuth();
 
   const [perfil, setPerfil]     = useState(null);
   const [loading, setLoading]   = useState(true);
@@ -518,7 +522,9 @@ export default function PerfilPage() {
           </p>
         ) : (
           <p className={styles.cvAviso}>
-            ⚠️ No cargaste tu CV todavía. Las empresas no van a poder verlo hasta que subas uno.
+            {usuario?.email === ALUMNO_DEMO_EMAIL
+              ? '⚠️ CV no cargado en este entorno de demostración.'
+              : '⚠️ No cargaste tu CV todavía. Las empresas no van a poder verlo hasta que subas uno.'}
           </p>
         )}
         <div className={styles.cvUpload}>

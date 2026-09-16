@@ -93,6 +93,9 @@ describe('AUTH', () => {
     expect(res.body.success).toBe(false);
   });
 
+  // Timeout explícito: bcrypt (costo 12) corre dos veces de punta a punta acá
+  // (password inutilizable en confirmarImportacion + comparación en login),
+  // más 2 roundtrips HTTP — más lento que el default de Jest (5s) bajo carga.
   test('7. el token de activación del import CSV funciona con POST /reset-password/:token (misma infraestructura)', async () => {
     const suf = Date.now();
     const csv = [
@@ -118,5 +121,5 @@ describe('AUTH', () => {
       .post('/api/auth/login')
       .send({ email: `activacion-${suf}@test.local`, password: 'NuevaPassword123' });
     expect(login.status).toBe(200);
-  });
+  }, 15000);
 });

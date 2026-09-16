@@ -30,7 +30,11 @@ export default function NavbarPublic() {
         {/* Acciones de la navbar pública */}
         <div className={styles.navbarPublicActions}>
           <Link to="/registro-empresa" className={styles.btnEmpresa}>
-            🏢 Registrarse como empresa
+            {/* En mobile el texto completo no entra junto al botón de login
+                (desbordaba la barra) — se acorta por CSS, no se recorta con
+                overflow. */}
+            <span className={styles.btnEmpresaFull}>🏢 Registrarse como empresa</span>
+            <span className={styles.btnEmpresaShort}>🏢 Empresa</span>
           </Link>
           <Link to="/login" className={styles.btnLogin}>
             Iniciar Sesión

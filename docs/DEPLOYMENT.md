@@ -151,31 +151,71 @@ Ver [checklist](#10-checklist-de-smoke-tests).
 
 ## 3. Flujo de instalación resumido
 
-**Primera instalación (una vez):**
-```
-npm ci
-npm run db:migrate
-npm run db:seed:admin      # requiere SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD en prod
-```
-
-**Deploys siguientes:**
+**Deploys de rutina (después del primer deploy):**
 ```
 npm ci
 npm run db:migrate
 ```
 
-**Carga opcional del escenario de presentación** (solo staging/demo, **nunca** en la
-producción real):
-```
-ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:presentacion
-```
-Sin `ALLOW_PRODUCTION_DEMO_SEED=true`, el script **aborta** si `NODE_ENV=production`.
-Crea **exactamente 3** usuarios ficticios — `empresa@demo.com`, `reclutador@demo.com`,
-`alumno@demo.com` (password `Demo1234!`) — más una empresa/ofertas/postulaciones/chats
-coherentes. No borra usuarios reales. **El admin real nunca forma parte de este escenario**:
-no lo crea, no usa `Demo1234!`, no aparece en `LoginPage` ni en `GET /api/demo/status`. Después
-de usarlo una vez, **eliminá `ALLOW_PRODUCTION_DEMO_SEED`** de las variables de entorno del
-servicio — no debe quedar seteada de forma permanente.
+### A. Crear el administrador real
+
+1. En Render, configurar `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD` (Environment).
+2. Ejecutar **una vez** `npm run db:seed:admin` (en el primer deploy, ver §2(c).3 —
+   temporalmente en el `buildCommand`, después revertirlo).
+3. Verificar: `npm run db:admin:status -- --email=<el email configurado>` — confirma
+   que existe, rol `admin`, `activo`/`habilitado` en `true`. Nunca muestra el hash.
+4. `SEED_ADMIN_PASSWORD` puede quedar seteada en Render (no se vuelve a usar
+   automáticamente — `db:seed:admin` nunca modifica una contraseña existente) o
+   retirarse si operativamente es preferible no dejarla persistida; cualquiera de
+   las dos opciones es segura.
+5. Para cambiar la contraseña del admin más adelante: **no** editar
+   `SEED_ADMIN_PASSWORD` y re-correr el seed (no tiene efecto). Usar el flujo normal
+   de recuperación — "¿Olvidaste tu contraseña?" en `/login` — o `/cambiar-password`
+   ya logueado.
+6. La contraseña del admin real **nunca** se muestra en ninguna pantalla de demo.
+
+### B. Cargar el escenario demo (solo staging/demo — opcional, una sola vez)
+
+**Nunca en la producción real** salvo una necesidad puntual y consciente:
+
+1. Desplegar el código y las migraciones normalmente (`npm run db:migrate`).
+2. Confirmar que el admin real ya existe (paso A) — el escenario demo es
+   independiente de él, pero es buena práctica tenerlo creado antes.
+3. Agregar temporalmente `ALLOW_PRODUCTION_DEMO_SEED=true` en las variables de
+   entorno del servicio.
+4. Ejecutar `npm run db:seed:presentacion`.
+5. Comprobar el resumen impreso: **exactamente 3 cuentas** (`empresa@demo.com`,
+   `reclutador@demo.com`, `alumno@demo.com`, password `Demo1234!`), **ninguna admin**.
+6. **Eliminar `ALLOW_PRODUCTION_DEMO_SEED` inmediatamente** — no debe quedar seteada
+   de forma permanente.
+7. Confirmar que `SEED_PRESENTACION_ON_BOOT` sigue en `false` (default en `render.yaml`).
+8. Verificar `GET /api/demo/status` → `{ enabled: true, accounts: [...3 cuentas...] }`.
+9. Probar el login con las 3 cuentas desde `LoginPage` (los botones de autocompletado
+   solo aparecen si el paso 8 dio `enabled:true`).
+
+El seed es idempotente (limpia y recrea solo su propio namespace) y no borra usuarios
+reales ni toca al admin real (ni lo crea, ni lo modifica, ni lo elimina). También limpia
+de forma segura una eventual cuenta legacy `sistema@demo.com` de una versión anterior del
+seed, sin tocar ningún otro admin.
+
+### C. Qué NO ejecutar contra Neon de producción
+
+- `npm run db:seed:demo` — bloqueado sin excepción en producción (no tiene override).
+- `npm run db:reset:dev` — bloqueado salvo `NODE_ENV=development` + `DB_HOST` local.
+- `npm run e2e:seed` (o `npm run e2e`) — bloqueado salvo `DB_HOST` local
+  (localhost/127.0.0.1/::1); además siempre opera sobre una base cuyo nombre
+  termina en `_e2e`, nunca sobre el nombre tal cual se le pase.
+
+### D. Limpiar solo el escenario demo
+
+No existe (ni hace falta) un comando separado de "solo limpiar": volver a correr
+`npm run db:seed:presentacion` ya limpia y recrea el escenario en una única
+transacción (todo o nada), y es la operación soportada y testeada. Si en algún
+momento se necesitara limpiar sin recrear, debería ser un comando nuevo que (a)
+exija confirmación explícita en producción, (b) borre únicamente el namespace de
+`OUR_EMAILS`/`RAZON_SOCIAL` de `seedPresentacion.js`, (c) nunca toque al admin real,
+(d) corra en una transacción, y (e) no tenga nada que limpiar en R2 (el escenario
+demo no crea objetos ahí). No se agregó en este ciclo por no ser necesario todavía.
 
 ---
 
