@@ -30,3 +30,28 @@ export function descargarTexto(contenido, nombreArchivo, mimeType = 'text/csv;ch
   a.click();
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Dispara la descarga de un Blob ya armado (ej. la respuesta binaria de un
+ * export xlsx/pdf del backend, `responseType: 'blob'`). El nombre de archivo
+ * sale siempre del header `Content-Disposition` que ya arma el servidor
+ * (nunca de input del cliente) — se lo pasa el caller, ya parseado.
+ */
+export function descargarBlob(blob, nombreArchivo) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nombreArchivo;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Extrae el `filename` de un header Content-Disposition
+ * (`attachment; filename="logs-123.csv"`), con un fallback si por algún
+ * motivo no viniera.
+ */
+export function nombreDesdeContentDisposition(header, fallback) {
+  const match = /filename="?([^"]+)"?/.exec(header || '');
+  return match ? match[1] : fallback;
+}

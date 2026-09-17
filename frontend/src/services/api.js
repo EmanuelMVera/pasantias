@@ -218,7 +218,13 @@ export const adminService = {
 
   // Logs del sistema (v1.4)
   getLogs:               (params) => api.get('/admin/logs', { params }),
+  // params puede incluir format: 'csv'|'xlsx'|'pdf' (default csv)
   exportarLogs:          (params) => api.get('/admin/logs/export', { params, responseType: 'blob' }),
+
+  // Estadísticas profesionales (Fase 2)
+  getEstadisticas:        (params) => api.get('/admin/estadisticas', { params }),
+  // params puede incluir format: 'xlsx'|'pdf' (default xlsx)
+  exportarEstadisticas:   (params) => api.get('/admin/estadisticas/export', { params, responseType: 'blob' }),
 
   // Solicitudes de registro de empresa (v1.6)
   getSolicitudesEmpresa:  (params) => api.get('/admin/solicitudes-empresa', { params }),

@@ -6,62 +6,70 @@
   margin-bottom: 2rem;
 }
 
-.statCard {
-  background: var(--bg-card);
-  border: 1.5px solid var(--border);
-  border-top: 4px solid var(--sc, var(--primary));
-  border-radius: var(--radius);
-  padding: 1.25rem 1rem;
+/* ── Toolbar de estadísticas (período + export) ─────────────────────────── */
+.statsToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.periodoSelector {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.embudoNota {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* ── Dos columnas (ofertas por área + ranking de empresas) ──────────────── */
+.dobleColumna {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  gap: 1.5rem;
+}
+
+.rankingList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rankingItem {
+  display: flex;
   align-items: center;
-  gap: 0.3rem;
-  text-align: center;
-  transition: transform 0.2s, box-shadow 0.2s;
-  box-shadow: var(--shadow-card);
+  gap: 0.75rem;
+  padding: 0.5rem 0.25rem;
+  border-bottom: 1px solid var(--border);
 }
 
-.statCard:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(0, 115, 173, 0.12);
+.rankingItem:last-child { border-bottom: none; }
+
+.rankingPos {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.statCard.highlight {
-  border-top-color: var(--success);
-  background: #f0faf4;
-}
-
-.statIcon { font-size: 1.5rem; }
-
-.statNum {
-  font-size: 1.9rem;
-  font-weight: 800;
-  color: var(--sc, var(--primary));
-}
-
-.statCard.highlight .statNum { color: var(--success); }
-
-.statLabel {
-  font-size: 0.73rem;
-  color: var(--text-muted);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-
-/* ── Skeleton ────────────────────────────────────────────────────────────── */
-.skeletonCard {
-  height: 120px;
-  border-radius: var(--radius);
-  background: linear-gradient(90deg, #e8edf2 25%, #f4f6f8 50%, #e8edf2 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s infinite;
-}
-
-@keyframes shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
+.rankingNombre { flex: 1; font-size: 0.88rem; color: var(--text); }
+.rankingValor { font-weight: 700; color: var(--primary); }
 
 /* ── Chart Container ─────────────────────────────────────────────────────── */
 .chartContainer {

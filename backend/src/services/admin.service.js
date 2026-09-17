@@ -109,15 +109,27 @@ async function listarLogs({ accion, usuarioId, entidad, desde, hasta, page = 1, 
   return { data: rows, pagination: buildPagination(count, { page, limit }) };
 }
 
-async function exportarLogsCSV({ accion, usuarioId, entidad, desde, hasta }) {
-  const where = _whereLogs({ accion, usuarioId, entidad, desde, hasta });
+// Límite duro compartido por los 3 formatos de exportación (CSV/XLSX/PDF):
+// no cargar en memoria más de esto de una — sección 14 del pedido.
+const LOGS_EXPORT_LIMIT = 5000;
 
-  const logs = await ActivityLog.findAll({
+/**
+ * Query compartida por los 3 formatos de exportación de logs — mismos
+ * filtros, mismo orden, mismo cap. Reusada por export.service.js (XLSX/PDF)
+ * para que nunca diverjan del CSV.
+ */
+async function obtenerLogsParaExport({ accion, usuarioId, entidad, desde, hasta }) {
+  const where = _whereLogs({ accion, usuarioId, entidad, desde, hasta });
+  return ActivityLog.findAll({
     where,
     include: [{ model: Usuario, as: 'usuario', attributes: ['nombre', 'apellido', 'email'], required: false }],
     order: [['createdAt', 'DESC']],
-    limit: 5000, // Cap para no sobrecargar el servidor
+    limit: LOGS_EXPORT_LIMIT,
   });
+}
+
+async function exportarLogsCSV(filtros) {
+  const logs = await obtenerLogsParaExport(filtros);
 
   const header = 'ID,Fecha,Acción,Entidad,EntidadID,Usuario,Email,IP,Detalle\n';
   const rows = logs.map((l) => {
@@ -143,4 +155,6 @@ module.exports = {
   obtenerActividadReciente,
   listarLogs,
   exportarLogsCSV,
+  obtenerLogsParaExport,
+  LOGS_EXPORT_LIMIT,
 };

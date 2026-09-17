@@ -23,7 +23,7 @@
 
 const router = require('express').Router();
 const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
-const { uploadLimiter } = require('../middleware/rateLimit');
+const { uploadLimiter, exportLimiter } = require('../middleware/rateLimit');
 const asyncHandler = require('../utils/asyncHandler');
 const adminCtrl = require('../controllers/admin.controller');
 const { multerCsv } = require('../services/csvImportacion.service');
@@ -35,6 +35,10 @@ const soloAdmin = [verifyToken, authorizeRoles('admin')];
 router.get('/dashboard-general', ...soloAdmin, asyncHandler(adminCtrl.getDashboardGeneral));
 router.get('/stats', ...soloAdmin, asyncHandler(adminCtrl.getStats)); // legacy
 router.get('/actividad-reciente', ...soloAdmin, asyncHandler(adminCtrl.getActividadReciente));
+
+// ── Estadísticas profesionales ──────────────────────────────────────────────────
+router.get('/estadisticas', ...soloAdmin, asyncHandler(adminCtrl.getEstadisticasGenerales));
+router.get('/estadisticas/export', ...soloAdmin, exportLimiter, asyncHandler(adminCtrl.exportarEstadisticas));
 
 // ── CRUD de usuarios ───────────────────────────────────────────────────────────
 router.get('/usuarios', ...soloAdmin, asyncHandler(adminCtrl.getUsuarios));
@@ -56,7 +60,7 @@ router.patch('/ofertas/:id/moderar', ...soloAdmin, asyncHandler(adminCtrl.modera
 
 // ── Logs de auditoría ──────────────────────────────────────────────────────────
 router.get('/logs', ...soloAdmin, asyncHandler(adminCtrl.getLogs));
-router.get('/logs/export', ...soloAdmin, asyncHandler(adminCtrl.exportarLogs));
+router.get('/logs/export', ...soloAdmin, exportLimiter, asyncHandler(adminCtrl.exportarLogs));
 
 // ── Solicitudes de registro de empresa ────────────────────────────────────────
 router.get('/solicitudes-empresa', ...soloAdmin, asyncHandler(adminCtrl.getSolicitudesEmpresa));

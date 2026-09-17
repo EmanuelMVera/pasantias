@@ -11,6 +11,8 @@
  */
 
 const adminService = require('../services/admin.service');
+const adminEstadisticasService = require('../services/adminEstadisticas.service');
+const exportService = require('../services/export.service');
 const adminUsuariosService = require('../services/adminUsuarios.service');
 const adminModeracionService = require('../services/adminModeracion.service');
 const { SolicitudEmpresa, SolicitudReclutador, Empresa } = require('../models');
@@ -18,7 +20,28 @@ const solicitudEmpresaService = require('../services/solicitudEmpresa.service');
 const solicitudReclutadorService = require('../services/solicitudReclutador.service');
 const csvImportacionService = require('../services/csvImportacion.service');
 const HttpError = require('../utils/httpError');
+const { registrarAuditoria } = require('../utils/auditLog');
 const { parsePagination, buildPagination, groupCount } = require('../utils/pagination');
+
+const FORMATOS_EXPORT_LOGS = ['csv', 'xlsx', 'pdf'];
+const FORMATOS_EXPORT_ESTADISTICAS = ['xlsx', 'pdf'];
+
+function nombreActor(req) {
+  return `${req.usuario.nombre} ${req.usuario.apellido} (${req.usuario.email})`;
+}
+
+const MIME_POR_FORMATO = {
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pdf: 'application/pdf',
+};
+
+function enviarArchivo(res, { buffer, filename }, mime) {
+  res.setHeader('Content-Type', mime);
+  // Nombre generado 100% server-side (ver export.service.nombreArchivo) —
+  // nunca a partir de input del cliente, así el header queda siempre seguro.
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  return res.send(buffer);
+}
 
 // ── Dashboard / métricas ──────────────────────────────────────────────────────
 
@@ -50,11 +73,62 @@ exports.getLogs = async (req, res) => {
 
 exports.exportarLogs = async (req, res) => {
   const { accion, usuarioId, entidad, desde, hasta } = req.query;
-  const csv = await adminService.exportarLogsCSV({ accion, usuarioId, entidad, desde, hasta });
+  const filtros = { accion, usuarioId, entidad, desde, hasta };
+  const format = (req.query.format || 'csv').toLowerCase();
 
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="logs-${Date.now()}.csv"`);
-  return res.send(String.fromCharCode(0xFEFF) + csv); // BOM para que Excel lo abra bien
+  if (!FORMATOS_EXPORT_LOGS.includes(format)) {
+    throw new HttpError(400, `Formato inválido. Valores permitidos: ${FORMATOS_EXPORT_LOGS.join(', ')}.`);
+  }
+
+  let filas;
+  if (format === 'csv') {
+    const csv = await adminService.exportarLogsCSV(filtros);
+    filas = null; // el conteo exacto no importa acá — el CSV ya es el formato "legacy"
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="logs-${Date.now()}.csv"`);
+    res.send(String.fromCharCode(0xFEFF) + csv); // BOM para que Excel lo abra bien
+  } else {
+    const generar = format === 'xlsx' ? exportService.generarLogsExcel : exportService.generarLogsPDF;
+    const resultado = await generar(filtros, { generadoPor: nombreActor(req) });
+    filas = resultado.filas;
+    enviarArchivo(res, resultado, MIME_POR_FORMATO[format]);
+  }
+
+  // Auditoría de la exportación — nunca el contenido exportado, solo qué se
+  // pidió y cuántas filas salieron. La respuesta ya se envió arriba; esto
+  // solo termina de resolver el handler (await, no fire-and-forget, para que
+  // el log quede escrito de forma confiable antes de que el request termine).
+  await registrarAuditoria({
+    req, accion: 'exportar_logs', entidad: 'activity_log',
+    detalle: { formato: format, filtros, filas },
+  });
+};
+
+// ── Estadísticas ───────────────────────────────────────────────────────────────
+
+exports.getEstadisticasGenerales = async (req, res) => {
+  const { desde, hasta, periodoDias } = req.query;
+  const data = await adminEstadisticasService.obtenerEstadisticasGenerales({ desde, hasta, periodoDias });
+  return res.json({ success: true, data });
+};
+
+exports.exportarEstadisticas = async (req, res) => {
+  const { desde, hasta, periodoDias } = req.query;
+  const filtros = { desde, hasta, periodoDias };
+  const format = (req.query.format || 'xlsx').toLowerCase();
+
+  if (!FORMATOS_EXPORT_ESTADISTICAS.includes(format)) {
+    throw new HttpError(400, `Formato inválido. Valores permitidos: ${FORMATOS_EXPORT_ESTADISTICAS.join(', ')}.`);
+  }
+
+  const generar = format === 'xlsx' ? exportService.generarEstadisticasExcel : exportService.generarEstadisticasPDF;
+  const resultado = await generar(filtros, { generadoPor: nombreActor(req) });
+  enviarArchivo(res, resultado, MIME_POR_FORMATO[format]);
+
+  await registrarAuditoria({
+    req, accion: 'exportar_estadisticas', entidad: 'estadisticas',
+    detalle: { formato: format, filtros },
+  });
 };
 
 // ── Usuarios ─────────────────────────────────────────────────────────────────

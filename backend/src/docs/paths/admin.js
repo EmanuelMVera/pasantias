@@ -53,6 +53,32 @@ module.exports = {
       responses: { 200: listaSimple(REF.schema('ActivityLog')) } }),
   },
 
+  // ── Estadísticas profesionales ────────────────────────────────────────────
+  '/api/admin/estadisticas': {
+    get: adminOp({ id: 'adminEstadisticasGenerales', summary: 'Estadísticas profesionales del sistema',
+      description: 'Embudo de selección, empresas/ofertas por estado, tasas, empresas con más actividad. `periodoDias` (7|30|90|365, default 30) o `desde`/`hasta` explícitos gobiernan las métricas "del período".',
+      query: [
+        { name: 'periodoDias', in: 'query', schema: { type: 'integer', enum: [7, 30, 90, 365] } },
+        { name: 'desde', in: 'query', schema: { type: 'string', format: 'date' } },
+        { name: 'hasta', in: 'query', schema: { type: 'string', format: 'date' } },
+      ],
+      responses: { 200: ok('EstadisticasGenerales') } }),
+  },
+  '/api/admin/estadisticas/export': {
+    get: adminOp({ id: 'adminEstadisticasExport', summary: 'Exportar estadísticas a Excel o PDF',
+      description: 'Mismos filtros que GET /estadisticas. `format` (xlsx|pdf, default xlsx). Rate-limit dedicado (20/hora por usuario). Genera un ActivityLog `exportar_estadisticas` (nunca loguea el contenido exportado).',
+      query: [
+        { name: 'format', in: 'query', schema: { type: 'string', enum: ['xlsx', 'pdf'] } },
+        { name: 'periodoDias', in: 'query', schema: { type: 'integer', enum: [7, 30, 90, 365] } },
+        { name: 'desde', in: 'query', schema: { type: 'string', format: 'date' } },
+        { name: 'hasta', in: 'query', schema: { type: 'string', format: 'date' } },
+      ],
+      errors: ['400'], // 429/500 ya los agrega adminOp()/operation() a toda ruta
+      responses: {
+        200: file('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet or application/pdf', 'Excel (3 hojas: Resumen, Datos, Filtros y metadatos + hojas de embudo/empresas) o PDF (KPIs + tablas, con numeración de página y pie de confidencialidad) según `format`.'),
+      } }),
+  },
+
   // ── Usuarios ───────────────────────────────────────────────────────────────
   '/api/admin/usuarios': {
     get: adminOp({ id: 'adminUsuariosList', summary: 'Listar usuarios',
@@ -124,10 +150,11 @@ module.exports = {
       responses: { 200: paginated('ActivityLog') } }),
   },
   '/api/admin/logs/export': {
-    get: adminOp({ id: 'adminLogsExport', summary: 'Exportar el log de auditoría a CSV',
-      description: 'Devuelve un CSV (máx. 5000 filas) con BOM.',
-      query: logFilters,
-      responses: { 200: file('text/csv', 'CSV con las columnas ID,Fecha,Acción,Entidad,EntidadID,Usuario,Email,IP,Detalle.') } }),
+    get: adminOp({ id: 'adminLogsExport', summary: 'Exportar el log de auditoría a CSV, Excel o PDF',
+      description: '`format` (csv|xlsx|pdf, default csv por compatibilidad). Máx. 5000 filas en cualquier formato. Rate-limit dedicado (20/hora por usuario). Genera un ActivityLog `exportar_logs` (nunca loguea el contenido exportado).',
+      query: [{ name: 'format', in: 'query', schema: { type: 'string', enum: ['csv', 'xlsx', 'pdf'] } }, ...logFilters],
+      errors: ['400'], // 429/500 ya los agrega adminOp()/operation() a toda ruta
+      responses: { 200: file('text/csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet or application/pdf', 'CSV con BOM (columnas ID,Fecha,Acción,Entidad,EntidadID,Usuario,Email,IP,Detalle), Excel (3 hojas) o PDF según `format`.') } }),
   },
 
   // ── Solicitudes de empresa ─────────────────────────────────────────────────

@@ -11,6 +11,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminService } from '../../services/api';
 import Paginacion from '../../components/Paginacion/Paginacion';
+import PageHeader from '../../components/ui/PageHeader';
+import ExportMenu from '../../components/ui/ExportMenu';
+import { descargarBlob, nombreDesdeContentDisposition } from '../../utils/csv';
 import styles from './AdminLogsPage.module.css';
 
 /* Tipos de acción con etiqueta y color */
@@ -27,9 +30,14 @@ const ACCIONES = {
   aprobar_oferta:           { label: 'Aprobar oferta',     color: '#27ae60', icon: '📢' },
   rechazar_oferta:          { label: 'Rechazar oferta',    color: '#c0392b', icon: '🚫' },
   crear_oferta:             { label: 'Nueva oferta',       color: '#0073AD', icon: '📝' },
+  pausar_oferta:            { label: 'Pausar oferta',      color: '#e67e22', icon: '⏸️' },
+  reactivar_oferta:         { label: 'Reactivar oferta',   color: '#27ae60', icon: '▶️' },
   cerrar_oferta:            { label: 'Cerrar oferta',      color: '#7f8c8d', icon: '🔒' },
   postular:                 { label: 'Postulación',        color: '#16a085', icon: '📋' },
   cambiar_estado_postulacion: { label: 'Estado postulación', color: '#8e44ad', icon: '🔃' },
+  importar_alumnos_csv:     { label: 'Importar CSV',       color: '#2980b9', icon: '📥' },
+  exportar_logs:            { label: 'Exportar auditoría', color: '#8e44ad', icon: '⬇️' },
+  exportar_estadisticas:    { label: 'Exportar estadísticas', color: '#8e44ad', icon: '⬇️' },
   sistema:                  { label: 'Sistema',            color: '#7f8c8d', icon: '⚙️' },
 };
 
@@ -37,7 +45,6 @@ export default function AdminLogsPage() {
   const [logs,        setLogs]       = useState([]);
   const [loading,     setLoading]    = useState(true);
   const [error,       setError]      = useState('');
-  const [exporting,   setExporting]  = useState(false);
 
   // Paginación (contrato común: { page, limit, total, totalPages })
   const [pagination, setPagination] = useState(null);
@@ -71,27 +78,21 @@ export default function AdminLogsPage() {
 
   useEffect(() => { cargar(1); }, [cargar]);
 
-  /* ── Exportar CSV ────────────────────────────────────────────── */
-  const handleExport = async () => {
-    setExporting(true);
+  /* ── Exportar (CSV / Excel / PDF) ────────────────────────────── */
+  const handleExport = async (format) => {
     try {
-      const params = {};
+      const params = { format };
       if (filtroAccion)  params.accion  = filtroAccion;
       if (filtroEntidad) params.entidad = filtroEntidad;
       if (desde)         params.desde   = desde;
       if (hasta)         params.hasta   = hasta;
 
       const res = await adminService.exportarLogs(params);
-      const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv;charset=utf-8;' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `logs-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const fallback = `logs-${new Date().toISOString().slice(0, 10)}.${format}`;
+      const nombre = nombreDesdeContentDisposition(res.headers['content-disposition'], fallback);
+      descargarBlob(res.data, nombre);
     } catch {
       setError('Error al exportar los logs.');
-    } finally {
-      setExporting(false);
     }
   };
 
@@ -99,20 +100,11 @@ export default function AdminLogsPage() {
   return (
     <div className="page-container">
       {/* Cabecera */}
-      <div className="dashboard-header">
-        <div>
-          <h1>Historial de Accesos</h1>
-          <p className={styles.subtitle}>{loading ? '...' : `${pagination?.total ?? 0} registro${(pagination?.total ?? 0) !== 1 ? 's' : ''} encontrado${(pagination?.total ?? 0) !== 1 ? 's' : ''}`}</p>
-        </div>
-        <button
-          id="btn-exportar-logs"
-          className="btn-secondary"
-          onClick={handleExport}
-          disabled={exporting}
-        >
-          {exporting ? 'Exportando...' : '⬇️ Exportar CSV'}
-        </button>
-      </div>
+      <PageHeader
+        title="Historial de Accesos"
+        subtitle={loading ? '...' : `${pagination?.total ?? 0} registro${(pagination?.total ?? 0) !== 1 ? 's' : ''} encontrado${(pagination?.total ?? 0) !== 1 ? 's' : ''}`}
+        actions={<ExportMenu id="btn-exportar-logs" formats={['csv', 'xlsx', 'pdf']} onExport={handleExport} />}
+      />
 
       {error && <p className="error-msg" style={{ marginBottom: '1rem' }}>{error}</p>}
 
@@ -127,7 +119,7 @@ export default function AdminLogsPage() {
 
         <select id="filtro-entidad" className={styles.filterSelect} value={filtroEntidad} onChange={(e) => setFiltroEntidad(e.target.value)}>
           <option value="">Todas las entidades</option>
-          {['usuario', 'empresa', 'oferta', 'postulacion'].map((e) => (
+          {['usuario', 'empresa', 'oferta', 'postulacion', 'activity_log', 'estadisticas'].map((e) => (
             <option key={e} value={e}>{e}</option>
           ))}
         </select>

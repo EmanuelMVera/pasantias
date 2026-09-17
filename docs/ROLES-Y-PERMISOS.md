@@ -132,8 +132,14 @@ queda auditada con `pausar_oferta` / `reactivar_oferta` / `cerrar_oferta`, marca
 | Usuarios: listar / ver / crear / editar / borrar (soft) / activar-desactivar | — | ✅ | — | — | — |
 | Empresas pendientes: listar / aprobar / rechazar | — | ✅ | — | — | — |
 | Ofertas: listar todas / ver pendientes / moderar | — | ✅ | — | — | — |
-| Logs de auditoría: ver / exportar | — | ✅ | — | — | — |
+| Logs de auditoría: ver / exportar (CSV / Excel / PDF) | — | ✅ | — | — | — |
+| Estadísticas profesionales: ver / exportar (Excel / PDF) | — | ✅ | — | — | — |
 | Importación masiva de alumnos/egresados por CSV (plantilla, dry-run, confirmar) | — | ✅ | — | — | — |
+
+Exportaciones (`/api/admin/logs/export`, `/api/admin/estadisticas/export`): rate-limit
+dedicado (20/hora por usuario), límite duro de 5000 filas, cada exportación queda
+auditada (`exportar_logs` / `exportar_estadisticas`, con formato y filtros usados —
+nunca el contenido exportado). Ver `backend/src/services/export.service.js`.
 
 ### Chat, notificaciones, archivos privados
 

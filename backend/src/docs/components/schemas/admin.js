@@ -52,6 +52,43 @@ module.exports = {
     },
   },
 
+  EstadisticasGenerales: {
+    type: 'object',
+    description: 'Estadísticas profesionales del sistema — sección 12 de la iteración funcional/visual. Todas las métricas salen de modelos existentes (ninguna se inventa); toda tasa/porcentaje es `null` (no 0%) cuando el denominador es 0.',
+    properties: {
+      periodo: { type: 'object', properties: { desde: { type: 'string', format: 'date-time' }, hasta: { type: 'string', format: 'date-time' } } },
+      usuarios: { type: 'object', properties: { totalActivos: { type: 'integer' }, alumnos: { type: 'integer' }, egresados: { type: 'integer' }, altasEnPeriodo: { type: 'integer' } } },
+      empresas: {
+        type: 'object',
+        properties: {
+          aprobadas: { type: 'integer' }, pendientes: { type: 'integer' }, rechazadas: { type: 'integer' },
+          reclutadoresActivos: { type: 'integer' },
+          tiempoPromedioAprobacionDias: { type: ['number', 'null'] },
+          conMasOfertas: { type: 'array', items: { type: 'object', properties: { empresaId: { type: 'integer' }, razonSocial: { type: 'string' }, totalOfertas: { type: 'integer' } } } },
+        },
+      },
+      ofertas: {
+        type: 'object',
+        properties: {
+          activas: { type: 'integer' }, pausadas: { type: 'integer' }, cerradas: { type: 'integer' }, rechazadas: { type: 'integer' },
+          pendienteModeracion: { type: 'integer' },
+          porArea: { type: 'object', additionalProperties: { type: 'integer' } },
+        },
+      },
+      postulaciones: { type: 'object', properties: { total: { type: 'integer' }, enPeriodo: { type: 'integer' } } },
+      contrataciones: { type: 'object', properties: { total: { type: 'integer' }, enPeriodo: { type: 'integer' }, tasaContratacion: { type: ['number', 'null'] } } },
+      embudo: {
+        type: 'object',
+        properties: {
+          enRevision: { type: 'integer' }, preseleccionado: { type: 'integer' }, entrevista: { type: 'integer' }, contratado: { type: 'integer' },
+          tasaEntrevistaAPreseleccion: { type: ['number', 'null'] },
+          tasaPreseleccionARevision: { type: ['number', 'null'] },
+          tasaContratadoAEntrevista: { type: ['number', 'null'] },
+        },
+      },
+    },
+  },
+
   DashboardEmpresa: {
     type: 'object',
     properties: {

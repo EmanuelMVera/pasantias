@@ -98,6 +98,17 @@ const writeLimiter = crearLimiter({
   message: 'Estás enviando datos demasiado rápido. Esperá unos segundos.',
 });
 
+// Exportación de logs/estadísticas (PDF/Excel/CSV) del panel admin: generar
+// un PDF/XLSX de miles de filas tiene un costo real de CPU/memoria — 20/hora
+// por usuario es holgado para uso legítimo y frena un loop accidental o
+// abusivo del botón de exportar.
+const exportLimiter = crearLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  keyGenerator: keyUsuario,
+  message: 'Demasiadas exportaciones. Esperá un rato antes de generar otra.',
+});
+
 // Techo global de la API por IP (nunca debería dispararse en uso normal).
 const apiLimiter = crearLimiter({
   windowMs: 15 * 60 * 1000,
@@ -114,4 +125,5 @@ module.exports = {
   uploadLimiter,
   writeLimiter,
   apiLimiter,
+  exportLimiter,
 };
