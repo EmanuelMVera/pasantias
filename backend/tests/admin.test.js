@@ -105,9 +105,21 @@ describe('ADMIN', () => {
     });
 
     test('sin --email y sin SEED_ADMIN_EMAIL → error de uso, no revienta', () => {
-      const r = correr([], { SEED_ADMIN_EMAIL: '' });
+      const r = correr([], { SEED_ADMIN_EMAIL: '', SEED_SECOND_ADMIN_EMAIL: '' });
       expect(r.ok).toBe(false);
       expect(r.stderr).toMatch(/Uso:/);
+    });
+
+    test('acepta varios --email y reporta cada uno, sin hashes', async () => {
+      const { usuario: admin1 } = await crearAdmin();
+      const { usuario: admin2 } = await crearAdmin();
+      idsUsuarios.push(admin1.id, admin2.id);
+
+      const r = correr([`--email=${admin1.email}`, `--email=${admin2.email}`]);
+      expect(r.ok).toBe(true);
+      expect(r.stdout).toContain(admin1.email);
+      expect(r.stdout).toContain(admin2.email);
+      expect(r.stdout).not.toMatch(/\$2[aby]\$/);
     });
   });
 });

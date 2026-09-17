@@ -174,6 +174,29 @@ npm run db:migrate
    ya logueado.
 6. La contraseña del admin real **nunca** se muestra en ninguna pantalla de demo.
 
+### A.1 Segundo administrador (opcional)
+
+Para dar de alta un segundo admin (p. ej. un compañero de equipo, con su propia
+cuenta — nunca se comparte contraseña entre personas):
+
+1. En Render, configurar `SEED_SECOND_ADMIN_EMAIL` y `SEED_SECOND_ADMIN_PASSWORD`
+   (y opcionalmente `SEED_SECOND_ADMIN_NAME` / `SEED_SECOND_ADMIN_LASTNAME`).
+   Si `SEED_SECOND_ADMIN_EMAIL` queda vacía, no se crea ningún segundo admin — es
+   puramente opcional.
+2. Ejecutar `npm run db:seed:admin` de nuevo (mismo mecanismo que el primero — build
+   command temporal si no hay Shell, ver arriba). Es **transaccional**: si algo está
+   mal configurado (por ejemplo, `SEED_SECOND_ADMIN_EMAIL` seteada sin su password, o
+   el email ya pertenece a un usuario con otro rol), el script aborta **sin crear ni
+   modificar nada**, ni siquiera el admin primario si ya existía.
+3. Verificar con `npm run db:admin:status -- --email=<primario> --email=<segundo>`
+   (acepta varios `--email`, o coma-separados).
+4. El segundo admin, igual que el primero, **nunca** aparece en `LoginPage` ni en
+   `GET /api/demo/status` — esas listas son fijas (3 cuentas demo) y no consultan la
+   tabla de usuarios por rol.
+5. Si el email ya existe con un rol distinto de `admin`, el script aborta con un error
+   claro — **nunca** eleva privilegios automáticamente. Para eso hace falta una acción
+   explícita de otro admin desde el panel (`Admin → Usuarios`).
+
 ### B. Cargar el escenario demo (solo staging/demo — opcional, una sola vez)
 
 **Nunca en la producción real** salvo una necesidad puntual y consciente:
@@ -184,8 +207,9 @@ npm run db:migrate
 3. Agregar temporalmente `ALLOW_PRODUCTION_DEMO_SEED=true` en las variables de
    entorno del servicio.
 4. Ejecutar `npm run db:seed:presentacion`.
-5. Comprobar el resumen impreso: **exactamente 3 cuentas** (`empresa@demo.com`,
-   `reclutador@demo.com`, `alumno@demo.com`, password `Demo1234!`), **ninguna admin**.
+5. Comprobar el resumen impreso: **exactamente 3 cuentas de login** (`empresa@demo.com`,
+   `reclutador@demo.com`, `alumno@demo.com`, password `Demo1234!`), **ninguna admin**,
+   más **10 candidatos sintéticos** `candidatoNN@demo.invalid` (ver más abajo).
 6. **Eliminar `ALLOW_PRODUCTION_DEMO_SEED` inmediatamente** — no debe quedar seteada
    de forma permanente.
 7. Confirmar que `SEED_PRESENTACION_ON_BOOT` sigue en `false` (default en `render.yaml`).
@@ -197,6 +221,97 @@ El seed es idempotente (limpia y recrea solo su propio namespace) y no borra usu
 reales ni toca al admin real (ni lo crea, ni lo modifica, ni lo elimina). También limpia
 de forma segura una eventual cuenta legacy `sistema@demo.com` de una versión anterior del
 seed, sin tocar ningún otro admin.
+
+#### B.1 Por qué Neon va a tener MÁS de 3 usuarios tras este seed
+
+La tabla `usuarios` va a mostrar **13 filas nuevas**, no 3: las 3 cuentas de login
+(`empresa@demo.com`, `reclutador@demo.com`, `alumno@demo.com`) **más 10 candidatos
+sintéticos** con email `candidatoNN@demo.invalid` (`candidato01@demo.invalid` …
+`candidato10@demo.invalid`). Son necesarios para que el pipeline de postulaciones del
+reclutador tenga contenido real: solo el alumno demo no alcanza para llenar el embudo
+de selección de 7 ofertas sin violar `UNIQUE(usuarioId, ofertaId)`.
+
+- **No tienen login utilizable en la práctica**: no aparecen en `LoginPage` ni en
+  `GET /api/demo/status` (esa lista es fija — 3 emails, no una consulta a `usuarios`).
+- El dominio `.invalid` está reservado por la RFC 2606 específicamente para que nunca
+  resuelva ni pertenezca a nadie — mismo criterio que las IPs de auditoría de este seed
+  (rango `203.0.113.0/24`, TEST-NET-3 de la RFC 5737).
+- Comparten la password `Demo1234!` con las 3 cuentas de login — no es un secreto
+  nuevo, ya está documentada acá mismo; no se crearon para tener un login individual.
+- Quedan namespaced (`@demo.invalid`) justamente para que sean fáciles de identificar
+  y de excluir de cualquier reporte/exportación que solo deba mostrar cuentas reales.
+
+**Conteos exactos verificados** (migración desde vacío + `db:seed:presentacion` únicamente,
+en Postgres local aislado — ver también `npm run db:seed:presentacion:status`):
+
+| Tabla | Conteo |
+|---|---|
+| usuarios (login demo) | 3 |
+| usuarios (candidatos sintéticos) | 10 |
+| empresas | 1 |
+| empresa_usuarios | 2 |
+| ofertas | 7 |
+| postulaciones | 14 |
+| postulacion_historial_estados | 29 |
+| mensajes | 17 |
+| notificaciones | 18 |
+| activity_logs | 14 |
+| solicitudes_empresa | 1 |
+| solicitudes_reclutador (total) | 2 (1 pendiente + 1 aprobado) |
+| archivos | 0 |
+
+Las 14 postulaciones son **siempre** las mismas: 4 del alumno demo (con historial
+completo) + 10 del pool sintético (una por candidato, sin reusar ningún par
+`usuarioId`+`ofertaId`) — determinístico, no depende de que haya corrido ningún otro
+seed antes (a diferencia de una versión anterior de este script, que tomaba el pool de
+cuentas `@itbeltran.com.ar` creadas por `seedDemo.js`; si ese script no había corrido,
+las postulaciones caían de 14 a 4 **en silencio**, sin error — ver el fix en el
+changelog de `seedPresentacion.js`).
+
+#### B.2 Verificar sin Shell — `db:seed:presentacion:status`
+
+Comando de solo lectura, cuenta filas sin secretos:
+
+```bash
+npm run db:seed:presentacion:status
+```
+
+Sin Shell en Render, igual que el seed de admin: cambiar temporalmente el
+*Build Command* a
+```
+npm ci && npm run db:migrate && npm run db:seed:presentacion:status
+```
+y leer el resultado en el log del deploy — después restaurar el Build Command normal
+(este comando no escribe nada, pero no hace falta dejarlo corriendo en cada deploy).
+
+**Consultas SQL equivalentes**, para correr directo en el SQL Editor de Neon (reemplazan
+al comando de arriba si se prefiere no tocar el Build Command en absoluto):
+
+```sql
+-- Usuarios del escenario demo (3 login + 10 candidatos sintéticos)
+SELECT
+  count(*) FILTER (WHERE email IN ('empresa@demo.com','reclutador@demo.com','alumno@demo.com')) AS login_demo,
+  count(*) FILTER (WHERE email LIKE '%@demo.invalid') AS candidatos_sinteticos
+FROM usuarios;
+
+-- Empresa + equipo
+SELECT count(*) FROM empresas WHERE "razonSocial" = 'Delta Innovación IT';
+SELECT count(*) FROM empresa_usuarios eu
+  JOIN empresas e ON e.id = eu."empresaId" WHERE e."razonSocial" = 'Delta Innovación IT';
+
+-- Ofertas y postulaciones
+SELECT count(*) FROM ofertas o
+  JOIN empresas e ON e.id = o."empresaId" WHERE e."razonSocial" = 'Delta Innovación IT';
+SELECT count(*) FROM postulaciones p
+  JOIN ofertas o ON o.id = p."ofertaId" JOIN empresas e ON e.id = o."empresaId"
+  WHERE e."razonSocial" = 'Delta Innovación IT';
+
+-- Integridad: NINGUNA de estas dos debe devolver más de 0 filas
+SELECT "usuarioId", "ofertaId", count(*) FROM postulaciones
+  GROUP BY 1, 2 HAVING count(*) > 1;                              -- duplicados UNIQUE
+SELECT count(*) FROM postulaciones p
+  LEFT JOIN ofertas o ON o.id = p."ofertaId" WHERE o.id IS NULL;  -- huérfanas
+```
 
 ### C. Qué NO ejecutar contra Neon de producción
 
@@ -258,8 +373,11 @@ Leyenda: **S** = secreta · **R** = requerida en producción · **O** = opcional
 | `EMAIL_PASS` | Render | O | *(App Password de Gmail)* | Con Gmail: **contraseña de aplicación**, no la del correo. | S |
 | `EMAIL_FROM` | Render | O | `"SisPasantías" <noreply@tudominio.edu>` | Remitente. Default: `"SisPasantías" <EMAIL_USER>`. | |
 | `EMAIL_REQUIRED` | Render | O | `false` | `true` = la API aborta si falta el SMTP. | |
-| `SEED_ADMIN_EMAIL` | Render | R (solo primer deploy) | `admin@tudominio.edu` | Email del admin. | |
-| `SEED_ADMIN_PASSWORD` | Render | R (solo primer deploy) | *(fuerte)* | Contraseña del admin. Cambiarla tras el primer login. | S |
+| `SEED_ADMIN_EMAIL` | Render | R (solo primer deploy) | `admin@tudominio.edu` | Email del admin primario. | |
+| `SEED_ADMIN_PASSWORD` | Render | R (solo primer deploy) | *(fuerte, ≥6 chars)* | Contraseña del admin primario. Cambiarla tras el primer login. | S |
+| `SEED_SECOND_ADMIN_EMAIL` | Render | O | `compañero@tudominio.edu` | Email del segundo admin (opcional). Vacío = no se crea ninguno. | |
+| `SEED_SECOND_ADMIN_PASSWORD` | Render | R si `SEED_SECOND_ADMIN_EMAIL` está seteada | *(fuerte, ≥6 chars)* | Si falta con el email seteado, el seed aborta sin crear nada. | S |
+| `SEED_SECOND_ADMIN_NAME` / `SEED_SECOND_ADMIN_LASTNAME` | Render | O | `Compa` / `Equipo` | Nombre/apellido del segundo admin. Default "Admin" / "Equipo". | |
 | `SEED_PRESENTACION_ON_BOOT` | Render | R | `false` | Nunca `true` en producción. | |
 | `ALLOW_PRODUCTION_DEMO_SEED` | Render | O | *(sin setear)* | `true` habilita `db:seed:presentacion` en prod (datos ficticios). | |
 | `ENABLE_API_DOCS` | Render | O | `false` | `true` expone Swagger UI en `/api/docs`. | |
@@ -278,11 +396,14 @@ cd backend
 
 npm run db:migrate            # aplica las pendientes (Umzug, pg_advisory_lock)
 npm run db:migrate:status     # ejecutadas + pendientes
-npm run db:seed:admin         # crea el admin — SOLO si no existe; si el email ya existe,
-                               # NO actualiza la contraseña (correr de nuevo con otra
-                               # SEED_ADMIN_PASSWORD no la cambia). Para resetearla, usá
+npm run db:seed:admin         # crea el/los admin(es) — SOLO si no existen; si un email ya
+                               # existe, NO actualiza la contraseña ni el rol (correr de
+                               # nuevo con otra password no la cambia). Transaccional: si
+                               # SEED_SECOND_ADMIN_* está mal configurada, no crea nada, ni
+                               # siquiera el primario. Para resetear una contraseña, usá
                                # "Olvidé mi contraseña" en /login.
-npm run db:admin:status -- --email=admin@tudominio.edu   # diagnóstico de solo lectura:
+npm run db:admin:status -- --email=admin@tudominio.edu --email=compañero@tudominio.edu
+                               # diagnóstico de solo lectura, acepta uno o varios --email:
                                # existe/no existe, rol, activo, habilitado, deletedAt.
                                # Nunca muestra el hash. No modifica nada.
 
@@ -390,6 +511,43 @@ Después del deploy final, contra la URL de Vercel:
 - [ ] Como admin, `GET /admin/importaciones` → descargar plantilla, previsualizar un CSV
       de prueba (dry-run) y confirmar → el usuario creado recibe el email de activación
       (o, sin SMTP, aparece en `devTokens` — nunca en producción).
+
+---
+
+## 11. Verificar que Vercel sirve el último commit (deployment viejo / caché)
+
+Contexto: el código de `LoginPage`/`GET /api/demo/status` **no tiene** ningún dato
+hardcodeado — el bloque de cuentas demo se arma 100% con lo que devuelve el backend
+(ver `demoStatus.test.js` y `frontendDemoLeak.test.js`). Si una captura del frontend
+muestra una cuenta que ya no existe (p. ej. una `sistema@demo.com` de una versión
+vieja del seed), la causa casi siempre es una de estas tres — en ese orden de
+probabilidad:
+
+1. **El deployment que se está viendo no es el commit más nuevo.** Vercel puede
+   tener un *Preview* viejo abierto en una pestaña, o el dominio de Production
+   apuntando a un deploy anterior si un deploy más nuevo falló o no se promovió.
+   - Vercel Dashboard → proyecto → pestaña **Deployments** → cada fila muestra el
+     hash de commit y el mensaje. Confirmar que el deployment marcado **Production**
+     (dominio real) corresponde al último commit de `main`.
+   - Si no lo es: abrir el deployment correcto → **⋯** → **Promote to Production**.
+2. **El navegador tiene el HTML/JS viejo en caché.** Los assets de Vite salen con
+   hash en el nombre de archivo (`index-XXXXXXXX.js`) — un asset nunca cambia de
+   contenido bajo el mismo nombre, así que cachearlo agresivamente es seguro. Lo que
+   **no** debe quedar cacheado de forma larga es `index.html` (el único archivo que
+   referencia el hash del bundle actual); Vercel ya lo sirve por default sin
+   `Cache-Control` inmutable (no hay ninguna regla de ese tipo en `vercel.json`,
+   confirmado). Igual, para descartarlo del todo: hard reload
+   (`Ctrl+Shift+R` / `Cmd+Shift+R`) o DevTools → Network → *Disable cache* → recargar.
+3. **El build de Vercel usó caché de una build anterior** (poco común, pero
+   posible si cambiaron dependencias). Vercel Dashboard → el deployment → **⋯** →
+   **Redeploy** → destildar **"Use existing Build Cache"**.
+
+No hay Service Worker en el proyecto (nada que "desregistrar").
+
+Como último chequeo, siempre verificable sin ambigüedad: `GET /api/demo/status`
+contra el backend real (`https://sispasantias-api.onrender.com/api/demo/status`) —
+si esa respuesta ya no trae la cuenta vieja, cualquier UI que siga mostrándola es
+100% un problema de deployment/caché del lado de Vercel, no del código.
 
 ---
 

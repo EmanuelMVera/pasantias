@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { empresaService, ofertaService } from '../../services/api';
 import { useEmpresa } from '../../hooks/useEmpresa';
+import { useAuth } from '../../hooks/useAuth';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import Toast from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
@@ -89,8 +90,16 @@ export default function EmpresaDashboardPage() {
   // empresa" (reclutador no puede editar, MiEmpresaPage ya lo restringe;
   // esto evita mostrarle un botón que dice "Editar" cuando en su caso es
   // de solo lectura). FE-05: viene de EmpresaContext, no de este fetch.
-  const { esReclutador } = useEmpresa();
+  const { esReclutador, esAdminEmpresa } = useEmpresa();
+  const { usuario } = useAuth();
   const { toast, showToast } = useToast();
+
+  // RBAC-01: admin_empresa puede pausar/cerrar/reactivar CUALQUIER oferta de
+  // su empresa (control institucional). El reclutador solo puede hacerlo con
+  // su propia oferta (o una histórica sin responsable registrado) — el
+  // backend ya lo exige, esto solo evita mostrarle un botón que va a fallar.
+  const puedeGestionarEstado = (oferta) =>
+    esAdminEmpresa || !oferta.creadaPorUsuarioId || oferta.creadaPorUsuarioId === usuario?.id;
 
   const cargarMetricas = useCallback(async () => {
     setError('');
@@ -138,7 +147,7 @@ export default function EmpresaDashboardPage() {
   const handleCambiarEstado = async (id, estado) => {
     setGuardando(id);
     try {
-      await ofertaService.update(id, { estado });
+      await ofertaService.cambiarEstado(id, estado);
       setOfertas((prev) => prev.map((o) => (o.id === id ? { ...o, estado } : o)));
       // Actualiza la métrica de activas/cerradas sin recargar todo
       if (metricas) {
@@ -243,6 +252,7 @@ export default function EmpresaDashboardPage() {
               <tr>
                 <th>Título</th>
                 <th>Área / Modalidad</th>
+                <th>Responsable</th>
                 <th>Ciudad</th>
                 <th>Estado</th>
                 <th>Vacantes</th>
@@ -265,6 +275,11 @@ export default function EmpresaDashboardPage() {
                   <td>
                     <div>{o.area ?? '—'}</div>
                     {o.modalidad && <small className={styles.modalidadSmall}>{o.modalidad}</small>}
+                  </td>
+                  <td>
+                    {o.creadaPor
+                      ? `${o.creadaPor.nombre} ${o.creadaPor.apellido}`
+                      : <span className={styles.modalidadSmall}>Responsable no registrado</span>}
                   </td>
                   <td>{o.ciudad || '—'}</td>
                   <td>
@@ -290,6 +305,10 @@ export default function EmpresaDashboardPage() {
                   <td className={styles.accionesTd}>
                     {guardando === o.id ? (
                       <span className={styles.guardandoSpan}>Guardando...</span>
+                    ) : !puedeGestionarEstado(o) ? (
+                      <span className={styles.estadoNota} title="Solo el reclutador responsable puede modificar el estado de esta oferta.">
+                        Solo el responsable
+                      </span>
                     ) : (
                       <>
                         {o.estado === 'activa' && (

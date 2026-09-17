@@ -115,6 +115,18 @@ services:
         sync: false
       - key: SEED_ADMIN_PASSWORD
         sync: false
+      # Segundo administrador — OPCIONAL (dejar sin cargar estas 4 si no hace
+      # falta un segundo admin). Si se carga el email, la password es
+      # obligatoria o el seed aborta sin crear nada. Nunca aparece en
+      # LoginPage ni en /api/demo/status. Ver docs/DEPLOYMENT.md.
+      - key: SEED_SECOND_ADMIN_EMAIL
+        sync: false
+      - key: SEED_SECOND_ADMIN_PASSWORD
+        sync: false
+      - key: SEED_SECOND_ADMIN_NAME
+        sync: false
+      - key: SEED_SECOND_ADMIN_LASTNAME
+        sync: false
 
       # ── Flags ─────────────────────────────────────────────────────────────
       - key: SEED_PRESENTACION_ON_BOOT

@@ -226,4 +226,66 @@ describe('seedPresentacion — escenario de 3 cuentas', () => {
       }
     }
   });
+
+  // ── Candidatos sintéticos (autocontenido — ya no depende de seedDemo.js) ──
+
+  test('crea exactamente 10 candidatos sintéticos candidatoNN@demo.invalid, cada uno con Perfil', async () => {
+    await ejecutarSeedPresentacion({ verbose: false });
+
+    const candidatos = await Usuario.findAll({
+      where: { email: { [Op.like]: '%@demo.invalid' } },
+      attributes: ['id', 'email', 'rol'],
+    });
+    expect(candidatos).toHaveLength(10);
+    for (const c of candidatos) {
+      expect(c.email).toMatch(/^candidato\d{2}@demo\.invalid$/);
+      expect(['alumno', 'egresado']).toContain(c.rol);
+    }
+
+    const perfiles = await Perfil.count({ where: { usuarioId: candidatos.map((c) => c.id) } });
+    expect(perfiles).toBe(10);
+  });
+
+  test('los candidatos sintéticos NO aparecen en GET /api/demo/status', async () => {
+    await ejecutarSeedPresentacion({ verbose: false });
+    const request = require('supertest');
+    const app = require('../src/app');
+
+    const res = await request(app).get('/api/demo/status');
+    expect(res.status).toBe(200);
+    expect(res.body.accounts).toHaveLength(3);
+    const emails = res.body.accounts.map((c) => c.email);
+    expect(emails.some((e) => e.endsWith('@demo.invalid'))).toBe(false);
+  });
+
+  test('conteo determinístico: exactamente 14 postulaciones (4 del alumno demo + 10 del pool sintético), sin importar qué otros seeds corrieron antes', async () => {
+    await ejecutarSeedPresentacion({ verbose: false });
+    const empresa = await Empresa.findOne({ where: { razonSocial: RAZON_SOCIAL } });
+    const ofertas = await Oferta.findAll({ where: { empresaId: empresa.id }, attributes: ['id'] });
+
+    const total = await Postulacion.count({ where: { ofertaId: ofertas.map((o) => o.id) } });
+    expect(total).toBe(14);
+
+    // UNIQUE(usuarioId, ofertaId): cada candidato (incluido el alumno demo)
+    // postula una sola vez por oferta — nunca dos postulaciones del mismo par.
+    const postulaciones = await Postulacion.findAll({
+      where: { ofertaId: ofertas.map((o) => o.id) },
+      attributes: ['usuarioId', 'ofertaId'],
+    });
+    const pares = postulaciones.map((p) => `${p.usuarioId}-${p.ofertaId}`);
+    expect(new Set(pares).size).toBe(pares.length);
+  });
+
+  test('idempotente: correr el seed dos veces no duplica los candidatos sintéticos ni las postulaciones', async () => {
+    await ejecutarSeedPresentacion({ verbose: false });
+    await ejecutarSeedPresentacion({ verbose: false });
+
+    const candidatos = await Usuario.count({ where: { email: { [Op.like]: '%@demo.invalid' } } });
+    expect(candidatos).toBe(10);
+
+    const empresa = await Empresa.findOne({ where: { razonSocial: RAZON_SOCIAL } });
+    const ofertas = await Oferta.findAll({ where: { empresaId: empresa.id }, attributes: ['id'] });
+    const total = await Postulacion.count({ where: { ofertaId: ofertas.map((o) => o.id) } });
+    expect(total).toBe(14);
+  });
 });

@@ -10,6 +10,7 @@
     "db:admin:status": "node src/utils/adminStatus.js",
     "db:seed:demo": "node src/utils/seedDemo.js",
     "db:seed:presentacion": "node src/utils/seedPresentacion.js",
+    "db:seed:presentacion:status": "node src/utils/seedPresentacionStatus.js",
     "db:migrate": "node scripts/migrate.js up",
     "db:migrate:down": "node scripts/migrate.js down",
     "db:migrate:status": "node scripts/migrate.js status",

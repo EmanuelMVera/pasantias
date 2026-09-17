@@ -54,6 +54,14 @@ module.exports = (sequelize) => {
         'aprobar_solicitud_reclutador',
         'rechazar_solicitud_reclutador',
         'solicitar_recuperacion_miembro', // EST-10
+        'importar_alumnos_csv',          // migración 014 — faltaba acá (bug: quedaba
+                                          // desincronizado del ENUM de Postgres y
+                                          // Sequelize rechazaba el valor antes de
+                                          // llegar a la DB, perdiendo la auditoría)
+        'pausar_oferta',                 // migración 015 — RBAC-01
+        'reactivar_oferta',              // migración 015 — RBAC-01
+        'exportar_logs',                 // migración 015
+        'exportar_estadisticas',         // migración 015
         'sistema'
       ),
       allowNull: false,

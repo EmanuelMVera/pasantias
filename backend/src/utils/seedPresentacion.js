@@ -25,10 +25,17 @@
  * Además siembra: 1 empresa aprobada + logo por URL externa, 7 ofertas en
  * todos los estados (activa/moderada, activa sin moderar, pausada, cerrada,
  * rechazada), postulaciones (4 del alumno demo con historial de estados
- * completo + un pool de candidatos reales para el reclutador), conversaciones
- * de chat entre los 3 roles, notificaciones de todos los tipos, solicitudes
- * de reclutador y de empresa pendientes, y registros de auditoría
- * (activity_logs).
+ * completo + 10 de un pool de candidatos SINTÉTICOS creados por este mismo
+ * seed — ver CANDIDATOS_SINTETICOS más abajo), conversaciones de chat entre
+ * los 3 roles, notificaciones de todos los tipos, solicitudes de reclutador
+ * y de empresa pendientes, y registros de auditoría (activity_logs).
+ *
+ * Autocontenido a propósito: versiones anteriores tomaban el pool de
+ * candidatos de cuentas `@itbeltran.com.ar` creadas por OTRO seed
+ * (seedDemo.js) — si ese script no había corrido antes, el pool quedaba
+ * vacío y las postulaciones caían de 14 a 4 en silencio, sin error. Ahora
+ * este seed crea sus propios ~10 candidatos, así el conteo es siempre el
+ * mismo sin depender de qué otros seeds corrieron antes.
  *
  * Es IDEMPOTENTE: cada corrida borra su propio escenario anterior (por email /
  * razón social) y lo vuelve a crear. No toca el resto de los datos demo.
@@ -93,13 +100,43 @@ const RAZON_SOCIAL = 'Delta Innovación IT';
 const EMPRESA_CUIT = '30712345689';
 const SOLICITUD_EMPRESA_EMAIL = 'registro@nubecode.demo';
 
+// Pool de candidatos SINTÉTICOS (autocontenido, ver comentario de cabecera).
+// Namespace `@demo.invalid` (dominio reservado por RFC 2606, nunca resuelve
+// — mismo criterio que las IPs de auditoría en TEST-NET-3 más abajo) para
+// que se distingan a simple vista de las 3 cuentas demo "de verdad". No se
+// exponen en LoginPage ni en GET /api/demo/status (CUENTAS_DEMO en
+// demo.controller.js es una lista fija de esas 3, no una query a la tabla
+// usuarios). Comparten la misma password que las 3 cuentas demo — no es un
+// secreto nuevo, es la MISMA `Demo1234!` ya documentada en README/DEPLOYMENT;
+// no se crean para tener login individual, solo para poblar el pipeline de
+// candidatos del reclutador con datos realistas y estables.
+const CANDIDATOS_SINTETICOS = [
+  { n: 1,  nombre: 'Sofía',      apellido: 'Ramírez',  rol: 'alumno',   carrera: 'Tecnicatura Superior en Programación',        ciudad: 'Avellaneda', img: 40 },
+  { n: 2,  nombre: 'Nicolás',    apellido: 'Duarte',    rol: 'alumno',   carrera: 'Tecnicatura Superior en Análisis de Sistemas', ciudad: 'Quilmes',    img: 41 },
+  { n: 3,  nombre: 'Valentina',  apellido: 'Acosta',    rol: 'alumno',   carrera: 'Tecnicatura Superior en Redes',                ciudad: 'Lanús',      img: 42 },
+  { n: 4,  nombre: 'Tomás',      apellido: 'Benítez',   rol: 'alumno',   carrera: 'Tecnicatura Superior en Programación',        ciudad: 'Avellaneda', img: 43 },
+  { n: 5,  nombre: 'Camila',     apellido: 'Ortiz',      rol: 'alumno',   carrera: 'Tecnicatura Superior en Análisis de Sistemas', ciudad: 'Quilmes',    img: 44 },
+  { n: 6,  nombre: 'Facundo',    apellido: 'Rojas',      rol: 'alumno',   carrera: 'Tecnicatura Superior en Programación',        ciudad: 'Lanús',      img: 45 },
+  { n: 7,  nombre: 'Julieta',    apellido: 'Vega',       rol: 'alumno',   carrera: 'Tecnicatura Superior en Redes',                ciudad: 'Avellaneda', img: 46 },
+  { n: 8,  nombre: 'Agustín',    apellido: 'Molina',     rol: 'egresado', carrera: 'Tecnicatura Superior en Análisis de Sistemas', ciudad: 'Quilmes',    img: 47 },
+  { n: 9,  nombre: 'Milagros',   apellido: 'Paz',        rol: 'alumno',   carrera: 'Tecnicatura Superior en Programación',        ciudad: 'Lanús',      img: 48 },
+  { n: 10, nombre: 'Bruno',      apellido: 'Suárez',     rol: 'egresado', carrera: 'Tecnicatura Superior en Programación',        ciudad: 'Avellaneda', img: 49 },
+];
+const candidatoEmail = (n) => `candidato${String(n).padStart(2, '0')}@demo.invalid`;
+
 // URL https externa estable para el logo de la empresa demo — nunca un
 // objeto R2 ni una fila Archivo (sección 5 del pedido: sin almacenar
 // recursos demo en el storage real). ui-avatars.com genera un logo simple a
 // partir del nombre, sin depender de un servicio de fotos de stock.
 const LOGO_EMPRESA_URL = 'https://ui-avatars.com/api/?name=Delta+Innovacion&background=1e3a5f&color=fff&size=150&bold=true&format=png';
 
-const OUR_EMAILS = [EMP_ADMIN.email, RECLUTA.email, ALUMNO.email];
+// Usado SOLO para el cleanup de limpiar() — incluye los 3 logins demo y los
+// candidatos sintéticos. GET /api/demo/status usa EMP_ADMIN/RECLUTA/ALUMNO
+// directamente (nunca esta lista), así que los candidatos jamás aparecen ahí.
+const OUR_EMAILS = [
+  EMP_ADMIN.email, RECLUTA.email, ALUMNO.email,
+  ...CANDIDATOS_SINTETICOS.map((c) => candidatoEmail(c.n)),
+];
 
 // Log de progreso: ruidoso cuando se corre como script (`npm run db:seed:presentacion`),
 // silencioso cuando lo invoca el arranque del servidor (ver seedPresentacionSiFalta).
@@ -619,26 +656,54 @@ async function sembrar(transaction) {
     cadena: ['en_revision', 'rechazado'],
   });
 
-  // 6b. Pool de candidatos REALES (alumnos/egresados demo existentes) para que
-  //     el reclutador tenga a quién gestionar en las ofertas activas.
-  const poolAlumnos = await Usuario.findAll({
-    where: { rol: { [Op.in]: ['alumno', 'egresado'] }, email: { [Op.like]: '%@itbeltran.com.ar' } },
-    order: [['id', 'ASC']],
-    limit: 10,
-    transaction,
-  });
+  // 6b. Pool de candidatos SINTÉTICOS (creados acá mismo, ver
+  //     CANDIDATOS_SINTETICOS) para que el reclutador tenga a quién
+  //     gestionar en las ofertas activas — autocontenido, no depende de que
+  //     otro seed haya corrido antes.
+  say('🚀 Creando candidatos sintéticos del pool...');
+  const poolAlumnos = [];
+  for (const c of CANDIDATOS_SINTETICOS) {
+    const candidato = await Usuario.create({
+      ...base,
+      rol: c.rol,
+      nombre: c.nombre,
+      apellido: c.apellido,
+      email: candidatoEmail(c.n),
+      ubicacion: `${c.ciudad}, Buenos Aires`,
+      fotoPerfil: `https://i.pravatar.cc/150?img=${c.img}`,
+      ultimoAcceso: daysAgo(c.n, 9 + (c.n % 8)),
+      createdAt: daysAgo(50 - c.n),
+    }, { transaction });
+    await Perfil.create({
+      usuarioId: candidato.id,
+      carrera: c.carrera,
+      areaInteres: 'Desarrollo Web',
+      disponibilidad: 'inmediata',
+      habilidades: ['JavaScript', 'Git'],
+      visibilidadPerfil: true,
+      createdAt: daysAgo(50 - c.n),
+    }, { transaction });
+    poolAlumnos.push(candidato);
+  }
 
+  // diasBase explícito por entrada (no una fórmula lineal por índice): cada
+  // oferta tiene su propia fecha de publicación y la postulación tiene que
+  // ser POSTERIOR a ella. 'datos' se publicó hace solo 2 días (fechaPublicacion
+  // daysAgo(2)) — un diasBase genérico (ej. 22) la haría "postular" 20 días
+  // antes de que la oferta existiera. Bug real encontrado al volver
+  // determinístico el pool de candidatos (antes quedaba enmascarado porque el
+  // pool solía estar vacío en el entorno de test).
   const poolPlan = [
-    { oferta: 'frontend', estado: 'preseleccionado', cadena: ['en_revision', 'preseleccionado'] },
-    { oferta: 'frontend', estado: 'en_revision', cadena: ['en_revision'] },
-    { oferta: 'frontend', estado: 'rechazado', cadena: ['en_revision', 'rechazado'] },
-    { oferta: 'backend', estado: 'entrevista', cadena: ['en_revision', 'preseleccionado', 'entrevista'] },
-    { oferta: 'backend', estado: 'en_revision', cadena: ['en_revision'] },
-    { oferta: 'qa', estado: 'rechazado', cadena: ['en_revision', 'rechazado'] },
-    { oferta: 'qa', estado: 'en_revision', cadena: ['en_revision'] },
-    { oferta: 'datos', estado: 'en_revision', cadena: ['en_revision'] },
-    { oferta: 'soporte', estado: 'preseleccionado', cadena: ['en_revision', 'preseleccionado'] },
-    { oferta: 'ux', estado: 'contratado', cadena: ['en_revision', 'preseleccionado', 'entrevista', 'contratado'] },
+    { oferta: 'frontend', estado: 'preseleccionado', cadena: ['en_revision', 'preseleccionado'], diasBase: 8 },
+    { oferta: 'frontend', estado: 'en_revision', cadena: ['en_revision'], diasBase: 10 },
+    { oferta: 'frontend', estado: 'rechazado', cadena: ['en_revision', 'rechazado'], diasBase: 12 },
+    { oferta: 'backend', estado: 'entrevista', cadena: ['en_revision', 'preseleccionado', 'entrevista'], diasBase: 6 },
+    { oferta: 'backend', estado: 'en_revision', cadena: ['en_revision'], diasBase: 9 },
+    { oferta: 'qa', estado: 'rechazado', cadena: ['en_revision', 'rechazado'], diasBase: 7 },
+    { oferta: 'qa', estado: 'en_revision', cadena: ['en_revision'], diasBase: 13 },
+    { oferta: 'datos', estado: 'en_revision', cadena: ['en_revision'], diasBase: 1 },
+    { oferta: 'soporte', estado: 'preseleccionado', cadena: ['en_revision', 'preseleccionado'], diasBase: 15 },
+    { oferta: 'ux', estado: 'contratado', cadena: ['en_revision', 'preseleccionado', 'entrevista', 'contratado'], diasBase: 20 },
   ];
 
   for (let i = 0; i < poolPlan.length && i < poolAlumnos.length; i++) {
@@ -648,7 +713,7 @@ async function sembrar(transaction) {
       usuario: cand,
       oferta: ofertas[plan.oferta],
       estado: plan.estado,
-      diasBase: 8 + i * 2,
+      diasBase: plan.diasBase,
       cartaPresentacion:
         `Hola, soy ${cand.nombre} ${cand.apellido}, estudiante de IT Beltrán. Me postulo a esta ` +
         'búsqueda porque se alinea con lo que estoy estudiando y busco mi primera experiencia laboral.',
@@ -915,6 +980,11 @@ module.exports = {
   EMP_ADMIN,
   RECLUTA,
   ALUMNO,
+  // Consumidos por seedPresentacionStatus.js (diagnóstico de solo lectura) —
+  // así el alcance de "qué es del escenario demo" vive en un solo lugar.
+  RAZON_SOCIAL,
+  OUR_EMAILS,
+  SOLICITUD_EMPRESA_EMAIL,
 };
 
 // ── CLI: node src/utils/seedPresentacion.js ─────────────────────────────────
@@ -943,7 +1013,8 @@ if (require.main === module) {
       console.log('   se crea únicamente con `npm run db:seed:admin`, ver docs/DEPLOYMENT.md.)');
       console.log(`  Empresa:        ${r.empresa} (aprobada) — CUIT ${EMPRESA_CUIT}`);
       console.log(`  Ofertas:        ${r.ofertas} (activa/moderada, activa sin moderar, pausada, cerrada, rechazada)`);
-      console.log(`  Postulaciones:  ${r.postulaciones} (4 del alumno demo con historial completo)`);
+      console.log(`  Postulaciones:  ${r.postulaciones} (4 del alumno demo con historial completo + 10 de candidatos sintéticos)`);
+      console.log(`  Candidatos:     10 usuarios sintéticos candidatoNN@demo.invalid (sin login en LoginPage, ver DEPLOYMENT.md)`);
       console.log('  Chats:          4 conversaciones (17 mensajes) entre las 3 cuentas demo');
       console.log('  Notificaciones: 18 (todos los tipos y prioridades)');
       console.log(`  Solicitudes:    1 de reclutador (pendiente) + 1 de empresa (pendiente)`);

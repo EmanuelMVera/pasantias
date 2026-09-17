@@ -24,46 +24,61 @@ async function resolverFotoPerfilBatch(usuarioIds) {
 }
 
 /**
- * Resuelve razonSocial y empresaId de un único usuario con rol 'empresa'.
+ * Resuelve razonSocial, logo, empresaId y rolInterno de un único usuario con
+ * rol 'empresa'. rolInterno decide la identidad visual en el frontend
+ * (admin_empresa → institucional; reclutador → persona) — ver Navbar.jsx.
  * 1. Busca membresía activa en empresa_usuarios
- * 2. Fallback: propietario directo (empresa.usuarioId)
+ * 2. Fallback: propietario directo (empresa.usuarioId) → admin_empresa implícito
  */
 async function resolverEmpresaData(usuarioId) {
   const membresia = await EmpresaUsuario.findOne({
     where: { usuarioId, activo: true },
-    attributes: [],
-    include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial'] }],
+    attributes: ['rolInterno'],
+    include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'logo'] }],
   });
   if (membresia?.empresa?.razonSocial) {
-    return { razonSocial: membresia.empresa.razonSocial, empresaId: membresia.empresa.id };
+    return {
+      razonSocial: membresia.empresa.razonSocial,
+      logo: membresia.empresa.logo,
+      empresaId: membresia.empresa.id,
+      rolInterno: membresia.rolInterno,
+    };
   }
-  const empresa = await Empresa.findOne({ where: { usuarioId }, attributes: ['id', 'razonSocial'] });
+  const empresa = await Empresa.findOne({ where: { usuarioId }, attributes: ['id', 'razonSocial', 'logo'] });
   return empresa
-    ? { razonSocial: empresa.razonSocial, empresaId: empresa.id }
-    : { razonSocial: null, empresaId: null };
+    ? { razonSocial: empresa.razonSocial, logo: empresa.logo, empresaId: empresa.id, rolInterno: 'admin_empresa' }
+    : { razonSocial: null, logo: null, empresaId: null, rolInterno: null };
 }
 
 /**
- * Batch lookup de razonSocial + empresaId para múltiples usuarios empresa.
- * @returns {Object} map { usuarioId: { razonSocial, empresaId } }
+ * Batch lookup de razonSocial + logo + empresaId + rolInterno para múltiples
+ * usuarios empresa.
+ * @returns {Object} map { usuarioId: { razonSocial, logo, empresaId, rolInterno } }
  */
 async function resolverEmpresasBatch(usuarioIds) {
   if (!usuarioIds?.length) return {};
   const [membresias, directas] = await Promise.all([
     EmpresaUsuario.findAll({
       where: { usuarioId: { [Op.in]: usuarioIds }, activo: true },
-      attributes: ['usuarioId'],
-      include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial'] }],
+      attributes: ['usuarioId', 'rolInterno'],
+      include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'logo'] }],
     }),
     Empresa.findAll({
       where: { usuarioId: { [Op.in]: usuarioIds } },
-      attributes: ['id', 'usuarioId', 'razonSocial'],
+      attributes: ['id', 'usuarioId', 'razonSocial', 'logo'],
     }),
   ]);
   const map = {};
-  directas.forEach((e) => { map[e.usuarioId] = { razonSocial: e.razonSocial, empresaId: e.id }; });
+  directas.forEach((e) => {
+    map[e.usuarioId] = { razonSocial: e.razonSocial, logo: e.logo, empresaId: e.id, rolInterno: 'admin_empresa' };
+  });
   membresias.forEach((m) => {
-    if (m.empresa?.razonSocial) map[m.usuarioId] = { razonSocial: m.empresa.razonSocial, empresaId: m.empresa.id };
+    if (m.empresa?.razonSocial) {
+      map[m.usuarioId] = {
+        razonSocial: m.empresa.razonSocial, logo: m.empresa.logo,
+        empresaId: m.empresa.id, rolInterno: m.rolInterno,
+      };
+    }
   });
   return map;
 }
@@ -145,7 +160,7 @@ async function buscarUsuarios(userId, rol, q) {
     resultados = [...companeros, ...alumnos.filter((u) => !vistos.has(u.id))].slice(0, 20);
   }
 
-  const data = resultados.map((u) => ({ ...u.toJSON(), razonSocial: null, empresaId: null }));
+  const data = resultados.map((u) => ({ ...u.toJSON(), razonSocial: null, logo: null, empresaId: null, rolInterno: null }));
 
   const sinFoto = data.filter((u) => !u.fotoPerfil).map((u) => u.id);
   if (sinFoto.length > 0) {
@@ -158,7 +173,9 @@ async function buscarUsuarios(userId, rol, q) {
     const rsMap = await resolverEmpresasBatch(empresaUserIds);
     data.forEach((u) => {
       u.razonSocial = rsMap[u.id]?.razonSocial ?? null;
+      u.logo        = rsMap[u.id]?.logo        ?? null;
       u.empresaId   = rsMap[u.id]?.empresaId   ?? null;
+      u.rolInterno  = rsMap[u.id]?.rolInterno  ?? null;
     });
   }
 
@@ -208,7 +225,9 @@ async function obtenerConversaciones(userId) {
     const empresaMap = await resolverEmpresasBatch(empresaUserIds);
     conversaciones.forEach((c) => {
       c.usuario.razonSocial = empresaMap[c.usuario.id]?.razonSocial ?? null;
+      c.usuario.logo        = empresaMap[c.usuario.id]?.logo        ?? null;
       c.usuario.empresaId   = empresaMap[c.usuario.id]?.empresaId   ?? null;
+      c.usuario.rolInterno  = empresaMap[c.usuario.id]?.rolInterno  ?? null;
     });
   }
 
@@ -244,12 +263,16 @@ async function obtenerHistorial(userId, partnerId, { page = 1, limit = 50, offse
 
   const partnerData = partner.toJSON();
   if (partner.rol === 'empresa') {
-    const { razonSocial, empresaId } = await resolverEmpresaData(partnerId);
+    const { razonSocial, logo, empresaId, rolInterno } = await resolverEmpresaData(partnerId);
     partnerData.razonSocial = razonSocial;
+    partnerData.logo        = logo;
     partnerData.empresaId   = empresaId;
+    partnerData.rolInterno  = rolInterno;
   } else {
     partnerData.razonSocial = null;
+    partnerData.logo        = null;
     partnerData.empresaId   = null;
+    partnerData.rolInterno  = null;
   }
 
   if (!partnerData.fotoPerfil) {

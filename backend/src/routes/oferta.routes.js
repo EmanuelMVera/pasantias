@@ -10,10 +10,16 @@
  * Rutas protegidas (alumno/egresado):
  * - GET /recomendadas   → Buscador inteligente basado en el perfil del alumno [NUEVO]
  *
- * Rutas protegidas (solo empresas):
- * - POST /              → Publica una nueva oferta
- * - PUT /:id            → Edita una oferta existente
- * - DELETE /:id         → Cierra una oferta (soft delete)
+ * Rutas protegidas (empresa):
+ * - POST /              → Publica una nueva oferta — SOLO reclutador. La empresa
+ *                          representa una entidad institucional, no publica ofertas
+ *                          operativas (feedback de la profesora, iteración RBAC-01).
+ * - PUT /:id            → Edita el contenido de una oferta — SOLO reclutador, y
+ *                          solo si es el creador (o la oferta es histórica sin
+ *                          creador registrado). No acepta cambios de `estado`.
+ * - PATCH /:id/estado   → Pausar/reactivar/cerrar — reclutador (solo su propia
+ *                          oferta) o admin_empresa (cualquier oferta de su empresa,
+ *                          control institucional). Único lugar donde cambia `estado`.
  *
  * ⚠️ ORDEN IMPORTANTE: /recomendadas debe ir ANTES de /:id para que Express
  *    no interprete la palabra "recomendadas" como un parámetro de ID.
@@ -41,18 +47,29 @@ router.get(
 router.get('/', asyncHandler(ctrl.getOfertas));           // Lista de ofertas con filtros opcionales
 router.get('/:id', asyncHandler(ctrl.getOfertaById));     // Detalle de una oferta y su empresa
 
-// ── Rutas empresa (admin_empresa y reclutador pueden crear/editar ofertas) ─────
-// verifyEmpresaMember inyecta req.empresa para los controllers
-// authorizeEmpresaRoles restringe a los roles con permisos de escritura
-const puedeEscribirOferta = [
+// ── Rutas empresa ────────────────────────────────────────────────────────────
+// verifyEmpresaMember inyecta req.empresa/req.miembroEmpresa para los controllers.
+// Crear y editar CONTENIDO es exclusivo del reclutador (RBAC-01): la empresa es
+// una entidad institucional, no publica ni redacta ofertas operativas.
+const soloReclutador = [
+  verifyToken,
+  authorizeRoles('empresa'),
+  verifyEmpresaMember,
+  authorizeEmpresaRoles('reclutador'),
+];
+
+// Cambiar estado (pausar/reactivar/cerrar) sí lo puede hacer admin_empresa,
+// como control institucional — además del reclutador sobre su propia oferta.
+// El controller decide el alcance exacto por rol (ver cambiarEstadoOferta).
+const puedeCambiarEstado = [
   verifyToken,
   authorizeRoles('empresa'),
   verifyEmpresaMember,
   authorizeEmpresaRoles('admin_empresa', 'reclutador'),
 ];
 
-router.post('/', ...puedeEscribirOferta, asyncHandler(ctrl.createOferta));      // Crear oferta
-router.put('/:id', ...puedeEscribirOferta, asyncHandler(ctrl.updateOferta));    // Editar oferta
-router.delete('/:id', ...puedeEscribirOferta, asyncHandler(ctrl.deleteOferta)); // Cerrar oferta
+router.post('/', ...soloReclutador, asyncHandler(ctrl.createOferta));                    // Crear oferta
+router.put('/:id', ...soloReclutador, asyncHandler(ctrl.updateOferta));                  // Editar contenido
+router.patch('/:id/estado', ...puedeCambiarEstado, asyncHandler(ctrl.cambiarEstadoOferta)); // Pausar/reactivar/cerrar
 
 module.exports = router;

@@ -54,13 +54,23 @@ const ROL_LABEL = {
 };
 
 /**
- * Devuelve "Nombre Apellido — Empresa SRL" si el usuario tiene razonSocial.
- * Para alumnos/egresados/admin devuelve solo "Nombre Apellido".
+ * Identidad a mostrar para un interlocutor de chat, coherente con Navbar.jsx:
+ * admin_empresa → identidad institucional (razón social primero); reclutador
+ * → persona, con la empresa como contexto secundario; el resto, su nombre.
  */
 function displayNombre(usuario) {
   const nombre = `${usuario?.nombre ?? ''} ${usuario?.apellido ?? ''}`.trim() || 'Usuario';
+  if (usuario?.rolInterno === 'admin_empresa' && usuario?.razonSocial) return usuario.razonSocial;
   if (usuario?.razonSocial) return `${nombre} — ${usuario.razonSocial}`;
   return nombre;
+}
+
+/** src/nombre/apellido para el Avatar, con el mismo criterio institucional. */
+function displayAvatarProps(usuario) {
+  if (usuario?.rolInterno === 'admin_empresa') {
+    return { src: usuario?.logo || null, nombre: usuario?.razonSocial || usuario?.nombre, apellido: '' };
+  }
+  return { src: usuario?.fotoPerfil, nombre: usuario?.nombre, apellido: usuario?.apellido };
 }
 
 /**
@@ -78,9 +88,7 @@ function ConversacionItem({ conv, activo, onClick }) {
       onKeyDown={(e) => e.key === 'Enter' && onClick()}
     >
       <Avatar
-        nombre={conv.usuario?.nombre}
-        apellido={conv.usuario?.apellido}
-        src={conv.usuario?.fotoPerfil}
+        {...displayAvatarProps(conv.usuario)}
         size={36}
         color={activo ? '#fff' : 'var(--primary)'}
         style={{ fontWeight: 800, fontSize: 36 * 0.38 }}
@@ -213,7 +221,7 @@ function NuevoChatModal({ onClose, onSeleccionar }) {
               tabIndex={0}
               onKeyDown={(e) => e.key === 'Enter' && onSeleccionar(u)}
             >
-              <Avatar nombre={u.nombre} size={40} />
+              <Avatar {...displayAvatarProps(u)} size={40} />
               <div className={styles.modalResultadoInfo}>
                 <strong>{displayNombre(u)}</strong>
                 <span>{u.email}</span>
@@ -505,9 +513,7 @@ export default function ChatPage() {
                   ←
                 </button>
                 <Avatar
-                  nombre={partnerActivo?.nombre}
-                  apellido={partnerActivo?.apellido}
-                  src={partnerActivo?.fotoPerfil}
+                  {...displayAvatarProps(partnerActivo)}
                   size={36}
                   style={{ fontWeight: 800, fontSize: 36 * 0.38 }}
                 />

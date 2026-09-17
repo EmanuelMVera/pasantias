@@ -86,7 +86,10 @@ async function obtenerOfertasConConteo(empresaId, { estado, page = 1, limit = 20
   const { count, rows: ofertas } = await Oferta.findAndCountAll({
     where,
     attributes: ['id', 'titulo', 'modalidad', 'ciudad', 'estado', 'moderada',
-                 'cantidadVacantes', 'fechaLimite', 'area', 'createdAt'],
+                 'cantidadVacantes', 'fechaLimite', 'area', 'createdAt', 'creadaPorUsuarioId'],
+    // Responsable de la oferta (RBAC-01): null en ofertas históricas anteriores
+    // a la migración 013 — el frontend debe mostrar "Responsable no registrado".
+    include: [{ model: Usuario, as: 'creadaPor', attributes: ['id', 'nombre', 'apellido', 'fotoPerfil'] }],
     order: [['createdAt', 'DESC'], ['id', 'DESC']],
     limit,
     offset,

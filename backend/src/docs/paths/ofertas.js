@@ -2,7 +2,10 @@
 const { operation, ok, paginated, message, REF } = require('../helpers');
 
 const T = 'ofertas';
-const R_ESCRIBE = ['empresa/admin_empresa', 'empresa/reclutador'];
+// RBAC-01: la empresa es una entidad institucional — solo el reclutador crea y
+// edita contenido. admin_empresa solo cambia el estado (control institucional).
+const R_CREA_EDITA = ['empresa/reclutador'];
+const R_CAMBIA_ESTADO = ['empresa/admin_empresa', 'empresa/reclutador'];
 
 const filtros = [
   REF.param('estadoQuery'),
@@ -25,8 +28,8 @@ module.exports = {
     }),
     post: operation({
       tag: T, id: 'ofertasCreate', summary: 'Publicar una oferta',
-      description: 'La oferta queda `moderada=false` hasta que un admin la aprueba.',
-      roles: R_ESCRIBE, csrf: true, body: 'OfertaCreate',
+      description: 'La oferta queda `moderada=false` hasta que un admin la aprueba. Solo reclutador.',
+      roles: R_CREA_EDITA, csrf: true, body: 'OfertaCreate',
       responses: { 201: message({ data: REF.schema('Oferta') }, { code: 201 }) },
       errors: ['400', '401', '403', '403csrf', '404empresa', '500'],
     }),
@@ -41,17 +44,26 @@ module.exports = {
       errors: ['404'],
     }),
     put: operation({
-      tag: T, id: 'ofertasUpdate', summary: 'Editar una oferta de mi empresa',
-      roles: R_ESCRIBE, csrf: true, params: ['id'], body: 'OfertaUpdate',
+      tag: T, id: 'ofertasUpdate', summary: 'Editar el contenido de una oferta de mi empresa',
+      description: 'Solo el reclutador responsable (`creadaPorUsuarioId`) — o cualquier reclutador si la oferta es histórica sin responsable registrado. No acepta `estado`; usar `PATCH /{id}/estado`.',
+      roles: R_CREA_EDITA, csrf: true, params: ['id'], body: 'OfertaUpdate',
       responses: { 200: ok('Oferta') },
       errors: ['400', '401', '403', '403csrf', '404', '500'],
     }),
-    delete: operation({
-      tag: T, id: 'ofertasDelete', summary: 'Cerrar una oferta de mi empresa',
-      description: 'Soft close — pasa a `estado=cerrada`.',
-      roles: R_ESCRIBE, csrf: true, params: ['id'],
-      responses: { 200: message() },
-      errors: ['401', '403', '403csrf', '404'],
+  },
+
+  '/api/ofertas/{id}/estado': {
+    patch: operation({
+      tag: T, id: 'ofertasCambiarEstado', summary: 'Pausar / reactivar / cerrar una oferta',
+      description: 'Único endpoint que cambia `estado`. El reclutador solo sobre su propia oferta; admin_empresa sobre cualquier oferta de su empresa (control institucional, queda auditado). Transiciones permitidas: activa↔pausada, activa\\|pausada→cerrada. `cerrada` es terminal.',
+      roles: R_CAMBIA_ESTADO, csrf: true, params: ['id'],
+      body: {
+        type: 'object',
+        required: ['estado'],
+        properties: { estado: { type: 'string', enum: ['activa', 'pausada', 'cerrada'] } },
+      },
+      responses: { 200: ok('Oferta') },
+      errors: ['400', '401', '403', '403csrf', '404', '500'],
     }),
   },
 };

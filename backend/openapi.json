@@ -1086,9 +1086,6 @@
           "fechaLimite": {
             "type": "string",
             "format": "date-time"
-          },
-          "creadaPorUsuarioId": {
-            "type": "integer"
           }
         }
       },
@@ -1168,9 +1165,6 @@
           "fechaLimite": {
             "type": "string",
             "format": "date-time"
-          },
-          "creadaPorUsuarioId": {
-            "type": "integer"
           }
         }
       },
@@ -3987,7 +3981,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "La oferta queda `moderada=false` hasta que un admin la aprueba.\n\n**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "description": "La oferta queda `moderada=false` hasta que un admin la aprueba. Solo reclutador.\n\n**Roles:** empresa/reclutador",
         "parameters": [
           {
             "$ref": "#/components/parameters/csrfHeader"
@@ -4061,7 +4055,7 @@
           "ofertas"
         ],
         "operationId": "ofertasUpdate",
-        "summary": "Editar una oferta de mi empresa",
+        "summary": "Editar el contenido de una oferta de mi empresa",
         "responses": {
           "200": {
             "description": "OK",
@@ -4107,7 +4101,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "description": "Solo el reclutador responsable (`creadaPorUsuarioId`) — o cualquier reclutador si la oferta es histórica sin responsable registrado. No acepta `estado`; usar `PATCH /{id}/estado`.\n\n**Roles:** empresa/reclutador",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -4126,13 +4120,15 @@
             }
           }
         }
-      },
-      "delete": {
+      }
+    },
+    "/api/ofertas/{id}/estado": {
+      "patch": {
         "tags": [
           "ofertas"
         ],
-        "operationId": "ofertasDelete",
-        "summary": "Cerrar una oferta de mi empresa",
+        "operationId": "ofertasCambiarEstado",
+        "summary": "Pausar / reactivar / cerrar una oferta",
         "responses": {
           "200": {
             "description": "OK",
@@ -4146,11 +4142,11 @@
                     {
                       "type": "object",
                       "required": [
-                        "message"
+                        "data"
                       ],
                       "properties": {
-                        "message": {
-                          "type": "string"
+                        "data": {
+                          "$ref": "#/components/schemas/Oferta"
                         }
                       }
                     }
@@ -4158,6 +4154,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
           },
           "401": {
             "$ref": "#/components/responses/Error401"
@@ -4175,7 +4174,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Soft close — pasa a `estado=cerrada`.\n\n**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "description": "Único endpoint que cambia `estado`. El reclutador solo sobre su propia oferta; admin_empresa sobre cualquier oferta de su empresa (control institucional, queda auditado). Transiciones permitidas: activa↔pausada, activa\\|pausada→cerrada. `cerrada` es terminal.\n\n**Roles:** empresa/admin_empresa · empresa/reclutador",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -4183,7 +4182,30 @@
           {
             "$ref": "#/components/parameters/csrfHeader"
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "estado"
+                ],
+                "properties": {
+                  "estado": {
+                    "type": "string",
+                    "enum": [
+                      "activa",
+                      "pausada",
+                      "cerrada"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/postulaciones": {

@@ -71,7 +71,11 @@ CREATE TYPE public.enum_activity_logs_accion AS ENUM (
     'rechazar_solicitud_reclutador',
     'sistema',
     'solicitar_recuperacion_miembro',
-    'importar_alumnos_csv'
+    'importar_alumnos_csv',
+    'pausar_oferta',
+    'reactivar_oferta',
+    'exportar_logs',
+    'exportar_estadisticas'
 );
 
 

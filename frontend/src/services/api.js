@@ -134,9 +134,9 @@ export const demoService = {
 export const ofertaService = {
   getAll:          (params) => api.get('/ofertas', { params }),       // Listar ofertas (con filtros opcionales)
   getById:         (id) => api.get(`/ofertas/${id}`),                 // Ver detalle de una oferta
-  create:          (data) => api.post('/ofertas', data),              // Publicar nueva oferta
-  update:          (id, data) => api.put(`/ofertas/${id}`, data),     // Editar oferta existente
-  delete:          (id) => api.delete(`/ofertas/${id}`),              // Cerrar oferta
+  create:          (data) => api.post('/ofertas', data),              // Publicar nueva oferta (solo reclutador)
+  update:          (id, data) => api.put(`/ofertas/${id}`, data),     // Editar contenido (solo reclutador responsable)
+  cambiarEstado:   (id, estado) => api.patch(`/ofertas/${id}/estado`, { estado }), // Pausar/reactivar/cerrar
   getRecomendadas: (params) => api.get('/ofertas/recomendadas', { params }), // Ofertas recomendadas para el alumno
 };
 

@@ -50,7 +50,7 @@ describe('CHAT', () => {
   test('alumno puede enviar un mensaje a una empresa y leer su propio historial', async () => {
     const { usuario: alumno, passwordPlana } = await crearAlumno();
     idsUsuarios.push(alumno.id);
-    const { usuarioAdmin } = await crearEmpresaConAdmin();
+    const { usuarioAdmin, empresa } = await crearEmpresaConAdmin();
     idsUsuarios.push(usuarioAdmin.id);
 
     const token = await loginYObtenerToken(alumno.email, passwordPlana);
@@ -67,5 +67,12 @@ describe('CHAT', () => {
 
     expect(historial.status).toBe(200);
     expect(historial.body.data.length).toBe(1);
+
+    // Identidad institucional (feedback de la profesora): el historial de
+    // chat debe traer razonSocial/logo/rolInterno del interlocutor empresa
+    // para que el frontend muestre la entidad, no una persona, cuando
+    // corresponde (admin_empresa) — ver ChatPage.jsx displayAvatarProps.
+    expect(historial.body.usuario.rolInterno).toBe('admin_empresa');
+    expect(historial.body.usuario.razonSocial).toBe(empresa.razonSocial);
   });
 });

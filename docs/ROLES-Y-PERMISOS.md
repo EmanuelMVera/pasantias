@@ -30,7 +30,7 @@ coinciden, **manda el código** — actualizá el documento.
 
 | Rol | Cómo se crea la cuenta |
 |---|---|
-| `admin` | Primer admin: `cd backend && npm run db:seed:admin`. Los demás: otro admin desde `Admin → Usuarios`. |
+| `admin` | Primer admin (y opcionalmente un segundo, vía `SEED_SECOND_ADMIN_*`): `cd backend && npm run db:seed:admin` — ver `docs/DEPLOYMENT.md` §3.A.1. Admins adicionales: otro admin desde `Admin → Usuarios`. |
 | `alumno` / `egresado` | Un admin los da de alta (`Admin → Usuarios → Nuevo`, `POST /api/admin/usuarios`). |
 | `empresa` + `admin_empresa` | La empresa manda una **solicitud pública** (`/registro-empresa` → `POST /api/solicitudes-empresa`). Un admin la aprueba y en ese momento se crean `Usuario` (rol `empresa`) + `Empresa` + `EmpresaUsuario` (`admin_empresa`). |
 | `empresa` + `reclutador` | El `admin_empresa` manda una **solicitud de reclutador** (`POST /api/empresas/equipo/solicitar`). Un admin la aprueba y crea `Usuario` + `EmpresaUsuario` (`reclutador`). La empresa nunca crea usuarios directamente. |
@@ -80,8 +80,21 @@ es autoridad de permisos).
 |---|:--:|:--:|:--:|:--:|:--:|
 | Ver listado y detalle de ofertas (activas + moderadas) | 🌐 | 🌐 | 🌐 | 🌐 | 🌐 |
 | Ver ofertas recomendadas para mi perfil | — | — | ✅ | — | — |
-| Crear / editar / cerrar una oferta de mi empresa | — | — | — | ✅ | ✅ |
+| Crear una oferta (`POST /api/ofertas`) | — | — | — | — | ✅ |
+| Editar el contenido de una oferta (`PUT /api/ofertas/:id`) | — | — | — | — | ✅¹ |
+| Pausar / reactivar una oferta (`PATCH /api/ofertas/:id/estado`) | — | — | — | ✅² | ✅¹ |
+| Cerrar una oferta (`PATCH /api/ofertas/:id/estado`) | — | — | — | ✅² | ✅¹ |
 | Moderar una oferta (aprobar / pausar / rechazar) | — | ✅ | — | — | — |
+
+¹ El reclutador solo sobre su propia oferta (`creadaPorUsuarioId === req.usuario.id`)
+o sobre una oferta histórica sin responsable registrado (`creadaPorUsuarioId IS NULL`,
+anterior a la migración 013) — nunca sobre la de otro reclutador.
+² `admin_empresa` puede pausar/reactivar/cerrar **cualquier** oferta de su empresa
+(control institucional, sin importar quién la creó) pero **nunca** crea una ni edita
+su contenido — la cuenta empresa es una entidad institucional, no publica ofertas
+operativas (feedback de la profesora, iteración RBAC-01). Toda transición de estado
+queda auditada con `pausar_oferta` / `reactivar_oferta` / `cerrar_oferta`, marcando
+`esOverrideInstitucional: true` en el detalle cuando el actor no es el responsable.
 
 ### Postulaciones
 
@@ -152,3 +165,9 @@ una de sus ofertas.
   pero no puede quitarse a sí mismo la condición de dueño.
 - Toda acción sensible (aprobaciones, cambios de rol, moderación, borrados) queda
   en `activity_logs` vía `registrarAuditoria` — ver [`../backend/README.md`](../backend/README.md) §Observabilidad.
+- **Reasignación de ofertas entre reclutadores (mejora futura, no implementada):**
+  hoy `oferta.creadaPorUsuarioId` es el único campo de responsable — alcanza para
+  "el creador edita, cualquiera puede tomar una histórica sin dueño". Si en el
+  futuro se necesita transferir una oferta activa de un reclutador a otro, hace
+  falta una columna nueva `asignadaAUsuarioId` (nullable, migración aparte) — no
+  se agregó ahora porque no hay un caso de uso concreto que la requiera.

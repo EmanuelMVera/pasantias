@@ -211,17 +211,24 @@ function ModalEditarRol({ miembro, onClose, onGuardado }) {
 }
 
 /* ── Tarjeta de miembro ─────────────────────────────────────────────────────── */
-function MiembroCard({ miembro, esPropietario, onToggleActivo, onEliminar, onRecuperacion }) {
+// La fila del admin_empresa muestra identidad INSTITUCIONAL (logo + razón
+// social) — la empresa es una entidad, no una persona (feedback de la
+// profesora). El responsable humano queda como dato secundario, igual al
+// patrón ya usado en Navbar.jsx. Los reclutadores siguen mostrándose como
+// personas (foto + nombre propio) — eso no cambia.
+function MiembroCard({ miembro, empresa, esPropietario, onToggleActivo, onEliminar, onRecuperacion }) {
   const u = miembro.usuario ?? miembro;
-  const nombre = `${u.nombre ?? ''} ${u.apellido ?? ''}`.trim() || u.email;
   const esProp = miembro.rolInterno === 'admin_empresa';
+  const nombre = esProp
+    ? (empresa?.razonSocial || `${u.nombre ?? ''} ${u.apellido ?? ''}`.trim())
+    : (`${u.nombre ?? ''} ${u.apellido ?? ''}`.trim() || u.email);
 
   return (
     <div className={`${styles.miembroCard} ${!miembro.activo ? styles.miembroInactivo : ''}`}>
       <Avatar
-        src={u.fotoPerfil}
-        nombre={u.nombre}
-        apellido={u.apellido}
+        src={esProp ? (empresa?.logo || null) : u.fotoPerfil}
+        nombre={esProp ? (empresa?.razonSocial || u.nombre) : u.nombre}
+        apellido={esProp ? '' : u.apellido}
         size={44}
         color={rolColor(miembro.rolInterno)}
         style={{ fontWeight: 800 }}
@@ -229,9 +236,14 @@ function MiembroCard({ miembro, esPropietario, onToggleActivo, onEliminar, onRec
       <div className={styles.cardInfo}>
         <div className={styles.cardNombre}>
           <strong>{nombre}</strong>
-          {esProp && <span className={styles.propietarioBadge}>Administrador</span>}
+          {esProp && <span className={styles.propietarioBadge}>Administrador de empresa</span>}
           {!miembro.activo && <span className={styles.suspendidoBadge}>Suspendido</span>}
         </div>
+        {esProp && (
+          <span className={styles.cardEmail}>
+            Responsable de cuenta: {u.nombre} {u.apellido}
+          </span>
+        )}
         <span className={styles.cardEmail}>{u.email}</span>
         <div className={styles.cardMeta}>
           <span className={styles.cardFecha}>Último acceso: {formatFecha(u.ultimoAcceso)}</span>
@@ -284,7 +296,7 @@ function SolicitudRow({ sol }) {
 
 /* ── Componente principal ───────────────────────────────────────────────────── */
 export default function EquipoPage() {
-  const { esAdminEmpresa } = useEmpresa();
+  const { esAdminEmpresa, empresa } = useEmpresa();
   const [equipo,      setEquipo]      = useState([]);
   const [solicitudes, setSolicitudes] = useState([]);
   const [loading,     setLoading]     = useState(true);
@@ -463,7 +475,7 @@ export default function EquipoPage() {
           <h2 className={styles.seccionTitulo}>Miembros activos</h2>
           <div className={styles.listaCards}>
             {activos.map(m => (
-              <MiembroCard key={m.id} miembro={m} esPropietario={esPropietario}
+              <MiembroCard key={m.id} miembro={m} empresa={empresa} esPropietario={esPropietario}
                 onToggleActivo={handleToggleActivo} onEliminar={handleEliminar}
                 onRecuperacion={handleRecuperacion}
               />
@@ -478,7 +490,7 @@ export default function EquipoPage() {
           <h2 className={styles.seccionTitulo} style={{ color: 'var(--text-muted)' }}>Cuentas suspendidas</h2>
           <div className={styles.listaCards}>
             {suspendidos.map(m => (
-              <MiembroCard key={m.id} miembro={m} esPropietario={esPropietario}
+              <MiembroCard key={m.id} miembro={m} empresa={empresa} esPropietario={esPropietario}
                 onToggleActivo={handleToggleActivo} onEliminar={handleEliminar}
                 onRecuperacion={handleRecuperacion}
               />

@@ -1,5 +1,5 @@
 /**
- * adminStatus.js — diagnóstico de solo lectura para el admin del sistema.
+ * adminStatus.js — diagnóstico de solo lectura para el/los admin(es) del sistema.
  *
  * No crea, no modifica, no borra nada. Sirve para responder "¿el admin ya
  * existe? ¿está activo?" sin tener que consultar la base a mano — útil
@@ -7,9 +7,12 @@
  * que después del primer deploy hace falta poder chequear el estado del
  * admin sin volver a correr el seed.
  *
- * Uso:
+ * Acepta uno o varios emails (segundo administrador — ver docs/DEPLOYMENT.md):
+ *
  *   npm run db:admin:status -- --email=admin@tudominio.edu
- *   (o, si SEED_ADMIN_EMAIL ya está seteada en el entorno, sin --email)
+ *   npm run db:admin:status -- --email=a@x.com --email=b@x.com
+ *   npm run db:admin:status -- --email=a@x.com,b@x.com
+ *   (sin --email: usa SEED_ADMIN_EMAIL y, si está seteada, SEED_SECOND_ADMIN_EMAIL)
  *
  * Nunca imprime el hash de la contraseña ni ningún token — ni siquiera se
  * piden esas columnas (ver `attributes` del findOne).
@@ -18,21 +21,19 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const { sequelize, Usuario } = require('../models');
 
-function leerArgEmail() {
-  const arg = process.argv.find((a) => a.startsWith('--email='));
-  return arg ? arg.slice('--email='.length) : undefined;
+function leerArgsEmail() {
+  const args = process.argv.filter((a) => a.startsWith('--email='));
+  const emails = args.flatMap((a) => a.slice('--email='.length).split(','));
+  return [...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))];
 }
 
-async function main() {
-  const email = (leerArgEmail() || process.env.SEED_ADMIN_EMAIL || '').trim().toLowerCase();
-  if (!email) {
-    console.error('Uso: npm run db:admin:status -- --email=admin@tudominio.edu');
-    console.error('(o definí SEED_ADMIN_EMAIL en el entorno)');
-    process.exit(1);
-  }
+function leerEmailsDefaultDeEnv() {
+  return [process.env.SEED_ADMIN_EMAIL, process.env.SEED_SECOND_ADMIN_EMAIL]
+    .filter(Boolean)
+    .map((e) => e.trim().toLowerCase());
+}
 
-  await sequelize.authenticate();
-
+async function reportarUno(email) {
   const usuario = await Usuario.findOne({
     where: { email },
     attributes: ['id', 'rol', 'activo', 'habilitado', 'deletedAt', 'createdAt', 'ultimoAcceso'],
@@ -41,14 +42,30 @@ async function main() {
 
   if (!usuario) {
     console.log(`No existe ningún usuario con email "${email}".`);
-  } else {
-    console.log(`Usuario encontrado: ${email}`);
-    console.log(`  rol: ${usuario.rol} · activo: ${usuario.activo} · habilitado: ${usuario.habilitado}`);
-    console.log(`  eliminado: ${usuario.deletedAt ? `sí (${usuario.deletedAt.toISOString()})` : 'no'}`);
-    console.log(`  creado: ${usuario.createdAt.toISOString()} · último acceso: ${usuario.ultimoAcceso ? usuario.ultimoAcceso.toISOString() : 'nunca'}`);
-    if (usuario.rol !== 'admin') {
-      console.log('  ⚠️  Este usuario NO tiene rol admin.');
-    }
+    return;
+  }
+  console.log(`Usuario encontrado: ${email}`);
+  console.log(`  rol: ${usuario.rol} · activo: ${usuario.activo} · habilitado: ${usuario.habilitado}`);
+  console.log(`  eliminado: ${usuario.deletedAt ? `sí (${usuario.deletedAt.toISOString()})` : 'no'}`);
+  console.log(`  creado: ${usuario.createdAt.toISOString()} · último acceso: ${usuario.ultimoAcceso ? usuario.ultimoAcceso.toISOString() : 'nunca'}`);
+  if (usuario.rol !== 'admin') {
+    console.log('  ⚠️  Este usuario NO tiene rol admin.');
+  }
+}
+
+async function main() {
+  const emails = leerArgsEmail().length > 0 ? leerArgsEmail() : leerEmailsDefaultDeEnv();
+  if (emails.length === 0) {
+    console.error('Uso: npm run db:admin:status -- --email=admin@tudominio.edu [--email=otro@x.com]');
+    console.error('(o definí SEED_ADMIN_EMAIL / SEED_SECOND_ADMIN_EMAIL en el entorno)');
+    process.exit(1);
+  }
+
+  await sequelize.authenticate();
+
+  for (const [i, email] of emails.entries()) {
+    if (i > 0) console.log('');
+    await reportarUno(email);
   }
 
   await sequelize.close();

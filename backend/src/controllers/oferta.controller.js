@@ -5,6 +5,23 @@ const { Op } = require('sequelize');
 const ofertaService   = require('../services/oferta.service');
 const empresaService  = require('../services/empresa.service');
 const { parsePagination, buildPagination } = require('../utils/pagination');
+const { registrarAuditoria } = require('../utils/auditLog');
+
+// Transiciones de estado permitidas vía PATCH /:id/estado. 'rechazada' no
+// aparece como origen: es moderación exclusiva del admin del sistema, la
+// empresa/reclutador no puede tocar una oferta rechazada. 'cerrada' es
+// terminal — cerrar es una decisión final, no se reactiva.
+const TRANSICIONES_ESTADO = {
+  activa:  ['pausada', 'cerrada'],
+  pausada: ['activa', 'cerrada'],
+  cerrada: [],
+};
+
+const ACCION_POR_ESTADO = {
+  activa:  'reactivar_oferta',
+  pausada: 'pausar_oferta',
+  cerrada: 'cerrar_oferta',
+};
 
 const _resolverEmpresa = empresaService.resolverEmpresaDelRequest;
 
@@ -85,7 +102,9 @@ exports.createOferta = async (req, res) => {
   return res.status(201).json({ success: true, message: 'Oferta creada. Pendiente de moderación.', data: oferta });
 };
 
-// ── Actualizar oferta ─────────────────────────────────────────────────────────
+// ── Actualizar oferta (contenido) ───────────────────────────────────────────────
+// Solo reclutador (ver oferta.routes.js) y solo el creador — o cualquier
+// reclutador activo si la oferta es histórica y no tiene creador registrado.
 
 exports.updateOferta = async (req, res) => {
   const empresa = await _resolverEmpresa(req);
@@ -94,7 +113,16 @@ exports.updateOferta = async (req, res) => {
   const oferta = await Oferta.findOne({ where: { id: req.params.id, empresaId: empresa.id } });
   if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
 
+  if (oferta.creadaPorUsuarioId && oferta.creadaPorUsuarioId !== req.usuario.id) {
+    return res.status(403).json({
+      success: false,
+      message: 'Solo el reclutador responsable de esta oferta puede editar su contenido.',
+      code: 'NO_ES_RESPONSABLE',
+    });
+  }
+
   const body = ofertaService.sanitizarCamposOpcionales(req.body);
+  delete body.estado; // el estado se cambia exclusivamente vía PATCH /:id/estado
   const { error, campos } = ofertaService.validarCamposPuesto(body);
   if (error) return res.status(400).json({ success: false, message: error });
 
@@ -102,15 +130,55 @@ exports.updateOferta = async (req, res) => {
   return res.json({ success: true, data: oferta });
 };
 
-// ── Cerrar oferta ─────────────────────────────────────────────────────────────
+// ── Cambiar estado (pausar / reactivar / cerrar) ────────────────────────────────
+// reclutador: solo su propia oferta (o histórica sin creador). admin_empresa:
+// cualquier oferta de su empresa — control institucional, nunca edita contenido.
 
-exports.deleteOferta = async (req, res) => {
+exports.cambiarEstadoOferta = async (req, res) => {
+  const { estado } = req.body;
+  if (!['activa', 'pausada', 'cerrada'].includes(estado)) {
+    return res.status(400).json({ success: false, message: 'estado inválido. Valores permitidos: activa, pausada, cerrada.' });
+  }
+
   const empresa = await _resolverEmpresa(req);
   if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
 
   const oferta = await Oferta.findOne({ where: { id: req.params.id, empresaId: empresa.id } });
   if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
 
-  await oferta.update({ estado: 'cerrada' });
-  return res.json({ success: true, message: 'Oferta cerrada correctamente.' });
+  const rolInterno = req.miembroEmpresa?.rolInterno;
+  const esResponsable = !oferta.creadaPorUsuarioId || oferta.creadaPorUsuarioId === req.usuario.id;
+
+  if (rolInterno === 'reclutador' && !esResponsable) {
+    return res.status(403).json({
+      success: false,
+      message: 'Solo el reclutador responsable de esta oferta puede cambiar su estado.',
+      code: 'NO_ES_RESPONSABLE',
+    });
+  }
+
+  const transicionesValidas = TRANSICIONES_ESTADO[oferta.estado] || [];
+  if (!transicionesValidas.includes(estado)) {
+    return res.status(400).json({
+      success: false,
+      message: `No se puede pasar de '${oferta.estado}' a '${estado}'.`,
+    });
+  }
+
+  await oferta.update({ estado });
+
+  await registrarAuditoria({
+    req,
+    accion: ACCION_POR_ESTADO[estado],
+    entidad: 'oferta',
+    entidadId: oferta.id,
+    detalle: {
+      actorRolInterno: rolInterno,
+      estadoAnterior: oferta.previous('estado'),
+      estadoNuevo: estado,
+      esOverrideInstitucional: rolInterno === 'admin_empresa' && !esResponsable,
+    },
+  });
+
+  return res.json({ success: true, message: 'Estado de la oferta actualizado.', data: oferta });
 };
