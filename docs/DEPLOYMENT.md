@@ -313,6 +313,72 @@ SELECT count(*) FROM postulaciones p
   LEFT JOIN ofertas o ON o.id = p."ofertaId" WHERE o.id IS NULL;  -- huérfanas
 ```
 
+### B.3 Dataset institucional a escala (solo staging/demo — opcional)
+
+Distinto del escenario dirigido de la sección B: `db:seed:institucional` genera un
+dataset VOLUMÉTRICO (20 empresas, 39 reclutadores, 80 alumnos/egresados, 39 ofertas,
+200 postulaciones — ver conteos completos más abajo) para ejercitar paginación,
+filtros, estadísticas y exportación a una escala realista. No reemplaza ni depende
+del escenario dirigido — cada uno vive en su propio namespace de email y se limpia/
+siembra independientemente.
+
+```bash
+ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:institucional          # sembrar
+npm run db:seed:institucional:status                                   # solo lectura
+npm run db:seed:institucional:clean                                    # limpiar sin resembrar
+ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:showcase                # los dos seeds juntos
+```
+
+Namespace `@institucional.invalid` (RFC 2606, nunca resuelve). Ninguna de estas
+~139 cuentas tiene login público: comparten una password **aleatoria por corrida**
+que el script nunca imprime ni loguea — no están pensadas para iniciar sesión, son
+datos para poblar paneles/reportes. Ninguna aparece en `LoginPage` ni en
+`GET /api/demo/status` (esos dos solo conocen las 3 cuentas de
+`db:seed:presentacion`, nunca consultan la tabla `usuarios` por patrón).
+
+**Conteos exactos verificados** (migración desde vacío + `db:seed:institucional`
+únicamente, Postgres local aislado):
+
+| Tabla | Conteo |
+|---|---|
+| usuarios (institucional) | 139 (20 admin_empresa + 39 reclutadores + 80 alumnos/egresados) |
+| usuarios rol admin | 0 |
+| empresas | 20 |
+| empresa_usuarios | 59 (20 admin_empresa + 39 reclutador) |
+| ofertas | 39 (una por reclutador — nunca por un admin_empresa, RBAC-01) |
+| postulaciones | 200 (pares usuarioId+ofertaId únicos, cero duplicados) |
+| postulacion_historial_estados | 480 |
+| mensajes | 200 (solo entre equipo de la misma empresa, o reclutador responsable ↔ postulante real) |
+| notificaciones | 400 |
+| activity_logs | 399 |
+| archivos | 0 |
+
+Reglas de diseño (ver cabecera de `backend/src/utils/seedInstitucional.js` para el
+detalle): 1-3 reclutadores por empresa, todo determinístico por índice (no
+`Math.random()` — la misma corrida da siempre el mismo dataset), cronología
+garantizada por un "reloj lógico" que solo avanza (nunca una postulación fechada
+antes que su oferta), transaccional (todo o nada), idempotente (limpia su propio
+namespace antes de resembrar), cero archivos/CV/logo subidos a disco o R2.
+
+**SQL de verificación** (Neon SQL Editor, alternativa a `db:seed:institucional:status`):
+
+```sql
+SELECT count(*) FROM usuarios WHERE email LIKE '%@institucional.invalid';           -- 139
+SELECT count(*) FROM usuarios WHERE email LIKE '%@institucional.invalid' AND rol='admin'; -- 0, siempre
+SELECT count(*) FROM empresas WHERE cuit LIKE '307000000%';                          -- 20
+
+-- Ninguna oferta institucional creada por un admin_empresa (debe dar 0 filas)
+SELECT count(*) FROM ofertas o
+  JOIN empresa_usuarios eu ON eu."usuarioId" = o."creadaPorUsuarioId"
+  JOIN empresas e ON e.id = o."empresaId"
+  WHERE e.cuit LIKE '307000000%' AND eu."rolInterno" = 'admin_empresa';
+
+-- Duplicados en postulaciones (debe dar 0 filas)
+SELECT p."usuarioId", p."ofertaId", count(*) FROM postulaciones p
+  JOIN usuarios u ON u.id = p."usuarioId" WHERE u.email LIKE '%@institucional.invalid'
+  GROUP BY 1, 2 HAVING count(*) > 1;
+```
+
 ### C. Qué NO ejecutar contra Neon de producción
 
 - `npm run db:seed:demo` — bloqueado sin excepción en producción (no tiene override).
@@ -408,7 +474,11 @@ npm run db:admin:status -- --email=admin@tudominio.edu --email=compañero@tudomi
                                # Nunca muestra el hash. No modifica nada.
 
 # Solo staging/demo — nunca en la producción real:
-ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:presentacion
+ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:presentacion     # 3 cuentas dirigidas (LoginPage)
+ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:institucional    # dataset amplio (sin login público)
+ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:showcase         # los dos anteriores juntos
+npm run db:seed:institucional:status                              # solo lectura, sin secretos
+npm run db:seed:institucional:clean                                # limpia el dataset amplio sin resembrar
 ```
 
 Contra Neon desde tu máquina: exportar `DATABASE_URL` (pooled) y `DB_SSL=true` antes del

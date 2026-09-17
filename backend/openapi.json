@@ -1717,6 +1717,11 @@
                   "aprobar_solicitud_reclutador",
                   "rechazar_solicitud_reclutador",
                   "solicitar_recuperacion_miembro",
+                  "importar_alumnos_csv",
+                  "pausar_oferta",
+                  "reactivar_oferta",
+                  "exportar_logs",
+                  "exportar_estadisticas",
                   "sistema"
                 ]
               },
