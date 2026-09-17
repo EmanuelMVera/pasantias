@@ -117,7 +117,7 @@ export default function AdminImportacionPage() {
       <div className={styles.card}>
         <h2>1. Seleccioná el archivo CSV</h2>
         <p className={styles.hint}>
-          Columnas: <code>legajo,nombre,apellido,email,rol,carrera,anioEgreso,telefono,ubicacion</code>.
+          Columnas: <code>legajo, nombre, apellido, email, rol, carrera, anioEgreso, telefono, ubicacion</code>.
           El rol debe ser <code>alumno</code> o <code>egresado</code>.
         </p>
         <div className={styles.fileRow}>

@@ -28,6 +28,11 @@
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
   font-size: 0.82rem;
+  /* La lista de columnas es una sola palabra sin espacios para el algoritmo
+     de wrap del navegador (las comas no son puntos de corte válidos) —
+     sin esto desborda el documento entero en mobile en vez de ajustar
+     dentro de la tarjeta. Encontrado con el barrido responsive (Fase 3). */
+  overflow-wrap: anywhere;
 }
 
 .fileRow {

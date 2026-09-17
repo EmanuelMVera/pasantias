@@ -19,6 +19,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.5rem;
 }
 
 .navbarPublicBrand {
@@ -27,6 +28,23 @@
   gap: 12px;
   text-decoration: none;
   color: #1e293b;
+  /* Permite que el flex item se achique por debajo de su ancho intrínseco
+     (default de flexbox es min-width:auto) — sin esto, en viewports muy
+     angostos el título nunca cede espacio a los botones y desborda. */
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.navbarPublicBrand .brandText {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.navbarPublicBrand .brandTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 
 .brandIcon {
@@ -55,6 +73,7 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  flex-shrink: 0; /* las acciones nunca ceden espacio primero — el título sí */
 }
 
 /* ── Botón Empresa ──────────────────────────────────────────────── */
@@ -66,7 +85,12 @@
   text-decoration: none;
   font-weight: 600;
   font-size: 0.9rem;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  /* Tap target >= 44px en cualquier breakpoint, aunque el padding/font se
+     achiquen en mobile — ver sección 11 del pedido de iteración. */
+  min-height: 44px;
+  box-sizing: border-box;
   border: 1.5px solid var(--primary);
   transition: all 0.25s ease;
 }
@@ -87,7 +111,10 @@
   text-decoration: none;
   font-weight: 600;
   font-size: 0.95rem;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  box-sizing: border-box;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid transparent;
 }
@@ -106,16 +133,24 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-/* ── Texto corto del botón "Empresa" — solo visible en mobile ─────────── */
-.btnEmpresaShort {
+/* ── Niveles de texto de los botones ────────────────────────────────────
+   3 niveles por botón (Full/Short/Micro) — el visible en cada breakpoint se
+   controla 100% por CSS (display), nunca se recorta con overflow. El nombre
+   accesible sale del aria-label del <Link> (NavbarPublic.jsx), así que es
+   estable en los 3 casos aunque el texto visible cambie. */
+.btnEmpresaShort,
+.btnEmpresaMicro,
+.btnLoginShort {
   display: none;
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────────
-   Mismos breakpoints canónicos que Navbar.module.css (640/480px). Sin esto,
-   "🏢 Registrarse como empresa" + "Iniciar Sesión" no entran en una barra de
-   70px de alto en mobile y desbordan el contenedor (nunca hacen wrap: la
-   barra es sticky y de alto fijo). */
+   Mismos breakpoints canónicos que Navbar.module.css (640/480px), más un
+   escalón ≤360px agregado tras encontrar desborde real en 320-375px (el
+   título + "🏢 Registrarse como empresa" + "Iniciar Sesión" no entraban).
+   `min-width:0`/`flex-shrink` en .navbarPublicBrand (arriba) + achicar texto
+   progresivamente acá — nunca flex-wrap: la barra es sticky de alto fijo,
+   envolver la rompería verticalmente. */
 @media (max-width: 640px) {
   .navbarPublicInner {
     padding: 0 0.75rem;
@@ -153,5 +188,51 @@
   .btnLogin {
     padding: 0.5rem 0.6rem;
     font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .navbarPublicInner {
+    padding: 0 0.6rem;
+  }
+
+  .navbarPublicBrand {
+    gap: 8px;
+  }
+
+  .brandIcon {
+    font-size: 1.3rem;
+  }
+
+  .brandTitle {
+    font-size: 1.05rem;
+  }
+
+  .navbarPublicActions {
+    gap: 0.3rem;
+  }
+
+  .btnEmpresa,
+  .btnLogin {
+    padding: 0.45rem 0.55rem;
+  }
+
+  /* A este ancho, "Empresa" + "Iniciar Sesión" ya no entran ni acortados —
+     el botón de empresa queda solo ícono (aria-label conserva el texto para
+     lectores de pantalla) y "Iniciar Sesión" pasa a "Entrar". */
+  .btnEmpresaShort {
+    display: none;
+  }
+
+  .btnEmpresaMicro {
+    display: inline;
+  }
+
+  .btnLoginFull {
+    display: none;
+  }
+
+  .btnLoginShort {
+    display: inline;
   }
 }

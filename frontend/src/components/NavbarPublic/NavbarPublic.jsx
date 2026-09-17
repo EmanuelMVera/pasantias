@@ -29,15 +29,18 @@ export default function NavbarPublic() {
 
         {/* Acciones de la navbar pública */}
         <div className={styles.navbarPublicActions}>
-          <Link to="/registro-empresa" className={styles.btnEmpresa}>
-            {/* En mobile el texto completo no entra junto al botón de login
-                (desbordaba la barra) — se acorta por CSS, no se recorta con
-                overflow. */}
-            <span className={styles.btnEmpresaFull}>🏢 Registrarse como empresa</span>
-            <span className={styles.btnEmpresaShort}>🏢 Empresa</span>
+          <Link to="/registro-empresa" className={styles.btnEmpresa} aria-label="Registrarse como empresa">
+            {/* 3 niveles de texto según el ancho disponible — nunca se
+                recorta con overflow, se acorta por CSS (≤640px / ≤360px).
+                aria-label fija el nombre accesible en los 3 casos, incluso
+                cuando el texto visible queda reducido al emoji. */}
+            <span className={styles.btnEmpresaFull} aria-hidden="true">🏢 Registrarse como empresa</span>
+            <span className={styles.btnEmpresaShort} aria-hidden="true">🏢 Empresa</span>
+            <span className={styles.btnEmpresaMicro} aria-hidden="true">🏢</span>
           </Link>
-          <Link to="/login" className={styles.btnLogin}>
-            Iniciar Sesión
+          <Link to="/login" className={styles.btnLogin} aria-label="Iniciar sesión">
+            <span className={styles.btnLoginFull} aria-hidden="true">Iniciar Sesión</span>
+            <span className={styles.btnLoginShort} aria-hidden="true">Entrar</span>
           </Link>
         </div>
       </div>
