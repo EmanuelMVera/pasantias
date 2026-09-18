@@ -166,6 +166,68 @@ export default function EmpresaDashboardPage() {
     }
   };
 
+  /* ── Helpers de presentación, compartidos entre la tabla (desktop) y las ──
+     cards (tablet/mobile) — misma fuente de datos y callbacks, sin duplicar
+     la lógica de permisos/transición de estado. */
+  const detalleOferta = (o) => [o.area, o.modalidad, o.ciudad].filter(Boolean).join(' · ');
+
+  const renderEstadoBadge = (o) => (
+    <span
+      className="badge"
+      style={{ background: ESTADO_COLOR[o.estado] ?? '#7f8c8d' }}
+      title={o.estado === 'rechazada' ? 'Esta oferta fue rechazada por el administrador.' : undefined}
+    >
+      {ESTADO_LABEL[o.estado] ?? o.estado}
+    </span>
+  );
+
+  const renderCandidatosBtn = (o) => (
+    <Link to={`/empresa/postulantes/${o.id}`} className="btn-small" aria-label={`Ver candidatos de "${o.titulo}"`}>
+      Ver candidatos
+    </Link>
+  );
+
+  const renderAcciones = (o) => {
+    if (guardando === o.id) {
+      return <span className={styles.guardandoSpan}>Guardando...</span>;
+    }
+    if (!puedeGestionarEstado(o)) {
+      return (
+        <span className={styles.estadoNota} title="Solo el reclutador responsable puede modificar el estado de esta oferta.">
+          Solo el responsable
+        </span>
+      );
+    }
+    if (o.estado === 'activa') {
+      return (
+        <>
+          <button className="btn-warn" onClick={() => handleCambiarEstado(o.id, 'pausada')} aria-label={`Pausar la oferta "${o.titulo}"`}>
+            Pausar
+          </button>
+          <button className="btn-danger" onClick={() => handleCambiarEstado(o.id, 'cerrada')} aria-label={`Cerrar la oferta "${o.titulo}"`}>
+            Cerrar
+          </button>
+        </>
+      );
+    }
+    if (o.estado === 'pausada') {
+      return (
+        <button className="btn-ok" onClick={() => handleCambiarEstado(o.id, 'activa')} aria-label={`Activar la oferta "${o.titulo}"`}>
+          Activar
+        </button>
+      );
+    }
+    if (o.estado === 'rechazada') {
+      return (
+        <span className={`${styles.estadoNota} ${styles.rechazada}`} title="Contactá al administrador para más información.">
+          Revisada por admin
+        </span>
+      );
+    }
+    // cerrada
+    return <span className={styles.estadoNota}>—</span>;
+  };
+
   return (
     <div className="page-container">
       <Toast toast={toast} />
@@ -246,118 +308,101 @@ export default function EmpresaDashboardPage() {
           <Link to="/empresa/nueva-oferta" className="btn-primary">Publicar primera oferta</Link>
         </div>
       ) : (
-        <div className={styles.ofertasTablaWrap}>
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Título</th>
-                <th>Área / Modalidad</th>
-                <th>Responsable</th>
-                <th>Ciudad</th>
-                <th>Estado</th>
-                <th>Vacantes</th>
-                <th>Postulados</th>
-                <th>Candidatos</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ofertas.map((o) => (
-                <tr key={o.id} className={guardando === o.id ? styles.rowGuardando : ''}>
-                  <td>
-                    <strong>{o.titulo}</strong>
-                    {!o.moderada && (
-                      <span className={styles.pendienteMod} title="Pendiente de moderación por el admin">
-                        · ⏳ Pendiente
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    <div>{o.area ?? '—'}</div>
-                    {o.modalidad && <small className={styles.modalidadSmall}>{o.modalidad}</small>}
-                  </td>
-                  <td>
-                    {o.creadaPor
-                      ? `${o.creadaPor.nombre} ${o.creadaPor.apellido}`
-                      : <span className={styles.modalidadSmall}>Responsable no registrado</span>}
-                  </td>
-                  <td>{o.ciudad || '—'}</td>
-                  <td>
-                    <span
-                      className="badge"
-                      style={{ background: ESTADO_COLOR[o.estado] ?? '#7f8c8d' }}
-                      title={o.estado === 'rechazada' ? 'Esta oferta fue rechazada por el administrador.' : undefined}
-                    >
-                      {ESTADO_LABEL[o.estado] ?? o.estado}
-                    </span>
-                  </td>
-                  <td className={styles.centrado}>{o.cantidadVacantes ?? '—'}</td>
-                  <td className={styles.centrado}>
-                    <strong className={`${styles.postuladosCount} ${o.totalPostulaciones > 0 ? styles.tienen : ''}`}>
-                      {o.totalPostulaciones ?? 0}
-                    </strong>
-                  </td>
-                  <td>
-                    <Link to={`/empresa/postulantes/${o.id}`} className="btn-small">
-                      Ver candidatos
-                    </Link>
-                  </td>
-                  <td className={styles.accionesTd}>
-                    {guardando === o.id ? (
-                      <span className={styles.guardandoSpan}>Guardando...</span>
-                    ) : !puedeGestionarEstado(o) ? (
-                      <span className={styles.estadoNota} title="Solo el reclutador responsable puede modificar el estado de esta oferta.">
-                        Solo el responsable
-                      </span>
-                    ) : (
-                      <>
-                        {o.estado === 'activa' && (
-                          <>
-                            <button
-                              className="btn-warn"
-                              onClick={() => handleCambiarEstado(o.id, 'pausada')}
-                            >
-                              Pausar
-                            </button>
-                            <button
-                              className="btn-danger"
-                              onClick={() => handleCambiarEstado(o.id, 'cerrada')}
-                            >
-                              Cerrar
-                            </button>
-                          </>
-                        )}
-                        {o.estado === 'pausada' && (
-                          <button
-                            className="btn-ok"
-                            onClick={() => handleCambiarEstado(o.id, 'activa')}
-                          >
-                            Activar
-                          </button>
-                        )}
-                        {o.estado === 'rechazada' && (
-                          <span
-                            className={`${styles.estadoNota} ${styles.rechazada}`}
-                            title="Contactá al administrador para más información."
-                          >
-                            Revisada por admin
-                          </span>
-                        )}
-                        {o.estado === 'cerrada' && (
-                          <span className={styles.estadoNota}>—</span>
-                        )}
-                      </>
-                    )}
-                  </td>
+        <>
+          {/* Desktop (≥1024px) — tabla semántica de 6 columnas, sin scroll horizontal */}
+          <div className={styles.ofertasTablaWrap}>
+            <table className={`tabla ${styles.ofertasTabla}`}>
+              <thead>
+                <tr>
+                  <th className={styles.colOferta}>Oferta</th>
+                  <th className={styles.colResponsable}>Responsable</th>
+                  <th className={styles.colEstado}>Estado</th>
+                  <th className={styles.colVacPost}>Vacantes / Postulados</th>
+                  <th className={styles.colCandidatos}>Candidatos</th>
+                  <th className={styles.colAcciones}>Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {ofertas.map((o) => (
+                  <tr key={o.id} className={guardando === o.id ? styles.rowGuardando : ''}>
+                    <td className="cell-break">
+                      <strong>{o.titulo}</strong>
+                      {!o.moderada && (
+                        <span className={styles.pendienteMod} title="Pendiente de moderación por el admin">
+                          · ⏳ Pendiente
+                        </span>
+                      )}
+                      {detalleOferta(o) && <small className={styles.modalidadSmall}>{detalleOferta(o)}</small>}
+                    </td>
+                    <td className="cell-break">
+                      {o.creadaPor
+                        ? `${o.creadaPor.nombre} ${o.creadaPor.apellido}`
+                        : <span className={styles.modalidadSmall}>Responsable no registrado</span>}
+                    </td>
+                    <td>{renderEstadoBadge(o)}</td>
+                    <td className={styles.centrado}>
+                      <span className={styles.vacPost}>
+                        {o.cantidadVacantes ?? '—'}
+                        <span className={styles.vacPostSep}>/</span>
+                        <strong className={`${styles.postuladosCount} ${o.totalPostulaciones > 0 ? styles.tienen : ''}`}>
+                          {o.totalPostulaciones ?? 0}
+                        </strong>
+                      </span>
+                    </td>
+                    <td>{renderCandidatosBtn(o)}</td>
+                    <td className={styles.accionesTd}>{renderAcciones(o)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Tablet/mobile (<1024px) — cards, sin intentar sostener 6 columnas angostas */}
+          <div className={styles.ofertasCards}>
+            {ofertas.map((o) => (
+              <article
+                key={o.id}
+                className={`${styles.ofertaCard} ${guardando === o.id ? styles.rowGuardando : ''}`}
+                style={{ '--card-color': ESTADO_COLOR[o.estado] ?? '#7f8c8d' }}
+              >
+                <header className={styles.cardHeader}>
+                  <h3 className={styles.cardTitulo}>{o.titulo}</h3>
+                  {!o.moderada && (
+                    <span className={styles.pendienteMod} title="Pendiente de moderación por el admin">
+                      ⏳ Pendiente
+                    </span>
+                  )}
+                </header>
+                {detalleOferta(o) && <p className={styles.cardMeta}>{detalleOferta(o)}</p>}
+
+                <dl className={styles.cardFields}>
+                  <div className={styles.cardField}>
+                    <dt>Responsable</dt>
+                    <dd>{o.creadaPor ? `${o.creadaPor.nombre} ${o.creadaPor.apellido}` : 'Responsable no registrado'}</dd>
+                  </div>
+                  <div className={styles.cardField}>
+                    <dt>Estado</dt>
+                    <dd>{renderEstadoBadge(o)}</dd>
+                  </div>
+                </dl>
+
+                <p className={styles.cardStats}>
+                  {o.cantidadVacantes ?? '—'} vacante{o.cantidadVacantes === 1 ? '' : 's'}
+                  {' · '}
+                  {o.totalPostulaciones ?? 0} postulado{o.totalPostulaciones === 1 ? '' : 's'}
+                </p>
+
+                <div className={styles.cardCandidatos}>{renderCandidatosBtn(o)}</div>
+                <div className={styles.cardAcciones}>{renderAcciones(o)}</div>
+              </article>
+            ))}
+          </div>
+
           <Paginacion
             pagination={paginationOfertas}
             onPageChange={(p) => cargarOfertas(filtroOferta, p)}
           />
-        </div>
+        </>
       )}
     </div>
   );
