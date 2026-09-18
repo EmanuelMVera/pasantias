@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useEmpresa } from '../../hooks/useEmpresa';
 import { notificacionService, mensajeService } from '../../services/api';
@@ -101,21 +101,27 @@ export default function Navbar() {
 
   /* ── Links según rol ─────────────────────────────────────────────────── */
   const linksAlumnoEgresado = [
-    { to: '/dashboard', label: 'Dashboard' },
+    { to: '/dashboard', label: 'Inicio' },
     { to: '/ofertas', label: 'Ofertas' },
     { to: '/mis-postulaciones', label: 'Mis Postulaciones' },
     { to: '/perfil', label: 'Mi Perfil' },
   ];
 
-  const linksEmpresa = [
-    { to: '/empresa', label: 'Panel' },
-    { to: '/empresa/nueva-oferta', label: '+ Nueva Oferta' },
-    { to: '/empresa/equipo', label: 'Equipo' },
-  ];
-
+  // admin_empresa gestiona la cuenta institucional (no publica ofertas —
+  // RBAC-01, backend/src/routes/oferta.routes.js); reclutador sí publica.
+  const linksEmpresa = esReclutador
+    ? [
+        { to: '/empresa', label: 'Panel' },
+        { to: '/empresa/nueva-oferta', label: '+ Nueva Oferta' },
+        { to: '/empresa/equipo', label: 'Equipo' },
+      ]
+    : [
+        { to: '/empresa', label: 'Panel' },
+        { to: '/empresa/equipo', label: 'Equipo' },
+      ];
 
   const linksAdmin = [
-    { to: '/admin', label: 'Dashboard' },
+    { to: '/admin', label: 'Panel' },
     { to: '/admin/solicitudes', label: '📋 Solicitudes' },
     { to: '/admin/ofertas', label: '📣 Ofertas' },
     { to: '/admin/usuarios', label: '👥 Usuarios' },
@@ -150,15 +156,6 @@ export default function Navbar() {
   const avatarApellido = esVistaEmpresaAdmin ? '' : usuario.apellido;
   const nombrePrincipal = esVistaEmpresaAdmin ? (empresa?.razonSocial || usuario.nombre) : usuario.nombre;
 
-  const esActivo = (to) => {
-    if (to === '/') return location.pathname === '/';
-    // Match exacto o subruta (ej: estando en /empresa/nueva-oferta, "Panel"
-    // (/empresa) queda activo). Es solo estilo; que "Panel" y "+ Nueva Oferta"
-    // queden ambos marcados en esa ruta es aceptable.
-    return location.pathname === to || location.pathname.startsWith(to + '/');
-  };
-
-
   /* ── Color del badge de notificaciones según prioridad ───────────────── */
   const notifColor = prioridadAlta
     ? styles.notifBadgeAlta
@@ -179,13 +176,14 @@ export default function Navbar() {
         {/* Links de navegación (desktop) */}
         <div className={styles.navbarLinks}>
           {links.map((l) => (
-            <Link
+            <NavLink
               key={l.to}
               to={l.to}
-              className={`${styles.navLink} ${esActivo(l.to) ? styles.active : ''}`}
+              end
+              className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
             >
               {l.label}
-            </Link>
+            </NavLink>
           ))}
         </div>
 
@@ -319,14 +317,15 @@ export default function Navbar() {
       {mobileOpen && (
         <div className={styles.navbarMobilePanel} id="nav-mobile">
           {links.map((l) => (
-            <Link
+            <NavLink
               key={l.to}
               to={l.to}
-              className={`${styles.navLink} ${esActivo(l.to) ? styles.active : ''}`}
+              end
+              className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
               onClick={() => setMobileOpen(false)}
             >
               {l.label}
-            </Link>
+            </NavLink>
           ))}
         </div>
       )}
