@@ -23,6 +23,8 @@ exports.buscarUsuarios = async (req, res) => {
 // ── Lista de conversaciones ───────────────────────────────────────────────────
 
 exports.getConversaciones = async (req, res) => {
+  if (req.usuario.rol === 'admin') return res.json({ success: true, total: 0, data: [] });
+
   const conversaciones = await chatService.obtenerConversaciones(req.usuario.id);
   return res.json({ success: true, total: conversaciones.length, data: conversaciones });
 };
@@ -45,7 +47,7 @@ exports.enviarMensaje = async (req, res) => {
     return res.status(404).json({ success: false, message: 'El destinatario no existe o está inactivo.' });
   }
 
-  const { ok, motivo } = await chatPermissionService.puedeChatear(emisorId, Number(receptorId));
+  const { ok, motivo } = await chatPermissionService.puedeEnviarMensaje(emisorId, Number(receptorId));
   if (!ok) return res.status(403).json({ success: false, message: motivo });
 
   if (!mensaje || mensaje.trim().length === 0) {
@@ -92,7 +94,7 @@ exports.getHistorial = async (req, res) => {
     return res.status(400).json({ success: false, message: 'No podés chatear con vos mismo.' });
   }
 
-  const { ok, motivo } = await chatPermissionService.puedeChatear(userId, partnerId);
+  const { ok, soloLectura, motivo } = await chatPermissionService.puedeVerConversacion(userId, partnerId);
   if (!ok) return res.status(403).json({ success: false, message: motivo });
 
   const resultado = await chatService.obtenerHistorial(userId, partnerId, { page, limit, offset });
@@ -100,7 +102,12 @@ exports.getHistorial = async (req, res) => {
     return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
   }
 
-  return res.json({ success: true, ...resultado });
+  return res.json({
+    success: true,
+    soloLectura,
+    motivoSoloLectura: soloLectura ? motivo : null,
+    ...resultado,
+  });
 };
 
 // ── Marcar conversación como leída ────────────────────────────────────────────
@@ -108,6 +115,9 @@ exports.getHistorial = async (req, res) => {
 exports.marcarLeida = async (req, res) => {
   const userId    = req.usuario.id;
   const partnerId = Number(req.params.usuarioId);
+
+  const { ok, motivo } = await chatPermissionService.puedeVerConversacion(userId, partnerId);
+  if (!ok) return res.status(403).json({ success: false, message: motivo });
 
   const [updated] = await Mensaje.update(
     { leido: true },

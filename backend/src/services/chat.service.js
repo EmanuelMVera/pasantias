@@ -1,9 +1,15 @@
 'use strict';
 
-const { Mensaje, Usuario, Empresa, EmpresaUsuario, Perfil } = require('../models');
+const { Mensaje, Usuario, Empresa, EmpresaUsuario, Perfil, Postulacion, Oferta } = require('../models');
 const { Op } = require('sequelize');
-const { resolverEmpresasDeUsuario } = require('./chatPermission.service');
+const { resolverMembresiasActivas, puedeVerConversacion } = require('./chatPermission.service');
 const { buildPagination } = require('../utils/pagination');
+
+// Estados de Postulacion que habilitan chat nuevo (ver chatPermission.service.js).
+// 'rechazado' queda afuera a propósito: un candidato rechazado puede seguir
+// apareciendo en la lista de conversaciones si ya hay historial, pero no
+// como resultado de búsqueda de "nuevo chat" (ver reglas de negocio).
+const ESTADOS_CHAT_ENVIO = ['preseleccionado', 'entrevista', 'contratado'];
 
 // ── Helpers de datos ──────────────────────────────────────────────────────────
 
@@ -86,8 +92,17 @@ async function resolverEmpresasBatch(usuarioIds) {
 // ── Búsqueda de usuarios ──────────────────────────────────────────────────────
 
 /**
- * Busca usuarios con los que el solicitante puede iniciar un chat.
- * Aplica reglas de visibilidad por rol y resuelve foto + razonSocial en batch.
+ * Busca usuarios con los que el solicitante puede iniciar un chat NUEVO.
+ * Ya no es un buscador global: refleja exactamente con quién puedeEnviarMensaje
+ * habilitaría una conversación (ver chatPermission.service.js).
+ *   - alumno/egresado: solo reclutadores con una Postulacion propia en estado
+ *     habilitante (preseleccionado/entrevista/contratado). Nunca otros
+ *     alumnos, nunca admin_empresa, nunca empresas ajenas.
+ *   - empresa (admin_empresa): solo compañeros activos de su propia empresa.
+ *   - empresa (reclutador): compañeros de equipo + candidatos de ofertas bajo
+ *     su responsabilidad (creadaPorUsuarioId propio, o NULL en ofertas
+ *     huérfanas) en estado habilitante.
+ *   - admin: ya filtrado antes de llegar acá (chat.controller.js).
  * @returns {Array} usuarios con fotoPerfil y razonSocial resueltos
  */
 async function buscarUsuarios(userId, rol, q) {
@@ -102,62 +117,103 @@ async function buscarUsuarios(userId, rol, q) {
   let resultados = [];
 
   if (['alumno', 'egresado'].includes(rol)) {
-    resultados = await Usuario.findAll({
-      where: {
-        id:     { [Op.ne]: userId },
-        activo: true,
-        rol:    { [Op.in]: ['alumno', 'egresado', 'empresa'] },
-        ...filtroTexto,
-      },
-      attributes: ['id', 'nombre', 'apellido', 'email', 'rol', 'fotoPerfil'],
-      limit: 20,
-      order: [['nombre', 'ASC'], ['apellido', 'ASC']],
+    const postulaciones = await Postulacion.findAll({
+      where: { usuarioId: userId, estado: { [Op.in]: ESTADOS_CHAT_ENVIO } },
+      attributes: ['id'],
+      include: [{ model: Oferta, as: 'oferta', attributes: ['empresaId', 'creadaPorUsuarioId'] }],
     });
-  } else if (rol === 'empresa') {
-    const misEmpresaIds = await resolverEmpresasDeUsuario(userId);
 
-    const alumnos = await Usuario.findAll({
-      where: {
-        id:     { [Op.ne]: userId },
-        activo: true,
-        rol:    { [Op.in]: ['alumno', 'egresado'] },
-        ...filtroTexto,
-      },
-      attributes: ['id', 'nombre', 'apellido', 'email', 'rol', 'fotoPerfil'],
-      limit: 15,
-      order: [['nombre', 'ASC'], ['apellido', 'ASC']],
-    });
+    const empresaIds = new Set(postulaciones.map((p) => p.oferta?.empresaId).filter(Boolean));
+    const reclutadorIds = new Set();
+
+    if (empresaIds.size > 0) {
+      const reclutadoresActivos = await EmpresaUsuario.findAll({
+        where: { empresaId: { [Op.in]: [...empresaIds] }, activo: true, rolInterno: 'reclutador' },
+        attributes: ['usuarioId', 'empresaId'],
+      });
+      const activosPorEmpresa = new Map();
+      reclutadoresActivos.forEach((r) => {
+        if (!activosPorEmpresa.has(r.empresaId)) activosPorEmpresa.set(r.empresaId, new Set());
+        activosPorEmpresa.get(r.empresaId).add(r.usuarioId);
+      });
+
+      postulaciones.forEach((p) => {
+        const oferta = p.oferta;
+        if (!oferta) return;
+        const activos = activosPorEmpresa.get(oferta.empresaId) ?? new Set();
+        if (oferta.creadaPorUsuarioId) {
+          if (activos.has(oferta.creadaPorUsuarioId)) reclutadorIds.add(oferta.creadaPorUsuarioId);
+        } else {
+          activos.forEach((id) => reclutadorIds.add(id));
+        }
+      });
+    }
+
+    if (reclutadorIds.size > 0) {
+      resultados = await Usuario.findAll({
+        where: { id: { [Op.in]: [...reclutadorIds] }, activo: true, ...filtroTexto },
+        attributes: ['id', 'nombre', 'apellido', 'email', 'rol', 'fotoPerfil'],
+        limit: 20,
+        order: [['nombre', 'ASC'], ['apellido', 'ASC']],
+      });
+    }
+  } else if (rol === 'empresa') {
+    const membresias = await resolverMembresiasActivas(userId);
+    const empresaIds = membresias.map((m) => m.empresaId);
+
+    const companeroIds = new Set();
+    if (empresaIds.length > 0) {
+      const [directos, miembros] = await Promise.all([
+        Empresa.findAll({ where: { id: { [Op.in]: empresaIds } }, attributes: ['usuarioId'] }),
+        EmpresaUsuario.findAll({ where: { empresaId: { [Op.in]: empresaIds }, activo: true }, attributes: ['usuarioId'] }),
+      ]);
+      directos.forEach((e) => companeroIds.add(e.usuarioId));
+      miembros.forEach((m) => companeroIds.add(m.usuarioId));
+      companeroIds.delete(userId);
+    }
+
+    const empresaIdsComoReclutador = membresias
+      .filter((m) => m.rolInterno === 'reclutador')
+      .map((m) => m.empresaId);
+
+    const candidatoIds = new Set();
+    if (empresaIdsComoReclutador.length > 0) {
+      const postulacionesCandidatos = await Postulacion.findAll({
+        where: { estado: { [Op.in]: ESTADOS_CHAT_ENVIO } },
+        attributes: ['usuarioId'],
+        include: [{
+          model: Oferta, as: 'oferta', attributes: [], required: true,
+          where: {
+            empresaId: { [Op.in]: empresaIdsComoReclutador },
+            [Op.or]: [{ creadaPorUsuarioId: userId }, { creadaPorUsuarioId: null }],
+          },
+        }],
+      });
+      postulacionesCandidatos.forEach((p) => candidatoIds.add(p.usuarioId));
+    }
 
     let companeros = [];
-    if (misEmpresaIds.size > 0) {
-      const [directos, miembros] = await Promise.all([
-        Empresa.findAll({
-          where: { id: { [Op.in]: [...misEmpresaIds] } },
-          attributes: ['usuarioId'],
-        }),
-        EmpresaUsuario.findAll({
-          where: { empresaId: { [Op.in]: [...misEmpresaIds] }, activo: true },
-          attributes: ['usuarioId'],
-        }),
-      ]);
-      const companeroIds = new Set([
-        ...directos.map((e) => e.usuarioId),
-        ...miembros.map((m) => m.usuarioId),
-      ]);
-      companeroIds.delete(userId);
+    if (companeroIds.size > 0) {
+      companeros = await Usuario.findAll({
+        where: { id: { [Op.in]: [...companeroIds] }, activo: true, ...filtroTexto },
+        attributes: ['id', 'nombre', 'apellido', 'email', 'rol', 'fotoPerfil'],
+        limit: 20,
+        order: [['nombre', 'ASC'], ['apellido', 'ASC']],
+      });
+    }
 
-      if (companeroIds.size > 0) {
-        companeros = await Usuario.findAll({
-          where: { id: { [Op.in]: [...companeroIds] }, activo: true, ...filtroTexto },
-          attributes: ['id', 'nombre', 'apellido', 'email', 'rol', 'fotoPerfil'],
-          limit: 5,
-          order: [['nombre', 'ASC'], ['apellido', 'ASC']],
-        });
-      }
+    let candidatos = [];
+    if (candidatoIds.size > 0) {
+      candidatos = await Usuario.findAll({
+        where: { id: { [Op.in]: [...candidatoIds] }, activo: true, ...filtroTexto },
+        attributes: ['id', 'nombre', 'apellido', 'email', 'rol', 'fotoPerfil'],
+        limit: 20,
+        order: [['nombre', 'ASC'], ['apellido', 'ASC']],
+      });
     }
 
     const vistos = new Set(companeros.map((u) => u.id));
-    resultados = [...companeros, ...alumnos.filter((u) => !vistos.has(u.id))].slice(0, 20);
+    resultados = [...companeros, ...candidatos.filter((u) => !vistos.has(u.id))].slice(0, 20);
   }
 
   const data = resultados.map((u) => ({ ...u.toJSON(), razonSocial: null, logo: null, empresaId: null, rolInterno: null }));
@@ -211,11 +267,22 @@ async function obtenerConversaciones(userId) {
     }
   }
 
-  const conversaciones = Array.from(mapa.values()).map((c) => ({
+  let conversaciones = Array.from(mapa.values()).map((c) => ({
     usuario: c.usuario?.toJSON ? c.usuario.toJSON() : { ...c.usuario },
     ultimoMensaje: c.ultimoMensaje,
     noLeidos: c.noLeidos,
   }));
+
+  // Recalcula el permiso vigente para cada interlocutor: pares que las reglas
+  // actuales ya no habilitan (ej. mensajes legacy alumno↔alumno) desaparecen
+  // de la lista; los que siguen habilitados solo para lectura (candidato
+  // rechazado) quedan marcados con soloLectura.
+  const permisos = await Promise.all(
+    conversaciones.map((c) => puedeVerConversacion(userId, c.usuario.id))
+  );
+  conversaciones = conversaciones
+    .map((c, i) => ({ ...c, soloLectura: permisos[i].soloLectura }))
+    .filter((_, i) => permisos[i].ok);
 
   const empresaUserIds = conversaciones
     .filter((c) => c.usuario.rol === 'empresa')

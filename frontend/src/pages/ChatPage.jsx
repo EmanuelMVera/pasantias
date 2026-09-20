@@ -256,6 +256,9 @@ export default function ChatPage() {
   const [enviando,        setEnviando]        = useState(false);
   const [errorConvs,      setErrorConvs]      = useState('');
   const [modalAbierto,    setModalAbierto]    = useState(false);
+  const [soloLectura,       setSoloLectura]       = useState(false);
+  const [motivoSoloLectura, setMotivoSoloLectura] = useState('');
+  const [errorConv,         setErrorConv]         = useState(''); // 403 al abrir/pollear la conversación activa
   const { toast, showToast } = useToast();
 
   const mensajesEndRef = useRef(null);
@@ -313,12 +316,19 @@ export default function ChatPage() {
           return { ...data.pagination, page: Math.max(prev.page, data.pagination.page) };
         });
         if (data.usuario) setPartnerInfo(data.usuario);
+        setSoloLectura(!!data.soloLectura);
+        setMotivoSoloLectura(data.motivoSoloLectura || '');
+        setErrorConv('');
         mensajeService.marcarLeida(convActivaId).catch(() => {});
         setConversaciones((prev) =>
           prev.map((c) => (c.usuario?.id === convActivaId ? { ...c, noLeidos: 0 } : c))
         );
-      } catch {
-        // Fallo silencioso para no interrumpir el polling
+      } catch (err) {
+        if (err.response?.status === 403) {
+          setErrorConv(err.response?.data?.message || 'No tenés acceso a esta conversación.');
+          clearInterval(pollRef.current); // la relación no es válida: no tiene sentido seguir pollendo
+        }
+        // otros errores: fallo silencioso, no interrumpe el polling
       } finally {
         if (inicial) setLoadingMensajes(false);
       }
@@ -326,6 +336,9 @@ export default function ChatPage() {
 
     setMensajes([]);
     setPagHist(null);
+    setSoloLectura(false);
+    setMotivoSoloLectura('');
+    setErrorConv('');
     cargarNuevos({ inicial: true }).then(scrollBottom);
 
     clearInterval(pollRef.current);
@@ -384,9 +397,16 @@ export default function ChatPage() {
           c.usuario?.id === convActivaId ? { ...c, ultimoMensaje: nuevo } : c
         )
       );
-    } catch {
+    } catch (err) {
       setNuevoMensaje(texto);
-      showToast('No se pudo enviar el mensaje. Intentá de nuevo.', 'error');
+      const msg = err.response?.data?.message || 'No se pudo enviar el mensaje. Intentá de nuevo.';
+      showToast(msg, 'error');
+      if (err.response?.status === 403) {
+        // La relación pasó a solo lectura (o se bloqueó) entre la apertura
+        // del chat y el envío — reflejarlo sin esperar al próximo poll.
+        setSoloLectura(true);
+        setMotivoSoloLectura(msg);
+      }
     } finally {
       setEnviando(false);
       inputRef.current?.focus();
@@ -550,65 +570,90 @@ export default function ChatPage() {
                 })()}
               </div>
 
-              {/* Mensajes */}
-              <div
-                className={styles.mensajesArea}
-                ref={mensajesAreaRef}
-                onScroll={handleScrollMensajes}
-              >
-                {loadingViejos && (
-                  <p className={styles.cargandoMsg}>Cargando mensajes anteriores…</p>
-                )}
-                {loadingMensajes && mensajes.length === 0 ? (
-                  <p className={styles.cargandoMsg}>Cargando mensajes...</p>
-                ) : mensajes.length === 0 ? (
-                  <p className={styles.cargandoMsg}>
-                    Aún no hay mensajes. ¡Escribí el primero!
-                  </p>
-                ) : (
-                  <>
-                    {mensajes.map((m, idx) => {
-                      const esMio = m.emisorId === usuario?.id;
-                      const fechaAnterior = idx > 0 ? mensajes[idx - 1].createdAt : null;
-                      const mismaFecha = fechaAnterior &&
-                        new Date(m.createdAt).toDateString() === new Date(fechaAnterior).toDateString();
-                      return (
-                        <div key={m.id}>
-                          {!mismaFecha && (
-                            <div className={styles.fechaSep}>
-                              <span>{formatFecha(m.createdAt)}</span>
+              {errorConv && mensajes.length === 0 ? (
+                /* Acceso inválido a esta conversación (URL directa a un usuario
+                   sin relación habilitada, o relación revocada) — estado de
+                   error explícito en vez de spinner infinito o pantalla en blanco. */
+                <div className={styles.chatEmpty}>
+                  <span>⚠️</span>
+                  <h3>No se pudo abrir esta conversación</h3>
+                  <p>{errorConv}</p>
+                  <button
+                    className={styles.nuevoChatBtnEmpty}
+                    onClick={() => { setConvActivaId(null); navigate('/chat', { replace: true }); }}
+                  >
+                    Volver a conversaciones
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Mensajes */}
+                  <div
+                    className={styles.mensajesArea}
+                    ref={mensajesAreaRef}
+                    onScroll={handleScrollMensajes}
+                  >
+                    {loadingViejos && (
+                      <p className={styles.cargandoMsg}>Cargando mensajes anteriores…</p>
+                    )}
+                    {loadingMensajes && mensajes.length === 0 ? (
+                      <p className={styles.cargandoMsg}>Cargando mensajes...</p>
+                    ) : mensajes.length === 0 ? (
+                      <p className={styles.cargandoMsg}>
+                        Aún no hay mensajes. ¡Escribí el primero!
+                      </p>
+                    ) : (
+                      <>
+                        {mensajes.map((m, idx) => {
+                          const esMio = m.emisorId === usuario?.id;
+                          const fechaAnterior = idx > 0 ? mensajes[idx - 1].createdAt : null;
+                          const mismaFecha = fechaAnterior &&
+                            new Date(m.createdAt).toDateString() === new Date(fechaAnterior).toDateString();
+                          return (
+                            <div key={m.id}>
+                              {!mismaFecha && (
+                                <div className={styles.fechaSep}>
+                                  <span>{formatFecha(m.createdAt)}</span>
+                                </div>
+                              )}
+                              <BurbujaMensaje mensaje={m} esMio={esMio} />
                             </div>
-                          )}
-                          <BurbujaMensaje mensaje={m} esMio={esMio} />
-                        </div>
-                      );
-                    })}
-                    <div ref={mensajesEndRef} />
-                  </>
-                )}
-              </div>
+                          );
+                        })}
+                        <div ref={mensajesEndRef} />
+                      </>
+                    )}
+                  </div>
 
-              {/* Input de envío */}
-              <form className={styles.inputBar} onSubmit={handleEnviar}>
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={nuevoMensaje}
-                  onChange={(e) => setNuevoMensaje(e.target.value)}
-                  placeholder="Escribí un mensaje..."
-                  disabled={enviando}
-                  maxLength={2000}
-                  autoComplete="off"
-                />
-                <button
-                  type="submit"
-                  className={styles.sendBtn}
-                  disabled={enviando || !nuevoMensaje.trim()}
-                  aria-label="Enviar mensaje"
-                >
-                  {enviando ? '…' : '➤'}
-                </button>
-              </form>
+                  {soloLectura && (
+                    <div className={styles.avisoLectura}>
+                      🔒 {motivoSoloLectura || 'Esta conversación pertenece a un proceso de selección finalizado.'}
+                    </div>
+                  )}
+
+                  {/* Input de envío */}
+                  <form className={styles.inputBar} onSubmit={handleEnviar}>
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={nuevoMensaje}
+                      onChange={(e) => setNuevoMensaje(e.target.value)}
+                      placeholder={soloLectura ? 'Esta conversación es de solo lectura' : 'Escribí un mensaje...'}
+                      disabled={enviando || soloLectura}
+                      maxLength={2000}
+                      autoComplete="off"
+                    />
+                    <button
+                      type="submit"
+                      className={styles.sendBtn}
+                      disabled={enviando || soloLectura || !nuevoMensaje.trim()}
+                      aria-label="Enviar mensaje"
+                    >
+                      {enviando ? '…' : '➤'}
+                    </button>
+                  </form>
+                </>
+              )}
             </>
           )}
         </main>

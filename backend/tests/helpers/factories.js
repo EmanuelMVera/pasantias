@@ -13,7 +13,7 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const request = require('supertest');
 const app = require('../../src/app');
-const { Usuario, Perfil, Empresa, EmpresaUsuario, Oferta, SolicitudEmpresa, Archivo } = require('../../src/models');
+const { Usuario, Perfil, Empresa, EmpresaUsuario, Oferta, Postulacion, SolicitudEmpresa, Archivo } = require('../../src/models');
 
 // Misma carpeta que archivo.service.js::UPLOADS_ROOT (backend/uploads) —
 // resolverRutaSegura exige que el archivo exista de verdad en disco.
@@ -114,6 +114,16 @@ async function crearOferta(empresa, overrides = {}) {
   });
 }
 
+/** Postulacion directa contra el modelo (sin pasar por postulacionService.validarPostulacion). */
+async function crearPostulacion(usuario, oferta, overrides = {}) {
+  return Postulacion.create({
+    usuarioId: usuario.id,
+    ofertaId: oferta.id,
+    estado: 'en_revision',
+    ...overrides,
+  });
+}
+
 async function crearSolicitudEmpresaPendiente(overrides = {}) {
   const suf = sufijo();
   return SolicitudEmpresa.create({
@@ -170,6 +180,7 @@ module.exports = {
   crearEmpresaConAdmin,
   agregarReclutador,
   crearOferta,
+  crearPostulacion,
   crearSolicitudEmpresaPendiente,
   crearArchivoCV,
   loginYObtenerToken,

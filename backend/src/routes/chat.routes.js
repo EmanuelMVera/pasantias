@@ -3,7 +3,10 @@
  *
  * Prefijo de la API: /api/chat
  *
- * Todas las rutas requieren autenticación (cualquier rol).
+ * Todas las rutas requieren autenticación y rol alumno/egresado/empresa —
+ * el administrador del sistema no participa del chat (defensa en
+ * profundidad a nivel de ruta; la lógica fina de quién-con-quién vive en
+ * chatPermission.service.js).
  *
  * ⚠️ ORDEN IMPORTANTE: rutas fijas (/usuarios, /:usuarioId/leer) deben ir
  *    ANTES de '/:usuarioId' para que Express no las trate como parámetro.
@@ -19,13 +22,15 @@
 'use strict';
 
 const router = require('express').Router();
-const { verifyToken } = require('../middleware/auth.middleware');
+const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
 const asyncHandler = require('../utils/asyncHandler');
 const { writeLimiter } = require('../middleware/rateLimit');
 const ctrl = require('../controllers/chat.controller');
 
-// Todos los endpoints de chat requieren estar autenticado (cualquier rol)
+// Todos los endpoints de chat requieren estar autenticado y no ser admin
+// (el administrador del sistema no participa del chat).
 router.use(verifyToken);
+router.use(authorizeRoles('alumno', 'egresado', 'empresa'));
 
 // GET  /api/chat/usuarios?q=texto — Busca usuarios para iniciar un nuevo chat
 // ⚠️ Debe ir ANTES de GET /:usuarioId para que Express no confunda 'usuarios' con un ID
