@@ -217,6 +217,14 @@
   cursor: pointer;
 }
 .selectorEstado select:focus { outline: none; border-color: var(--primary); }
+.estadoSoloLectura {
+  padding: 0.45rem 0.7rem;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  background: var(--bg-alt, var(--bg));
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
 
 /* ── Compat bar ──────────────────────────────────────────────────────────────── */
 .compatWrap {

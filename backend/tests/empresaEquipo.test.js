@@ -47,6 +47,29 @@ describe('EMPRESA EQUIPO', () => {
     expect(res.status).toBe(404);
   });
 
+  test('admin_empresa puede suspender, reactivar y retirar a un reclutador de su equipo', async () => {
+    const { usuarioAdmin, empresa, passwordPlana } = await crearEmpresaConAdmin();
+    idsUsuarios.push(usuarioAdmin.id);
+    const { usuarioReclutador, membresia } = await agregarReclutador(empresa);
+    idsUsuarios.push(usuarioReclutador.id);
+
+    const token = await loginYObtenerToken(usuarioAdmin.email, passwordPlana);
+    const auth = (req) => req.set('Authorization', `Bearer ${token}`);
+
+    const suspender = await auth(request(app).patch(`/api/empresas/equipo/${membresia.id}`))
+      .send({ activo: false });
+    expect(suspender.status).toBe(200);
+    expect(suspender.body.data.activo).toBe(false);
+
+    const reactivar = await auth(request(app).patch(`/api/empresas/equipo/${membresia.id}`))
+      .send({ activo: true });
+    expect(reactivar.status).toBe(200);
+    expect(reactivar.body.data.activo).toBe(true);
+
+    const retirar = await auth(request(app).delete(`/api/empresas/equipo/${membresia.id}`));
+    expect(retirar.status).toBe(200);
+  });
+
   test('reclutador recibe 403 en las rutas de gestión de equipo', async () => {
     const { usuarioAdmin, empresa } = await crearEmpresaConAdmin();
     idsUsuarios.push(usuarioAdmin.id);

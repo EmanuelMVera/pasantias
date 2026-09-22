@@ -45,7 +45,7 @@ const METRIC_CARDS = [
     action: ({ navigate }) => navigate('/empresa/candidatos?estado=contratado'),
   },
   {
-    key: 'miembrosEquipo',  label: 'Equipo Reclutador', icon: '👥', color: 'var(--secondary)',
+    key: 'miembrosEquipo',  label: 'Miembros del equipo', icon: '👥', color: 'var(--secondary)',
     action: ({ navigate }) => navigate('/empresa/equipo'),
   },
 ];
@@ -100,6 +100,13 @@ export default function EmpresaDashboardPage() {
   // backend ya lo exige, esto solo evita mostrarle un botón que va a fallar.
   const puedeGestionarEstado = (oferta) =>
     esAdminEmpresa || !oferta.creadaPorUsuarioId || oferta.creadaPorUsuarioId === usuario?.id;
+
+  // RBAC-02: a diferencia de puedeGestionarEstado, acá NO hay override de
+  // admin_empresa — el contenido de una oferta solo lo edita el reclutador
+  // responsable (o cualquier reclutador si es una oferta histórica sin
+  // responsable registrado). admin_empresa nunca edita contenido.
+  const puedeEditarContenido = (oferta) =>
+    esReclutador && (!oferta.creadaPorUsuarioId || oferta.creadaPorUsuarioId === usuario?.id);
 
   const cargarMetricas = useCallback(async () => {
     setError('');
@@ -188,19 +195,29 @@ export default function EmpresaDashboardPage() {
   );
 
   const renderAcciones = (o) => {
+    const editarBtn = puedeEditarContenido(o) && (
+      <Link to={`/empresa/ofertas/${o.id}/editar`} className="btn-small" aria-label={`Editar la oferta "${o.titulo}"`}>
+        ✏️ Editar
+      </Link>
+    );
+
     if (guardando === o.id) {
-      return <span className={styles.guardandoSpan}>Guardando...</span>;
+      return <>{editarBtn}<span className={styles.guardandoSpan}>Guardando...</span></>;
     }
     if (!puedeGestionarEstado(o)) {
       return (
-        <span className={styles.estadoNota} title="Solo el reclutador responsable puede modificar el estado de esta oferta.">
-          Solo el responsable
-        </span>
+        <>
+          {editarBtn}
+          <span className={styles.estadoNota} title="Solo el reclutador responsable puede modificar el estado de esta oferta.">
+            Solo el responsable
+          </span>
+        </>
       );
     }
     if (o.estado === 'activa') {
       return (
         <>
+          {editarBtn}
           <button className="btn-warn" onClick={() => handleCambiarEstado(o.id, 'pausada')} aria-label={`Pausar la oferta "${o.titulo}"`}>
             Pausar
           </button>
@@ -212,20 +229,26 @@ export default function EmpresaDashboardPage() {
     }
     if (o.estado === 'pausada') {
       return (
-        <button className="btn-ok" onClick={() => handleCambiarEstado(o.id, 'activa')} aria-label={`Activar la oferta "${o.titulo}"`}>
-          Activar
-        </button>
+        <>
+          {editarBtn}
+          <button className="btn-ok" onClick={() => handleCambiarEstado(o.id, 'activa')} aria-label={`Activar la oferta "${o.titulo}"`}>
+            Activar
+          </button>
+        </>
       );
     }
     if (o.estado === 'rechazada') {
       return (
-        <span className={`${styles.estadoNota} ${styles.rechazada}`} title="Contactá al administrador para más información.">
-          Revisada por admin
-        </span>
+        <>
+          {editarBtn}
+          <span className={`${styles.estadoNota} ${styles.rechazada}`} title="Contactá al administrador para más información.">
+            Revisada por admin
+          </span>
+        </>
       );
     }
     // cerrada
-    return <span className={styles.estadoNota}>—</span>;
+    return <>{editarBtn}<span className={styles.estadoNota}>—</span></>;
   };
 
   return (
@@ -243,7 +266,9 @@ export default function EmpresaDashboardPage() {
           <Link to="/empresa/equipo"     className="btn-secondary">
             {esReclutador ? '👥 Ver equipo' : '👥 Gestionar equipo'}
           </Link>
-          <Link to="/empresa/nueva-oferta" className="btn-primary">+ Nueva Oferta</Link>
+          {!esAdminEmpresa && (
+            <Link to="/empresa/nueva-oferta" className="btn-primary">+ Nueva Oferta</Link>
+          )}
         </div>
       </div>
 
@@ -305,7 +330,9 @@ export default function EmpresaDashboardPage() {
         <div className={styles.emptyState}>
           <span>📭</span>
           <p>Todavía no publicaste ninguna oferta.</p>
-          <Link to="/empresa/nueva-oferta" className="btn-primary">Publicar primera oferta</Link>
+          {!esAdminEmpresa && (
+            <Link to="/empresa/nueva-oferta" className="btn-primary">Publicar primera oferta</Link>
+          )}
         </div>
       ) : (
         <>

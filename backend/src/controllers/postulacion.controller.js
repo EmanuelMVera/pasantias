@@ -151,7 +151,12 @@ exports.getPostulacionesByOferta = async (req, res) => {
     pagination,
     conteoPorEstado,
     total: pagination.total,
-    oferta: { id: oferta.id, titulo: oferta.titulo, habilidadesRequeridas: oferta.habilidadesRequeridas },
+    oferta: {
+      id: oferta.id,
+      titulo: oferta.titulo,
+      habilidadesRequeridas: oferta.habilidadesRequeridas,
+      creadaPorUsuarioId: oferta.creadaPorUsuarioId,
+    },
   });
 };
 
@@ -169,6 +174,21 @@ exports.updateEstado = async (req, res) => {
   if (!empresa) return res.status(403).json({ success: false, message: 'No tenés un perfil de empresa activo.' });
   if (postulacion.oferta.empresaId !== empresa.id) {
     return res.status(403).json({ success: false, message: 'No tenés permiso para modificar esta postulación.' });
+  }
+
+  // RBAC-02: las acciones operativas sobre un candidato (cambiar estado,
+  // notas) corresponden al reclutador responsable de la oferta — mismo
+  // patrón que updateOferta/cambiarEstadoOferta. Ofertas huérfanas (sin
+  // creadaPorUsuarioId, previas a la migración 013) quedan gestionables por
+  // cualquier reclutador activo de la empresa.
+  const esResponsable = !postulacion.oferta.creadaPorUsuarioId
+    || postulacion.oferta.creadaPorUsuarioId === req.usuario.id;
+  if (!esResponsable) {
+    return res.status(403).json({
+      success: false,
+      message: 'Solo el reclutador responsable de esta oferta puede gestionar a sus candidatos.',
+      code: 'NO_ES_RESPONSABLE',
+    });
   }
 
   const estadoAnterior = postulacion.estado;

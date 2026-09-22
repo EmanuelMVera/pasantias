@@ -15,6 +15,8 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { postulacionService, abrirArchivoPrivado } from '../../services/api';
 import Avatar from '../../components/Avatar/Avatar';
 import Paginacion from '../../components/Paginacion/Paginacion';
+import { useEmpresa } from '../../hooks/useEmpresa';
+import { useAuth } from '../../hooks/useAuth';
 import { LISTA_ESTADOS_POSTULACION, ESTADOS_HABILITAN_CHAT, getEstadoInfo, normalizarEstado } from '../../constants/postulacionEstados';
 import styles from './PostulantesMiOfertaPage.module.css';
 
@@ -43,8 +45,11 @@ function CompatBar({ valor }) {
 export default function PostulantesMiOfertaPage() {
   const { ofertaId } = useParams();
   const navigate = useNavigate();
+  const { esReclutador } = useEmpresa();
+  const { usuario } = useAuth();
 
   const [postulaciones, setPostulaciones] = useState([]);
+  const [ofertaInfo,    setOfertaInfo]    = useState(null);
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState('');
   const [filtro,        setFiltro]        = useState('');
@@ -53,6 +58,12 @@ export default function PostulantesMiOfertaPage() {
   const [conteoPorEstado, setConteoPorEstado] = useState({});
   const [page,          setPage]          = useState(1);
 
+  // RBAC-02: las acciones operativas (cambiar estado, contactar) son del
+  // reclutador responsable de la oferta — admin_empresa y otros reclutadores
+  // de la misma empresa mantienen la vista, pero en modo lectura.
+  const puedeGestionar = esReclutador
+    && (!ofertaInfo?.creadaPorUsuarioId || ofertaInfo.creadaPorUsuarioId === usuario?.id);
+
   const cargar = useCallback(async (pagina = 1) => {
     setLoading(true);
     try {
@@ -60,6 +71,7 @@ export default function PostulantesMiOfertaPage() {
       if (filtro) params.estado = filtro;
       const { data } = await postulacionService.getByOferta(ofertaId, params);
       setPostulaciones(data.data ?? []);
+      setOfertaInfo(data.oferta ?? null);
       setPagination(data.pagination ?? null);
       setConteoPorEstado(data.conteoPorEstado ?? {});
       setPage(pagina);
@@ -203,7 +215,7 @@ export default function PostulantesMiOfertaPage() {
                         <div className={styles.candidatoInfo}>
                           <div className={styles.nombreRow}>
                             <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>
-                            {ESTADOS_HABILITAN_CHAT.includes(normalizarEstado(p.estado)) && p.usuario?.id && (
+                            {puedeGestionar && ESTADOS_HABILITAN_CHAT.includes(normalizarEstado(p.estado)) && p.usuario?.id && (
                               <button
                                 className={styles.btnContactar}
                                 onClick={() => navigate(`/chat/${p.usuario.id}`)}
@@ -254,18 +266,28 @@ export default function PostulantesMiOfertaPage() {
                       </div>
                     </div>
 
-                    {/* Selector de estado */}
+                    {/* Selector de estado — solo el reclutador responsable de
+                        esta oferta gestiona candidatos (RBAC-02) */}
                     <div className={styles.selectorEstado}>
                       <label>Estado</label>
-                      <select
-                        value={p.estado}
-                        onChange={e => handleCambiarEstado(p.id, e.target.value)}
-                        style={{ borderColor: col?.color ?? 'var(--border)' }}
-                      >
-                        {LISTA_ESTADOS_POSTULACION.map(e => (
-                          <option key={e.estado} value={e.estado}>{e.emoji} {e.label}</option>
-                        ))}
-                      </select>
+                      {puedeGestionar ? (
+                        <select
+                          value={p.estado}
+                          onChange={e => handleCambiarEstado(p.id, e.target.value)}
+                          style={{ borderColor: col?.color ?? 'var(--border)' }}
+                        >
+                          {LISTA_ESTADOS_POSTULACION.map(e => (
+                            <option key={e.estado} value={e.estado}>{e.emoji} {e.label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span
+                          className={styles.estadoSoloLectura}
+                          title="Solo el reclutador responsable de esta oferta puede gestionar a sus candidatos."
+                        >
+                          {col?.emoji} {col?.label ?? p.estado}
+                        </span>
+                      )}
                     </div>
                   </div>
                 );

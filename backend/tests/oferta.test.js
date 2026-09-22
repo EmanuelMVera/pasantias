@@ -108,6 +108,26 @@ describe('OFERTA', () => {
     expect(resPausar.body.code).toBe('NO_ES_RESPONSABLE');
   });
 
+  test('reclutador creador puede editar el contenido de su propia oferta', async () => {
+    const { empresa } = await crearEmpresaConAdmin();
+    const { usuarioReclutador, passwordPlana } = await agregarReclutador(empresa);
+    idsUsuarios.push(usuarioReclutador.id);
+    const token = await loginYObtenerToken(usuarioReclutador.email, passwordPlana);
+    const crear = await request(app)
+      .post('/api/ofertas')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ titulo: 'Oferta original', descripcion: 'Descripción de prueba.' });
+    const ofertaId = crear.body.data.id;
+
+    const res = await request(app)
+      .put(`/api/ofertas/${ofertaId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ titulo: 'Oferta editada por su responsable' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.titulo).toBe('Oferta editada por su responsable');
+  });
+
   test('admin_empresa SÍ puede pausar/cerrar la oferta de un reclutador (control institucional)', async () => {
     const { usuarioAdmin, empresa, passwordPlana } = await crearEmpresaConAdmin();
     idsUsuarios.push(usuarioAdmin.id);

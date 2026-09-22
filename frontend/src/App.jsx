@@ -42,6 +42,7 @@ import PerfilPage from './pages/alumno/PerfilPage';
 // Páginas de la empresa (requieren rol empresa)
 import EmpresaDashboardPage from './pages/empresa/EmpresaDashboardPage';
 import CrearOfertaPage from './pages/empresa/CrearOfertaPage';
+import EditarOfertaPage from './pages/empresa/EditarOfertaPage';
 import PostulantesMiOfertaPage from './pages/empresa/PostulantesMiOfertaPage';
 import EquipoPage from './pages/empresa/EquipoPage';
 import SeguridadPage from './pages/empresa/SeguridadPage';
@@ -180,6 +181,11 @@ function AppRoutes() {
       <Route path="/empresa/nueva-oferta" element={
         <ProtectedRoute roles={['empresa']}>
           <CrearOfertaPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/empresa/ofertas/:id/editar" element={
+        <ProtectedRoute roles={['empresa']}>
+          <EditarOfertaPage />
         </ProtectedRoute>
       } />
       <Route path="/empresa/postulantes/:ofertaId" element={

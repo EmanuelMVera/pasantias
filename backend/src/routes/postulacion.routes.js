@@ -7,17 +7,25 @@
  * - POST /          → Se postula a una oferta
  * - GET  /mis       → Historial de postulaciones propias
  *
- * Rutas para empresas (admin_empresa y reclutador pueden ver y gestionar):
- * - GET  /oferta/:ofertaId  → Ver candidatos de una oferta
- * - PATCH /:id/estado       → Actualizar el estado de una postulación
+ * Rutas para empresas:
+ * - GET  /oferta/:ofertaId  → Ver candidatos de una oferta (cualquier miembro activo)
+ * - PATCH /:id/estado       → Actualizar el estado de una postulación (solo reclutador
+ *                             responsable de la oferta — RBAC-02)
  *
- * Todos los miembros activos pueden ver; ambos roles pueden cambiar estados.
+ * Todos los miembros activos pueden VER candidatos de cualquier oferta de su empresa
+ * (visión global, igual que ya pasa con el listado de ofertas). Las acciones operativas
+ * sobre un candidato (cambiar estado, notas) son del reclutador responsable de esa
+ * oferta — admin_empresa no opera candidatos, solo consulta (ver oferta.controller.js
+ * para el mismo patrón sobre ofertas).
  *
  * Changelog:
  * - v1.0: implementación inicial
  * - v1.5: rutas de empresa usan verifyEmpresaMember para inyectar req.empresa
  *         · GET /oferta/:ofertaId → cualquier miembro del equipo
  *         · PATCH /:id/estado     → admin_empresa y reclutador
+ * - v1.6 (RBAC-02): PATCH /:id/estado pasa a ser exclusivo de reclutador, y solo
+ *         del responsable de la oferta (mismo criterio que updateOferta/
+ *         cambiarEstadoOferta) — admin_empresa mantiene solo GET /oferta/:ofertaId.
  */
 
 const router = require('express').Router();
@@ -45,11 +53,12 @@ router.get(
   asyncHandler(ctrl.getPostulacionesByOferta)
 );
 
-// Cambiar estado de una postulación — admin_empresa y reclutador
+// Cambiar estado de una postulación — solo reclutador (y solo el responsable
+// de la oferta, chequeado en el controller — RBAC-02).
 router.patch(
   '/:id/estado',
   ...baseMiembroEmpresa,
-  authorizeEmpresaRoles('admin_empresa', 'reclutador'),
+  authorizeEmpresaRoles('reclutador'),
   validate(validateUpdateEstado),
   asyncHandler(ctrl.updateEstado)
 );
