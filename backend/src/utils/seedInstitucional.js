@@ -200,12 +200,12 @@ const CADENA_POR_ESTADO = {
 };
 
 const ESTADO_OFERTA_PATTERN = [
-  { estado: 'activa', moderada: true },
-  { estado: 'activa', moderada: true },
-  { estado: 'activa', moderada: false }, // pendiente de moderación
-  { estado: 'pausada', moderada: true },
-  { estado: 'cerrada', moderada: true },
-  { estado: 'rechazada', moderada: false },
+  { estado: 'activa', estadoModeracion: 'aprobada' },
+  { estado: 'activa', estadoModeracion: 'aprobada' },
+  { estado: 'activa', estadoModeracion: 'pendiente' },
+  { estado: 'pausada', estadoModeracion: 'aprobada' },
+  { estado: 'cerrada', estadoModeracion: 'aprobada' },
+  { estado: 'activa', estadoModeracion: 'rechazada' },
 ];
 
 async function sembrar(transaction) {
@@ -307,7 +307,7 @@ async function sembrar(transaction) {
     for (const reclutador of reclutadores) {
       const area = areas[ofertaGlobalIdx % areas.length];
       const tipoPuesto = TIPO_PUESTO[ofertaGlobalIdx % TIPO_PUESTO.length];
-      const { estado, moderada } = ESTADO_OFERTA_PATTERN[ofertaGlobalIdx % ESTADO_OFERTA_PATTERN.length];
+      const { estado, estadoModeracion } = ESTADO_OFERTA_PATTERN[ofertaGlobalIdx % ESTADO_OFERTA_PATTERN.length];
       const tOferta = tick(1, 4);
       const oferta = await Oferta.create({
         empresaId: empresa.id,
@@ -323,7 +323,7 @@ async function sembrar(transaction) {
         requiereExperiencia: false,
         carrerasDestinatarias,
         estado,
-        moderada,
+        estadoModeracion,
         vistas: 15 + (ofertaGlobalIdx * 13) % 300,
         cantidadVacantes: 1 + (ofertaGlobalIdx % 3),
         remuneracion: 'A convenir',

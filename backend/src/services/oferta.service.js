@@ -9,6 +9,33 @@ const logger = require('../utils/logger');
 const TIPOS_PUESTO_VALIDOS = ['pasante', 'trainee', 'junior'];
 const CARRERAS_VALIDAS = require('../data/catalogos.json').carreras;
 
+// ── Visibilidad para alumnos/egresados (RBAC-04) ────────────────────────────
+// Única fuente de verdad de "¿esta oferta se puede mostrar a un candidato?":
+// ciclo de vida 'activa' Y moderación resuelta a favor. Se usa en TODO
+// endpoint que expone ofertas a candidatos (listado público, detalle,
+// recomendadas, dashboard de alumno) para no repetir la condición a mano.
+const ESTADOS_MODERACION_VISIBLES = ['aprobada', 'auto_aprobada'];
+
+/** Condición Sequelize `where` que determina si una oferta es visible. */
+function whereOfertaVisible() {
+  return { estado: 'activa', estadoModeracion: { [Op.in]: ESTADOS_MODERACION_VISIBLES } };
+}
+
+/** Mismo criterio aplicado a una instancia ya cargada (checks puntuales). */
+function esOfertaVisible(oferta) {
+  return oferta.estado === 'activa' && ESTADOS_MODERACION_VISIBLES.includes(oferta.estadoModeracion);
+}
+
+// Transiciones de ciclo de vida permitidas (PATCH /api/ofertas/:id/estado,
+// empresa; y pausar/cerrar del admin en adminModeracion.service.js). No
+// incluye 'rechazada': eso es moderación, vive en estadoModeracion, nunca en
+// estado. 'cerrada' es terminal — cerrar es una decisión final.
+const TRANSICIONES_ESTADO = {
+  activa:  ['pausada', 'cerrada'],
+  pausada: ['activa', 'cerrada'],
+  cerrada: [],
+};
+
 // Campos numéricos / de fecha que el formulario del frontend envía como ''
 // (string vacío) cuando el usuario los deja en blanco. Postgres rechaza '' para
 // columnas integer/date con un 22P02 → 500. Normalizamos '' → null antes de crear.
@@ -77,13 +104,15 @@ function validarCamposPuesto(body) {
 
 /**
  * Ofertas recomendadas para el endpoint /api/ofertas/recomendadas (con paginación).
- * Solo ofertas activas; no requiere moderada=true (alumnos ven aunque esté pendiente).
+ * Misma regla de visibilidad que el resto de los endpoints de candidatos
+ * (whereOfertaVisible) — antes filtraba solo por estado='activa', sin exigir
+ * moderación resuelta, lo que dejaba colar ofertas pendientes (bug RBAC-04).
  * Recibe { page, limit, offset } ya saneados por parsePagination (SCALE-03).
  */
 async function obtenerRecomendadas(usuarioId, usuario, { page = 1, limit = 12, offset = 0 } = {}) {
   const perfil = await Perfil.findOne({ where: { usuarioId } });
 
-  const where = { estado: 'activa' };
+  const where = { ...whereOfertaVisible() };
 
   const postuladas = await Postulacion.findAll({ where: { usuarioId }, attributes: ['ofertaId'] });
   const idsPostuladas = postuladas.map((p) => p.ofertaId);
@@ -122,12 +151,12 @@ async function obtenerRecomendadas(usuarioId, usuario, { page = 1, limit = 12, o
 
 /**
  * Top N ofertas recomendadas para el dashboard del alumno.
- * Requiere moderada=true (solo muestra ofertas ya revisadas por el admin).
+ * Misma regla de visibilidad que obtenerRecomendadas (whereOfertaVisible).
  * Acepta perfil pre-cargado para evitar query extra.
  */
 async function obtenerRecomendadasDashboard(perfil, usuarioId, usuario, limite = 5) {
   try {
-    const where = { estado: 'activa', moderada: true };
+    const where = { ...whereOfertaVisible() };
 
     const postuladas = await Postulacion.findAll({ where: { usuarioId }, attributes: ['ofertaId'] });
     const idsPostuladas = postuladas.map((p) => p.ofertaId);
@@ -180,4 +209,7 @@ module.exports = {
   obtenerRecomendadas,
   obtenerRecomendadasDashboard,
   notificarAdminsNuevaOferta,
+  whereOfertaVisible,
+  esOfertaVisible,
+  TRANSICIONES_ESTADO,
 };

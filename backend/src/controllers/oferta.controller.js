@@ -7,15 +7,7 @@ const empresaService  = require('../services/empresa.service');
 const { parsePagination, buildPagination } = require('../utils/pagination');
 const { registrarAuditoria } = require('../utils/auditLog');
 
-// Transiciones de estado permitidas vía PATCH /:id/estado. 'rechazada' no
-// aparece como origen: es moderación exclusiva del admin del sistema, la
-// empresa/reclutador no puede tocar una oferta rechazada. 'cerrada' es
-// terminal — cerrar es una decisión final, no se reactiva.
-const TRANSICIONES_ESTADO = {
-  activa:  ['pausada', 'cerrada'],
-  pausada: ['activa', 'cerrada'],
-  cerrada: [],
-};
+const { TRANSICIONES_ESTADO } = ofertaService;
 
 const ACCION_POR_ESTADO = {
   activa:  'reactivar_oferta',
@@ -31,7 +23,7 @@ exports.getOfertas = async (req, res) => {
   const { area, modalidad, ciudad, experiencia, tipoPuesto, q } = req.query;
   const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 12, maxLimit: 48 });
 
-  const where = { estado: 'activa', moderada: true };
+  const where = { ...ofertaService.whereOfertaVisible() };
   if (area)       where.area = { [Op.iLike]: `%${area}%` };
   if (modalidad)  where.modalidad = modalidad;
   if (ciudad)     where.ciudad = { [Op.iLike]: `%${ciudad}%` };
@@ -70,7 +62,7 @@ exports.getOfertasRecomendadas = async (req, res) => {
 
 exports.getOfertaById = async (req, res) => {
   const oferta = await Oferta.findOne({
-    where: { id: req.params.id, estado: 'activa', moderada: true },
+    where: { id: req.params.id, ...ofertaService.whereOfertaVisible() },
     include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'logo', 'rubro', 'ciudad'] }],
   });
   if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
@@ -94,7 +86,7 @@ exports.createOferta = async (req, res) => {
   if (error) return res.status(400).json({ success: false, message: error });
 
   const oferta = await Oferta.create({
-    ...body, ...campos, empresaId: empresa.id, moderada: false, creadaPorUsuarioId: req.usuario.id,
+    ...body, ...campos, empresaId: empresa.id, estadoModeracion: 'pendiente', creadaPorUsuarioId: req.usuario.id,
   });
 
   ofertaService.notificarAdminsNuevaOferta(oferta, empresa); // fire-and-forget

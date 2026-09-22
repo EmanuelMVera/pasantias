@@ -37,8 +37,6 @@
   font-size: 0.82rem;
 }
 
-.moderadaCell { text-align: center; }
-
 .procesando {
   color: var(--text-muted);
   font-size: 0.85rem;

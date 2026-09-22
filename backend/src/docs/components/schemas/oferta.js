@@ -7,7 +7,7 @@ const full = modelToSchema(Oferta, { exclude: ['deletedAt'] });
 // Campos que NO se aceptan en el body de creación/edición (los fija el server).
 // creadaPorUsuarioId: sale exclusivamente de req.usuario.id — un valor enviado
 // en el body se ignora silenciosamente (RBAC-01, ver tests/oferta.test.js).
-const NO_INPUT = ['id', 'empresaId', 'moderada', 'vistas', 'estado', 'nivelExperiencia',
+const NO_INPUT = ['id', 'empresaId', 'estadoModeracion', 'vistas', 'estado', 'nivelExperiencia',
   'creadaPorUsuarioId', 'createdAt', 'updatedAt', 'deletedAt'];
 const inputProps = Object.fromEntries(
   Object.entries(full.properties).filter(([k]) => !NO_INPUT.includes(k)),

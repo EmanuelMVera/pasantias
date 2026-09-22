@@ -22,9 +22,10 @@
  * URL https externa estable (ver LOGO_EMPRESA_URL); el alumno demo queda sin
  * CV cargado (el perfil lo indica explícitamente en la UI).
  *
- * Además siembra: 1 empresa aprobada + logo por URL externa, 7 ofertas en
- * todos los estados (activa/moderada, activa sin moderar, pausada, cerrada,
- * rechazada), postulaciones (4 del alumno demo con historial de estados
+ * Además siembra: 1 empresa aprobada + logo por URL externa, 7 ofertas
+ * cubriendo las combinaciones de ciclo de vida (activa/pausada/cerrada) y
+ * moderación (aprobada/pendiente/rechazada, ejes independientes desde
+ * RBAC-04), postulaciones (4 del alumno demo con historial de estados
  * completo + 10 de un pool de candidatos SINTÉTICOS creados por este mismo
  * seed — ver CANDIDATOS_SINTETICOS más abajo), conversaciones de chat entre
  * los 3 roles, notificaciones de todos los tipos, solicitudes de reclutador
@@ -411,7 +412,7 @@ async function sembrar(transaction) {
       habilidadesRequeridas: ['JavaScript', 'React', 'CSS', 'Git'],
       tipoPuesto: 'pasante',
       estado: 'activa',
-      moderada: true,
+      estadoModeracion: 'aprobada',
       vistas: 148,
       cantidadVacantes: 2,
       fechaPublicacion: daysAgo(25),
@@ -431,7 +432,7 @@ async function sembrar(transaction) {
       habilidadesRequeridas: ['Node.js', 'SQL', 'Express', 'Git'],
       tipoPuesto: 'pasante',
       estado: 'activa',
-      moderada: true,
+      estadoModeracion: 'aprobada',
       vistas: 96,
       cantidadVacantes: 1,
       fechaPublicacion: daysAgo(18),
@@ -452,7 +453,7 @@ async function sembrar(transaction) {
       habilidadesRequeridas: ['Testing', 'JavaScript', 'Git'],
       tipoPuesto: 'trainee',
       estado: 'activa',
-      moderada: true,
+      estadoModeracion: 'aprobada',
       vistas: 71,
       cantidadVacantes: 1,
       fechaPublicacion: daysAgo(22),
@@ -472,7 +473,7 @@ async function sembrar(transaction) {
       habilidadesRequeridas: ['TCP/IP', 'Routing', 'Soporte'],
       tipoPuesto: 'pasante',
       estado: 'pausada',
-      moderada: true,
+      estadoModeracion: 'aprobada',
       vistas: 54,
       cantidadVacantes: 1,
       fechaPublicacion: daysAgo(35),
@@ -492,7 +493,7 @@ async function sembrar(transaction) {
       habilidadesRequeridas: ['Python', 'SQL', 'Excel'],
       tipoPuesto: 'pasante',
       estado: 'activa',
-      moderada: false, // pendiente de moderación del admin
+      estadoModeracion: 'pendiente',
       vistas: 8,
       cantidadVacantes: 1,
       fechaPublicacion: daysAgo(2),
@@ -512,7 +513,7 @@ async function sembrar(transaction) {
       habilidadesRequeridas: ['Figma', 'UX Research', 'Prototipado'],
       tipoPuesto: 'pasante',
       estado: 'cerrada',
-      moderada: true,
+      estadoModeracion: 'aprobada',
       vistas: 203,
       cantidadVacantes: 1,
       // 43 (no 70): la empresa/admin_empresa existen desde hace 45 días (ver
@@ -532,8 +533,8 @@ async function sembrar(transaction) {
       salario: 340000,
       habilidadesRequeridas: ['Linux', 'OWASP', 'Análisis de logs'],
       tipoPuesto: 'pasante',
-      estado: 'rechazada', // rechazada por moderación
-      moderada: false,
+      estado: 'activa', // el ciclo de vida no se toca al rechazar (RBAC-04)
+      estadoModeracion: 'rechazada',
       vistas: 3,
       cantidadVacantes: 1,
       fechaPublicacion: daysAgo(6),
@@ -1012,7 +1013,7 @@ if (require.main === module) {
       console.log('  (El administrador real del sistema NO forma parte de este escenario —');
       console.log('   se crea únicamente con `npm run db:seed:admin`, ver docs/DEPLOYMENT.md.)');
       console.log(`  Empresa:        ${r.empresa} (aprobada) — CUIT ${EMPRESA_CUIT}`);
-      console.log(`  Ofertas:        ${r.ofertas} (activa/moderada, activa sin moderar, pausada, cerrada, rechazada)`);
+      console.log(`  Ofertas:        ${r.ofertas} (ciclo de vida activa/pausada/cerrada × moderación aprobada/pendiente/rechazada)`);
       console.log(`  Postulaciones:  ${r.postulaciones} (4 del alumno demo con historial completo + 10 de candidatos sintéticos)`);
       console.log(`  Candidatos:     10 usuarios sintéticos candidatoNN@demo.invalid (sin login en LoginPage, ver DEPLOYMENT.md)`);
       console.log('  Chats:          4 conversaciones (17 mensajes) entre las 3 cuentas demo');

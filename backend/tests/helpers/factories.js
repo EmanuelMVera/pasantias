@@ -108,7 +108,7 @@ async function crearOferta(empresa, overrides = {}) {
     titulo: `Pasantía de prueba ${suf}`,
     descripcion: 'Descripción de prueba generada por la suite de tests.',
     estado: 'activa',
-    moderada: true,
+    estadoModeracion: 'aprobada',
     cantidadVacantes: 1,
     ...overrides,
   });

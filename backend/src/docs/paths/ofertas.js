@@ -21,14 +21,14 @@ module.exports = {
   '/api/ofertas': {
     get: operation({
       tag: T, id: 'ofertasList', summary: 'Listar ofertas activas y aprobadas',
-      description: 'Público. Solo devuelve ofertas `estado=activa` y `moderada=true`.',
+      description: 'Público. Solo devuelve ofertas `estado=activa` y `estadoModeracion` en (`aprobada`, `auto_aprobada`).',
       security: [],
       query: ['pageParam', 'limitParam', ...filtros],
       responses: { 200: paginated('Oferta') },
     }),
     post: operation({
       tag: T, id: 'ofertasCreate', summary: 'Publicar una oferta',
-      description: 'La oferta queda `moderada=false` hasta que un admin la aprueba. Solo reclutador.',
+      description: 'La oferta queda `estadoModeracion=pendiente` hasta que un admin la aprueba. Solo reclutador.',
       roles: R_CREA_EDITA, csrf: true, body: 'OfertaCreate',
       responses: { 201: message({ data: REF.schema('Oferta') }, { code: 201 }) },
       errors: ['400', '401', '403', '403csrf', '404empresa', '500'],
@@ -38,7 +38,7 @@ module.exports = {
   '/api/ofertas/{id}': {
     get: operation({
       tag: T, id: 'ofertasGet', summary: 'Detalle de una oferta',
-      description: 'Público. Incrementa el contador de vistas. 404 si no está `activa`+`moderada`.',
+      description: 'Público. Incrementa el contador de vistas. 404 si no está `activa` y con moderación resuelta (`aprobada`/`auto_aprobada`).',
       security: [], params: ['id'],
       responses: { 200: ok('Oferta') },
       errors: ['404'],

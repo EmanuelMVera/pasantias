@@ -39,6 +39,13 @@ module.exports = {
     description: 'Filtra por estado (valores según el recurso).',
     schema: { type: 'string' },
   },
+  estadoModeracionQuery: {
+    name: 'estadoModeracion',
+    in: 'query',
+    required: false,
+    description: 'Filtra ofertas por estado de moderación (pendiente|aprobada|rechazada|auto_aprobada).',
+    schema: { type: 'string', enum: ['pendiente', 'aprobada', 'rechazada', 'auto_aprobada'] },
+  },
   qQuery: {
     name: 'q',
     in: 'query',

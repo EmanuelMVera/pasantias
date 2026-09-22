@@ -23,14 +23,14 @@ async function resolverEmpresaDelRequest(req) {
 async function obtenerMetricasDashboard(empresaId) {
   const ofertas = await Oferta.findAll({
     where: { empresaId },
-    attributes: ['id', 'estado', 'moderada'],
+    attributes: ['id', 'estado', 'estadoModeracion'],
   });
   const ofertaIds = ofertas.map((o) => o.id);
 
   const ofertasActivas             = ofertas.filter((o) => o.estado === 'activa').length;
   const ofertasPausadas            = ofertas.filter((o) => o.estado === 'pausada').length;
   const ofertasCerradas            = ofertas.filter((o) => o.estado === 'cerrada').length;
-  const ofertasPendienteModeracion = ofertas.filter((o) => !o.moderada && o.estado === 'activa').length;
+  const ofertasPendienteModeracion = ofertas.filter((o) => o.estadoModeracion === 'pendiente').length;
 
   const wherePost = ofertaIds.length > 0 ? { ofertaId: ofertaIds } : { ofertaId: -1 };
 
@@ -52,7 +52,7 @@ async function obtenerMetricasDashboard(empresaId) {
 
   const ofertasRecientes = await Oferta.findAll({
     where: { empresaId },
-    attributes: ['id', 'titulo', 'estado', 'moderada', 'vistas', 'createdAt', 'cantidadVacantes'],
+    attributes: ['id', 'titulo', 'estado', 'estadoModeracion', 'vistas', 'createdAt', 'cantidadVacantes'],
     order: [['createdAt', 'DESC']],
     limit: 5,
   });
@@ -85,7 +85,7 @@ async function obtenerOfertasConConteo(empresaId, { estado, page = 1, limit = 20
 
   const { count, rows: ofertas } = await Oferta.findAndCountAll({
     where,
-    attributes: ['id', 'titulo', 'modalidad', 'ciudad', 'estado', 'moderada',
+    attributes: ['id', 'titulo', 'modalidad', 'ciudad', 'estado', 'estadoModeracion',
                  'cantidadVacantes', 'fechaLimite', 'area', 'createdAt', 'creadaPorUsuarioId'],
     // Responsable de la oferta (RBAC-01): null en ofertas históricas anteriores
     // a la migración 013 — el frontend debe mostrar "Responsable no registrado".

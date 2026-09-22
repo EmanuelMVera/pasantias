@@ -62,9 +62,9 @@ ejecute una vez: `CREATE EXTENSION pgcrypto; CREATE EXTENSION pg_trgm;`.
 
 ---
 
-## Las migraciones actuales (000 → 012)
+## Las migraciones actuales (000 → 016)
 
-13 archivos. `000` es el baseline; `001`–`012` son incrementales. Todas ya están
+17 archivos. `000` es el baseline; `001`–`016` son incrementales. Todas ya están
 aplicadas en las bases de desarrollo/CI y **son históricas** — no se tocan.
 
 | # | Archivo | Origen | Qué hace |
@@ -82,6 +82,10 @@ aplicadas en las bases de desarrollo/CI y **son históricas** — no se tocan.
 | 010 | `010-indices-escala.js` | SCALE-02 | Índices aprobados en la auditoría SCALE-01 (cada uno responde a una query concreta del código). `CREATE INDEX CONCURRENTLY`, incluye `pg_trgm` para búsqueda por texto. |
 | 011 | `011-activity-log-observabilidad.js` | OPS-01 | `activity_logs.requestId` (VARCHAR(36) NULL, sin backfill) + `idx_activity_logs_accion_created`. Correlaciona auditoría ↔ logs técnicos vía `X-Request-Id`. |
 | 012 | `012-limpiar-residuos-legacy.js` | DB-02 | Saca `'aval'` del CHECK `chk_notificaciones_tipo` (feature "Avales" desmontada; aborta si hay filas con ese tipo). `DROP TABLE IF EXISTS avales` (guardado: solo si está vacía). |
+| 013 | `013-ofertas-creador-auditoria.js` | RBAC-01 | `ofertas.creadaPorUsuarioId` (FK nullable a `usuarios.id`, `ON DELETE SET NULL`) — solo atribución/auditoría de quién creó la oferta, no restringe visibilidad. `CREATE INDEX CONCURRENTLY` parcial. |
+| 014 | `014-activity-log-importar-csv.js` | EST-12 | Agrega `'importar_alumnos_csv'` al ENUM `activity_logs.accion`. `ALTER TYPE … ADD VALUE` (aditivo, no reversible). |
+| 015 | `015-activity-log-ofertas-export.js` | RBAC-01 / OPS-03 | Agrega `'pausar_oferta'`, `'reactivar_oferta'`, `'exportar_logs'`, `'exportar_estadisticas'` al ENUM `activity_logs.accion`. |
+| 016 | `016-separar-estado-moderacion-oferta.js` | RBAC-04 | `ofertas.estado` pasa a solo ciclo de vida (`activa\|pausada\|cerrada`, saca `'rechazada'`); nueva columna `estadoModeracion` (`pendiente\|aprobada\|rechazada\|auto_aprobada`) reemplaza al booleano `moderada` (se elimina en la misma migración). Backfill de datos existentes + reemplazo de los índices `idx_ofertas_moderada_estado`/`idx_ofertas_estado_moderada_created` por sus equivalentes sobre `estadoModeracion`. |
 
 `db:migrate:status` es la fuente de verdad de qué se aplicó en *esta* base.
 

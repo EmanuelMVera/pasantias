@@ -57,20 +57,33 @@ const METRIC_CARDS = [
 // (empresa/equipo primero).
 const ORDEN_RECLUTADOR = ['postulaciones', 'entrevistas', 'contrataciones', 'ofertasActivas', 'ofertasCerradas', 'miembrosEquipo'];
 
-/* Colores de badge por estado de oferta */
+/* Colores/labels de badge por estado de ciclo de vida de la oferta */
 const ESTADO_COLOR = {
-  activa:    '#27ae60',
-  pausada:   '#e67e22',
-  rechazada: '#e74c3c',
-  cerrada:   '#7f8c8d',
-  pendiente: '#3498db',
+  activa:  '#27ae60',
+  pausada: '#e67e22',
+  cerrada: '#7f8c8d',
 };
 
 const ESTADO_LABEL = {
-  activa:    'Activa',
-  pausada:   'Pausada',
-  rechazada: 'Rechazada',
-  cerrada:   'Cerrada',
+  activa:  'Activa',
+  pausada: 'Pausada',
+  cerrada: 'Cerrada',
+};
+
+/* Colores/labels de badge por estado de moderación (eje independiente,
+   RBAC-04 — reemplaza el booleano `moderada`) */
+const MODERACION_COLOR = {
+  pendiente:     '#3498db',
+  aprobada:      '#27ae60',
+  auto_aprobada: '#16a085',
+  rechazada:     '#e74c3c',
+};
+
+const MODERACION_LABEL = {
+  pendiente:     'Pendiente de revisión',
+  aprobada:      'Aprobada',
+  auto_aprobada: 'Publicación automática',
+  rechazada:     'Rechazada',
 };
 
 export default function EmpresaDashboardPage() {
@@ -179,14 +192,28 @@ export default function EmpresaDashboardPage() {
   const detalleOferta = (o) => [o.area, o.modalidad, o.ciudad].filter(Boolean).join(' · ');
 
   const renderEstadoBadge = (o) => (
-    <span
-      className="badge"
-      style={{ background: ESTADO_COLOR[o.estado] ?? '#7f8c8d' }}
-      title={o.estado === 'rechazada' ? 'Esta oferta fue rechazada por el administrador.' : undefined}
-    >
+    <span className="badge" style={{ background: ESTADO_COLOR[o.estado] ?? '#7f8c8d' }}>
       {ESTADO_LABEL[o.estado] ?? o.estado}
     </span>
   );
+
+  // Moderación es un eje independiente del ciclo de vida (RBAC-04) — no se
+  // muestra nada para 'aprobada' (es el estado esperado/silencioso), igual
+  // criterio que antes tenía `!moderada`, pero ahora también distingue
+  // 'rechazada' y 'auto_aprobada' en vez de colapsarlos en un booleano.
+  const renderModeracionBadge = (o) => {
+    if (o.estadoModeracion === 'aprobada') return null;
+    const icono = o.estadoModeracion === 'pendiente' ? '⏳' : o.estadoModeracion === 'rechazada' ? '❌' : '🤖';
+    return (
+      <span
+        className={styles.pendienteMod}
+        style={{ color: MODERACION_COLOR[o.estadoModeracion] ?? undefined }}
+        title={`Moderación: ${MODERACION_LABEL[o.estadoModeracion] ?? o.estadoModeracion}`}
+      >
+        · {icono} {MODERACION_LABEL[o.estadoModeracion] ?? o.estadoModeracion}
+      </span>
+    );
+  };
 
   const renderCandidatosBtn = (o) => (
     <Link to={`/empresa/postulantes/${o.id}`} className="btn-small" aria-label={`Ver candidatos de "${o.titulo}"`}>
@@ -234,16 +261,6 @@ export default function EmpresaDashboardPage() {
           <button className="btn-ok" onClick={() => handleCambiarEstado(o.id, 'activa')} aria-label={`Activar la oferta "${o.titulo}"`}>
             Activar
           </button>
-        </>
-      );
-    }
-    if (o.estado === 'rechazada') {
-      return (
-        <>
-          {editarBtn}
-          <span className={`${styles.estadoNota} ${styles.rechazada}`} title="Contactá al administrador para más información.">
-            Revisada por admin
-          </span>
         </>
       );
     }
@@ -354,11 +371,7 @@ export default function EmpresaDashboardPage() {
                   <tr key={o.id} className={guardando === o.id ? styles.rowGuardando : ''}>
                     <td className="cell-break">
                       <strong>{o.titulo}</strong>
-                      {!o.moderada && (
-                        <span className={styles.pendienteMod} title="Pendiente de moderación por el admin">
-                          · ⏳ Pendiente
-                        </span>
-                      )}
+                      {renderModeracionBadge(o)}
                       {detalleOferta(o) && <small className={styles.modalidadSmall}>{detalleOferta(o)}</small>}
                     </td>
                     <td className="cell-break">
@@ -394,11 +407,7 @@ export default function EmpresaDashboardPage() {
               >
                 <header className={styles.cardHeader}>
                   <h3 className={styles.cardTitulo}>{o.titulo}</h3>
-                  {!o.moderada && (
-                    <span className={styles.pendienteMod} title="Pendiente de moderación por el admin">
-                      ⏳ Pendiente
-                    </span>
-                  )}
+                  {renderModeracionBadge(o)}
                 </header>
                 {detalleOferta(o) && <p className={styles.cardMeta}>{detalleOferta(o)}</p>}
 

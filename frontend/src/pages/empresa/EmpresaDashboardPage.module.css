@@ -150,11 +150,6 @@
   color: var(--text-muted);
 }
 
-.estadoNota.rechazada {
-  color: #e74c3c;
-  font-style: italic;
-}
-
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .metricsGrid,

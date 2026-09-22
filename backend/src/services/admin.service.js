@@ -11,6 +11,7 @@ const { Usuario, Empresa, Oferta, Postulacion, Notificacion, ActivityLog } = req
 const { Op } = require('sequelize');
 const { buildPagination } = require('../utils/pagination');
 const { escaparCeldaCsv } = require('../utils/csv');
+const { whereOfertaVisible } = require('./oferta.service');
 
 async function obtenerDashboardGeneral() {
   const [
@@ -23,8 +24,8 @@ async function obtenerDashboardGeneral() {
     Usuario.count({ where: { rol: 'egresado', activo: true } }),
     Empresa.count({ where: { estadoAprobacion: 'aprobada' } }),
     Usuario.count({ where: { activo: true } }),
-    Oferta.count({ where: { estado: 'activa', moderada: true } }),
-    Oferta.count({ where: { moderada: false } }),
+    Oferta.count({ where: whereOfertaVisible() }),
+    Oferta.count({ where: { estadoModeracion: 'pendiente' } }),
     Postulacion.count(),
     Postulacion.count({ where: { estado: 'contratado' } }),
     Postulacion.count({ where: { estado: 'entrevista' } }),

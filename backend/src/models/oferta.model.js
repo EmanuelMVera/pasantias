@@ -3,15 +3,26 @@
  *
  * Representa una publicación de pasantía creada por una empresa.
  *
- * Ciclo de vida de una oferta:
- * 1. La empresa la crea → queda con moderada: false y estado: 'activa'
- * 2. El admin la revisa y aprueba → moderada: true (aparece en el listado público)
- * 3. La empresa puede pausarla o cerrarla cuando ya no necesita postulantes
+ * Dos ejes independientes (RBAC-04 / DB-03 — antes mezclados en `estado` +
+ * `moderada`, ver migración 016):
+ *   - `estado`: ciclo de vida de la publicación (activa/pausada/cerrada).
+ *   - `estadoModeracion`: revisión institucional (pendiente/aprobada/
+ *     rechazada/auto_aprobada).
+ *
+ * Ciclo de vida típico:
+ * 1. La empresa la crea → estado: 'activa', estadoModeracion: 'pendiente'.
+ * 2. El admin la revisa: aprobada (aparece en listados/recomendadas — ver
+ *    esOfertaVisible en oferta.service.js) o rechazada (terminal, nunca se
+ *    vuelve visible aunque estado siga siendo 'activa').
+ * 3. La empresa puede pausarla o cerrarla cuando ya no necesita postulantes,
+ *    independientemente de su estado de moderación.
  *
  * Changelog:
  * - v1.2: agregados fechaPublicacion, cantidadVacantes, salario, beneficios,
  *         modalidadExtendida para el panel corporativo avanzado.
  *         fechaLimite cumple la función de fechaCierre (sin duplicar campo).
+ * - v1.3 (RBAC-04): reemplazado `moderada` (boolean) + `estado='rechazada'`
+ *         por `estadoModeracion` — ver migración 016.
  */
 
 'use strict';
@@ -126,20 +137,31 @@ module.exports = (sequelize) => {
 
     // ── Estado y moderación ───────────────────────────────────────────────
 
-    // Estado actual de la oferta
-    // 'activa' → recibe postulaciones | 'pausada' → inactiva temporalmente
-    // 'rechazada' → rechazada por el admin | 'cerrada' → finalizada
-    // STRING + CHECK (no ENUM de Postgres): ya se le agregó 'rechazada' una
-    // vez después de creado el tipo; un conjunto que sigue evolucionando no
-    // debería vivir en un ENUM irreversible.
+    // Estado de ciclo de vida de la publicación — NO incluye moderación
+    // (ver `estadoModeracion` abajo). 'activa' → recibe postulaciones |
+    // 'pausada' → inactiva temporalmente | 'cerrada' → finalizada, terminal.
+    // STRING + CHECK (no ENUM de Postgres): un conjunto que puede seguir
+    // evolucionando no debería vivir en un ENUM irreversible.
     estado: {
       type: DataTypes.STRING(20),
       defaultValue: 'activa',
-      validate: { isIn: [['activa', 'pausada', 'rechazada', 'cerrada']] },
+      validate: { isIn: [['activa', 'pausada', 'cerrada']] },
     },
 
-    // Indica si el administrador revisó y aprobó la oferta (visible públicamente)
-    moderada: { type: DataTypes.BOOLEAN, defaultValue: false },
+    // Revisión institucional — independiente del ciclo de vida. Determina si
+    // la oferta es elegible para mostrarse a alumnos/egresados (ver
+    // oferta.service.js::esOfertaVisible / whereOfertaVisible):
+    //   'pendiente'     → recién creada, sin revisar todavía (default).
+    //   'aprobada'      → un admin la revisó y aprobó.
+    //   'rechazada'     → un admin la rechazó — terminal, no se re-modera.
+    //   'auto_aprobada' → aprobada sin intervención humana (reservado para
+    //                     una política de confianza futura; nada la asigna
+    //                     todavía — RBAC-04 solo deja el modelo listo).
+    estadoModeracion: {
+      type: DataTypes.STRING(20),
+      defaultValue: 'pendiente',
+      validate: { isIn: [['pendiente', 'aprobada', 'rechazada', 'auto_aprobada']] },
+    },
 
     // Contador de vistas de la oferta (se incrementa en cada consulta de detalle)
     vistas: { type: DataTypes.INTEGER, defaultValue: 0 },

@@ -196,18 +196,28 @@ exports.getOfertasPendientes = async (req, res) => {
 };
 
 exports.getOfertas = async (req, res) => {
-  const { estado } = req.query;
+  const { estado, estadoModeracion } = req.query;
   const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 25, maxLimit: 100 });
-  const { data, pagination } = await adminModeracionService.listarOfertas({ estado, page, limit, offset });
+  const { data, pagination } = await adminModeracionService.listarOfertas({ estado, estadoModeracion, page, limit, offset });
   return res.json({ success: true, data, pagination, total: pagination.total });
 };
 
+const MENSAJE_POR_ACCION_MODERAR = {
+  aprobar:  'aprobada',
+  rechazar: 'rechazada',
+  pausar:   'pausada',
+  cerrar:   'cerrada',
+};
+
 exports.moderarOferta = async (req, res) => {
-  const { accion, estado } = await adminModeracionService.moderarOferta(
+  const resultado = await adminModeracionService.moderarOferta(
     req.params.id, req.body, { actorUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id }
   );
-  const mensajeAccion = accion === 'aprobar' ? 'aprobada' : accion === 'pausar' ? 'pausada' : accion === 'rechazar' ? 'rechazada' : 'cerrada';
-  return res.json({ success: true, message: `Oferta ${mensajeAccion}.`, data: { estado, moderada: true } });
+  return res.json({
+    success: true,
+    message: `Oferta ${MENSAJE_POR_ACCION_MODERAR[resultado.accion]}.`,
+    data: resultado,
+  });
 };
 
 // ── Solicitudes de registro de empresa (v1.6) ─────────────────────────────────

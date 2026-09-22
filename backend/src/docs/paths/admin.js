@@ -127,17 +127,25 @@ module.exports = {
   },
   '/api/admin/ofertas': {
     get: adminOp({ id: 'adminOfertasList', summary: 'Listar todas las ofertas',
-      query: ['pageParam', 'limitParam', REF.param('estadoQuery')],
+      query: ['pageParam', 'limitParam', REF.param('estadoQuery'), REF.param('estadoModeracionQuery')],
       responses: { 200: paginated('Oferta') } }),
   },
   '/api/admin/ofertas/{id}/moderar': {
-    patch: adminOp({ id: 'adminOfertasModerar', summary: 'Moderar una oferta (aprobar/pausar/rechazar/cerrar)',
+    patch: adminOp({ id: 'adminOfertasModerar', summary: 'Moderar una oferta (aprobar/rechazar) o cambiar su ciclo de vida (pausar/cerrar)',
+      description:
+        '`aprobar`/`rechazar` cambian `estadoModeracion`. `pausar`/`cerrar` cambian `estado` — nunca ambos en la ' +
+        'misma llamada. Transiciones de moderación válidas: pendiente→aprobada, pendiente→rechazada, ' +
+        'auto_aprobada→rechazada, aprobada→rechazada (rechazada es terminal).',
       csrf: true, params: ['id'], body: 'AdminModerarOferta', errors: ['400', '404'],
       responses: {
         200: message({
           data: {
             type: 'object',
-            properties: { estado: { type: 'string' }, moderada: { type: 'boolean' } },
+            properties: {
+              accion: { type: 'string' },
+              estadoModeracion: { type: 'string', description: 'Presente cuando `accion` fue aprobar/rechazar.' },
+              estado: { type: 'string', description: 'Presente cuando `accion` fue pausar/cerrar.' },
+            },
           },
         }),
       } }),

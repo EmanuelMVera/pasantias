@@ -104,7 +104,7 @@ async function sembrar() {
     descripcion: 'Pasantía de desarrollo backend con Node.js y PostgreSQL. Datos generados para los tests E2E.',
     area: 'Programación', modalidad: 'hibrido', ciudad: 'Avellaneda',
     tipoPuesto: 'pasante', cantidadVacantes: 2,
-    estado: 'activa', moderada: true,
+    estado: 'activa', estadoModeracion: 'aprobada',
   });
   await Oferta.create({
     empresaId: empresa.id,
@@ -112,7 +112,7 @@ async function sembrar() {
     descripcion: 'Pasantía de análisis de datos, pendiente de moderación. Datos E2E.',
     area: 'Datos', modalidad: 'remoto',
     tipoPuesto: 'trainee', cantidadVacantes: 1,
-    estado: 'activa', moderada: false,
+    estado: 'activa', estadoModeracion: 'pendiente',
   });
 
   // ── Postulación pre-sembrada (para "ver candidatos") ──────────────────────

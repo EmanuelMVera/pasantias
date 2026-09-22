@@ -38,8 +38,13 @@ const MODALIDADES = ['presencial', 'remoto', 'hibrido'];
 // tipoPuesto: mayoría pasante/trainee, minoría junior
 const TIPOS_PUESTO = ['pasante', 'pasante', 'trainee', 'pasante', 'junior'];
 
-// Distribución de estados de oferta: ~50% activa, ~25% pausada/cerrada, ~12% rechazada
-const ESTADOS_OFERTA = ['activa', 'activa', 'activa', 'activa', 'pausada', 'pausada', 'cerrada', 'rechazada'];
+// Distribución de estado (ciclo de vida): ~55% activa, ~25% pausada, ~20% cerrada
+const ESTADOS_OFERTA = ['activa', 'activa', 'activa', 'pausada', 'pausada', 'cerrada'];
+
+// Distribución de estadoModeracion (eje independiente): ~65% aprobada,
+// ~20% pendiente, ~15% rechazada — ninguna se genera 'auto_aprobada' todavía
+// (no hay política de confianza automática implementada, RBAC-04).
+const ESTADOS_MODERACION_OFERTA = ['aprobada', 'aprobada', 'aprobada', 'aprobada', 'pendiente', 'rechazada'];
 
 // Estados de postulación con distribución realista
 const ESTADOS_POSTULACION = [
@@ -303,8 +308,7 @@ async function seedDemo() {
           : null;
 
         const estado = ESTADOS_OFERTA[(i + o) % ESTADOS_OFERTA.length];
-        // rechazada siempre sin moderar; algunas activas/pausadas/cerradas también sin moderar
-        const moderada = estado !== 'rechazada' && !((i + o) % 4 === 3);
+        const estadoModeracion = ESTADOS_MODERACION_OFERTA[(i + o) % ESTADOS_MODERACION_OFERTA.length];
 
         const modalidad = pick(MODALIDADES, i + o);
         const habilidades = skillsFor(area, o);
@@ -337,7 +341,7 @@ async function seedDemo() {
           fechaPublicacion: new Date(),
           fechaLimite: new Date(Date.now() + (30 + o * 10) * 24 * 60 * 60 * 1000),
           estado,
-          moderada,
+          estadoModeracion,
           vistas: (i * 7 + o * 3 + 1) % 80 + 5,
         }, { transaction });
 

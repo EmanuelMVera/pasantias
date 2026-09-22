@@ -36,9 +36,12 @@ module.exports = {
   AdminModerarOferta: {
     type: 'object',
     required: ['accion'],
+    description:
+      '`aprobar`/`rechazar` tocan `estadoModeracion` (revisión institucional). ' +
+      '`pausar`/`cerrar` tocan `estado` (ciclo de vida de la publicación) — nunca se mezclan en la misma escritura.',
     properties: {
-      accion: { type: 'string', enum: ['aprobar', 'pausar', 'rechazar', 'cerrar'] },
-      aprobada: { type: 'boolean', deprecated: true, description: 'Fallback legacy de `accion`.' },
+      accion: { type: 'string', enum: ['aprobar', 'rechazar', 'pausar', 'cerrar'] },
+      aprobada: { type: 'boolean', deprecated: true, description: 'Fallback legacy de `accion` (aprobar/rechazar).' },
     },
   },
 

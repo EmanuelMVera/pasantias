@@ -2,7 +2,7 @@
 const request = require('supertest');
 const app = require('../src/app');
 const { Oferta, ActivityLog } = require('../src/models');
-const { crearEmpresaConAdmin, crearOferta, agregarReclutador } = require('./helpers/factories');
+const { crearEmpresaConAdmin, crearOferta, agregarReclutador, crearAlumno } = require('./helpers/factories');
 const { limpiarUsuarios, cerrarConexion } = require('./helpers/cleanup');
 const { loginYObtenerToken } = require('./helpers/factories');
 
@@ -210,29 +210,29 @@ describe('OFERTA', () => {
     expect(res.body.data.fechaLimite).toBeNull();
   });
 
-  test('el listado público no incluye ofertas sin moderar', async () => {
+  test('el listado público no incluye ofertas pendientes de moderación', async () => {
     const { usuarioAdmin, empresa } = await crearEmpresaConAdmin();
     idsUsuarios.push(usuarioAdmin.id);
-    const ofertaSinModerar = await crearOferta(empresa, { moderada: false });
+    const ofertaPendiente = await crearOferta(empresa, { estadoModeracion: 'pendiente' });
 
     const res = await request(app).get('/api/ofertas');
 
     expect(res.status).toBe(200);
     const ids = res.body.data.map((o) => o.id);
-    expect(ids).not.toContain(ofertaSinModerar.id);
+    expect(ids).not.toContain(ofertaPendiente.id);
   });
 
-  test('el detalle público de una oferta sin moderar devuelve 404 sin sesión', async () => {
+  test('el detalle público de una oferta pendiente de moderación devuelve 404 sin sesión', async () => {
     const { usuarioAdmin, empresa } = await crearEmpresaConAdmin();
     idsUsuarios.push(usuarioAdmin.id);
-    const ofertaSinModerar = await crearOferta(empresa, { moderada: false });
+    const ofertaPendiente = await crearOferta(empresa, { estadoModeracion: 'pendiente' });
 
-    const res = await request(app).get(`/api/ofertas/${ofertaSinModerar.id}`);
+    const res = await request(app).get(`/api/ofertas/${ofertaPendiente.id}`);
 
     expect(res.status).toBe(404);
   });
 
-  test('el detalle público de una oferta moderada no expone el CUIT de la empresa', async () => {
+  test('el detalle público de una oferta aprobada no expone el CUIT de la empresa', async () => {
     const { usuarioAdmin, empresa } = await crearEmpresaConAdmin();
     idsUsuarios.push(usuarioAdmin.id);
     const oferta = await crearOferta(empresa);
@@ -305,5 +305,101 @@ describe('OFERTA', () => {
 
     const fresca = await Oferta.findByPk(oferta.id, { attributes: ['creadaPorUsuarioId'] });
     expect(fresca.creadaPorUsuarioId).toBeNull();
+  });
+
+  // ── RBAC-04: visibilidad = estado='activa' AND estadoModeracion IN
+  //    ('aprobada','auto_aprobada') — regla única, aplicada consistentemente
+  //    en listado, detalle y recomendadas (oferta.service.js::whereOfertaVisible).
+  describe('RBAC-04 — visibilidad de ofertas para alumnos/egresados', () => {
+    test('pendiente no es visible (ni en el listado ni en el detalle)', async () => {
+      const { empresa } = await crearEmpresaConAdmin();
+      const oferta = await crearOferta(empresa, { estado: 'activa', estadoModeracion: 'pendiente' });
+
+      const listado = await request(app).get('/api/ofertas');
+      expect(listado.body.data.map((o) => o.id)).not.toContain(oferta.id);
+
+      const detalle = await request(app).get(`/api/ofertas/${oferta.id}`);
+      expect(detalle.status).toBe(404);
+    });
+
+    test('aprobada y activa es visible (listado y detalle)', async () => {
+      const { empresa } = await crearEmpresaConAdmin();
+      const oferta = await crearOferta(empresa, { estado: 'activa', estadoModeracion: 'aprobada' });
+
+      const listado = await request(app).get('/api/ofertas');
+      expect(listado.body.data.map((o) => o.id)).toContain(oferta.id);
+
+      const detalle = await request(app).get(`/api/ofertas/${oferta.id}`);
+      expect(detalle.status).toBe(200);
+    });
+
+    test('auto_aprobada y activa es visible (listado y detalle)', async () => {
+      const { empresa } = await crearEmpresaConAdmin();
+      const oferta = await crearOferta(empresa, { estado: 'activa', estadoModeracion: 'auto_aprobada' });
+
+      const listado = await request(app).get('/api/ofertas');
+      expect(listado.body.data.map((o) => o.id)).toContain(oferta.id);
+
+      const detalle = await request(app).get(`/api/ofertas/${oferta.id}`);
+      expect(detalle.status).toBe(200);
+    });
+
+    test('rechazada no es visible aunque el ciclo de vida siga activa', async () => {
+      const { empresa } = await crearEmpresaConAdmin();
+      const oferta = await crearOferta(empresa, { estado: 'activa', estadoModeracion: 'rechazada' });
+
+      const listado = await request(app).get('/api/ofertas');
+      expect(listado.body.data.map((o) => o.id)).not.toContain(oferta.id);
+
+      const detalle = await request(app).get(`/api/ofertas/${oferta.id}`);
+      expect(detalle.status).toBe(404);
+    });
+
+    test('aprobada pero pausada no es visible', async () => {
+      const { empresa } = await crearEmpresaConAdmin();
+      const oferta = await crearOferta(empresa, { estado: 'pausada', estadoModeracion: 'aprobada' });
+
+      const listado = await request(app).get('/api/ofertas');
+      expect(listado.body.data.map((o) => o.id)).not.toContain(oferta.id);
+
+      const detalle = await request(app).get(`/api/ofertas/${oferta.id}`);
+      expect(detalle.status).toBe(404);
+    });
+
+    test('/api/ofertas/recomendadas aplica la misma regla (bug corregido: ya no filtraba por moderación)', async () => {
+      const { usuario: alumno, passwordPlana } = await crearAlumno();
+      idsUsuarios.push(alumno.id);
+      const { empresa } = await crearEmpresaConAdmin();
+      const pendiente = await crearOferta(empresa, { estado: 'activa', estadoModeracion: 'pendiente' });
+      const aprobada  = await crearOferta(empresa, { estado: 'activa', estadoModeracion: 'aprobada' });
+
+      const token = await loginYObtenerToken(alumno.email, passwordPlana);
+      const res = await request(app)
+        .get('/api/ofertas/recomendadas')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      const ids = res.body.data.map((o) => o.id);
+      expect(ids).not.toContain(pendiente.id);
+      expect(ids).toContain(aprobada.id);
+    });
+
+    test('el dashboard del alumno (ofertas recomendadas) tampoco incluye pendientes', async () => {
+      const { usuario: alumno, passwordPlana } = await crearAlumno();
+      idsUsuarios.push(alumno.id);
+      const { empresa } = await crearEmpresaConAdmin();
+      const pendiente = await crearOferta(empresa, { estado: 'activa', estadoModeracion: 'pendiente' });
+      const aprobada  = await crearOferta(empresa, { estado: 'activa', estadoModeracion: 'aprobada' });
+
+      const token = await loginYObtenerToken(alumno.email, passwordPlana);
+      const res = await request(app)
+        .get('/api/students/dashboard')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      const ids = res.body.data.ofertasRecomendadas.map((o) => o.id);
+      expect(ids).not.toContain(pendiente.id);
+      expect(ids).toContain(aprobada.id);
+    });
   });
 });
