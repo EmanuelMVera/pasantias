@@ -48,7 +48,7 @@ instalación de PostgreSQL.
 ### 2.1 Clonar
 
 ```bash
-git clone https://github.com/lucashmercado/pasantias.git
+git clone https://github.com/EmanuelMVera/pasantias.git
 cd pasantias
 ```
 

@@ -48,13 +48,6 @@
   gap: 0.75rem;
 }
 
-.rolBadge {
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-}
-
 /* ── Skeleton ───────────────────────────────────────────────────────────────── */
 .skeletonList {
   display: flex;
@@ -98,40 +91,6 @@
   margin-top: 0.25rem;
   font-size: 0.9rem;
 }
-
-.fieldHint {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  line-height: 1.4;
-}
-
-.fieldRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-}
-
-.required { color: #dc2626; }
-
-/* ── Selector de contraseña ──────────────────────────────────────────────────── */
-.passwordField {
-  display: flex;
-  gap: 0.4rem;
-}
-
-.passwordField input { flex: 1; }
-
-.togglePwd {
-  padding: 0.5rem 0.65rem;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  cursor: pointer;
-  font-size: 1rem;
-  line-height: 1;
-  transition: background 0.15s;
-}
-.togglePwd:hover { background: var(--bg-card); }
 
 /* ── Botones ────────────────────────────────────────────────────────────────── */
 .btnPrimary {
@@ -178,9 +137,7 @@
 
 /* ── Responsive ─────────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .fieldRow { grid-template-columns: 1fr; }
   .statsRow { gap: 0.5rem; }
-  .modal { max-width: 100%; margin: 0.5rem; }
 }
 
 /* ── Alerta de solicitudes pendientes ────────────────────────────────────────── */
@@ -196,12 +153,4 @@
   margin-bottom: 1.5rem;
   font-size: 0.88rem;
   color: #713f12;
-}
-
-/* ── Rol fijo display ────────────────────────────────────────────────────────── */
-.rolFijo {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
 }

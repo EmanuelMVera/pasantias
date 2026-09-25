@@ -183,7 +183,7 @@ export default function SolicitudEmpresaPage() {
           </span>
         </div>
 
-        <form onSubmit={handleSubmit} className={styles.form} noValidate>
+        <form onSubmit={handleSubmit} noValidate>
 
           {/* ── A. Datos de la empresa ── */}
           <fieldset className={styles.section}>

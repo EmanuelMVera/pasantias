@@ -127,6 +127,12 @@
   margin-left: 0.15rem;
 }
 
+.fieldHint {
+  font-size: 0.78rem;
+  color: var(--text-muted, #5a6a7a);
+  line-height: 1.4;
+}
+
 .input,
 .textarea {
   font-family: var(--font-primary);

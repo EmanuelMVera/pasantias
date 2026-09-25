@@ -17,7 +17,6 @@ import { empresaService } from '../../services/empresa.service';
 import { useEmpresa } from '../../hooks/useEmpresa';
 import MiembroEquipoCard from '../../components/MiembroEquipoCard/MiembroEquipoCard';
 import SolicitarReclutadorModal from '../../components/SolicitarReclutadorModal/SolicitarReclutadorModal';
-import EditarRolModal from '../../components/EditarRolModal/EditarRolModal';
 import SolicitudesReclutadoresTabla from '../../components/SolicitudesReclutadoresTabla/SolicitudesReclutadoresTabla';
 import ConfirmModal from '../../components/ConfirmModal/ConfirmModal';
 import styles from './EquipoPage.module.css';
@@ -32,7 +31,6 @@ export default function EquipoPage() {
   const [toast,       setToast]       = useState('');
 
   const [modalSolicitar,  setModalSolicitar]  = useState(false);
-  const [modalRol,        setModalRol]        = useState(null);
   const [modalSuspender,  setModalSuspender]  = useState(null); // miembro a suspender/reactivar
   const [modalEliminar,   setModalEliminar]   = useState(null); // miembro a quitar del equipo
   const [modalRecuperacion, setModalRecuperacion] = useState(null); // miembro a enviarle recuperación de acceso
@@ -76,11 +74,6 @@ export default function EquipoPage() {
         ? `✅ ${nueva.nombre} ya puede acceder al sistema — le enviamos las credenciales por email.`
         : '✅ Solicitud enviada. El administrador la revisará pronto.'
     );
-  };
-
-  const handleRolGuardado = (id, nuevoRol) => {
-    setEquipo(prev => prev.map(m => m.id === id ? { ...m, rolInterno: nuevoRol } : m));
-    showToast('✓ Rol actualizado.');
   };
 
   const handleRecuperacion = (miembro) => {
@@ -255,13 +248,6 @@ export default function EquipoPage() {
           onClose={() => setModalSolicitar(false)}
           onEnviada={handleEnviada}
           esConfiable={empresa?.nivelConfianza === 'confiable'}
-        />
-      )}
-      {modalRol && (
-        <EditarRolModal
-          miembro={modalRol}
-          onClose={() => setModalRol(null)}
-          onGuardado={(nuevoRol) => { handleRolGuardado(modalRol.id, nuevoRol); setModalRol(null); }}
         />
       )}
 
