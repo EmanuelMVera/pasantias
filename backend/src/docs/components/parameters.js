@@ -46,6 +46,13 @@ module.exports = {
     description: 'Filtra ofertas por estado de moderación (pendiente|aprobada|rechazada|auto_aprobada).',
     schema: { type: 'string', enum: ['pendiente', 'aprobada', 'rechazada', 'auto_aprobada'] },
   },
+  nivelConfianzaQuery: {
+    name: 'nivelConfianza',
+    in: 'query',
+    required: false,
+    description: 'Filtra empresas por nivel de confianza institucional (estandar|confiable).',
+    schema: { type: 'string', enum: ['estandar', 'confiable'] },
+  },
   qQuery: {
     name: 'q',
     in: 'query',

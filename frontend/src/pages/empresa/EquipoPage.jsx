@@ -61,7 +61,7 @@ function ConfirmModal({
 }
 
 /* ── Modal: Solicitar reclutador ────────────────────────────────────────────── */
-function ModalSolicitarReclutador({ onClose, onEnviada }) {
+function ModalSolicitarReclutador({ onClose, onEnviada, esConfiable }) {
   const [form, setForm] = useState({ nombre: '', apellido: '', email: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -101,8 +101,9 @@ function ModalSolicitarReclutador({ onClose, onEnviada }) {
         <div className={styles.infoBox}>
           <span>ℹ️</span>
           <span>
-            La solicitud será revisada por el administrador del instituto.
-            Al aprobarla, se creará la cuenta y se enviarán las credenciales por email.
+            {esConfiable
+              ? 'Tu empresa es de confianza institucional: la cuenta se crea de inmediato, sin esperar aprobación del administrador. Las credenciales se envían por email.'
+              : 'La solicitud será revisada por el administrador del instituto. Al aprobarla, se creará la cuenta y se enviarán las credenciales por email.'}
           </span>
         </div>
 
@@ -343,7 +344,11 @@ export default function EquipoPage() {
 
   const handleEnviada = (nueva) => {
     setSolicitudes(prev => [nueva, ...prev]);
-    showToast('✅ Solicitud enviada. El administrador la revisará pronto.');
+    showToast(
+      nueva.estado === 'aprobado'
+        ? `✅ ${nueva.nombre} ya puede acceder al sistema — le enviamos las credenciales por email.`
+        : '✅ Solicitud enviada. El administrador la revisará pronto.'
+    );
   };
 
   const handleRolGuardado = (id, nuevoRol) => {
@@ -539,6 +544,7 @@ export default function EquipoPage() {
         <ModalSolicitarReclutador
           onClose={() => setModalSolicitar(false)}
           onEnviada={handleEnviada}
+          esConfiable={empresa?.nivelConfianza === 'confiable'}
         />
       )}
       {modalRol && (

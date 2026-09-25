@@ -193,6 +193,12 @@ export default function MiEmpresaPage() {
           <dd>{empresa?.cuit ?? '—'}</dd>
           <dt>Estado</dt>
           <dd>{ESTADO_LABEL[empresa?.estadoAprobacion] ?? empresa?.estadoAprobacion ?? '—'}</dd>
+          {empresa?.nivelConfianza === 'confiable' && (
+            <>
+              <dt>Nivel de confianza</dt>
+              <dd>🤝 Empresa de confianza institucional</dd>
+            </>
+          )}
         </dl>
         <p className={styles.readonlyHint}>
           Para modificar la razón social o el CUIT, contactate con el administrador del sistema.

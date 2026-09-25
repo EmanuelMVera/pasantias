@@ -203,12 +203,38 @@ async function notificarAdminsNuevaOferta(oferta, empresa) {
   }
 }
 
+/**
+ * Notifica a los admins cuando una oferta se publica automáticamente por
+ * política de confianza (RBAC-05) — ya es visible, sin pasar por moderación
+ * previa. El admin sigue pudiendo revisarla y pausarla/rechazarla/cerrarla
+ * después (moderación posterior, ver adminModeracion.service.js).
+ */
+async function notificarAdminsOfertaAutoAprobada(oferta, empresa) {
+  try {
+    const admins = await Usuario.findAll({ where: { rol: 'admin', activo: true }, attributes: ['id'] });
+    await Promise.all(admins.map((admin) =>
+      crearNotificacion({
+        usuarioId: admin.id,
+        titulo: '🤖 Oferta publicada automáticamente',
+        mensaje: `La empresa de confianza "${empresa.razonSocial}" publicó una nueva oferta: "${oferta.titulo}". La publicación ya se encuentra visible.`,
+        tipo: 'oferta',
+        tipoVisual: 'info',
+        enlace: '/admin/ofertas',
+        accionURL: '/admin/ofertas',
+      })
+    ));
+  } catch (e) {
+    logger.error({ err: e }, 'notif_admin_oferta_auto_aprobada_fallo');
+  }
+}
+
 module.exports = {
   validarCamposPuesto,
   sanitizarCamposOpcionales,
   obtenerRecomendadas,
   obtenerRecomendadasDashboard,
   notificarAdminsNuevaOferta,
+  notificarAdminsOfertaAutoAprobada,
   whereOfertaVisible,
   esOfertaVisible,
   TRANSICIONES_ESTADO,

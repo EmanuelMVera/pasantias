@@ -62,9 +62,9 @@ ejecute una vez: `CREATE EXTENSION pgcrypto; CREATE EXTENSION pg_trgm;`.
 
 ---
 
-## Las migraciones actuales (000 → 016)
+## Las migraciones actuales (000 → 018)
 
-17 archivos. `000` es el baseline; `001`–`016` son incrementales. Todas ya están
+19 archivos. `000` es el baseline; `001`–`018` son incrementales. Todas ya están
 aplicadas en las bases de desarrollo/CI y **son históricas** — no se tocan.
 
 | # | Archivo | Origen | Qué hace |
@@ -86,6 +86,8 @@ aplicadas en las bases de desarrollo/CI y **son históricas** — no se tocan.
 | 014 | `014-activity-log-importar-csv.js` | EST-12 | Agrega `'importar_alumnos_csv'` al ENUM `activity_logs.accion`. `ALTER TYPE … ADD VALUE` (aditivo, no reversible). |
 | 015 | `015-activity-log-ofertas-export.js` | RBAC-01 / OPS-03 | Agrega `'pausar_oferta'`, `'reactivar_oferta'`, `'exportar_logs'`, `'exportar_estadisticas'` al ENUM `activity_logs.accion`. |
 | 016 | `016-separar-estado-moderacion-oferta.js` | RBAC-04 | `ofertas.estado` pasa a solo ciclo de vida (`activa\|pausada\|cerrada`, saca `'rechazada'`); nueva columna `estadoModeracion` (`pendiente\|aprobada\|rechazada\|auto_aprobada`) reemplaza al booleano `moderada` (se elimina en la misma migración). Backfill de datos existentes + reemplazo de los índices `idx_ofertas_moderada_estado`/`idx_ofertas_estado_moderada_created` por sus equivalentes sobre `estadoModeracion`. |
+| 017 | `017-nivel-confianza-empresa.js` | RBAC-05 | `empresas.nivelConfianza` (STRING + CHECK, `estandar\|confiable`, default `'estandar'`) — política institucional que permite a una empresa de confianza operar con moderación posterior en vez de previa. |
+| 018 | `018-activity-log-confianza-empresa.js` | RBAC-05 | Agrega 4 valores al ENUM `activity_logs.accion`: `'marcar_empresa_confiable'`, `'revocar_confianza_empresa'`, `'auto_aprobar_solicitud_reclutador'`, `'oferta_auto_aprobada'`. |
 
 `db:migrate:status` es la fuente de verdad de qué se aplicó en *esta* base.
 

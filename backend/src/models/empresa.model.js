@@ -70,6 +70,19 @@ module.exports = (sequelize) => {
       defaultValue: 'pendiente',
     },
 
+    // Política institucional "empresa estándar vs. empresa de confianza"
+    // (RBAC-05): una empresa confiable publica ofertas auto-aprobadas y
+    // agrega reclutadores sin pasar por aprobación manual del admin del
+    // sistema (moderación posterior, no previa). La confianza es de la
+    // EMPRESA, nunca de un reclutador individual — todo el equipo la
+    // hereda. Cambia solo vía PATCH /api/admin/empresas/:id/confianza.
+    // STRING + CHECK (no ENUM) — mismo criterio que Oferta.estado/estadoModeracion.
+    nivelConfianza: {
+      type: DataTypes.STRING(20),
+      defaultValue: 'estandar',
+      validate: { isIn: [['estandar', 'confiable']] },
+    },
+
     // ── Auditoría de aprobación (EST-08 §4.7) ─────────────────────────────
     // Quién y cuándo aprobó/rechazó, y por qué — hoy solo quedaba en
     // activity_logs genérico, que se depura por retención y no está

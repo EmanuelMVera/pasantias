@@ -160,12 +160,18 @@ exports.solicitarReclutador = async (req, res) => {
   const empresa = await _resolverEmpresa(req);
   if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
 
-  const solicitud = await equipoService.solicitarReclutador(empresa, req.body);
-  return res.status(201).json({
-    success: true,
-    message: 'Solicitud enviada correctamente. El administrador la revisará pronto.',
-    data: solicitud,
+  const solicitud = await equipoService.solicitarReclutador(empresa, req.body, {
+    actorUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id,
   });
+
+  // RBAC-05: si la empresa es de confianza, solicitarReclutador ya creó la
+  // cuenta en el mismo request — el mensaje refleja el resultado real
+  // (solicitud.estado), no asume el flujo de aprobación manual.
+  const mensaje = solicitud.estado === 'aprobado'
+    ? 'Reclutador agregado automáticamente (empresa de confianza). Le enviamos las credenciales por email.'
+    : 'Solicitud enviada correctamente. El administrador la revisará pronto.';
+
+  return res.status(201).json({ success: true, message: mensaje, data: solicitud });
 };
 
 exports.getMisSolicitudesReclutador = async (req, res) => {

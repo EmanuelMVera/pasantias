@@ -53,6 +53,10 @@ router.get('/empresas/pendientes', ...soloAdmin, asyncHandler(adminCtrl.getEmpre
 router.patch('/empresas/:id/aprobar', ...soloAdmin, asyncHandler(adminCtrl.aprobarEmpresa));
 router.patch('/empresas/:id/rechazar', ...soloAdmin, asyncHandler(adminCtrl.rechazarEmpresa));
 
+// ── Empresas — listado general + nivel de confianza (RBAC-05) ─────────────────
+router.get('/empresas', ...soloAdmin, asyncHandler(adminCtrl.getEmpresas));
+router.patch('/empresas/:id/confianza', ...soloAdmin, asyncHandler(adminCtrl.cambiarNivelConfianzaEmpresa));
+
 // ── Moderación de ofertas ─────────────────────────────────────────────────────
 router.get('/ofertas/pendientes', ...soloAdmin, asyncHandler(adminCtrl.getOfertasPendientes));
 router.get('/ofertas', ...soloAdmin, asyncHandler(adminCtrl.getOfertas));

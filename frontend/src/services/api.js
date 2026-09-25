@@ -199,6 +199,11 @@ export const adminService = {
   aprobarEmpresa:        (id) => api.patch(`/admin/empresas/${id}/aprobar`),
   rechazarEmpresa:       (id) => api.patch(`/admin/empresas/${id}/rechazar`),
 
+  // Listado general de empresas + nivel de confianza institucional (RBAC-05)
+  getEmpresas:            (params) => api.get('/admin/empresas', { params }),
+  // accion: 'marcar' (→ confiable) | 'revocar' (→ estandar)
+  cambiarConfianzaEmpresa: (id, accion) => api.patch(`/admin/empresas/${id}/confianza`, { accion }),
+
   // Moderación de ofertas
   getOfertasPendientes:  () => api.get('/admin/ofertas/pendientes'),
   getTodasOfertas:       (params) => api.get('/admin/ofertas', { params }),

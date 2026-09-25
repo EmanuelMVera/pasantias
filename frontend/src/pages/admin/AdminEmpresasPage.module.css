@@ -1,0 +1,79 @@
+/* AdminEmpresasPage.module.css — listado general de empresas + confianza institucional. */
+
+.feedback { margin-bottom: 1rem; }
+
+.emptyBox {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.rowBusy { opacity: 0.5; }
+
+.fechaCell {
+  white-space: nowrap;
+  font-size: 0.82rem;
+}
+
+.emailSmall {
+  color: var(--text-muted);
+}
+
+.procesando {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.acciones {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.confirmarTexto {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* ── Filtros ──────────────────────────────────────────────────────────────── */
+.filtrosWrap {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.filtros {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.filtro {
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 400;
+  font-family: var(--font-primary);
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.filtroActivo {
+  color: #fff;
+  font-weight: 700;
+}
+
+.count {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin-left: auto;
+}

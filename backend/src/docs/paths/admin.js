@@ -119,6 +119,24 @@ module.exports = {
       csrf: true, params: ['id'], body: 'MotivoRechazo', bodyRequired: false, errors: ['404'],
       responses: { 200: message() } }),
   },
+  '/api/admin/empresas': {
+    get: adminOp({ id: 'adminEmpresasList', summary: 'Listar todas las empresas',
+      query: ['pageParam', 'limitParam', REF.param('estadoQuery'), REF.param('nivelConfianzaQuery')],
+      responses: { 200: paginated('Empresa') } }),
+  },
+  '/api/admin/empresas/{id}/confianza': {
+    patch: adminOp({ id: 'adminEmpresasConfianza', summary: 'Marcar o revocar el nivel de confianza institucional de una empresa',
+      description:
+        'RBAC-05. Una empresa `confiable` agrega reclutadores y publica ofertas sin moderación previa ' +
+        '(moderación posterior — el admin sigue pudiendo pausar/rechazar/cerrar después). Revocar no ' +
+        'modifica retroactivamente lo ya publicado; solo rige para operaciones nuevas.',
+      csrf: true, params: ['id'], body: 'AdminCambiarConfianzaEmpresa', errors: ['400', '404'],
+      responses: {
+        200: message({
+          data: { type: 'object', properties: { nivelConfianza: { type: 'string', enum: ['estandar', 'confiable'] } } },
+        }),
+      } }),
+  },
 
   // ── Ofertas (moderación) ───────────────────────────────────────────────────
   '/api/admin/ofertas/pendientes': {

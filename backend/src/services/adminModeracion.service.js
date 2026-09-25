@@ -55,6 +55,57 @@ async function rechazarEmpresa(id, motivo, { actorUsuarioId, ip, requestId }) {
   await registrarAuditoria({ usuarioId: actorUsuarioId, ip, requestId, accion: 'rechazar_empresa', entidad: 'empresa', entidadId: empresa.id, detalle: { razonSocial: empresa.razonSocial } });
 }
 
+// ── Listado general + nivel de confianza (RBAC-05) ─────────────────────────────
+
+async function listarEmpresas({ estadoAprobacion, nivelConfianza, page = 1, limit = 25, offset = 0 }) {
+  const where = {};
+  if (estadoAprobacion) where.estadoAprobacion = estadoAprobacion;
+  if (nivelConfianza) where.nivelConfianza = nivelConfianza;
+
+  const { count, rows } = await Empresa.findAndCountAll({
+    where,
+    include: [{ model: Usuario, as: 'usuario', attributes: ['nombre', 'apellido', 'email'] }],
+    order: [['createdAt', 'DESC'], ['id', 'DESC']],
+    limit,
+    offset,
+  });
+
+  return { data: rows, pagination: buildPagination(count, { page, limit }) };
+}
+
+const ACCIONES_CONFIANZA = ['marcar', 'revocar'];
+const CONFIANZA_POR_ACCION = { marcar: 'confiable', revocar: 'estandar' };
+
+// Cambia el nivel de confianza institucional de una empresa. Nunca toca
+// retroactivamente ofertas/solicitudes ya resueltas con la política vigente
+// al momento de crearlas — solo afecta operaciones nuevas de ahí en más.
+async function cambiarNivelConfianza(id, accion, { actorUsuarioId, ip, requestId }) {
+  const empresa = await Empresa.findByPk(id);
+  if (!empresa) throw new HttpError(404, 'Empresa no encontrada.');
+
+  if (!ACCIONES_CONFIANZA.includes(accion)) {
+    throw new HttpError(400, `accion inválida. Válidas: ${ACCIONES_CONFIANZA.join(', ')}.`);
+  }
+
+  const nivelNuevo = CONFIANZA_POR_ACCION[accion];
+  if (empresa.nivelConfianza === nivelNuevo) {
+    throw new HttpError(400, `La empresa ya es '${nivelNuevo}'.`);
+  }
+
+  const nivelAnterior = empresa.nivelConfianza;
+  await empresa.update({ nivelConfianza: nivelNuevo });
+
+  await registrarAuditoria({
+    usuarioId: actorUsuarioId, ip, requestId,
+    accion: accion === 'marcar' ? 'marcar_empresa_confiable' : 'revocar_confianza_empresa',
+    entidad: 'empresa',
+    entidadId: empresa.id,
+    detalle: { razonSocial: empresa.razonSocial, nivelAnterior, nivelNuevo },
+  });
+
+  return { nivelConfianza: nivelNuevo };
+}
+
 // ── Moderación de ofertas ───────────────────────────────────────────────────────
 
 async function listarOfertasPendientes() {
@@ -185,6 +236,8 @@ module.exports = {
   listarEmpresasPendientes,
   aprobarEmpresa,
   rechazarEmpresa,
+  listarEmpresas,
+  cambiarNivelConfianza,
   listarOfertasPendientes,
   listarOfertas,
   moderarOferta,

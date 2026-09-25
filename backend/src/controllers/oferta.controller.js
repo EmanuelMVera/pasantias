@@ -85,13 +85,34 @@ exports.createOferta = async (req, res) => {
   const { error, campos } = ofertaService.validarCamposPuesto(body);
   if (error) return res.status(400).json({ success: false, message: error });
 
+  // RBAC-05: empresas de confianza publican sin moderación previa — la
+  // confianza es de la EMPRESA, se resuelve al momento de crear la oferta
+  // (revocarla después no re-modera lo ya publicado, ver
+  // adminModeracion.service.js::cambiarNivelConfianza).
+  const esConfiable = empresa.nivelConfianza === 'confiable';
+  const estadoModeracion = esConfiable ? 'auto_aprobada' : 'pendiente';
+
   const oferta = await Oferta.create({
-    ...body, ...campos, empresaId: empresa.id, estadoModeracion: 'pendiente', creadaPorUsuarioId: req.usuario.id,
+    ...body, ...campos, empresaId: empresa.id, estadoModeracion, creadaPorUsuarioId: req.usuario.id,
   });
 
-  ofertaService.notificarAdminsNuevaOferta(oferta, empresa); // fire-and-forget
+  if (esConfiable) {
+    ofertaService.notificarAdminsOfertaAutoAprobada(oferta, empresa); // fire-and-forget
+    registrarAuditoria({
+      req,
+      accion: 'oferta_auto_aprobada',
+      entidad: 'oferta',
+      entidadId: oferta.id,
+      detalle: { titulo: oferta.titulo, empresaId: empresa.id, razonSocial: empresa.razonSocial },
+    });
+  } else {
+    ofertaService.notificarAdminsNuevaOferta(oferta, empresa); // fire-and-forget
+  }
 
-  return res.status(201).json({ success: true, message: 'Oferta creada. Pendiente de moderación.', data: oferta });
+  const mensaje = esConfiable
+    ? 'Oferta creada y publicada automáticamente (empresa de confianza).'
+    : 'Oferta creada. Pendiente de moderación.';
+  return res.status(201).json({ success: true, message: mensaje, data: oferta });
 };
 
 // ── Actualizar oferta (contenido) ───────────────────────────────────────────────

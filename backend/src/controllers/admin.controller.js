@@ -188,6 +188,25 @@ exports.rechazarEmpresa = async (req, res) => {
   return res.json({ success: true, message: 'Empresa rechazada.' });
 };
 
+// ── Listado general de empresas + nivel de confianza (RBAC-05) ────────────────
+
+exports.getEmpresas = async (req, res) => {
+  const { estadoAprobacion, nivelConfianza } = req.query;
+  const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 25, maxLimit: 100 });
+  const { data, pagination } = await adminModeracionService.listarEmpresas({ estadoAprobacion, nivelConfianza, page, limit, offset });
+  return res.json({ success: true, data, pagination, total: pagination.total });
+};
+
+exports.cambiarNivelConfianzaEmpresa = async (req, res) => {
+  const resultado = await adminModeracionService.cambiarNivelConfianza(
+    req.params.id, req.body?.accion, { actorUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id }
+  );
+  const mensaje = resultado.nivelConfianza === 'confiable'
+    ? 'Empresa marcada como confiable.'
+    : 'Confianza institucional revocada.';
+  return res.json({ success: true, message: mensaje, data: resultado });
+};
+
 // ── Moderación de ofertas ────────────────────────────────────────────────────────
 
 exports.getOfertasPendientes = async (req, res) => {

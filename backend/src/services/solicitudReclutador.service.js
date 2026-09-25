@@ -14,31 +14,19 @@ const { registrarAuditoria } = require('../utils/auditLog');
 const logger = require('../utils/logger');
 
 /**
- * Aprueba una solicitud de reclutador:
- *  1. Valida estado y duplicado de email
- *  2. En transacción: crea Usuario, crea EmpresaUsuario, actualiza solicitud
- *  3. Notificación in-app al admin_empresa
- *  4. Email al reclutador con credenciales
- *  5. Email al propietario de la empresa
+ * Crea la cuenta de reclutador a partir de una SolicitudReclutador pendiente:
+ * valida que el email no tenga cuenta ya, y en una transacción crea el
+ * Usuario, crea el EmpresaUsuario (rolInterno: reclutador) y marca la
+ * solicitud como 'aprobado'. Reusado tanto por `aprobarSolicitud` (admin del
+ * sistema aprueba manualmente) como por el alta automática de reclutador en
+ * empresas de confianza (empresaEquipo.service.js — RBAC-05), que es
+ * literalmente "el mismo mecanismo actual" aplicado sin esperar al admin.
  *
- * @returns {{ usuarioId, email, passwordGenerada }}
+ * @returns {{ usuario: Usuario, passwordPlano: string }}
  */
-async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }) {
+async function crearCuentaReclutadorDesdeSolicitud(solicitud) {
   const t = await sequelize.transaction();
   try {
-    const solicitud = await SolicitudReclutador.findByPk(solicitudId, {
-      include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'usuarioId'] }],
-      transaction: t,
-    });
-    if (!solicitud) {
-      await t.rollback();
-      throw new HttpError(404, 'Solicitud no encontrada.');
-    }
-    if (solicitud.estado !== 'pendiente') {
-      await t.rollback();
-      throw new HttpError(400, `La solicitud ya fue ${solicitud.estado}.`);
-    }
-
     const emailExistente = await Usuario.findOne({ where: { email: solicitud.email }, transaction: t });
     if (emailExistente) {
       await t.rollback();
@@ -70,71 +58,105 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }) 
     await solicitud.update({ estado: 'aprobado' }, { transaction: t });
     await t.commit();
 
-    await registrarAuditoria({
-      usuarioId: adminUsuarioId,
-      ip,
-      requestId,
-      accion:    'aprobar_solicitud_reclutador',
-      entidad:   'solicitud_reclutador',
-      entidadId: solicitud.id,
-      detalle:   { email: solicitud.email, empresaId: solicitud.empresaId },
-    });
-
-    // Notificación in-app al admin_empresa
-    const empresaOwner = solicitud.empresa?.usuarioId;
-    if (empresaOwner) {
-      crearNotificacion({
-        usuarioId: empresaOwner,
-        titulo: '✅ Solicitud de reclutador aprobada',
-        mensaje: `${solicitud.nombre}${solicitud.apellido ? ' ' + solicitud.apellido : ''} ya puede acceder al sistema como reclutador.`,
-        tipo: 'sistema',
-        tipoVisual: 'success',
-        enlace: '/empresa/equipo',
-        accionURL: '/empresa/equipo',
-      }).catch((e) => logger.error({ err: e }, 'notif_aprobacion_reclutador_fallo'));
-    }
-
-    const loginUrl = `${config.urls.client}/login`;
-
-    // Email al reclutador con credenciales
-    enviarEmail({
-      to: solicitud.email,
-      subject: '✅ Tu cuenta de reclutador fue creada – SisPasantías',
-      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
-        <h2 style="color:#0073AD">¡Tu cuenta fue creada! 🎉</h2>
-        <p>Hola, <strong>${solicitud.nombre}</strong>.</p>
-        <p>El equipo de <strong>SisPasantías</strong> activó tu cuenta de reclutador en <strong>${solicitud.empresa?.razonSocial}</strong>.</p>
-        <table style="margin:1rem 0;border-collapse:collapse;width:100%">
-          <tr><td style="padding:8px 12px;background:#f0f6fc;font-weight:600;width:130px">Email</td><td style="padding:8px 12px;background:#e8f4fb">${solicitud.email}</td></tr>
-          <tr><td style="padding:8px 12px;background:#f0f6fc;font-weight:600">Contraseña</td><td style="padding:8px 12px;background:#e8f4fb;font-family:monospace;font-size:1.1rem">${passwordPlano}</td></tr>
-        </table>
-        <p style="color:#c0392b;font-size:0.88rem">⚠️ Cambiá tu contraseña al ingresar por primera vez.</p>
-        <a href="${loginUrl}" style="display:inline-block;margin-top:1rem;background:#0073AD;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold">Ingresar al sistema</a>
-      </div>`,
-    }).catch((e) => logger.error({ err: e }, 'email_reclutador_aprobado_fallo'));
-
-    // Email al propietario de la empresa
-    if (empresaOwner) {
-      const propietario = await Usuario.findByPk(empresaOwner);
-      if (propietario) {
-        enviarEmail({
-          to: propietario.email,
-          subject: '✅ Solicitud de reclutador aprobada – SisPasantías',
-          html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
-            <h2 style="color:#0073AD">Solicitud aprobada</h2>
-            <p>La solicitud de reclutador para <strong>${solicitud.nombre}</strong> (${solicitud.email}) fue <strong>aprobada</strong>.</p>
-            <p>El reclutador ya puede acceder al sistema con las credenciales enviadas a su email.</p>
-          </div>`,
-        }).catch((e) => logger.error({ err: e }, 'email_empresa_aprobado_fallo'));
-      }
-    }
-
-    return { usuarioId: nuevoUsuario.id, email: solicitud.email, passwordGenerada: passwordPlano };
+    return { usuario: nuevoUsuario, passwordPlano };
   } catch (err) {
     // Solo hace rollback si la transacción no fue commiteada
     if (t.finished !== 'commit') await t.rollback();
     throw err;
   }
+}
+
+/**
+ * Email al reclutador recién creado con sus credenciales de acceso —
+ * mismo template tanto si lo disparó la aprobación manual del admin como
+ * el alta automática por política de confianza.
+ */
+function enviarEmailCredencialesReclutador(solicitud, passwordPlano) {
+  const loginUrl = `${config.urls.client}/login`;
+  return enviarEmail({
+    to: solicitud.email,
+    subject: '✅ Tu cuenta de reclutador fue creada – SisPasantías',
+    html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
+      <h2 style="color:#0073AD">¡Tu cuenta fue creada! 🎉</h2>
+      <p>Hola, <strong>${solicitud.nombre}</strong>.</p>
+      <p>El equipo de <strong>SisPasantías</strong> activó tu cuenta de reclutador en <strong>${solicitud.empresa?.razonSocial}</strong>.</p>
+      <table style="margin:1rem 0;border-collapse:collapse;width:100%">
+        <tr><td style="padding:8px 12px;background:#f0f6fc;font-weight:600;width:130px">Email</td><td style="padding:8px 12px;background:#e8f4fb">${solicitud.email}</td></tr>
+        <tr><td style="padding:8px 12px;background:#f0f6fc;font-weight:600">Contraseña</td><td style="padding:8px 12px;background:#e8f4fb;font-family:monospace;font-size:1.1rem">${passwordPlano}</td></tr>
+      </table>
+      <p style="color:#c0392b;font-size:0.88rem">⚠️ Cambiá tu contraseña al ingresar por primera vez.</p>
+      <a href="${loginUrl}" style="display:inline-block;margin-top:1rem;background:#0073AD;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold">Ingresar al sistema</a>
+    </div>`,
+  });
+}
+
+/**
+ * Aprueba una solicitud de reclutador:
+ *  1. Valida estado
+ *  2. Crea la cuenta (crearCuentaReclutadorDesdeSolicitud)
+ *  3. Auditoría
+ *  4. Notificación in-app al admin_empresa
+ *  5. Email al reclutador con credenciales
+ *  6. Email al propietario de la empresa
+ *
+ * @returns {{ usuarioId, email, passwordGenerada }}
+ */
+async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }) {
+  const solicitud = await SolicitudReclutador.findByPk(solicitudId, {
+    include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'usuarioId'] }],
+  });
+  if (!solicitud) throw new HttpError(404, 'Solicitud no encontrada.');
+  if (solicitud.estado !== 'pendiente') {
+    throw new HttpError(400, `La solicitud ya fue ${solicitud.estado}.`);
+  }
+
+  const { usuario: nuevoUsuario, passwordPlano } = await crearCuentaReclutadorDesdeSolicitud(solicitud);
+
+  await registrarAuditoria({
+    usuarioId: adminUsuarioId,
+    ip,
+    requestId,
+    accion:    'aprobar_solicitud_reclutador',
+    entidad:   'solicitud_reclutador',
+    entidadId: solicitud.id,
+    detalle:   { email: solicitud.email, empresaId: solicitud.empresaId },
+  });
+
+  // Notificación in-app al admin_empresa
+  const empresaOwner = solicitud.empresa?.usuarioId;
+  if (empresaOwner) {
+    crearNotificacion({
+      usuarioId: empresaOwner,
+      titulo: '✅ Solicitud de reclutador aprobada',
+      mensaje: `${solicitud.nombre}${solicitud.apellido ? ' ' + solicitud.apellido : ''} ya puede acceder al sistema como reclutador.`,
+      tipo: 'sistema',
+      tipoVisual: 'success',
+      enlace: '/empresa/equipo',
+      accionURL: '/empresa/equipo',
+    }).catch((e) => logger.error({ err: e }, 'notif_aprobacion_reclutador_fallo'));
+  }
+
+  // Email al reclutador con credenciales
+  enviarEmailCredencialesReclutador(solicitud, passwordPlano)
+    .catch((e) => logger.error({ err: e }, 'email_reclutador_aprobado_fallo'));
+
+  // Email al propietario de la empresa
+  if (empresaOwner) {
+    const propietario = await Usuario.findByPk(empresaOwner);
+    if (propietario) {
+      enviarEmail({
+        to: propietario.email,
+        subject: '✅ Solicitud de reclutador aprobada – SisPasantías',
+        html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
+          <h2 style="color:#0073AD">Solicitud aprobada</h2>
+          <p>La solicitud de reclutador para <strong>${solicitud.nombre}</strong> (${solicitud.email}) fue <strong>aprobada</strong>.</p>
+          <p>El reclutador ya puede acceder al sistema con las credenciales enviadas a su email.</p>
+        </div>`,
+      }).catch((e) => logger.error({ err: e }, 'email_empresa_aprobado_fallo'));
+    }
+  }
+
+  return { usuarioId: nuevoUsuario.id, email: solicitud.email, passwordGenerada: passwordPlano };
 }
 
 /**
@@ -190,4 +212,9 @@ async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip, requestId },
   }
 }
 
-module.exports = { aprobarSolicitud, rechazarSolicitud };
+module.exports = {
+  aprobarSolicitud,
+  rechazarSolicitud,
+  crearCuentaReclutadorDesdeSolicitud,
+  enviarEmailCredencialesReclutador,
+};

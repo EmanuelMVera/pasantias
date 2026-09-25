@@ -62,6 +62,10 @@ module.exports = (sequelize) => {
         'reactivar_oferta',              // migración 015 — RBAC-01
         'exportar_logs',                 // migración 015
         'exportar_estadisticas',         // migración 015
+        'marcar_empresa_confiable',      // migración 018 — RBAC-05
+        'revocar_confianza_empresa',     // migración 018 — RBAC-05
+        'auto_aprobar_solicitud_reclutador', // migración 018 — RBAC-05
+        'oferta_auto_aprobada',          // migración 018 — RBAC-05
         'sistema'
       ),
       allowNull: false,

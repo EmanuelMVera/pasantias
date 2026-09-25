@@ -55,6 +55,7 @@ import AdminUsuariosPage   from './pages/admin/AdminUsuariosPage';
 import AdminLogsPage       from './pages/admin/AdminLogsPage';
 import AdminSolicitudesPage from './pages/admin/AdminSolicitudesPage';
 import AdminOfertasPage    from './pages/admin/AdminOfertasPage';
+import AdminEmpresasPage   from './pages/admin/AdminEmpresasPage';
 import AdminImportacionPage from './pages/admin/AdminImportacionPage';
 
 // Páginas de perfiles públicos (alumno/egresado y empresa)
@@ -252,6 +253,11 @@ function AppRoutes() {
       <Route path="/admin/solicitudes" element={
         <ProtectedRoute roles={['admin']}>
           <AdminSolicitudesPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/empresas" element={
+        <ProtectedRoute roles={['admin']}>
+          <AdminEmpresasPage />
         </ProtectedRoute>
       } />
       <Route path="/admin/ofertas" element={

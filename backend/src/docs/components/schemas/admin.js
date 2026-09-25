@@ -45,6 +45,15 @@ module.exports = {
     },
   },
 
+  AdminCambiarConfianzaEmpresa: {
+    type: 'object',
+    required: ['accion'],
+    description: 'Cambia el nivel de confianza institucional de una empresa (RBAC-05). Reversible en cualquier momento; no re-modera retroactivamente lo ya publicado.',
+    properties: {
+      accion: { type: 'string', enum: ['marcar', 'revocar'], description: '`marcar` → confiable, `revocar` → estandar.' },
+    },
+  },
+
   DashboardGeneral: {
     type: 'object',
     properties: {

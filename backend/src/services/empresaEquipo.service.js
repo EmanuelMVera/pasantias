@@ -3,6 +3,10 @@
 const { EmpresaUsuario, Usuario, SolicitudReclutador } = require('../models');
 const HttpError = require('../utils/httpError');
 const authService = require('./auth.service');
+const solicitudReclutadorService = require('./solicitudReclutador.service');
+const { crearNotificacion } = require('../utils/notificador');
+const { registrarAuditoria } = require('../utils/auditLog');
+const logger = require('../utils/logger');
 
 async function listarEquipo(empresa) {
   const equipo = await EmpresaUsuario.findAll({
@@ -120,7 +124,30 @@ async function desactivarMiembro(empresa, miembroId) {
   await miembro.update({ activo: false });
 }
 
-async function solicitarReclutador(empresa, { nombre, apellido, email }) {
+/**
+ * Notifica a los admins del sistema que una empresa de confianza agregó un
+ * reclutador sin pasar por aprobación manual — moderación posterior, no
+ * previa (RBAC-05). Mismo patrón fire-and-forget que
+ * oferta.service.js::notificarAdminsNuevaOferta/notificarAdminsOfertaAutoAprobada.
+ */
+async function notificarAdminsReclutadorAutoAprobado(solicitud, empresa) {
+  try {
+    const admins = await Usuario.findAll({ where: { rol: 'admin', activo: true }, attributes: ['id'] });
+    await Promise.all(admins.map((admin) =>
+      crearNotificacion({
+        usuarioId: admin.id,
+        titulo: '🤝 Reclutador agregado automáticamente',
+        mensaje: `La empresa de confianza "${empresa.razonSocial}" agregó a ${solicitud.nombre}${solicitud.apellido ? ' ' + solicitud.apellido : ''} como reclutador, sin aprobación manual.`,
+        tipo: 'sistema',
+        tipoVisual: 'info',
+        enlace: '/admin/usuarios',
+        accionURL: '/admin/usuarios',
+      })
+    ));
+  } catch (e) { logger.error({ err: e }, 'notif_admin_reclutador_auto_aprobado_fallo'); }
+}
+
+async function solicitarReclutador(empresa, { nombre, apellido, email }, ctx = {}) {
   if (!nombre?.trim() || !apellido?.trim() || !email?.trim()) {
     throw new HttpError(400, 'Nombre, apellido y email son requeridos.');
   }
@@ -149,13 +176,39 @@ async function solicitarReclutador(empresa, { nombre, apellido, email }) {
     throw err;
   }
 
-  return SolicitudReclutador.create({
+  const solicitud = await SolicitudReclutador.create({
     empresaId: empresa.id,
     nombre:    nombre.trim(),
     apellido:  apellido.trim(),
     email:     email.trim().toLowerCase(),
     estado:    'pendiente',
   });
+
+  // RBAC-05: empresa de confianza → alta inmediata, sin aprobación manual.
+  // Reusa el mismo mecanismo de creación de cuenta que ya usa el admin del
+  // sistema al aprobar una solicitud (solicitudReclutador.service.js) —
+  // "según el mecanismo actual", solo que sin esperar al admin.
+  if (empresa.nivelConfianza === 'confiable') {
+    solicitud.empresa = empresa; // para el template del email (razonSocial)
+    const { passwordPlano } = await solicitudReclutadorService.crearCuentaReclutadorDesdeSolicitud(solicitud);
+
+    await registrarAuditoria({
+      usuarioId: ctx.actorUsuarioId,
+      ip: ctx.ip,
+      requestId: ctx.requestId,
+      accion:    'auto_aprobar_solicitud_reclutador',
+      entidad:   'solicitud_reclutador',
+      entidadId: solicitud.id,
+      detalle:   { email: solicitud.email, empresaId: empresa.id, razonSocial: empresa.razonSocial },
+    });
+
+    solicitudReclutadorService.enviarEmailCredencialesReclutador(solicitud, passwordPlano)
+      .catch((e) => logger.error({ err: e }, 'email_reclutador_auto_aprobado_fallo'));
+
+    notificarAdminsReclutadorAutoAprobado(solicitud, empresa); // fire-and-forget
+  }
+
+  return solicitud;
 }
 
 async function obtenerSolicitudesReclutador(empresaId) {

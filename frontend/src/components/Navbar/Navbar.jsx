@@ -123,6 +123,7 @@ export default function Navbar() {
   const linksAdmin = [
     { to: '/admin', label: 'Panel' },
     { to: '/admin/solicitudes', label: '📋 Solicitudes' },
+    { to: '/admin/empresas', label: '🏢 Empresas' },
     { to: '/admin/ofertas', label: '📣 Ofertas' },
     { to: '/admin/usuarios', label: '👥 Usuarios' },
     { to: '/admin/importaciones', label: '📥 Importar' },
