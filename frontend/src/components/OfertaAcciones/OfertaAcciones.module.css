@@ -1,0 +1,10 @@
+.estadoNota {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.guardandoSpan {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-style: italic;
+}

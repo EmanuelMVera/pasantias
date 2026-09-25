@@ -15,285 +15,12 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { empresaService } from '../../services/empresa.service';
 import { useEmpresa } from '../../hooks/useEmpresa';
-import Avatar from '../../components/Avatar/Avatar';
-import Modal from '../../components/Modal/Modal';
+import MiembroEquipoCard from '../../components/MiembroEquipoCard/MiembroEquipoCard';
+import SolicitarReclutadorModal from '../../components/SolicitarReclutadorModal/SolicitarReclutadorModal';
+import EditarRolModal from '../../components/EditarRolModal/EditarRolModal';
+import SolicitudesReclutadoresTabla from '../../components/SolicitudesReclutadoresTabla/SolicitudesReclutadoresTabla';
+import ConfirmModal from '../../components/ConfirmModal/ConfirmModal';
 import styles from './EquipoPage.module.css';
-
-/* ── Helpers ─────────────────────────────────────────────────────────────────── */
-const ROL_COLORS = { admin_empresa: '#7c3aed', reclutador: '#0891b2' };
-function rolColor(rol) { return ROL_COLORS[rol] ?? '#64748b'; }
-function formatFecha(iso) {
-  if (!iso) return 'Nunca';
-  return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-const ESTADO_SOLICITUD = {
-  pendiente:  { label: 'Pendiente',  color: '#ca8a04', bg: '#fef9c3' },
-  aprobado:   { label: 'Aprobado',   color: '#15803d', bg: '#dcfce7' },
-  rechazado:  { label: 'Rechazado',  color: '#dc2626', bg: '#fee2e2' },
-};
-
-/* ── Modal de confirmación (suspender / quitar / recuperación) ──────────────── */
-function ConfirmModal({
-  title, icon, iconBg, miembro, nota, notaTone = 'warn',
-  confirmLabel, confirmTone = 'danger', onConfirm, onClose,
-}) {
-  const nombre = miembro.usuario?.nombre ?? miembro.nombre ?? '';
-  const apellido = miembro.usuario?.apellido ?? '';
-  const email = miembro.usuario?.email ?? miembro.email;
-
-  return (
-    <Modal title={title} onClose={onClose} maxWidth={420}>
-      <div className={styles.confirmHead}>
-        <div className={styles.confirmIcon} style={{ background: iconBg }} aria-hidden="true">{icon}</div>
-        <p className={styles.confirmName}>{nombre} {apellido}</p>
-        <p className={styles.confirmEmail}>{email}</p>
-      </div>
-      <div className={`${styles.confirmNota} ${styles[`nota_${notaTone}`]}`}>{nota}</div>
-      <div className={styles.confirmActions}>
-        <button className={styles.btnSecondary} onClick={onClose}>Cancelar</button>
-        <button className={`${styles.confirmBtn} ${styles[`confirmBtn_${confirmTone}`]}`} onClick={onConfirm}>
-          {confirmLabel}
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
-/* ── Modal: Solicitar reclutador ────────────────────────────────────────────── */
-function ModalSolicitarReclutador({ onClose, onEnviada, esConfiable }) {
-  const [form, setForm] = useState({ nombre: '', apellido: '', email: '' });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.nombre.trim() || !form.apellido.trim() || !form.email.trim()) {
-      setError('Nombre, apellido y email son requeridos.');
-      return;
-    }
-    setLoading(true);
-    setError('');
-    try {
-      const { data } = await empresaService.solicitarReclutador(form);
-      onEnviada(data.data);
-      onClose();
-    } catch (err) {
-      const code = err.response?.data?.code;
-      const msg  = err.response?.data?.message ?? 'Error al enviar la solicitud.';
-      // Mensajes específicos según el código de error del backend
-      if (code === 'EMAIL_REGISTRADO') {
-        setError('Ese email ya tiene una cuenta en el sistema. Contactate con el administrador.');
-      } else if (code === 'EMAIL_SOLICITUD_PENDIENTE') {
-        setError('Ya existe una solicitud pendiente para ese email en tu empresa.');
-      } else {
-        setError(msg);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Modal title="📋 Solicitar nuevo reclutador" onClose={onClose}>
-      <form onSubmit={handleSubmit} className={styles.modalForm}>
-
-        <div className={styles.infoBox}>
-          <span>ℹ️</span>
-          <span>
-            {esConfiable
-              ? 'Tu empresa es de confianza institucional: la cuenta se crea de inmediato, sin esperar aprobación del administrador. Las credenciales se envían por email.'
-              : 'La solicitud será revisada por el administrador del instituto. Al aprobarla, se creará la cuenta y se enviarán las credenciales por email.'}
-          </span>
-        </div>
-
-        <div className={styles.fieldGroup}>
-          <label>Nombre *</label>
-          <input
-            type="text"
-            value={form.nombre}
-            onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
-            placeholder="Juan"
-            required
-            autoFocus
-          />
-        </div>
-
-        <div className={styles.fieldGroup}>
-          <label>Apellido *</label>
-          <input
-            type="text"
-            value={form.apellido}
-            onChange={e => setForm(f => ({ ...f, apellido: e.target.value }))}
-            placeholder="Pérez"
-            required
-          />
-        </div>
-
-        <div className={styles.fieldGroup}>
-          <label>Email *</label>
-          <input
-            type="email"
-            value={form.email}
-            onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-            placeholder="reclutador@empresa.com"
-            required
-          />
-        </div>
-
-        {error && <p className={styles.errorMsg}>⚠️ {error}</p>}
-
-        <div className={styles.modalActions}>
-          <button type="button" className={styles.btnSecondary} onClick={onClose}>Cancelar</button>
-          <button type="submit" className={styles.btnPrimary} disabled={loading}>
-            {loading ? 'Enviando...' : '📤 Enviar solicitud'}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
-/* ── Modal: Editar rol ──────────────────────────────────────────────────────── */
-// Solo reclutador es asignable manualmente; admin_empresa lo define el flujo de aprobación
-const ROLES = [
-  { value: 'reclutador', label: 'Reclutador', color: '#0891b2', desc: 'Crea ofertas y gestiona candidatos' },
-];
-
-function ModalEditarRol({ miembro, onClose, onGuardado }) {
-  const [rolInterno, setRol] = useState(miembro.rolInterno ?? 'reclutador');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await empresaService.editarMiembro(miembro.id, { rolInterno });
-      onGuardado(rolInterno);
-      onClose();
-    } catch (err) {
-      setError(err.response?.data?.message ?? 'Error al cambiar el rol.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Modal title={`✏️ Cambiar rol — ${miembro.usuario?.nombre ?? miembro.nombre}`} onClose={onClose}>
-      <form onSubmit={handleSubmit} className={styles.modalForm}>
-        <div className={styles.fieldGroup}>
-          <label>Rol en el equipo</label>
-          <div className={styles.rolRadioGroup}>
-            {ROLES.map(r => (
-              <label key={r.value}
-                className={`${styles.rolRadio} ${rolInterno === r.value ? styles.rolRadioActive : ''}`}
-                style={rolInterno === r.value ? { borderColor: r.color, background: r.color + '12' } : {}}
-              >
-                <input type="radio" name="rolInterno" value={r.value} checked={rolInterno === r.value} onChange={() => setRol(r.value)} />
-                <div>
-                  <strong style={rolInterno === r.value ? { color: r.color } : {}}>{r.label}</strong>
-                  <span>{r.desc}</span>
-                </div>
-              </label>
-            ))}
-          </div>
-        </div>
-        {error && <p className={styles.errorMsg}>{error}</p>}
-        <div className={styles.modalActions}>
-          <button type="button" className={styles.btnSecondary} onClick={onClose}>Cancelar</button>
-          <button type="submit" className={styles.btnPrimary} disabled={loading}>
-            {loading ? 'Guardando...' : '✓ Guardar rol'}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
-/* ── Tarjeta de miembro ─────────────────────────────────────────────────────── */
-// La fila del admin_empresa muestra identidad INSTITUCIONAL (logo + razón
-// social) — la empresa es una entidad, no una persona (feedback de la
-// profesora). El responsable humano queda como dato secundario, igual al
-// patrón ya usado en Navbar.jsx. Los reclutadores siguen mostrándose como
-// personas (foto + nombre propio) — eso no cambia.
-function MiembroCard({ miembro, empresa, esPropietario, onToggleActivo, onEliminar, onRecuperacion }) {
-  const u = miembro.usuario ?? miembro;
-  const esProp = miembro.rolInterno === 'admin_empresa';
-  const nombre = esProp
-    ? (empresa?.razonSocial || `${u.nombre ?? ''} ${u.apellido ?? ''}`.trim())
-    : (`${u.nombre ?? ''} ${u.apellido ?? ''}`.trim() || u.email);
-
-  return (
-    <div className={`${styles.miembroCard} ${!miembro.activo ? styles.miembroInactivo : ''}`}>
-      <Avatar
-        src={esProp ? (empresa?.logo || null) : u.fotoPerfil}
-        nombre={esProp ? (empresa?.razonSocial || u.nombre) : u.nombre}
-        apellido={esProp ? '' : u.apellido}
-        size={44}
-        color={rolColor(miembro.rolInterno)}
-        style={{ fontWeight: 800 }}
-      />
-      <div className={styles.cardInfo}>
-        <div className={styles.cardNombre}>
-          <strong>{nombre}</strong>
-          {esProp && <span className={styles.propietarioBadge}>Administrador de empresa</span>}
-          {!miembro.activo && <span className={styles.suspendidoBadge}>Suspendido</span>}
-        </div>
-        {esProp && (
-          <span className={styles.cardEmail}>
-            Responsable de cuenta: {u.nombre} {u.apellido}
-          </span>
-        )}
-        <span className={styles.cardEmail}>{u.email}</span>
-        <div className={styles.cardMeta}>
-          <span className={styles.cardFecha}>Último acceso: {formatFecha(u.ultimoAcceso)}</span>
-        </div>
-      </div>
-      {esPropietario && !esProp && (
-        <div className={styles.cardAcciones}>
-          <button
-            className={`${styles.btnAccion} ${miembro.activo ? styles.btnWarning : styles.btnOk}`}
-            onClick={() => onToggleActivo(miembro)}
-          >
-            {miembro.activo ? '⏸ Suspender' : '▶ Reactivar'}
-          </button>
-          <button
-            className={styles.btnAccion}
-            onClick={() => onRecuperacion(miembro)}
-          >
-            🔑 Enviar recuperación de acceso
-          </button>
-          <button
-            className={`${styles.btnAccion} ${styles.btnDanger}`}
-            onClick={() => onEliminar(miembro)}
-          >
-            🗑️ Quitar del equipo
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── Fila de solicitud de reclutador ────────────────────────────────────────── */
-function SolicitudRow({ sol }) {
-  const est = ESTADO_SOLICITUD[sol.estado] ?? ESTADO_SOLICITUD.pendiente;
-  return (
-    <tr>
-      <td><strong>{sol.nombre}</strong></td>
-      <td className={`${styles.cellMuted} cell-break`}>{sol.email}</td>
-      <td>
-        <span className={styles.estadoPill} style={{ background: est.bg, color: est.color }}>
-          {est.label}
-        </span>
-      </td>
-      <td className={styles.cellFecha}>
-        {new Date(sol.createdAt).toLocaleDateString('es-AR')}
-      </td>
-    </tr>
-  );
-}
 
 /* ── Componente principal ───────────────────────────────────────────────────── */
 export default function EquipoPage() {
@@ -480,7 +207,7 @@ export default function EquipoPage() {
           <h2 className={styles.seccionTitulo}>Miembros activos</h2>
           <div className={styles.listaCards}>
             {activos.map(m => (
-              <MiembroCard key={m.id} miembro={m} empresa={empresa} esPropietario={esPropietario}
+              <MiembroEquipoCard key={m.id} miembro={m} empresa={empresa} esPropietario={esPropietario}
                 onToggleActivo={handleToggleActivo} onEliminar={handleEliminar}
                 onRecuperacion={handleRecuperacion}
               />
@@ -495,7 +222,7 @@ export default function EquipoPage() {
           <h2 className={styles.seccionTitulo} style={{ color: 'var(--text-muted)' }}>Cuentas suspendidas</h2>
           <div className={styles.listaCards}>
             {suspendidos.map(m => (
-              <MiembroCard key={m.id} miembro={m} empresa={empresa} esPropietario={esPropietario}
+              <MiembroEquipoCard key={m.id} miembro={m} empresa={empresa} esPropietario={esPropietario}
                 onToggleActivo={handleToggleActivo} onEliminar={handleEliminar}
                 onRecuperacion={handleRecuperacion}
               />
@@ -506,24 +233,7 @@ export default function EquipoPage() {
 
       {/* ── Historial de solicitudes de reclutadores ── */}
       {!loading && solicitudes.length > 0 && (
-        <section className={styles.seccion} style={{ marginTop: '2rem' }}>
-          <h2 className={styles.seccionTitulo}>Solicitudes de reclutadores</h2>
-          <div className={styles.tablaWrap}>
-            <table className="tabla">
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Email</th>
-                  <th>Estado</th>
-                  <th>Fecha</th>
-                </tr>
-              </thead>
-              <tbody>
-                {solicitudes.map(s => <SolicitudRow key={s.id} sol={s} />)}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <SolicitudesReclutadoresTabla solicitudes={solicitudes} />
       )}
 
       {/* ── Estado vacío ── */}
@@ -541,14 +251,14 @@ export default function EquipoPage() {
 
       {/* ── Modales ── */}
       {modalSolicitar && (
-        <ModalSolicitarReclutador
+        <SolicitarReclutadorModal
           onClose={() => setModalSolicitar(false)}
           onEnviada={handleEnviada}
           esConfiable={empresa?.nivelConfianza === 'confiable'}
         />
       )}
       {modalRol && (
-        <ModalEditarRol
+        <EditarRolModal
           miembro={modalRol}
           onClose={() => setModalRol(null)}
           onGuardado={(nuevoRol) => { handleRolGuardado(modalRol.id, nuevoRol); setModalRol(null); }}

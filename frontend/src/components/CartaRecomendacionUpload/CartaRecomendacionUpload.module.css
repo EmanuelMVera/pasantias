@@ -1,0 +1,13 @@
+/* Duplicado a propósito de CvUpload.module.css (CSS Modules escopa por archivo). */
+.cvUpload {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.cvHint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}

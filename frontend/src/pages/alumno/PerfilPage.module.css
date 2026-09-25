@@ -73,26 +73,6 @@
   margin-top: 0.5rem;
 }
 
-/* ── CV Upload ───────────────────────────────────────────────────────────── */
-.cvAviso {
-  color: var(--warning);
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.cvUpload {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.cvHint {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  margin-top: 0.25rem;
-}
-
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .formSection {

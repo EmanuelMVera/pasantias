@@ -15,8 +15,10 @@
 
 import { useState, useEffect } from 'react';
 import { userService } from '../../services/user.service';
-import { abrirArchivoPrivado } from '../../services/api';
-import { useAuth } from '../../hooks/useAuth';
+import FotoPerfilUpload from '../../components/FotoPerfilUpload/FotoPerfilUpload';
+import TagsInput from '../../components/TagsInput/TagsInput';
+import CvUpload from '../../components/CvUpload/CvUpload';
+import CartaRecomendacionUpload from '../../components/CartaRecomendacionUpload/CartaRecomendacionUpload';
 import styles from './PerfilPage.module.css';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -91,24 +93,11 @@ function FormSection({ title, icon, children }) {
   );
 }
 
-// Email de la cuenta demo del alumno (seedPresentacion.js::ALUMNO) — solo se
-// usa para mostrar un aviso más específico; no afecta ninguna regla real.
-const ALUMNO_DEMO_EMAIL = 'alumno@demo.com';
-
 export default function PerfilPage() {
-  const { usuario, actualizarUsuario } = useAuth();
-
   const [perfil, setPerfil]     = useState(null);
   const [loading, setLoading]   = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg]           = useState('');
-  const [cvFile, setCvFile]     = useState(null);
-  const [subiendoCV, setSubiendoCV] = useState(false);
-  const [cartaFile, setCartaFile] = useState(null);
-  const [subiendoCarta, setSubiendoCarta] = useState(false);
-  const [fotoFile, setFotoFile] = useState(null);
-  const [subiendoFoto, setSubiendoFoto] = useState(false);
-  const [fotoPreview, setFotoPreview] = useState('');
 
   const [form, setForm] = useState({
     // Campos existentes
@@ -158,8 +147,6 @@ export default function PerfilPage() {
           telefono: d.telefono || '',
           ubicacion: d.ubicacion || '',
         }));
-        // Inicializar preview de foto
-        if (d.fotoPerfil) setFotoPreview(d.fotoPerfil);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -197,72 +184,6 @@ export default function PerfilPage() {
       setMsg(`❌ Error al guardar el perfil.${detalle ? ' ' + detalle : ''}`);
     } finally {
       setGuardando(false);
-      setTimeout(() => setMsg(''), 4000);
-    }
-  };
-
-  const handleSubirCV = async () => {
-    if (!cvFile) return;
-    setSubiendoCV(true);
-    const formData = new FormData();
-    formData.append('cv', cvFile);
-    try {
-      await userService.subirCV(formData);
-      setMsg('✅ CV subido correctamente.');
-    } catch {
-      setMsg('❌ Error al subir el CV.');
-    } finally {
-      setSubiendoCV(false);
-      setTimeout(() => setMsg(''), 4000);
-    }
-  };
-
-  const handleSubirCarta = async () => {
-    if (!cartaFile) return;
-    setSubiendoCarta(true);
-    const formData = new FormData();
-    formData.append('carta', cartaFile);
-    try {
-      await userService.subirCartaRecomendacion(formData);
-      setMsg('✅ Carta de recomendación subida correctamente.');
-      // Recargar perfil para mostrar el nuevo link
-      const { data } = await userService.getPerfil();
-      setPerfil(data.data || {});
-    } catch {
-      setMsg('❌ Error al subir la carta de recomendación.');
-    } finally {
-      setSubiendoCarta(false);
-      setTimeout(() => setMsg(''), 4000);
-    }
-  };
-
-  // SEC-03: la foto de perfil se sube como imagen validada (JPG/PNG/WEBP, ≤ 2 MB).
-  const handleFotoChange = (e) => {
-    const file = e.target.files?.[0] || null;
-    if (file && file.size > 2 * 1024 * 1024) {
-      setMsg('❌ La imagen no puede superar los 2 MB.');
-      e.target.value = '';
-      return;
-    }
-    setFotoFile(file);
-  };
-
-  const handleSubirFoto = async () => {
-    if (!fotoFile) return;
-    setSubiendoFoto(true);
-    const formData = new FormData();
-    formData.append('foto', fotoFile);
-    try {
-      const { data } = await userService.subirFoto(formData);
-      setFotoPreview(data.fotoPerfil);
-      setForm((prev) => ({ ...prev, fotoPerfil: data.fotoPerfil }));
-      actualizarUsuario({ fotoPerfil: data.fotoPerfil });
-      setFotoFile(null);
-      setMsg('✅ Foto de perfil actualizada.');
-    } catch (err) {
-      setMsg(`❌ Error al subir la foto.${err?.response?.data?.message ? ' ' + err.response.data.message : ''}`);
-    } finally {
-      setSubiendoFoto(false);
       setTimeout(() => setMsg(''), 4000);
     }
   };
@@ -358,89 +279,39 @@ export default function PerfilPage() {
                 placeholder="Twitter, Behance, etc." />
             </div>
           </div>
-          <div className="form-group">
-            <label>Foto de perfil</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-              {fotoPreview && (
-                <img
-                  key={fotoPreview}
-                  src={fotoPreview}
-                  alt="Foto de perfil"
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                  style={{
-                    width: 72, height: 72, borderRadius: '50%',
-                    objectFit: 'cover', border: '2px solid var(--border)',
-                  }}
-                />
-              )}
-              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleFotoChange} />
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={handleSubirFoto}
-                disabled={!fotoFile || subiendoFoto}
-              >
-                {subiendoFoto ? 'Subiendo...' : 'Subir foto'}
-              </button>
-            </div>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              JPG, PNG o WEBP. Máximo 2 MB.
-            </span>
-          </div>
+          <FotoPerfilUpload
+            fotoInicial={perfil?.fotoPerfil}
+            onMensaje={setMsg}
+            onFotoActualizada={(url) => setForm((prev) => ({ ...prev, fotoPerfil: url }))}
+          />
         </FormSection>
 
         {/* ── 3. Experiencia y proyectos ──────────────────────────────────── */}
         <FormSection title="Experiencia y Proyectos" icon="💼">
           <div className="form-row">
-            <div className="form-group">
-              <label>
-                Habilidades Técnicas
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>
-                  (separá con comas, ej: JavaScript, React, SQL)
-                </span>
-              </label>
-              <input
-                name="habilidadesTexto"
-                value={form.habilidadesTexto || ''}
-                onChange={handleChange}
-                placeholder="JavaScript, React, Node.js, SQL..."
-              />
-              {/* Tags visuales de las habilidades ya cargadas */}
-              {form.habilidadesTexto && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.4rem' }}>
-                  {tagTextToArray(form.habilidadesTexto).map((h, i) => (
-                    <span key={i} style={{
-                      background: 'var(--primary-light, #e0f2fe)', color: 'var(--primary, #0284c7)',
-                      borderRadius: '999px', padding: '0.15rem 0.65rem', fontSize: '0.78rem', fontWeight: 600,
-                    }}>{h}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="form-group">
-              <label>
-                Idiomas
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>
-                  (separá con comas, ej: Español, Inglés B2)
-                </span>
-              </label>
-              <input
-                name="idiomasTexto"
-                value={form.idiomasTexto || ''}
-                onChange={handleChange}
-                placeholder="Español nativo, Inglés B2, Portugués..."
-              />
-              {form.idiomasTexto && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.4rem' }}>
-                  {tagTextToArray(form.idiomasTexto).map((idioma, i) => (
-                    <span key={i} style={{
-                      background: 'var(--success-light, #dcfce7)', color: 'var(--success, #16a34a)',
-                      borderRadius: '999px', padding: '0.15rem 0.65rem', fontSize: '0.78rem', fontWeight: 600,
-                    }}>{idioma}</span>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* Tags visuales de las habilidades ya cargadas */}
+            <TagsInput
+              name="habilidadesTexto"
+              value={form.habilidadesTexto}
+              onChange={handleChange}
+              label="Habilidades Técnicas"
+              hint="(separá con comas, ej: JavaScript, React, SQL)"
+              placeholder="JavaScript, React, Node.js, SQL..."
+              tags={tagTextToArray(form.habilidadesTexto)}
+              tagBackground="var(--primary-light, #e0f2fe)"
+              tagColor="var(--primary, #0284c7)"
+            />
+            <TagsInput
+              name="idiomasTexto"
+              value={form.idiomasTexto}
+              onChange={handleChange}
+              label="Idiomas"
+              hint="(separá con comas, ej: Español, Inglés B2)"
+              placeholder="Español nativo, Inglés B2, Portugués..."
+              tags={tagTextToArray(form.idiomasTexto)}
+              tagBackground="var(--success-light, #dcfce7)"
+              tagColor="var(--success, #16a34a)"
+            />
           </div>
           <div className="form-group">
             <label htmlFor="pf-experienciaLaboral">Experiencia Laboral</label>
@@ -508,79 +379,14 @@ export default function PerfilPage() {
       </form>
 
       {/* ── 5. Currículum Vitae ────────────────────────────────────────── */}
-      <div className="cv-section">
-        <h2>Currículum Vitae</h2>
-        {perfil?.cvArchivoId ? (
-          <p>
-            CV actual:{' '}
-            <button
-              type="button"
-              onClick={() => abrirArchivoPrivado(perfil.cvArchivoId, { nombreArchivo: 'CV.pdf' })}
-              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}
-            >
-              📄 Ver CV actual
-            </button>
-          </p>
-        ) : (
-          <p className={styles.cvAviso}>
-            {usuario?.email === ALUMNO_DEMO_EMAIL
-              ? '⚠️ CV no cargado en este entorno de demostración.'
-              : '⚠️ No cargaste tu CV todavía. Las empresas no van a poder verlo hasta que subas uno.'}
-          </p>
-        )}
-        <div className={styles.cvUpload}>
-          <input
-            type="file"
-            accept=".pdf"
-            onChange={(e) => setCvFile(e.target.files[0])}
-          />
-          <button
-            className="btn-secondary"
-            onClick={handleSubirCV}
-            disabled={!cvFile || subiendoCV}
-          >
-            {subiendoCV ? 'Subiendo...' : '⬆️ Subir nuevo CV'}
-          </button>
-        </div>
-        <p className={styles.cvHint}>Solo archivos PDF. Máximo 5 MB.</p>
-      </div>
+      <CvUpload cvArchivoId={perfil?.cvArchivoId} onMensaje={setMsg} />
 
       {/* ── 6. Carta de Recomendación ─────────────────────────────────── */}
-      <div className="cv-section">
-        <h2>🎓 Carta de Recomendación</h2>
-        <p style={{ fontSize: '0.87rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-          Podés subir una carta de recomendación de un docente, empleador o entidad académica.
-          Es visible para las empresas cuando revisan tu perfil como candidato.
-        </p>
-        {perfil?.cartaArchivoId && (
-          <p>
-            Carta actual:{' '}
-            <button
-              type="button"
-              onClick={() => abrirArchivoPrivado(perfil.cartaArchivoId, { nombreArchivo: 'Carta-recomendacion' })}
-              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}
-            >
-              📄 Ver carta actual
-            </button>
-          </p>
-        )}
-        <div className={styles.cvUpload}>
-          <input
-            id="carta-file"
-            type="file"
-            accept=".pdf,image/*"
-            onChange={(e) => setCartaFile(e.target.files[0])}
-          />
-          <button
-            className="btn-secondary"
-            onClick={handleSubirCarta}
-            disabled={!cartaFile || subiendoCarta}
-          >
-            {subiendoCarta ? 'Subiendo...' : '⬆️ Subir carta'}
-          </button>
-        </div>
-        <p className={styles.cvHint}>PDF o imagen (JPG, PNG). Máximo 5 MB.</p>
-      </div>
+      <CartaRecomendacionUpload
+        cartaArchivoId={perfil?.cartaArchivoId}
+        onMensaje={setMsg}
+        onPerfilActualizado={setPerfil}
+      />
     </div>
   );
 }

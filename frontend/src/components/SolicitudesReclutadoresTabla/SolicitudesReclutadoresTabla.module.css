@@ -1,0 +1,41 @@
+/* ── Secciones ──────────────────────────────────────────────────────────────── */
+.seccion {
+  margin-bottom: 2rem;
+}
+
+.seccionTitulo {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+/* ── Tabla de solicitudes ────────────────────────────────────────────────────── */
+.tablaWrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* ── Celdas de la tabla de solicitudes ───────────────────────────────────── */
+.cellMuted {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.cellFecha {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.estadoPill {
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}

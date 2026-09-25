@@ -1,0 +1,45 @@
+/* ── Modal de rechazo ────────────────────────────────────────────────────────── */
+.modalBody {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 1.1rem;
+}
+
+.opcional {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 0.25rem;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+/* Duplicado a propósito de AdminSolicitudesPage.module.css: el mismo botón
+   grande también lo usa el panel de detalle de SolicitudesEmpresaSection —
+   CSS Modules escopa por archivo, así que no se comparte una sola definición. */
+.btnRechazarLg {
+  font-family: var(--font-primary);
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #c0392b, #e74c3c);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 3px 10px rgba(192,57,43,0.25);
+}
+
+.btnRechazarLg:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btnRechazarLg:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }

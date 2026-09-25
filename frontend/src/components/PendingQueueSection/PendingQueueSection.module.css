@@ -1,0 +1,39 @@
+/* ── Secciones Admin ─────────────────────────────────────────────────────── */
+/* Duplicado a propósito de AdminDashboardPage.module.css: la sección de
+   "Actividad reciente" de la página usa la misma clase; CSS Modules escopa
+   por archivo. */
+.adminSection { margin-bottom: 2.5rem; }
+
+.pendientesList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pendienteCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.15s;
+}
+
+.pendienteCard:hover { border-color: var(--primary); }
+.pendienteCard strong { font-size: 0.95rem; color: var(--secondary); }
+.pendienteCard p { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.2rem; }
+
+.pendienteActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .pendienteCard { flex-direction: column; align-items: flex-start; }
+}

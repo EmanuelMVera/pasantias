@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom';
 import { adminService } from '../../services/admin.service';
 import Modal from '../../components/Modal/Modal';
 import Paginacion from '../../components/Paginacion/Paginacion';
+import UsuarioFormModal from '../../components/UsuarioFormModal/UsuarioFormModal';
 import { usePaginacion } from '../../hooks/usePaginacion';
 import styles from './AdminUsuariosPage.module.css';
 
@@ -322,78 +323,16 @@ export default function AdminUsuariosPage() {
 
       {/* ── Modal Crear / Editar ─────────────────────────────────────── */}
       {(modal === 'crear' || modal === 'editar') && (
-        <Modal title={modal === 'crear' ? '+ Nuevo Usuario' : '✏️ Editar Usuario'} onClose={cerrarModal}>
-            <form onSubmit={modal === 'crear' ? handleCrear : handleEditar} className={styles.form}>
-              {formError && <p className="error-msg">{formError}</p>}
-
-              <div className={styles.formRow}>
-                <div className="form-group">
-                  <label htmlFor="u-nombre">Nombre *</label>
-                  <input id="u-nombre" name="nombre" value={form.nombre} onChange={handleChange} required />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="u-apellido">Apellido *</label>
-                  <input id="u-apellido" name="apellido" value={form.apellido} onChange={handleChange} required />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="u-email">Email *</label>
-                <input id="u-email" name="email" type="email" value={form.email} onChange={handleChange} required />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="u-password">{modal === 'crear' ? 'Contraseña *' : 'Nueva contraseña (dejar vacío para no cambiar)'}</label>
-                <input id="u-password" name="password" type="password" value={form.password} onChange={handleChange} required={modal === 'crear'} placeholder={modal === 'editar' ? '••••••••' : ''} />
-              </div>
-
-              <div className={styles.formRow}>
-                <div className="form-group">
-                  <label htmlFor="u-rol">Rol *</label>
-                  <select id="u-rol" name="rol" value={form.rol} onChange={handleChange} required>
-                    {ROLES.map((r) => <option key={r} value={r}>{ROL_BADGE[r]?.label ?? r}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label htmlFor="u-telefono">Teléfono</label>
-                  <input id="u-telefono" name="telefono" value={form.telefono} onChange={handleChange} placeholder="+54 11 1234-5678" />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="u-ubicacion">Ubicación</label>
-                <input id="u-ubicacion" name="ubicacion" value={form.ubicacion} onChange={handleChange} placeholder="Ciudad, Provincia" />
-              </div>
-
-              {(form.rol === 'alumno' || form.rol === 'egresado') && (
-                <div className="form-group">
-                  <label htmlFor="u-legajo">Legajo *</label>
-                  <input
-                    id="u-legajo"
-                    name="legajo"
-                    value={form.legajo}
-                    onChange={handleChange}
-                    required
-                    placeholder="Ej: 00457"
-                  />
-                </div>
-              )}
-
-              {modal === 'editar' && (
-                <label className={styles.checkboxLabel}>
-                  <input name="activo" type="checkbox" checked={form.activo} onChange={handleChange} />
-                  <span>Cuenta activa</span>
-                </label>
-              )}
-
-              <div className={styles.modalFooter}>
-                <button type="button" className="btn-secondary" onClick={cerrarModal}>Cancelar</button>
-                <button type="submit" className="btn-primary" disabled={formLoading}>
-                  {formLoading ? 'Guardando...' : (modal === 'crear' ? 'Crear Usuario' : 'Guardar Cambios')}
-                </button>
-              </div>
-            </form>
-        </Modal>
+        <UsuarioFormModal
+          modo={modal}
+          form={form}
+          onChange={handleChange}
+          onSubmit={modal === 'crear' ? handleCrear : handleEditar}
+          onClose={cerrarModal}
+          formError={formError}
+          formLoading={formLoading}
+          rolOptions={ROLES.map((r) => ({ value: r, label: ROL_BADGE[r]?.label ?? r }))}
+        />
       )}
 
       {/* ── Modal Confirmar Suspender / Reactivar ────────────────────── */}

@@ -18,6 +18,8 @@ import {
 import PageHeader from '../../components/ui/PageHeader';
 import StatCard from '../../components/ui/StatCard';
 import ExportMenu from '../../components/ui/ExportMenu';
+import ActividadFeed from '../../components/ActividadFeed/ActividadFeed';
+import PendingQueueSection from '../../components/PendingQueueSection/PendingQueueSection';
 import { descargarBlob, nombreDesdeContentDisposition } from '../../utils/csv';
 import styles from './AdminDashboardPage.module.css';
 
@@ -31,32 +33,6 @@ const PERIODOS = [
 const EMBUDO_COLORS = ['#0073AD', '#8e44ad', '#e67e22', '#27ae60'];
 const fmt = (n) => (n == null ? '—' : Number(n).toLocaleString('es-AR'));
 const fmtPct = (n) => (n == null ? '—' : `${Number(n).toLocaleString('es-AR')}%`);
-
-/** Feed de actividad reciente */
-function ActividadFeed({ actividad }) {
-  if (!actividad || actividad.length === 0) return (
-    <p className="msg">No hay actividad reciente registrada.</p>
-  );
-
-  return (
-    <div className={styles.actividadList}>
-      {actividad.slice(0, 10).map((item) => (
-        <div key={item.id ?? `${item.accion}-${item.createdAt}`} className={styles.actividadItem}>
-          <span className={styles.actividadIcon}>📌</span>
-          <div className={styles.actividadBody}>
-            <span>
-              {item.usuario ? `${item.usuario.nombre} ${item.usuario.apellido}` : 'Sistema'} — {item.accion?.replace(/_/g, ' ')}
-              {item.entidad ? ` (${item.entidad}${item.entidadId ? ` #${item.entidadId}` : ''})` : ''}
-            </span>
-            <span className={styles.actividadFecha}>
-              {item.createdAt ? new Date(item.createdAt).toLocaleString('es-AR') : ''}
-            </span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export default function AdminDashboardPage() {
   const [periodoDias, setPeriodoDias] = useState(30);
@@ -272,73 +248,49 @@ export default function AdminDashboardPage() {
       </section>
 
       {/* ── Solicitudes de empresa pendientes ──────────────────────────────── */}
-      <section className={styles.adminSection}>
-        <h2>Solicitudes de Empresa Pendientes ({empresasPendientes.length})</h2>
-        {empresasPendientes.length === 0 ? (
-          <p className="msg">No hay solicitudes pendientes. ✅</p>
-        ) : (
-          <div className={styles.pendientesList}>
-            {empresasPendientes.map((e) => (
-              <div key={e.id} className={styles.pendienteCard}>
-                <div>
-                  <strong>{e.razonSocial}</strong>
-                  <p>{e.email}{e.cuit ? ` — CUIT: ${e.cuit}` : ''}</p>
-                </div>
-                <div className={styles.pendienteActions}>
-                  <button className="btn-ok"     onClick={() => handleAprobarEmpresa(e.id)}>✓ Aprobar</button>
-                  <button className="btn-danger" onClick={() => handleRechazarEmpresa(e.id)}>✕ Rechazar</button>
-                </div>
-              </div>
-            ))}
-          </div>
+      <PendingQueueSection
+        title="Solicitudes de Empresa Pendientes"
+        items={empresasPendientes}
+        emptyMessage="No hay solicitudes pendientes. ✅"
+        renderItem={(e) => (
+          <>
+            <strong>{e.razonSocial}</strong>
+            <p>{e.email}{e.cuit ? ` — CUIT: ${e.cuit}` : ''}</p>
+          </>
         )}
-      </section>
+        onAprobar={handleAprobarEmpresa}
+        onRechazar={handleRechazarEmpresa}
+      />
 
       {/* ── Solicitudes de reclutadores pendientes ───────────────────────────── */}
-      <section className={styles.adminSection}>
-        <h2>Solicitudes de Reclutadores Pendientes ({reclutadoresPendientes.length})</h2>
-        {reclutadoresPendientes.length === 0 ? (
-          <p className="msg">No hay solicitudes de reclutadores pendientes. ✅</p>
-        ) : (
-          <div className={styles.pendientesList}>
-            {reclutadoresPendientes.map((r) => (
-              <div key={r.id} className={styles.pendienteCard}>
-                <div>
-                  <strong>{r.nombre} {r.apellido}</strong>
-                  <p>{r.email}{r.empresa ? ` — ${r.empresa.razonSocial}` : ''}</p>
-                </div>
-                <div className={styles.pendienteActions}>
-                  <button className="btn-ok"     onClick={() => handleAprobarReclutador(r.id)}>✓ Aprobar</button>
-                  <button className="btn-danger" onClick={() => handleRechazarReclutador(r.id)}>✕ Rechazar</button>
-                </div>
-              </div>
-            ))}
-          </div>
+      <PendingQueueSection
+        title="Solicitudes de Reclutadores Pendientes"
+        items={reclutadoresPendientes}
+        emptyMessage="No hay solicitudes de reclutadores pendientes. ✅"
+        renderItem={(r) => (
+          <>
+            <strong>{r.nombre} {r.apellido}</strong>
+            <p>{r.email}{r.empresa ? ` — ${r.empresa.razonSocial}` : ''}</p>
+          </>
         )}
-      </section>
+        onAprobar={handleAprobarReclutador}
+        onRechazar={handleRechazarReclutador}
+      />
 
       {/* ── Ofertas pendientes ─────────────────────────────────────────────── */}
-      <section className={styles.adminSection}>
-        <h2>Ofertas Pendientes de Moderación ({ofertasPendientes.length})</h2>
-        {ofertasPendientes.length === 0 ? (
-          <p className="msg">No hay ofertas pendientes. ✅</p>
-        ) : (
-          <div className={styles.pendientesList}>
-            {ofertasPendientes.map((o) => (
-              <div key={o.id} className={styles.pendienteCard}>
-                <div>
-                  <strong>{o.titulo}</strong>
-                  <p>{o.empresa?.razonSocial}</p>
-                </div>
-                <div className={styles.pendienteActions}>
-                  <button className="btn-ok"     onClick={() => handleModerarOferta(o.id, true)}>✓ Aprobar</button>
-                  <button className="btn-danger" onClick={() => handleModerarOferta(o.id, false)}>✕ Rechazar</button>
-                </div>
-              </div>
-            ))}
-          </div>
+      <PendingQueueSection
+        title="Ofertas Pendientes de Moderación"
+        items={ofertasPendientes}
+        emptyMessage="No hay ofertas pendientes. ✅"
+        renderItem={(o) => (
+          <>
+            <strong>{o.titulo}</strong>
+            <p>{o.empresa?.razonSocial}</p>
+          </>
         )}
-      </section>
+        onAprobar={(id) => handleModerarOferta(id, true)}
+        onRechazar={(id) => handleModerarOferta(id, false)}
+      />
     </div>
   );
 }

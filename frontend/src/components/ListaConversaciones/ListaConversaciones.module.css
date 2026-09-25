@@ -1,0 +1,108 @@
+/* ── Sidebar izquierdo ───────────────────────────────────────────────────── */
+.sidebar {
+  width: 320px;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--bg-card);
+  flex-shrink: 0;
+}
+
+.sidebarHeader {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebarHeader h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+/* Botón ✏️ en el header del sidebar */
+.nuevoChatBtn {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0.3rem 0.55rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  line-height: 1;
+}
+.nuevoChatBtn:hover {
+  background: rgba(255,255,255,0.28);
+  transform: scale(1.1);
+}
+
+.convList {
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ── Estados del sidebar ─────────────────────────────────────────────────── */
+.sidebarLoading, .sidebarEmpty, .sidebarError {
+  padding: 1.5rem 1.25rem;
+}
+
+.sidebarEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+  color: var(--text-muted);
+  padding: 3rem 1.25rem;
+}
+
+.sidebarEmpty span { font-size: 2rem; }
+.sidebarError { color: var(--danger); font-size: 0.88rem; }
+
+.skeletonConv {
+  height: 68px;
+  margin: 0.5rem 1rem;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, #e8edf2 25%, #f4f6f8 50%, #e8edf2 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Duplicado a propósito de ChatPage.module.css: el mismo botón también se usa
+   en los estados vacíos del panel derecho; CSS Modules escopa por archivo. */
+.nuevoChatBtnEmpty {
+  margin-top: 0.5rem;
+  padding: 0.55rem 1.2rem;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 99px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.nuevoChatBtnEmpty:hover {
+  background: var(--primary-dark, #005f8e);
+  transform: translateY(-1px);
+}
+
+/* ── Responsive (móvil) ──────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  /* En móvil, ocultar sidebar cuando hay conversación activa */
+  .sidebarHiddenMobile { display: none; }
+
+  /* Sidebar ocupa toda la pantalla en móvil */
+  .sidebar { width: 100%; min-width: unset; border-right: none; }
+}

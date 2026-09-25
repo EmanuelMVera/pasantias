@@ -1,6 +1,7 @@
 // @ts-check
 const path = require('path');
 const { execFileSync } = require('child_process');
+const { chromium } = require('@playwright/test');
 
 /**
  * global-setup.js — TEST-02 / CI-03.
@@ -27,18 +28,49 @@ const { execFileSync } = require('child_process');
  * teniendo la misma limitación de siempre (necesita que la base ya exista de
  * una corrida previa para que el webServer no falle); `npm run e2e` es la
  * forma soportada de correr la suite completa desde un Postgres vacío.
+ *
+ * CALENTAMIENTO: el front del e2e corre con `vite dev`, que compila los módulos
+ * bajo demanda y optimiza dependencias la primera vez que las ve (eso puede
+ * incluso recargar la página). Sin calentar, el PRIMER test de la suite paga
+ * todo eso dentro de su timeout de 30s y falla de forma intermitente aunque la
+ * app esté bien (pasa solo si se corre aislado con el servidor ya tibio). Como
+ * `globalSetup` corre con los webServer ya arriba, acá se visita /login una vez
+ * antes de empezar; la app no usa lazy(), así que esa carga trae todo el grafo.
  */
-module.exports = async () => {
+async function calentarFrontend(baseURL) {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    // Dos visitas: la primera puede disparar la optimización de dependencias de
+    // Vite (y con ella una recarga); la segunda ya sale del caché.
+    for (let i = 0; i < 2; i++) {
+      await page.goto(`${baseURL}/login`, { waitUntil: 'networkidle', timeout: 60_000 });
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
+module.exports = async (config) => {
   if (process.env.E2E_DB_PREPARED === 'true') {
     console.log('[global-setup] pasantias_db_e2e ya fue preparada por scripts/run-e2e.js — se omite la recreación.');
-    return;
+  } else {
+    // Credenciales de DB: localmente de backend/.env (dotenv dentro del script);
+    // en CI ya están en process.env (bloque env: del job).
+    execFileSync('node', ['scripts/seed-e2e.js'], {
+      cwd: path.join(__dirname, '..', 'backend'),
+      stdio: 'inherit',
+      env: { ...process.env, NODE_ENV: 'test', DB_NAME: 'pasantias_db_e2e' },
+    });
   }
 
-  // Credenciales de DB: localmente de backend/.env (dotenv dentro del script);
-  // en CI ya están en process.env (bloque env: del job).
-  execFileSync('node', ['scripts/seed-e2e.js'], {
-    cwd: path.join(__dirname, '..', 'backend'),
-    stdio: 'inherit',
-    env: { ...process.env, NODE_ENV: 'test', DB_NAME: 'pasantias_db_e2e' },
-  });
+  const baseURL = config.projects[0]?.use?.baseURL ?? 'http://localhost:5173';
+  try {
+    await calentarFrontend(baseURL);
+    console.log('[global-setup] frontend calentado (/login cargado).');
+  } catch (err) {
+    // Best-effort: si el calentamiento falla no se aborta la suite, solo pierde
+    // el beneficio (el primer test vuelve a poder ser lento).
+    console.warn(`[global-setup] no se pudo calentar el frontend: ${err.message}`);
+  }
 };

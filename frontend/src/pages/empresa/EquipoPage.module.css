@@ -48,123 +48,12 @@
   gap: 0.75rem;
 }
 
-/* ── Tarjeta de miembro ─────────────────────────────────────────────────────── */
-.miembroCard {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1rem 1.25rem;
-  box-shadow: var(--shadow-card);
-  transition: box-shadow 0.2s, border-color 0.2s;
-}
-
-.miembroCard:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-  border-color: var(--primary-light, #a5b4fc);
-}
-
-.miembroInactivo {
-  opacity: 0.55;
-  filter: grayscale(0.4);
-}
-
-/* ── Avatar ─────────────────────────────────────────────────────────────────── */
-/* ── Info del miembro ───────────────────────────────────────────────────────── */
-.cardInfo {
-  flex: 1;
-  min-width: 0;
-}
-
-.cardNombre {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  font-size: 0.95rem;
-}
-
-.cardEmail {
-  display: block;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  margin-top: 0.1rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cardMeta {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 0.4rem;
-  flex-wrap: wrap;
-}
-
 .rolBadge {
   font-size: 0.75rem;
   font-weight: 700;
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
 }
-
-.cardFecha {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-}
-
-.propietarioBadge {
-  font-size: 0.7rem;
-  font-weight: 700;
-  background: #7c3aed20;
-  color: #7c3aed;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-}
-
-.suspendidoBadge {
-  font-size: 0.7rem;
-  font-weight: 700;
-  background: #dc262620;
-  color: #dc2626;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-}
-
-/* ── Acciones de la tarjeta ─────────────────────────────────────────────────── */
-.cardAcciones {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.btnAccion {
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.35rem 0.7rem;
-  border-radius: var(--radius);
-  border: 1.5px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.btnAccion:hover { background: var(--bg-card); border-color: var(--primary); }
-
-.btnWarning  { border-color: #d97706; color: #d97706; }
-.btnWarning:hover  { background: #fef3c720; }
-
-.btnOk { border-color: #16a34a; color: #16a34a; }
-.btnOk:hover { background: #dcfce720; }
-
-.btnDanger { border-color: #dc2626; color: #dc2626; }
-.btnDanger:hover { background: #fef2f220; }
 
 /* ── Skeleton ───────────────────────────────────────────────────────────────── */
 .skeletonList {
@@ -204,138 +93,10 @@
 
 .emptyState span { font-size: 2.8rem; }
 
-/* ── Modal (contenido; el chrome overlay/panel/header vive en components/Modal) ── */
-.modalForm {
-  padding: 1.25rem 1.5rem 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-
-.modalActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.6rem;
-  margin-top: 0.25rem;
-}
-
-/* ── Celdas de la tabla de solicitudes ───────────────────────────────────── */
-.cellMuted {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  word-break: break-word;
-}
-
-.cellFecha {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.estadoPill {
-  padding: 3px 10px;
-  border-radius: 99px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
 .subtitulo {
   color: var(--text-muted);
   margin-top: 0.25rem;
   font-size: 0.9rem;
-}
-
-/* ── Modal de confirmación (suspender / quitar / recuperación) ─────────────── */
-.confirmHead {
-  text-align: center;
-  padding: 1.5rem 1.5rem 0;
-}
-
-.confirmIcon {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  margin: 0 auto 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.8rem;
-}
-
-.confirmName {
-  font-weight: 600;
-  font-size: 1rem;
-  margin-bottom: 0.25rem;
-}
-
-.confirmEmail {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  margin-bottom: 1rem;
-  word-break: break-word;
-}
-
-.confirmNota {
-  margin: 0 1.5rem 1.5rem;
-  padding: 0.9rem 1rem;
-  border-radius: 8px;
-  font-size: 0.88rem;
-}
-
-.nota_warn    { background: #fff7ed; border: 1px solid #fed7aa; color: #92400e; }
-.nota_success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
-.nota_info    { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
-
-.confirmActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.6rem;
-  padding: 0 1.5rem 1.5rem;
-  flex-wrap: wrap;
-}
-
-.confirmBtn {
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 0.6rem 1.4rem;
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-
-.confirmBtn_danger  { background: #dc2626; }
-.confirmBtn_success { background: #16a34a; }
-.confirmBtn_info    { background: #2563eb; }
-
-/* ── Campos del formulario ──────────────────────────────────────────────────── */
-.fieldGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.fieldGroup label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.fieldGroup input,
-.fieldGroup select {
-  padding: 0.6rem 0.85rem;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 0.9rem;
-  background: var(--bg);
-  color: var(--text);
-  transition: border-color 0.15s;
-}
-.fieldGroup input:focus,
-.fieldGroup select:focus {
-  outline: none;
-  border-color: var(--primary);
 }
 
 .fieldHint {
@@ -372,39 +133,7 @@
 }
 .togglePwd:hover { background: var(--bg-card); }
 
-/* ── Selector de rol tipo radio ─────────────────────────────────────────────── */
-.rolRadioGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.rolRadio {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-
-.rolRadio input[type="radio"] { margin-top: 0.15rem; cursor: pointer; }
-.rolRadio input[type="radio"]:focus { outline: none; }
-
-.rolRadio > div {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.rolRadio strong { font-size: 0.9rem; font-weight: 700; }
-.rolRadio span   { font-size: 0.78rem; color: var(--text-muted); }
-
-.rolRadioActive { transition: all 0.15s; }
-
-/* ── Botones del modal ──────────────────────────────────────────────────────── */
+/* ── Botones ────────────────────────────────────────────────────────────────── */
 .btnPrimary {
   background: var(--primary);
   color: #fff;
@@ -418,19 +147,6 @@
 }
 .btnPrimary:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
 .btnPrimary:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.btnSecondary {
-  background: transparent;
-  color: var(--text);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.6rem 1.1rem;
-  font-size: 0.88rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.btnSecondary:hover { background: var(--bg); }
 
 /* ── Toast ──────────────────────────────────────────────────────────────────── */
 .toast {
@@ -462,8 +178,6 @@
 
 /* ── Responsive ─────────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .miembroCard { flex-wrap: wrap; }
-  .cardAcciones { width: 100%; justify-content: flex-end; }
   .fieldRow { grid-template-columns: 1fr; }
   .statsRow { gap: 0.5rem; }
   .modal { max-width: 100%; margin: 0.5rem; }
@@ -484,27 +198,6 @@
   color: #713f12;
 }
 
-/* ── Info box en modal ───────────────────────────────────────────────────────── */
-.infoBox {
-  display: flex;
-  gap: 0.6rem;
-  align-items: flex-start;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: var(--radius);
-  padding: 0.75rem 1rem;
-  font-size: 0.82rem;
-  color: #1e40af;
-  line-height: 1.5;
-}
-
-/* ── Tabla de solicitudes ────────────────────────────────────────────────────── */
-.tablaWrap {
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
 /* ── Rol fijo display ────────────────────────────────────────────────────────── */
 .rolFijo {
   display: flex;
@@ -512,4 +205,3 @@
   gap: 0.75rem;
   flex-wrap: wrap;
 }
-

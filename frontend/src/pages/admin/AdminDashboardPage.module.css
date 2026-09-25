@@ -90,75 +90,10 @@
   letter-spacing: 0.6px;
 }
 
-/* ── Actividad reciente ───────────────────────────────────────────────────── */
-.actividadList {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.actividadItem {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.7rem 1rem;
-  font-size: 0.88rem;
-  transition: border-color 0.15s;
-}
-
-.actividadItem:hover { border-color: var(--primary); }
-
-.actividadIcon { font-size: 1.1rem; flex-shrink: 0; }
-
-.actividadBody {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  flex: 1;
-}
-
-.actividadFecha {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-}
-
-/* ── Secciones Admin ─────────────────────────────────────────────────────── */
+/* ── Sección "Actividad reciente" ─────────────────────────────────────────── */
 .adminSection { margin-bottom: 2.5rem; }
-
-.pendientesList {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.pendienteCard {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1rem 1.5rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  box-shadow: var(--shadow-card);
-  transition: border-color 0.15s;
-}
-
-.pendienteCard:hover { border-color: var(--primary); }
-.pendienteCard strong { font-size: 0.95rem; color: var(--secondary); }
-.pendienteCard p { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.2rem; }
-
-.pendienteActions {
-  display: flex;
-  gap: 0.5rem;
-  flex-shrink: 0;
-}
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .statsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pendienteCard { flex-direction: column; align-items: flex-start; }
 }

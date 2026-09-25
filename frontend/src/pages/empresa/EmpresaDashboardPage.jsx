@@ -16,47 +16,11 @@ import { ofertaService } from '../../services/oferta.service';
 import { useEmpresa } from '../../hooks/useEmpresa';
 import { useAuth } from '../../hooks/useAuth';
 import Paginacion from '../../components/Paginacion/Paginacion';
+import MetricasGrid from '../../components/MetricasGrid/MetricasGrid';
+import OfertaAcciones from '../../components/OfertaAcciones/OfertaAcciones';
 import Toast from '../../components/ui/Toast';
 import { useToast } from '../../hooks/useToast';
 import styles from './EmpresaDashboardPage.module.css';
-
-/**
- * Configuración de tarjetas de métricas.
- * action: función que recibe { navigate, setFiltroOferta, tablaRef } y define la acción al hacer click.
- */
-const METRIC_CARDS = [
-  {
-    key: 'ofertasActivas',  label: 'Ofertas Activas',   icon: '📢', color: 'var(--success)',
-    action: ({ setFiltroOferta, tablaRef }) => { setFiltroOferta('activa'); tablaRef.current?.scrollIntoView({ behavior: 'smooth' }); },
-  },
-  {
-    key: 'ofertasCerradas', label: 'Ofertas Cerradas',  icon: '🔒', color: 'var(--text-muted)',
-    action: ({ setFiltroOferta, tablaRef }) => { setFiltroOferta('cerrada'); tablaRef.current?.scrollIntoView({ behavior: 'smooth' }); },
-  },
-  {
-    key: 'postulaciones',   label: 'Postulaciones',     icon: '📋', color: 'var(--primary)',
-    action: ({ navigate }) => navigate('/empresa/candidatos'),
-  },
-  {
-    key: 'entrevistas',     label: 'Entrevistas',       icon: '🗓️', color: '#8e44ad',
-    action: ({ navigate }) => navigate('/empresa/candidatos?estado=entrevista'),
-  },
-  {
-    key: 'contrataciones',  label: 'Contrataciones',    icon: '🤝', color: '#16a085',
-    action: ({ navigate }) => navigate('/empresa/candidatos?estado=contratado'),
-  },
-  {
-    key: 'miembrosEquipo',  label: 'Miembros del equipo', icon: '👥', color: 'var(--secondary)',
-    action: ({ navigate }) => navigate('/empresa/equipo'),
-  },
-];
-
-// Orden de tarjetas para el reclutador: lo operativo (candidatos/entrevistas/
-// ofertas) primero — lo estratégico (equipo) al final. Ninguna tarjeta se
-// oculta (ambos roles tienen acceso legítimo a todos estos datos), solo
-// cambia el orden de lectura. admin_empresa mantiene el orden por defecto
-// (empresa/equipo primero).
-const ORDEN_RECLUTADOR = ['postulaciones', 'entrevistas', 'contrataciones', 'ofertasActivas', 'ofertasCerradas', 'miembrosEquipo'];
 
 /* Colores/labels de badge por estado de ciclo de vida de la oferta */
 const ESTADO_COLOR = {
@@ -160,10 +124,6 @@ export default function EmpresaDashboardPage() {
   useEffect(() => { cargarMetricas(); }, [cargarMetricas]);
   useEffect(() => { cargarOfertas(filtroOferta, 1); }, [filtroOferta, cargarOfertas]);
 
-  const cards = esReclutador
-    ? ORDEN_RECLUTADOR.map((k) => METRIC_CARDS.find((c) => c.key === k))
-    : METRIC_CARDS;
-
   /* Cambia estado de una oferta (pausar / activar / cerrar) */
   const handleCambiarEstado = async (id, estado) => {
     setGuardando(id);
@@ -222,52 +182,15 @@ export default function EmpresaDashboardPage() {
     </Link>
   );
 
-  const renderAcciones = (o) => {
-    const editarBtn = puedeEditarContenido(o) && (
-      <Link to={`/empresa/ofertas/${o.id}/editar`} className="btn-small" aria-label={`Editar la oferta "${o.titulo}"`}>
-        ✏️ Editar
-      </Link>
-    );
-
-    if (guardando === o.id) {
-      return <>{editarBtn}<span className={styles.guardandoSpan}>Guardando...</span></>;
-    }
-    if (!puedeGestionarEstado(o)) {
-      return (
-        <>
-          {editarBtn}
-          <span className={styles.estadoNota} title="Solo el reclutador responsable puede modificar el estado de esta oferta.">
-            Solo el responsable
-          </span>
-        </>
-      );
-    }
-    if (o.estado === 'activa') {
-      return (
-        <>
-          {editarBtn}
-          <button className="btn-warn" onClick={() => handleCambiarEstado(o.id, 'pausada')} aria-label={`Pausar la oferta "${o.titulo}"`}>
-            Pausar
-          </button>
-          <button className="btn-danger" onClick={() => handleCambiarEstado(o.id, 'cerrada')} aria-label={`Cerrar la oferta "${o.titulo}"`}>
-            Cerrar
-          </button>
-        </>
-      );
-    }
-    if (o.estado === 'pausada') {
-      return (
-        <>
-          {editarBtn}
-          <button className="btn-ok" onClick={() => handleCambiarEstado(o.id, 'activa')} aria-label={`Activar la oferta "${o.titulo}"`}>
-            Activar
-          </button>
-        </>
-      );
-    }
-    // cerrada
-    return <>{editarBtn}<span className={styles.estadoNota}>—</span></>;
-  };
+  const renderAcciones = (o) => (
+    <OfertaAcciones
+      oferta={o}
+      guardando={guardando === o.id}
+      puedeEditar={puedeEditarContenido(o)}
+      puedeGestionar={puedeGestionarEstado(o)}
+      onCambiarEstado={handleCambiarEstado}
+    />
+  );
 
   return (
     <div className="page-container">
@@ -295,27 +218,12 @@ export default function EmpresaDashboardPage() {
       {error && <p className={`error-msg ${styles.errorGlobal}`}>⚠️ {error}</p>}
 
       {/* ── Tarjetas de métricas ──────────────────────────────────────────── */}
-      {loading ? (
-        <div className={styles.skeletonGrid}>
-          {cards.map((c) => <div key={c.key} className={styles.skeletonCard} />)}
-        </div>
-      ) : (
-        <div className={styles.metricsGrid}>
-          {cards.map(({ key, label, icon, color, action }) => (
-            <button
-              key={key}
-              className={`${styles.metricCard} ${styles.metricCardBtn}`}
-              style={{ '--card-color': color }}
-              onClick={() => action({ navigate, setFiltroOferta, tablaRef })}
-              title={`Ver ${label.toLowerCase()}`}
-            >
-              <span className={styles.metricIcon}>{icon}</span>
-              <span className={styles.metricValue}>{metricas?.[key] ?? '—'}</span>
-              <span className={styles.metricLabel}>{label}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      <MetricasGrid
+        loading={loading}
+        metricas={metricas}
+        esReclutador={esReclutador}
+        onSelect={(action) => action({ navigate, setFiltroOferta, tablaRef })}
+      />
 
       {/* ── Tabla de ofertas propias ──────────────────────────────────────── */}
       <div className={`dashboard-header ${styles.subHeader}`} ref={tablaRef}>

@@ -1,0 +1,51 @@
+/* Encabezado de la conversación abierta */
+.chatHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.backBtn {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+  color: var(--primary);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  transition: background 0.15s;
+  font-family: var(--font-primary);
+  display: none; /* Solo visible en móvil */
+}
+
+.chatHeaderInfo strong { display: block; font-size: 0.92rem; color: var(--secondary); }
+.chatHeaderInfo span   { font-size: 0.8rem; color: var(--text-muted); }
+
+/* ── Botón "Ver perfil" (header del chat) ────────────────────────────────── */
+.verPerfilBtn {
+  margin-left: auto;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.verPerfilBtn:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ── Responsive (móvil) ──────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  /* Mostrar botón de volver en móvil */
+  .backBtn { display: flex; }
+}

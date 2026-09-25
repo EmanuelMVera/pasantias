@@ -1,0 +1,77 @@
+/* ── Modal de confirmación (suspender / quitar / recuperación) ─────────────── */
+.confirmHead {
+  text-align: center;
+  padding: 1.5rem 1.5rem 0;
+}
+
+.confirmIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  margin: 0 auto 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+}
+
+.confirmName {
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.confirmEmail {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+  word-break: break-word;
+}
+
+.confirmNota {
+  margin: 0 1.5rem 1.5rem;
+  padding: 0.9rem 1rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+
+.nota_warn    { background: #fff7ed; border: 1px solid #fed7aa; color: #92400e; }
+.nota_success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+.nota_info    { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+
+.confirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding: 0 1.5rem 1.5rem;
+  flex-wrap: wrap;
+}
+
+.confirmBtn {
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.4rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.confirmBtn_danger  { background: #dc2626; }
+.confirmBtn_success { background: #16a34a; }
+.confirmBtn_info    { background: #2563eb; }
+
+/* Duplicado a propósito de los CSS de los otros modales de equipo: CSS Modules
+   escopa por archivo. */
+.btnSecondary {
+  background: transparent;
+  color: var(--text);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 1.1rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btnSecondary:hover { background: var(--bg); }

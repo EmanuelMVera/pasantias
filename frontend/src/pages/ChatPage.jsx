@@ -17,221 +17,31 @@
  *  GET    /api/chat/:usuarioId         → historial con un usuario
  *  POST   /api/chat                    → enviar { receptorId, mensaje }
  *  PATCH  /api/chat/:usuarioId/leer    → marcar conversación como leída
+ *
+ * La carga/polling/paginación/envío de la conversación activa vive en
+ * hooks/useConversacion.js; esta página coordina la lista, el interlocutor
+ * activo y la navegación.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useConversacion } from '../hooks/useConversacion';
 import { mensajeService } from '../services/chat.service';
-import Avatar from '../components/Avatar/Avatar';
-import Modal from '../components/Modal/Modal';
+import ListaConversaciones from '../components/ListaConversaciones/ListaConversaciones';
+import ChatHeader from '../components/ChatHeader/ChatHeader';
+import BurbujaMensaje from '../components/BurbujaMensaje/BurbujaMensaje';
+import Composer from '../components/Composer/Composer';
+import NuevoChatModal from '../components/NuevoChatModal/NuevoChatModal';
 import Toast from '../components/ui/Toast';
 import { useToast } from '../hooks/useToast';
 import styles from './ChatPage.module.css';
-
-const POLL_INTERVAL = 10_000; // ms
-
-/** Formatea hora para mostrar en burbuja de mensaje */
-function formatHora(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-}
 
 /** Formatea fecha para separadores de día */
 function formatFecha(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   return d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
-}
-
-/** Etiqueta de rol para el modal de búsqueda */
-const ROL_LABEL = {
-  alumno:   '🎓 Alumno',
-  egresado: '🏅 Egresado',
-  empresa:  '🏢 Empresa',
-  admin:    '⚙️ Admin',
-};
-
-/**
- * Identidad a mostrar para un interlocutor de chat, coherente con Navbar.jsx:
- * admin_empresa → identidad institucional (razón social primero); reclutador
- * → persona, con la empresa como contexto secundario; el resto, su nombre.
- */
-function displayNombre(usuario) {
-  const nombre = `${usuario?.nombre ?? ''} ${usuario?.apellido ?? ''}`.trim() || 'Usuario';
-  if (usuario?.rolInterno === 'admin_empresa' && usuario?.razonSocial) return usuario.razonSocial;
-  if (usuario?.razonSocial) return `${nombre} — ${usuario.razonSocial}`;
-  return nombre;
-}
-
-/** src/nombre/apellido para el Avatar, con el mismo criterio institucional. */
-function displayAvatarProps(usuario) {
-  if (usuario?.rolInterno === 'admin_empresa') {
-    return { src: usuario?.logo || null, nombre: usuario?.razonSocial || usuario?.nombre, apellido: '' };
-  }
-  return { src: usuario?.fotoPerfil, nombre: usuario?.nombre, apellido: usuario?.apellido };
-}
-
-/**
- * Card de conversación en el panel lateral.
- * El backend devuelve: { usuario: {id, nombre, apellido, ...}, ultimoMensaje: {...}, noLeidos: N }
- */
-function ConversacionItem({ conv, activo, onClick }) {
-  const noLeidos = conv.noLeidos ?? 0;
-  return (
-    <div
-      className={`${styles.convItem} ${activo ? styles.convActivo : ''}`}
-      onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onClick()}
-    >
-      <Avatar
-        {...displayAvatarProps(conv.usuario)}
-        size={36}
-        color={activo ? '#fff' : 'var(--primary)'}
-        style={{ fontWeight: 800, fontSize: 36 * 0.38 }}
-      />
-      <div className={styles.convInfo}>
-        <div className={styles.convNombreRow}>
-          <strong className={styles.convNombre}>
-            {displayNombre(conv.usuario)}
-          </strong>
-          <span className={styles.convHora}>
-            {formatHora(conv.ultimoMensaje?.createdAt)}
-          </span>
-        </div>
-        <div className={styles.convPreviewRow}>
-          <span className={styles.convPreview}>
-            {conv.ultimoMensaje?.mensaje ?? 'Sin mensajes'}
-          </span>
-          {noLeidos > 0 && (
-            <span className={styles.convBadge}>{noLeidos}</span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Burbuja de mensaje individual */
-function BurbujaMensaje({ mensaje, esMio }) {
-  return (
-    <div className={`${styles.burbujaWrap} ${esMio ? styles.burbujaWrapMia : ''}`}>
-      {!esMio && (
-        <Avatar
-          nombre={mensaje.emisor?.nombre}
-          apellido={mensaje.emisor?.apellido}
-          src={mensaje.emisor?.fotoPerfil}
-          size={30}
-          style={{ fontWeight: 800, fontSize: 30 * 0.38 }}
-        />
-      )}
-      <div className={`${styles.burbuja} ${esMio ? styles.burbujaMia : styles.burbujaSuya}`}>
-        <p>{mensaje.mensaje ?? mensaje.contenido}</p>
-        <span className={styles.burbujaHora}>
-          {formatHora(mensaje.createdAt)}
-          {esMio && (
-            <span className={styles.burbujaLeido} title={mensaje.leido ? 'Leído' : 'Enviado'}>
-              {mensaje.leido ? ' ✓✓' : ' ✓'}
-            </span>
-          )}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Modal para iniciar un nuevo chat buscando un usuario.
- */
-function NuevoChatModal({ onClose, onSeleccionar }) {
-  const [query,       setQuery]       = useState('');
-  const [resultados,  setResultados]  = useState([]);
-  const [buscando,    setBuscando]    = useState(false);
-  const [sinResultados, setSinResultados] = useState(false);
-  const inputRef = useRef(null);
-  const debounceRef = useRef(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  const buscar = (texto) => {
-    setQuery(texto);
-    setSinResultados(false);
-    clearTimeout(debounceRef.current);
-
-    if (texto.trim().length < 2) {
-      setResultados([]);
-      return;
-    }
-
-    debounceRef.current = setTimeout(async () => {
-      setBuscando(true);
-      try {
-        const { data } = await mensajeService.buscarUsuarios(texto.trim());
-        const lista = data.data ?? [];
-        setResultados(lista);
-        setSinResultados(lista.length === 0);
-      } catch {
-        setResultados([]);
-      } finally {
-        setBuscando(false);
-      }
-    }, 300);
-  };
-
-  return (
-    <Modal
-      title="✏️ Nuevo mensaje"
-      onClose={onClose}
-      style={{ display: 'flex', flexDirection: 'column', maxHeight: '80vh', overflow: 'hidden' }}
-    >
-
-        <div className={styles.modalSearch}>
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder="Buscar por nombre, apellido o email..."
-            value={query}
-            onChange={(e) => buscar(e.target.value)}
-            className={styles.modalInput}
-          />
-        </div>
-
-        <div className={styles.modalResultados}>
-          {buscando ? (
-            <p className={styles.modalEstado}>Buscando...</p>
-          ) : sinResultados ? (
-            <p className={styles.modalEstado}>No se encontraron usuarios con "{query}".</p>
-          ) : resultados.length === 0 && query.length >= 2 ? (
-            <p className={styles.modalEstado}>Ingresá un nombre, apellido o email.</p>
-          ) : query.length < 2 ? (
-            <p className={styles.modalEstado}>Escribí al menos 2 caracteres para buscar.</p>
-          ) : null}
-
-          {resultados.map((u) => (
-            <div
-              key={u.id}
-              className={styles.modalResultadoItem}
-              onClick={() => onSeleccionar(u)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && onSeleccionar(u)}
-            >
-              <Avatar {...displayAvatarProps(u)} size={40} />
-              <div className={styles.modalResultadoInfo}>
-                <strong>{displayNombre(u)}</strong>
-                <span>{u.email}</span>
-                <span className={styles.modalRolBadge}>{ROL_LABEL[u.rol] ?? u.rol}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-    </Modal>
-  );
 }
 
 /* ── Componente principal ──────────────────────────────────────────────────── */
@@ -247,41 +57,15 @@ export default function ChatPage() {
   // partnerInfo: datos del interlocutor activo, poblado desde getHistorial.
   // Cubre el caso en que no hay conversación previa (convActivaObj undefined).
   const [partnerInfo,     setPartnerInfo]     = useState(null);
-  const [mensajes,        setMensajes]        = useState([]);
-  const [nuevoMensaje,    setNuevoMensaje]    = useState('');
   const [loadingConvs,    setLoadingConvs]    = useState(true);
-  const [loadingMensajes, setLoadingMensajes] = useState(false);
-  const [loadingViejos,   setLoadingViejos]   = useState(false);
-  const [pagHist,         setPagHist]         = useState(null); // { page, limit, total, totalPages }
-  const [enviando,        setEnviando]        = useState(false);
   const [errorConvs,      setErrorConvs]      = useState('');
   const [modalAbierto,    setModalAbierto]    = useState(false);
-  const [soloLectura,       setSoloLectura]       = useState(false);
-  const [motivoSoloLectura, setMotivoSoloLectura] = useState('');
-  const [errorConv,         setErrorConv]         = useState(''); // 403 al abrir/pollear la conversación activa
   const { toast, showToast } = useToast();
 
-  const mensajesEndRef = useRef(null);
-  const mensajesAreaRef = useRef(null);
-  const inputRef       = useRef(null);
-  const pollRef        = useRef(null);
-
-  /* Une dos listas de mensajes por id, en orden cronológico. */
-  const mergeMensajes = useCallback((a, b) => {
-    const map = new Map();
-    for (const m of a) map.set(m.id, m);
-    for (const m of b) map.set(m.id, m);
-    return [...map.values()].sort(
-      (x, y) => new Date(x.createdAt) - new Date(y.createdAt) || x.id - y.id
-    );
-  }, []);
-
-  /* ── Scroll al último mensaje ──────────────────────────────────────────── */
-  const scrollBottom = useCallback(() => {
-    mensajesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
-
   useEffect(() => {
+    // Comportamiento previo intencional: al cambiar :usuarioId se recarga la
+    // lista y se vuelve a mostrar el skeleton.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingConvs(true);
     mensajeService
       .getConversaciones()
@@ -296,121 +80,23 @@ export default function ChatPage() {
       .finally(() => setLoadingConvs(false));
   }, [usuarioIdParam]);
 
-  /* ── Cargar mensajes cuando cambia la conversación activa ──────────────── */
-  useEffect(() => {
-    if (!convActivaId) return;
+  const {
+    mensajes, setMensajes,
+    nuevoMensaje, setNuevoMensaje,
+    loadingMensajes, loadingViejos, enviando,
+    soloLectura, motivoSoloLectura, errorConv,
+    mensajesEndRef, mensajesAreaRef, inputRef,
+    handleScrollMensajes, handleEnviar,
+  } = useConversacion({ convActivaId, setConversaciones, setPartnerInfo, showToast });
 
-    // Trae la página 1 (mensajes más nuevos) y la fusiona con lo ya cargado
-    // (así el poller de 10s no borra las páginas viejas traídas por scroll).
-    const cargarNuevos = async ({ inicial = false } = {}) => {
-      if (inicial) setLoadingMensajes(true);
-      try {
-        const { data } = await mensajeService.getMensajes(convActivaId, { page: 1 });
-        const lista = data.data ?? data ?? [];
-        setMensajes((prev) => (inicial ? lista : mergeMensajes(prev, lista)));
-        // El poller trae la página 1: actualiza total/totalPages pero NO pisa
-        // el "hasta qué página vieja llegó" el usuario con scroll.
-        setPagHist((prev) => {
-          if (!data.pagination) return prev;
-          if (!prev || inicial) return data.pagination;
-          return { ...data.pagination, page: Math.max(prev.page, data.pagination.page) };
-        });
-        if (data.usuario) setPartnerInfo(data.usuario);
-        setSoloLectura(!!data.soloLectura);
-        setMotivoSoloLectura(data.motivoSoloLectura || '');
-        setErrorConv('');
-        mensajeService.marcarLeida(convActivaId).catch(() => {});
-        setConversaciones((prev) =>
-          prev.map((c) => (c.usuario?.id === convActivaId ? { ...c, noLeidos: 0 } : c))
-        );
-      } catch (err) {
-        if (err.response?.status === 403) {
-          setErrorConv(err.response?.data?.message || 'No tenés acceso a esta conversación.');
-          clearInterval(pollRef.current); // la relación no es válida: no tiene sentido seguir pollendo
-        }
-        // otros errores: fallo silencioso, no interrumpe el polling
-      } finally {
-        if (inicial) setLoadingMensajes(false);
-      }
-    };
+  /* ── Volver a la lista (sin conversación activa) ───────────────────────── */
+  const volverALista = () => { setConvActivaId(null); navigate('/chat', { replace: true }); };
 
+  /* ── Seleccionar una conversación existente de la lista ────────────────── */
+  const handleSeleccionarConversacion = (partnerId) => {
+    setConvActivaId(partnerId);
     setMensajes([]);
-    setPagHist(null);
-    setSoloLectura(false);
-    setMotivoSoloLectura('');
-    setErrorConv('');
-    cargarNuevos({ inicial: true }).then(scrollBottom);
-
-    clearInterval(pollRef.current);
-    pollRef.current = setInterval(() => cargarNuevos(), POLL_INTERVAL);
-    return () => clearInterval(pollRef.current);
-  }, [convActivaId, scrollBottom, mergeMensajes]);
-
-  /* ── Cargar mensajes ANTIGUOS al scrollear hacia arriba ───────────────── */
-  const cargarViejos = useCallback(async () => {
-    if (loadingViejos || !pagHist || pagHist.page >= pagHist.totalPages) return;
-    setLoadingViejos(true);
-    const area = mensajesAreaRef.current;
-    const alturaPrevia = area?.scrollHeight ?? 0;
-    try {
-      const paginaVieja = pagHist.page + 1;
-      const { data } = await mensajeService.getMensajes(convActivaId, { page: paginaVieja });
-      const viejos = data.data ?? [];
-      setMensajes((prev) => mergeMensajes(viejos, prev));
-      setPagHist((prev) => ({ ...(data.pagination ?? prev), page: paginaVieja }));
-      // Preservar la posición de scroll: el contenido creció hacia arriba.
-      requestAnimationFrame(() => {
-        if (area) area.scrollTop = area.scrollHeight - alturaPrevia;
-      });
-    } catch {
-      // silencioso
-    } finally {
-      setLoadingViejos(false);
-    }
-  }, [convActivaId, pagHist, loadingViejos, mergeMensajes]);
-
-  const handleScrollMensajes = (e) => {
-    if (e.target.scrollTop < 80) cargarViejos();
-  };
-
-  // Auto-scroll al fondo solo cuando llegan mensajes nuevos (no al cargar viejos).
-  useEffect(() => { if (!loadingViejos) scrollBottom(); }, [mensajes, loadingViejos, scrollBottom]);
-
-  /* ── Enviar mensaje ────────────────────────────────────────────────────── */
-  const handleEnviar = async (e) => {
-    e.preventDefault();
-    const texto = nuevoMensaje.trim();
-    if (!texto || !convActivaId || enviando) return;
-
-    setEnviando(true);
-    setNuevoMensaje('');
-    try {
-      const { data } = await mensajeService.enviar({
-        receptorId: convActivaId,
-        mensaje: texto,
-      });
-      const nuevo = data.data ?? data;
-      setMensajes((prev) => [...prev, nuevo]);
-      // Actualizar el último mensaje en la lista de conversaciones
-      setConversaciones((prev) =>
-        prev.map((c) =>
-          c.usuario?.id === convActivaId ? { ...c, ultimoMensaje: nuevo } : c
-        )
-      );
-    } catch (err) {
-      setNuevoMensaje(texto);
-      const msg = err.response?.data?.message || 'No se pudo enviar el mensaje. Intentá de nuevo.';
-      showToast(msg, 'error');
-      if (err.response?.status === 403) {
-        // La relación pasó a solo lectura (o se bloqueó) entre la apertura
-        // del chat y el envío — reflejarlo sin esperar al próximo poll.
-        setSoloLectura(true);
-        setMotivoSoloLectura(msg);
-      }
-    } finally {
-      setEnviando(false);
-      inputRef.current?.focus();
-    }
+    navigate(`/chat/${partnerId}`, { replace: true });
   };
 
   /* ── Seleccionar usuario desde el modal de nuevo chat ──────────────────── */
@@ -456,56 +142,14 @@ export default function ChatPage() {
 
       <div className={styles.chatLayout}>
         {/* ── Panel izquierdo: lista de conversaciones ──────────────────── */}
-        <aside className={`${styles.sidebar} ${convActivaId ? styles.sidebarHiddenMobile : ''}`}>
-          <div className={styles.sidebarHeader}>
-            <h2>💬 Mensajes</h2>
-            <button
-              className={styles.nuevoChatBtn}
-              onClick={() => setModalAbierto(true)}
-              title="Nuevo mensaje"
-              aria-label="Iniciar nueva conversación"
-            >
-              ✏️
-            </button>
-          </div>
-
-          {loadingConvs ? (
-            <div className={styles.sidebarLoading}>
-              {[1, 2, 3].map((i) => <div key={i} className={styles.skeletonConv} />)}
-            </div>
-          ) : errorConvs ? (
-            <p className={styles.sidebarError}>{errorConvs}</p>
-          ) : conversaciones.length === 0 ? (
-            <div className={styles.sidebarEmpty}>
-              <span>✉️</span>
-              <p>No tenés conversaciones aún.</p>
-              <button
-                className={styles.nuevoChatBtnEmpty}
-                onClick={() => setModalAbierto(true)}
-              >
-                Iniciar una conversación
-              </button>
-            </div>
-          ) : (
-            <div className={styles.convList}>
-              {conversaciones.map((conv) => {
-                const partnerId = conv.usuario?.id;
-                return (
-                  <ConversacionItem
-                    key={partnerId}
-                    conv={conv}
-                    activo={partnerId === convActivaId}
-                    onClick={() => {
-                      setConvActivaId(partnerId);
-                      setMensajes([]);
-                      navigate(`/chat/${partnerId}`, { replace: true });
-                    }}
-                  />
-                );
-              })}
-            </div>
-          )}
-        </aside>
+        <ListaConversaciones
+          conversaciones={conversaciones}
+          convActivaId={convActivaId}
+          loading={loadingConvs}
+          error={errorConvs}
+          onNuevoChat={() => setModalAbierto(true)}
+          onSeleccionar={handleSeleccionarConversacion}
+        />
 
         {/* ── Panel derecho: vista de mensajes ──────────────────────────── */}
         <main className={`${styles.chatMain} ${!convActivaId ? styles.chatMainHiddenMobile : ''}`}>
@@ -524,51 +168,11 @@ export default function ChatPage() {
           ) : (
             <>
               {/* Encabezado de la conversación */}
-              <div className={styles.chatHeader}>
-                <button
-                  className={styles.backBtn}
-                  onClick={() => { setConvActivaId(null); navigate('/chat', { replace: true }); }}
-                  aria-label="Volver a conversaciones"
-                >
-                  ←
-                </button>
-                <Avatar
-                  {...displayAvatarProps(partnerActivo)}
-                  size={36}
-                  style={{ fontWeight: 800, fontSize: 36 * 0.38 }}
-                />
-                <div className={styles.chatHeaderInfo}>
-                  <strong>
-                    {loadingMensajes && !partnerActivo
-                      ? 'Cargando...'
-                      : displayNombre(partnerActivo)}
-                  </strong>
-                  <span>{partnerActivo?.email}</span>
-                </div>
-                {/* Ver perfil — link a perfil público del interlocutor */}
-                {(() => {
-                  const perfilUrl = partnerActivo?.rol === 'empresa'
-                    ? (partnerActivo?.empresaId ? `/empresa/${partnerActivo.empresaId}` : null)
-                    : (partnerActivo?.id ? `/perfil/${partnerActivo.id}` : null);
-                  return perfilUrl ? (
-                    <button
-                      className={styles.verPerfilBtn}
-                      onClick={() => navigate(perfilUrl)}
-                      title="Ver perfil"
-                    >
-                      Ver perfil
-                    </button>
-                  ) : (
-                    <button
-                      className={styles.verPerfilBtn}
-                      disabled
-                      title="Perfil no disponible"
-                    >
-                      Ver perfil
-                    </button>
-                  );
-                })()}
-              </div>
+              <ChatHeader
+                partnerActivo={partnerActivo}
+                loadingMensajes={loadingMensajes}
+                onVolver={volverALista}
+              />
 
               {errorConv && mensajes.length === 0 ? (
                 /* Acceso inválido a esta conversación (URL directa a un usuario
@@ -580,7 +184,7 @@ export default function ChatPage() {
                   <p>{errorConv}</p>
                   <button
                     className={styles.nuevoChatBtnEmpty}
-                    onClick={() => { setConvActivaId(null); navigate('/chat', { replace: true }); }}
+                    onClick={volverALista}
                   >
                     Volver a conversaciones
                   </button>
@@ -625,33 +229,15 @@ export default function ChatPage() {
                     )}
                   </div>
 
-                  {soloLectura && (
-                    <div className={styles.avisoLectura}>
-                      🔒 {motivoSoloLectura || 'Esta conversación pertenece a un proceso de selección finalizado.'}
-                    </div>
-                  )}
-
-                  {/* Input de envío */}
-                  <form className={styles.inputBar} onSubmit={handleEnviar}>
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      value={nuevoMensaje}
-                      onChange={(e) => setNuevoMensaje(e.target.value)}
-                      placeholder={soloLectura ? 'Esta conversación es de solo lectura' : 'Escribí un mensaje...'}
-                      disabled={enviando || soloLectura}
-                      maxLength={2000}
-                      autoComplete="off"
-                    />
-                    <button
-                      type="submit"
-                      className={styles.sendBtn}
-                      disabled={enviando || soloLectura || !nuevoMensaje.trim()}
-                      aria-label="Enviar mensaje"
-                    >
-                      {enviando ? '…' : '➤'}
-                    </button>
-                  </form>
+                  <Composer
+                    inputRef={inputRef}
+                    valor={nuevoMensaje}
+                    onChange={setNuevoMensaje}
+                    onSubmit={handleEnviar}
+                    enviando={enviando}
+                    soloLectura={soloLectura}
+                    motivoSoloLectura={motivoSoloLectura}
+                  />
                 </>
               )}
             </>
