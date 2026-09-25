@@ -5,16 +5,16 @@
   "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lucashmercado/pasantias.git"
+    "url": "git+https://github.com/EmanuelMVera/pasantias.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/lucashmercado/pasantias/issues"
+    "url": "https://github.com/EmanuelMVera/pasantias/issues"
   },
-  "homepage": "https://github.com/lucashmercado/pasantias#readme",
+  "homepage": "https://github.com/EmanuelMVera/pasantias#readme",
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "concurrently": "^9.2.1"
