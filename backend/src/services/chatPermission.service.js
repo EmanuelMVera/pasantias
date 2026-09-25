@@ -1,21 +1,16 @@
 'use strict';
 
-const { Usuario, Empresa, EmpresaUsuario, Postulacion, Oferta } = require('../models');
+const { Usuario, EmpresaUsuario, Postulacion, Oferta } = require('../models');
 const { Op } = require('sequelize');
 const logger = require('../utils/logger');
 
 /**
- * Devuelve un Set con todos los IDs de empresa a los que pertenece el usuario.
- * Considera propietario directo (empresa.usuarioId) y membresías en equipo.
+ * Devuelve un Set con todos los IDs de empresa a los que pertenece el usuario
+ * (RBAC-06: exclusivamente membresías activas en empresa_usuarios).
  */
 async function resolverEmpresasDeUsuario(usuarioId) {
-  const [directa, membresias] = await Promise.all([
-    Empresa.findOne({ where: { usuarioId }, attributes: ['id'] }),
-    EmpresaUsuario.findAll({ where: { usuarioId, activo: true }, attributes: ['empresaId'] }),
-  ]);
-  const ids = new Set(membresias.map((m) => m.empresaId));
-  if (directa) ids.add(directa.id);
-  return ids;
+  const membresias = await EmpresaUsuario.findAll({ where: { usuarioId, activo: true }, attributes: ['empresaId'] });
+  return new Set(membresias.map((m) => m.empresaId));
 }
 
 /**
@@ -35,20 +30,12 @@ async function comparteMismaEmpresa(usuarioAId, usuarioBId) {
 /**
  * Devuelve TODAS las membresías empresariales activas del usuario, cada una
  * con su rolInterno específico (a diferencia de resolverEmpresasDeUsuario,
- * que solo da el Set de IDs). Dueño directo sin fila EmpresaUsuario propia
- * para esa empresa cuenta como admin_empresa implícito.
+ * que solo da el Set de IDs). RBAC-06: exclusivamente empresa_usuarios.
  * @returns {Array<{ empresaId: number, rolInterno: 'admin_empresa'|'reclutador' }>}
  */
 async function resolverMembresiasActivas(usuarioId) {
-  const [directa, membresias] = await Promise.all([
-    Empresa.findOne({ where: { usuarioId }, attributes: ['id'] }),
-    EmpresaUsuario.findAll({ where: { usuarioId, activo: true }, attributes: ['empresaId', 'rolInterno'] }),
-  ]);
-  const lista = membresias.map((m) => ({ empresaId: m.empresaId, rolInterno: m.rolInterno }));
-  if (directa && !lista.some((m) => m.empresaId === directa.id)) {
-    lista.push({ empresaId: directa.id, rolInterno: 'admin_empresa' });
-  }
-  return lista;
+  const membresias = await EmpresaUsuario.findAll({ where: { usuarioId, activo: true }, attributes: ['empresaId', 'rolInterno'] });
+  return membresias.map((m) => ({ empresaId: m.empresaId, rolInterno: m.rolInterno }));
 }
 
 /**

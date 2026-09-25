@@ -30,7 +30,6 @@ module.exports = {
       telefono: { type: ['string', 'null'] },
       sitioWeb: { type: ['string', 'null'] },
       logo: { type: ['string', 'null'] },
-      usuarioId: { type: 'integer' },
       ofertas: { type: 'array', items: { $ref: '#/components/schemas/OfertaResumen' } },
     },
   },

@@ -6,7 +6,8 @@
  * Consume: GET /api/empresas/:id (requiere sesión)
  *
  * Muestra info pública de la empresa (solo si estadoAprobacion='aprobada')
- * y sus ofertas activas. El botón Contactar solo aparece para alumnos/egresados.
+ * y sus ofertas activas. No hay botón de contacto directo: el chat con la
+ * empresa se habilita únicamente vía una Postulacion (RBAC-06 / reglas de chat).
  */
 
 import { useState, useEffect } from 'react';
@@ -14,7 +15,6 @@ import { useParams, useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { empresaService } from '../../services/api';
 import Card from '../../components/ui/Card';
-import Button from '../../components/ui/Button';
 import EmptyState from '../../components/ui/EmptyState';
 import styles from './EmpresaPublicaPage.module.css';
 
@@ -94,13 +94,6 @@ export default function EmpresaPublicaPage() {
           )}
         </div>
 
-        {esAlumnoEgresado && data.usuarioId && (
-          <div className={styles.headerAcciones}>
-            <Button variant="primary" onClick={() => navigate(`/chat/${data.usuarioId}`)}>
-              💬 Contactar
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* ── Descripción ── */}

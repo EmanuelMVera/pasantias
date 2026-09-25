@@ -240,7 +240,6 @@ async function seedDemo() {
       const cuitLimpio = (item.cuit || '').replace(/\D/g, '');
 
       const empresa = await Empresa.create({
-        usuarioId: owner.id,
         razonSocial: item.razonSocial,
         cuit: cuitLimpio.length === 11 ? cuitLimpio : null,
         descripcion: item.descripcion,

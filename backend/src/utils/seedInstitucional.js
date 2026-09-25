@@ -248,7 +248,6 @@ async function sembrar(transaction) {
 
     const rubro = RUBROS[i % RUBROS.length];
     const empresa = await Empresa.create({
-      usuarioId: admin.id,
       razonSocial: nombreEmpresa,
       cuit: cuitEmpresa(i),
       descripcion: `${nombreEmpresa} es una empresa del rubro ${rubro} con sede en ${CIUDADES[i % CIUDADES.length]}. Dataset institucional generado para pruebas de escala.`,

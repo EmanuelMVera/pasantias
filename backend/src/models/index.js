@@ -32,10 +32,6 @@ const ConfiguracionInstitucional = require('./configuracionInstitucional.model')
 Usuario.hasOne(Perfil, { foreignKey: 'usuarioId', as: 'perfil', onDelete: 'CASCADE' });
 Perfil.belongsTo(Usuario, { foreignKey: 'usuarioId', as: 'usuario' });
 
-// ── Asociaciones — Empresa ────────────────────────────────────────────────────
-Usuario.hasOne(Empresa, { foreignKey: 'usuarioId', as: 'empresa', onDelete: 'CASCADE' });
-Empresa.belongsTo(Usuario, { foreignKey: 'usuarioId', as: 'usuario' });
-
 // ── Asociaciones — Oferta ─────────────────────────────────────────────────────
 Empresa.hasMany(Oferta, { foreignKey: 'empresaId', as: 'ofertas', onDelete: 'CASCADE' });
 Oferta.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
@@ -51,7 +47,9 @@ Postulacion.belongsTo(Oferta, { foreignKey: 'ofertaId', as: 'oferta' });
 Usuario.hasMany(Notificacion, { foreignKey: 'usuarioId', as: 'notificaciones', onDelete: 'CASCADE' });
 Notificacion.belongsTo(Usuario, { foreignKey: 'usuarioId', as: 'usuario' });
 
-// ── Asociaciones — EmpresaUsuario (equipo reclutadores) ───────────────────────
+// ── Asociaciones — EmpresaUsuario (equipo: admin_empresa + reclutadores) ──────
+// Única vía para resolver "la empresa de un usuario" desde RBAC-06 (migración
+// 019) — Empresa ya no tiene ninguna referencia directa a Usuario.
 Empresa.hasMany(EmpresaUsuario, { foreignKey: 'empresaId', as: 'equipo', onDelete: 'CASCADE' });
 EmpresaUsuario.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
 EmpresaUsuario.belongsTo(Usuario, { foreignKey: 'usuarioId', as: 'usuario' });

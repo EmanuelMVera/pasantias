@@ -14,21 +14,39 @@
  * decisión 2).
  */
 
-const { Empresa, Usuario, Oferta } = require('../models');
+const { Empresa, Usuario, EmpresaUsuario, Oferta } = require('../models');
 const { crearNotificacion } = require('../utils/notificador');
 const HttpError = require('../utils/httpError');
 const { buildPagination } = require('../utils/pagination');
 const { registrarAuditoria } = require('../utils/auditLog');
 const logger = require('../utils/logger');
 const { TRANSICIONES_ESTADO } = require('./oferta.service');
+const { obtenerAdminsActivos } = require('./empresa.service');
 
 // ── Empresas (aprobación directa) ──────────────────────────────────────────────
 
+// El admin_empresa ya no cuelga de Empresa directamente (RBAC-06) — se trae
+// vía el equipo (EmpresaUsuario) y se aplana a `usuario` para no cambiar la
+// forma de la respuesta que ya consumía el resto del código/API.
+function _conAdminAplanado(empresa) {
+  const data = empresa.toJSON();
+  data.usuario = data.equipo?.[0]?.usuario ?? null;
+  delete data.equipo;
+  return data;
+}
+
+const INCLUDE_ADMIN_EMPRESA = {
+  model: EmpresaUsuario, as: 'equipo', required: false,
+  where: { rolInterno: 'admin_empresa', activo: true },
+  include: [{ model: Usuario, as: 'usuario', attributes: ['nombre', 'apellido', 'email'] }],
+};
+
 async function listarEmpresasPendientes() {
-  return Empresa.findAll({
+  const empresas = await Empresa.findAll({
     where: { estadoAprobacion: 'pendiente' },
-    include: [{ model: Usuario, as: 'usuario', attributes: ['nombre', 'apellido', 'email'] }],
+    include: [INCLUDE_ADMIN_EMPRESA],
   });
+  return empresas.map(_conAdminAplanado);
 }
 
 async function aprobarEmpresa(id, { actorUsuarioId, ip, requestId }) {
@@ -40,7 +58,8 @@ async function aprobarEmpresa(id, { actorUsuarioId, ip, requestId }) {
     aprobadaPorUsuarioId: actorUsuarioId,
     aprobadaEn: new Date(),
   });
-  await Usuario.update({ habilitado: true }, { where: { id: empresa.usuarioId } });
+  const admins = await obtenerAdminsActivos(empresa.id);
+  await Usuario.update({ habilitado: true }, { where: { id: admins.map((a) => a.id) } });
   await registrarAuditoria({ usuarioId: actorUsuarioId, ip, requestId, accion: 'aprobar_empresa', entidad: 'empresa', entidadId: empresa.id, detalle: { razonSocial: empresa.razonSocial } });
 }
 
@@ -64,13 +83,13 @@ async function listarEmpresas({ estadoAprobacion, nivelConfianza, page = 1, limi
 
   const { count, rows } = await Empresa.findAndCountAll({
     where,
-    include: [{ model: Usuario, as: 'usuario', attributes: ['nombre', 'apellido', 'email'] }],
+    include: [INCLUDE_ADMIN_EMPRESA],
     order: [['createdAt', 'DESC'], ['id', 'DESC']],
     limit,
     offset,
   });
 
-  return { data: rows, pagination: buildPagination(count, { page, limit }) };
+  return { data: rows.map(_conAdminAplanado), pagination: buildPagination(count, { page, limit }) };
 }
 
 const ACCIONES_CONFIANZA = ['marcar', 'revocar'];
@@ -161,19 +180,17 @@ const NOTIF_POR_ACCION = {
 
 async function notificarEmpresa(oferta, accion) {
   try {
-    const empresaOferta = await Empresa.findByPk(oferta.empresaId, { attributes: ['usuarioId'] });
-    if (empresaOferta?.usuarioId) {
-      const notif = NOTIF_POR_ACCION[accion];
-      await crearNotificacion({
-        usuarioId: empresaOferta.usuarioId,
-        titulo: notif.titulo,
-        mensaje: notif.mensaje(oferta.titulo),
-        tipo: 'oferta',
-        tipoVisual: notif.tipoVisual,
-        enlace: '/empresa',
-        accionURL: '/empresa',
-      });
-    }
+    const admins = await obtenerAdminsActivos(oferta.empresaId);
+    const notif = NOTIF_POR_ACCION[accion];
+    await Promise.all(admins.map((admin) => crearNotificacion({
+      usuarioId: admin.id,
+      titulo: notif.titulo,
+      mensaje: notif.mensaje(oferta.titulo),
+      tipo: 'oferta',
+      tipoVisual: notif.tipoVisual,
+      enlace: '/empresa',
+      accionURL: '/empresa',
+    })));
   } catch (e) { logger.error({ err: e }, 'notif_moderacion_oferta_fallo'); }
 }
 

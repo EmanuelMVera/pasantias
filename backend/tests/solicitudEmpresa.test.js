@@ -38,7 +38,6 @@ describe('SOLICITUD EMPRESA', () => {
 
     const empresaCreada = await Empresa.findByPk(empresaId);
     expect(empresaCreada.estadoAprobacion).toBe('aprobada');
-    expect(empresaCreada.usuarioId).toBe(usuarioId);
 
     const membresia = await EmpresaUsuario.findOne({ where: { empresaId, usuarioId } });
     expect(membresia.rolInterno).toBe('admin_empresa');

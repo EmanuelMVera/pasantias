@@ -75,7 +75,11 @@ CREATE TYPE public.enum_activity_logs_accion AS ENUM (
     'pausar_oferta',
     'reactivar_oferta',
     'exportar_logs',
-    'exportar_estadisticas'
+    'exportar_estadisticas',
+    'marcar_empresa_confiable',
+    'revocar_confianza_empresa',
+    'auto_aprobar_solicitud_reclutador',
+    'oferta_auto_aprobada'
 );
 
 
@@ -320,7 +324,6 @@ ALTER SEQUENCE public.empresa_usuarios_id_seq OWNED BY public.empresa_usuarios.i
 
 CREATE TABLE public.empresas (
     id integer NOT NULL,
-    "usuarioId" integer NOT NULL,
     "razonSocial" character varying(200) NOT NULL,
     cuit character varying(11),
     descripcion text,
@@ -337,7 +340,9 @@ CREATE TABLE public.empresas (
     "aprobadaPorUsuarioId" integer,
     "aprobadaEn" timestamp with time zone,
     "motivoRechazo" text,
-    CONSTRAINT chk_empresas_cuit_formato CHECK (((cuit IS NULL) OR ((cuit)::text ~ '^[0-9]{11}$'::text)))
+    "nivelConfianza" character varying(20) DEFAULT 'estandar'::character varying,
+    CONSTRAINT chk_empresas_cuit_formato CHECK (((cuit IS NULL) OR ((cuit)::text ~ '^[0-9]{11}$'::text))),
+    CONSTRAINT chk_empresas_nivel_confianza CHECK ((("nivelConfianza")::text = ANY ((ARRAY['estandar'::character varying, 'confiable'::character varying])::text[])))
 );
 
 
@@ -464,13 +469,14 @@ CREATE TABLE public.ofertas (
     "fechaPublicacion" timestamp with time zone,
     "fechaLimite" timestamp with time zone,
     estado character varying(20) DEFAULT 'activa'::character varying,
-    moderada boolean DEFAULT false,
     vistas integer DEFAULT 0,
     "createdAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "deletedAt" timestamp with time zone,
     "creadaPorUsuarioId" integer,
-    CONSTRAINT chk_ofertas_estado CHECK (((estado)::text = ANY ((ARRAY['activa'::character varying, 'pausada'::character varying, 'rechazada'::character varying, 'cerrada'::character varying])::text[])))
+    "estadoModeracion" character varying(20) DEFAULT 'pendiente'::character varying,
+    CONSTRAINT chk_ofertas_estado CHECK (((estado)::text = ANY ((ARRAY['activa'::character varying, 'pausada'::character varying, 'cerrada'::character varying])::text[]))),
+    CONSTRAINT chk_ofertas_estado_moderacion CHECK ((("estadoModeracion")::text = ANY ((ARRAY['pendiente'::character varying, 'aprobada'::character varying, 'rechazada'::character varying, 'auto_aprobada'::character varying])::text[])))
 );
 
 
@@ -990,14 +996,6 @@ ALTER TABLE ONLY public.empresa_usuarios
 
 
 --
--- Name: empresas unique_empresa_usuario_dueno; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.empresas
-    ADD CONSTRAINT unique_empresa_usuario_dueno UNIQUE ("usuarioId");
-
-
---
 -- Name: empresas unique_empresas_cuit; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1157,10 +1155,10 @@ CREATE INDEX idx_ofertas_empresa_estado ON public.ofertas USING btree ("empresaI
 
 
 --
--- Name: idx_ofertas_estado_moderada_created; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_ofertas_estado_estadomoderacion_created; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_ofertas_estado_moderada_created ON public.ofertas USING btree (estado, moderada, "createdAt" DESC) WHERE ("deletedAt" IS NULL);
+CREATE INDEX idx_ofertas_estado_estadomoderacion_created ON public.ofertas USING btree (estado, "estadoModeracion", "createdAt" DESC) WHERE ("deletedAt" IS NULL);
 
 
 --
@@ -1168,6 +1166,13 @@ CREATE INDEX idx_ofertas_estado_moderada_created ON public.ofertas USING btree (
 --
 
 CREATE INDEX idx_ofertas_estado_publicacion ON public.ofertas USING btree (estado, "fechaPublicacion" DESC);
+
+
+--
+-- Name: idx_ofertas_estadomoderacion_estado; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ofertas_estadomoderacion_estado ON public.ofertas USING btree ("estadoModeracion", estado);
 
 
 --
@@ -1182,13 +1187,6 @@ CREATE INDEX idx_ofertas_fecha_limite_activa ON public.ofertas USING btree ("fec
 --
 
 CREATE INDEX idx_ofertas_habilidades_gin ON public.ofertas USING gin ("habilidadesRequeridas") WHERE ("deletedAt" IS NULL);
-
-
---
--- Name: idx_ofertas_moderada_estado; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_ofertas_moderada_estado ON public.ofertas USING btree (moderada, estado);
 
 
 --
@@ -1297,6 +1295,13 @@ CREATE INDEX mensajes_receptor_leido_idx ON public.mensajes USING btree ("recept
 
 
 --
+-- Name: unique_admin_empresa_por_usuario; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX unique_admin_empresa_por_usuario ON public.empresa_usuarios USING btree ("usuarioId") WHERE (("rolInterno")::text = 'admin_empresa'::text);
+
+
+--
 -- Name: usuarios_email_lower_unique; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1341,14 +1346,6 @@ ALTER TABLE ONLY public.empresa_usuarios
 
 ALTER TABLE ONLY public.empresas
     ADD CONSTRAINT "empresas_aprobadaPorUsuarioId_fkey" FOREIGN KEY ("aprobadaPorUsuarioId") REFERENCES public.usuarios(id) ON DELETE SET NULL;
-
-
---
--- Name: empresas empresas_usuarioId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.empresas
-    ADD CONSTRAINT "empresas_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES public.usuarios(id) ON DELETE CASCADE;
 
 
 --

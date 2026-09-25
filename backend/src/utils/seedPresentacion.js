@@ -349,7 +349,6 @@ async function sembrar(transaction) {
   say('🚀 Creando empresa y equipo...');
 
   const empresa = await Empresa.create({
-    usuarioId: empAdmin.id,
     razonSocial: RAZON_SOCIAL,
     cuit: EMPRESA_CUIT,
     descripcion:

@@ -8,12 +8,10 @@
  * │  Resuelve la empresa a la que pertenece el usuario autenticado y la adjunta │
  * │  en req.empresa y req.miembroEmpresa para que los controllers la usen.      │
  * │                                                                             │
- * │  Flujo de resolución (en orden):                                            │
- * │    1. Si el usuario es admin_empresa directo (empresa.usuarioId === req.usuario.id) │
- * │       → adjunta empresa y crea un objeto miembro virtual con rol 'admin_empresa' │
- * │    2. Si tiene una membresía activa en empresa_usuarios                      │
+ * │  Flujo de resolución (RBAC-06 — EmpresaUsuario es la ÚNICA fuente):         │
+ * │    1. Si tiene una membresía activa en empresa_usuarios                      │
  * │       → adjunta empresa y el registro de membresía real                     │
- * │    3. Si no tiene acceso → 404                                              │
+ * │    2. Si no tiene acceso → 404                                              │
  * └─────────────────────────────────────────────────────────────────────────────┘
  *
  * ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -49,35 +47,17 @@ const { Empresa, EmpresaUsuario } = require('../models');
  *
  * Adjunta en el request:
  *   req.empresa        → instancia de Empresa
- *   req.miembroEmpresa → instancia de EmpresaUsuario (o virtual si es propietario directo)
+ *   req.miembroEmpresa → instancia de EmpresaUsuario
  *
  * Respuestas de error:
- *   404 → el usuario no tiene empresa registrada ni membresía
- *   403 → tiene membresía pero está inactiva
+ *   404 → el usuario no tiene ninguna membresía activa en empresa_usuarios
  */
 const verifyEmpresaMember = async (req, res, next) => {
   try {
     const usuarioId = req.usuario.id;
 
-    // ── 1. Verificar si es admin_empresa directo (empresa.usuarioId === su id) ─
-    // Compatibilidad con cuentas donde el usuario es el dueño registrado de la empresa
-    // pero puede no tener todavía registro en empresa_usuarios.
-    const empresaPropia = await Empresa.findOne({ where: { usuarioId } });
-
-    if (empresaPropia) {
-      req.empresa = empresaPropia;
-      // Construye un objeto virtual de membresía para el admin_empresa directo
-      req.miembroEmpresa = {
-        rolInterno: 'admin_empresa',
-        activo: true,
-        empresaId: empresaPropia.id,
-        usuarioId,
-        esAdminVirtual: true, // Indica que no es un registro real de empresa_usuarios
-      };
-      return next();
-    }
-
-    // ── 2. Verificar si es miembro del equipo (admin_empresa o reclutador) ────
+    // Única fuente de verdad (RBAC-06): membresía activa en empresa_usuarios,
+    // sea admin_empresa o reclutador.
     const membresia = await EmpresaUsuario.findOne({
       where: { usuarioId, activo: true },
       include: [{ model: Empresa, as: 'empresa' }],

@@ -33,8 +33,7 @@ async function resolverFotoPerfilBatch(usuarioIds) {
  * Resuelve razonSocial, logo, empresaId y rolInterno de un único usuario con
  * rol 'empresa'. rolInterno decide la identidad visual en el frontend
  * (admin_empresa → institucional; reclutador → persona) — ver Navbar.jsx.
- * 1. Busca membresía activa en empresa_usuarios
- * 2. Fallback: propietario directo (empresa.usuarioId) → admin_empresa implícito
+ * RBAC-06: exclusivamente vía membresía activa en empresa_usuarios.
  */
 async function resolverEmpresaData(usuarioId) {
   const membresia = await EmpresaUsuario.findOne({
@@ -50,34 +49,22 @@ async function resolverEmpresaData(usuarioId) {
       rolInterno: membresia.rolInterno,
     };
   }
-  const empresa = await Empresa.findOne({ where: { usuarioId }, attributes: ['id', 'razonSocial', 'logo'] });
-  return empresa
-    ? { razonSocial: empresa.razonSocial, logo: empresa.logo, empresaId: empresa.id, rolInterno: 'admin_empresa' }
-    : { razonSocial: null, logo: null, empresaId: null, rolInterno: null };
+  return { razonSocial: null, logo: null, empresaId: null, rolInterno: null };
 }
 
 /**
  * Batch lookup de razonSocial + logo + empresaId + rolInterno para múltiples
- * usuarios empresa.
+ * usuarios empresa. RBAC-06: exclusivamente vía empresa_usuarios.
  * @returns {Object} map { usuarioId: { razonSocial, logo, empresaId, rolInterno } }
  */
 async function resolverEmpresasBatch(usuarioIds) {
   if (!usuarioIds?.length) return {};
-  const [membresias, directas] = await Promise.all([
-    EmpresaUsuario.findAll({
-      where: { usuarioId: { [Op.in]: usuarioIds }, activo: true },
-      attributes: ['usuarioId', 'rolInterno'],
-      include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'logo'] }],
-    }),
-    Empresa.findAll({
-      where: { usuarioId: { [Op.in]: usuarioIds } },
-      attributes: ['id', 'usuarioId', 'razonSocial', 'logo'],
-    }),
-  ]);
-  const map = {};
-  directas.forEach((e) => {
-    map[e.usuarioId] = { razonSocial: e.razonSocial, logo: e.logo, empresaId: e.id, rolInterno: 'admin_empresa' };
+  const membresias = await EmpresaUsuario.findAll({
+    where: { usuarioId: { [Op.in]: usuarioIds }, activo: true },
+    attributes: ['usuarioId', 'rolInterno'],
+    include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'logo'] }],
   });
+  const map = {};
   membresias.forEach((m) => {
     if (m.empresa?.razonSocial) {
       map[m.usuarioId] = {
@@ -163,11 +150,9 @@ async function buscarUsuarios(userId, rol, q) {
 
     const companeroIds = new Set();
     if (empresaIds.length > 0) {
-      const [directos, miembros] = await Promise.all([
-        Empresa.findAll({ where: { id: { [Op.in]: empresaIds } }, attributes: ['usuarioId'] }),
-        EmpresaUsuario.findAll({ where: { empresaId: { [Op.in]: empresaIds }, activo: true }, attributes: ['usuarioId'] }),
-      ]);
-      directos.forEach((e) => companeroIds.add(e.usuarioId));
+      const miembros = await EmpresaUsuario.findAll({
+        where: { empresaId: { [Op.in]: empresaIds }, activo: true }, attributes: ['usuarioId'],
+      });
       miembros.forEach((m) => companeroIds.add(m.usuarioId));
       companeroIds.delete(userId);
     }

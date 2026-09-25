@@ -11,6 +11,7 @@ const { enviarEmail } = require('../utils/mailer');
 const { config } = require('../config/env');
 const { crearNotificacion } = require('../utils/notificador');
 const { registrarAuditoria } = require('../utils/auditLog');
+const { obtenerAdminsActivos } = require('./empresa.service');
 const logger = require('../utils/logger');
 
 /**
@@ -103,7 +104,7 @@ function enviarEmailCredencialesReclutador(solicitud, passwordPlano) {
  */
 async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }) {
   const solicitud = await SolicitudReclutador.findByPk(solicitudId, {
-    include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'usuarioId'] }],
+    include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial'] }],
   });
   if (!solicitud) throw new HttpError(404, 'Solicitud no encontrada.');
   if (solicitud.estado !== 'pendiente') {
@@ -122,39 +123,36 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }) 
     detalle:   { email: solicitud.email, empresaId: solicitud.empresaId },
   });
 
-  // Notificación in-app al admin_empresa
-  const empresaOwner = solicitud.empresa?.usuarioId;
-  if (empresaOwner) {
+  // Notificación in-app + email a todos los admin_empresa activos (RBAC-06)
+  const admins = await obtenerAdminsActivos(solicitud.empresaId);
+  await Promise.all(admins.map((admin) =>
     crearNotificacion({
-      usuarioId: empresaOwner,
+      usuarioId: admin.id,
       titulo: '✅ Solicitud de reclutador aprobada',
       mensaje: `${solicitud.nombre}${solicitud.apellido ? ' ' + solicitud.apellido : ''} ya puede acceder al sistema como reclutador.`,
       tipo: 'sistema',
       tipoVisual: 'success',
       enlace: '/empresa/equipo',
       accionURL: '/empresa/equipo',
-    }).catch((e) => logger.error({ err: e }, 'notif_aprobacion_reclutador_fallo'));
-  }
+    }).catch((e) => logger.error({ err: e }, 'notif_aprobacion_reclutador_fallo'))
+  ));
 
   // Email al reclutador con credenciales
   enviarEmailCredencialesReclutador(solicitud, passwordPlano)
     .catch((e) => logger.error({ err: e }, 'email_reclutador_aprobado_fallo'));
 
-  // Email al propietario de la empresa
-  if (empresaOwner) {
-    const propietario = await Usuario.findByPk(empresaOwner);
-    if (propietario) {
-      enviarEmail({
-        to: propietario.email,
-        subject: '✅ Solicitud de reclutador aprobada – SisPasantías',
-        html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
-          <h2 style="color:#0073AD">Solicitud aprobada</h2>
-          <p>La solicitud de reclutador para <strong>${solicitud.nombre}</strong> (${solicitud.email}) fue <strong>aprobada</strong>.</p>
-          <p>El reclutador ya puede acceder al sistema con las credenciales enviadas a su email.</p>
-        </div>`,
-      }).catch((e) => logger.error({ err: e }, 'email_empresa_aprobado_fallo'));
-    }
-  }
+  // Email a los admin_empresa activos
+  await Promise.all(admins.map((admin) =>
+    enviarEmail({
+      to: admin.email,
+      subject: '✅ Solicitud de reclutador aprobada – SisPasantías',
+      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
+        <h2 style="color:#0073AD">Solicitud aprobada</h2>
+        <p>La solicitud de reclutador para <strong>${solicitud.nombre}</strong> (${solicitud.email}) fue <strong>aprobada</strong>.</p>
+        <p>El reclutador ya puede acceder al sistema con las credenciales enviadas a su email.</p>
+      </div>`,
+    }).catch((e) => logger.error({ err: e }, 'email_empresa_aprobado_fallo'))
+  ));
 
   return { usuarioId: nuevoUsuario.id, email: solicitud.email, passwordGenerada: passwordPlano };
 }
@@ -164,7 +162,7 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }) 
  */
 async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }, motivo) {
   const solicitud = await SolicitudReclutador.findByPk(solicitudId, {
-    include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'usuarioId'] }],
+    include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial'] }],
   });
   if (!solicitud) throw new HttpError(404, 'Solicitud no encontrada.');
   if (solicitud.estado !== 'pendiente') {
@@ -183,33 +181,32 @@ async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip, requestId },
     detalle:   { email: solicitud.email, motivo },
   });
 
-  const empresaOwner = solicitud.empresa?.usuarioId;
+  const admins = await obtenerAdminsActivos(solicitud.empresaId);
 
-  if (empresaOwner) {
+  await Promise.all(admins.map((admin) =>
     crearNotificacion({
-      usuarioId: empresaOwner,
+      usuarioId: admin.id,
       titulo: '❌ Solicitud de reclutador rechazada',
       mensaje: `La solicitud para ${solicitud.nombre}${solicitud.apellido ? ' ' + solicitud.apellido : ''} (${solicitud.email}) no fue aprobada.${motivo ? ` Motivo: ${motivo}` : ''}`,
       tipo: 'sistema',
       tipoVisual: 'error',
       enlace: '/empresa/equipo',
       accionURL: '/empresa/equipo',
-    }).catch((e) => logger.error({ err: e }, 'notif_rechazo_reclutador_fallo'));
+    }).catch((e) => logger.error({ err: e }, 'notif_rechazo_reclutador_fallo'))
+  ));
 
-    const propietario = await Usuario.findByPk(empresaOwner);
-    if (propietario) {
-      enviarEmail({
-        to: propietario.email,
-        subject: '❌ Solicitud de reclutador rechazada – SisPasantías',
-        html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
-          <h2 style="color:#c0392b">Solicitud rechazada</h2>
-          <p>La solicitud de reclutador para <strong>${solicitud.nombre}</strong> (${solicitud.email}) fue <strong>rechazada</strong>.</p>
-          ${motivo ? `<p><strong>Motivo:</strong> ${motivo}</p>` : ''}
-          <p>Si tenés consultas, contactate con el equipo del instituto.</p>
-        </div>`,
-      }).catch((e) => logger.error({ err: e }, 'email_empresa_rechazado_fallo'));
-    }
-  }
+  await Promise.all(admins.map((admin) =>
+    enviarEmail({
+      to: admin.email,
+      subject: '❌ Solicitud de reclutador rechazada – SisPasantías',
+      html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
+        <h2 style="color:#c0392b">Solicitud rechazada</h2>
+        <p>La solicitud de reclutador para <strong>${solicitud.nombre}</strong> (${solicitud.email}) fue <strong>rechazada</strong>.</p>
+        ${motivo ? `<p><strong>Motivo:</strong> ${motivo}</p>` : ''}
+        <p>Si tenés consultas, contactate con el equipo del instituto.</p>
+      </div>`,
+    }).catch((e) => logger.error({ err: e }, 'email_empresa_rechazado_fallo'))
+  ));
 }
 
 module.exports = {

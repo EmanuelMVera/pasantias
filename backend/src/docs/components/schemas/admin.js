@@ -125,7 +125,6 @@ module.exports = {
       id: { type: 'integer' },
       rolInterno: { type: 'string', enum: ['admin_empresa', 'reclutador'] },
       activo: { type: 'boolean' },
-      esAdminVirtual: { type: 'boolean', description: 'true = dueño directo sin fila en empresa_usuarios.' },
       usuario: { $ref: '#/components/schemas/UsuarioResumen' },
     },
   },

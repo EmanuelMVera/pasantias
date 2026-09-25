@@ -51,7 +51,7 @@ Flags de cuenta:
 |---|---|---|
 | `verifyToken` | `middleware/auth.middleware.js` | Lee el JWT de la **cookie `token`** (HttpOnly; fallback header `Authorization: Bearer` para tests/clientes API), valida firma + `tokenVersion`, carga `req.usuario`. |
 | `authorizeRoles(...roles)` | `middleware/auth.middleware.js` | 403 si `req.usuario.rol` no está en la lista. |
-| `verifyEmpresaMember` | `middleware/empresa.middleware.js` | Resuelve la empresa del usuario y adjunta `req.empresa` + `req.miembroEmpresa`. Si el usuario es dueño directo (`empresa.usuarioId === req.usuario.id`) crea una membresía **virtual** con `rolInterno: 'admin_empresa'`. 404 si no tiene ninguna empresa. |
+| `verifyEmpresaMember` | `middleware/empresa.middleware.js` | Resuelve la empresa del usuario y adjunta `req.empresa` + `req.miembroEmpresa`, exclusivamente a partir de una membresía activa en `empresa_usuarios`. 404 (`SIN_EMPRESA`) si no tiene ninguna. |
 | `authorizeEmpresaRoles(...roles)` | `middleware/empresa.middleware.js` | 403 si `req.miembroEmpresa.rolInterno` no está en la lista. Usar **después** de `verifyEmpresaMember`. |
 
 En el frontend, el equivalente son `ProtectedRoute` (rol de sistema) y
@@ -160,10 +160,11 @@ una de sus ofertas.
 
 ## 5. Notas de diseño
 
-- **El propietario directo de una empresa siempre pasa como `admin_empresa`**,
-  aunque no tenga fila en `empresa_usuarios` (membresía virtual en
-  `verifyEmpresaMember`). Cuentas creadas antes del sistema multi-usuario siguen
-  funcionando así.
+- **`empresa_usuarios` es la única fuente de verdad de quién representa a una
+  empresa** (RBAC-06). `Empresa` ya no tiene ninguna referencia directa a
+  `Usuario` — no existe ningún "dueño implícito" ni membresía virtual; toda
+  empresa tiene garantizada al menos una fila `admin_empresa` activa desde la
+  migración 019.
 - **`reclutador` no puede tocar el equipo ni el perfil de la empresa**, solo lo
   operativo: ofertas, candidatos, embudo de selección, chat.
 - El rol interno **no** se puede elevar a `admin_empresa` desde el panel de empresa;

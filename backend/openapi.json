@@ -150,6 +150,34 @@
           "type": "string"
         }
       },
+      "estadoModeracionQuery": {
+        "name": "estadoModeracion",
+        "in": "query",
+        "required": false,
+        "description": "Filtra ofertas por estado de moderación (pendiente|aprobada|rechazada|auto_aprobada).",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "pendiente",
+            "aprobada",
+            "rechazada",
+            "auto_aprobada"
+          ]
+        }
+      },
+      "nivelConfianzaQuery": {
+        "name": "nivelConfianza",
+        "in": "query",
+        "required": false,
+        "description": "Filtra empresas por nivel de confianza institucional (estandar|confiable).",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "estandar",
+            "confiable"
+          ]
+        }
+      },
       "qQuery": {
         "name": "q",
         "in": "query",
@@ -660,9 +688,6 @@
           "id": {
             "type": "integer"
           },
-          "usuarioId": {
-            "type": "integer"
-          },
           "razonSocial": {
             "type": "string",
             "maxLength": 200
@@ -705,6 +730,10 @@
               "aprobada",
               "rechazada"
             ]
+          },
+          "nivelConfianza": {
+            "type": "string",
+            "maxLength": 20
           },
           "aprobadaPorUsuarioId": {
             "type": "integer"
@@ -805,9 +834,6 @@
               "string",
               "null"
             ]
-          },
-          "usuarioId": {
-            "type": "integer"
           },
           "ofertas": {
             "type": "array",
@@ -938,8 +964,9 @@
                 "type": "string",
                 "maxLength": 20
               },
-              "moderada": {
-                "type": "boolean"
+              "estadoModeracion": {
+                "type": "string",
+                "maxLength": 20
               },
               "vistas": {
                 "type": "integer"
@@ -1722,6 +1749,10 @@
                   "reactivar_oferta",
                   "exportar_logs",
                   "exportar_estadisticas",
+                  "marcar_empresa_confiable",
+                  "revocar_confianza_empresa",
+                  "auto_aprobar_solicitud_reclutador",
+                  "oferta_auto_aprobada",
                   "sistema"
                 ]
               },
@@ -1846,20 +1877,38 @@
         "required": [
           "accion"
         ],
+        "description": "`aprobar`/`rechazar` tocan `estadoModeracion` (revisión institucional). `pausar`/`cerrar` tocan `estado` (ciclo de vida de la publicación) — nunca se mezclan en la misma escritura.",
         "properties": {
           "accion": {
             "type": "string",
             "enum": [
               "aprobar",
-              "pausar",
               "rechazar",
+              "pausar",
               "cerrar"
             ]
           },
           "aprobada": {
             "type": "boolean",
             "deprecated": true,
-            "description": "Fallback legacy de `accion`."
+            "description": "Fallback legacy de `accion` (aprobar/rechazar)."
+          }
+        }
+      },
+      "AdminCambiarConfianzaEmpresa": {
+        "type": "object",
+        "required": [
+          "accion"
+        ],
+        "description": "Cambia el nivel de confianza institucional de una empresa (RBAC-05). Reversible en cualquier momento; no re-modera retroactivamente lo ya publicado.",
+        "properties": {
+          "accion": {
+            "type": "string",
+            "enum": [
+              "marcar",
+              "revocar"
+            ],
+            "description": "`marcar` → confiable, `revocar` → estandar."
           }
         }
       },
@@ -2118,10 +2167,6 @@
           },
           "activo": {
             "type": "boolean"
-          },
-          "esAdminVirtual": {
-            "type": "boolean",
-            "description": "true = dueño directo sin fila en empresa_usuarios."
           },
           "usuario": {
             "$ref": "#/components/schemas/UsuarioResumen"
@@ -4031,7 +4076,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Público. Solo devuelve ofertas `estado=activa` y `moderada=true`.",
+        "description": "Público. Solo devuelve ofertas `estado=activa` y `estadoModeracion` en (`aprobada`, `auto_aprobada`).",
         "parameters": [
           {
             "$ref": "#/components/parameters/pageParam"
@@ -4151,7 +4196,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "La oferta queda `moderada=false` hasta que un admin la aprueba. Solo reclutador.\n\n**Roles:** empresa/reclutador",
+        "description": "La oferta queda `estadoModeracion=pendiente` hasta que un admin la aprueba. Solo reclutador.\n\n**Roles:** empresa/reclutador",
         "parameters": [
           {
             "$ref": "#/components/parameters/csrfHeader"
@@ -4212,7 +4257,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Público. Incrementa el contador de vistas. 404 si no está `activa`+`moderada`.",
+        "description": "Público. Incrementa el contador de vistas. 404 si no está `activa` y con moderación resuelta (`aprobada`/`auto_aprobada`).",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -6270,6 +6315,165 @@
         }
       }
     },
+    "/api/admin/empresas": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminEmpresasList",
+        "summary": "Listar todas las empresas",
+        "responses": {
+          "200": {
+            "description": "Lista paginada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data",
+                        "pagination"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Empresa"
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Redundante con pagination.total (legacy)."
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/pageParam"
+          },
+          {
+            "$ref": "#/components/parameters/limitParam"
+          },
+          {
+            "$ref": "#/components/parameters/estadoQuery"
+          },
+          {
+            "$ref": "#/components/parameters/nivelConfianzaQuery"
+          }
+        ]
+      }
+    },
+    "/api/admin/empresas/{id}/confianza": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "adminEmpresasConfianza",
+        "summary": "Marcar o revocar el nivel de confianza institucional de una empresa",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "nivelConfianza": {
+                              "type": "string",
+                              "enum": [
+                                "estandar",
+                                "confiable"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "RBAC-05. Una empresa `confiable` agrega reclutadores y publica ofertas sin moderación previa (moderación posterior — el admin sigue pudiendo pausar/rechazar/cerrar después). Revocar no modifica retroactivamente lo ya publicado; solo rige para operaciones nuevas.\n\n**Roles:** admin",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCambiarConfianzaEmpresa"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/ofertas/pendientes": {
       "get": {
         "tags": [
@@ -6389,6 +6593,9 @@
           },
           {
             "$ref": "#/components/parameters/estadoQuery"
+          },
+          {
+            "$ref": "#/components/parameters/estadoModeracionQuery"
           }
         ]
       }
@@ -6399,7 +6606,7 @@
           "admin"
         ],
         "operationId": "adminOfertasModerar",
-        "summary": "Moderar una oferta (aprobar/pausar/rechazar/cerrar)",
+        "summary": "Moderar una oferta (aprobar/rechazar) o cambiar su ciclo de vida (pausar/cerrar)",
         "responses": {
           "200": {
             "description": "OK",
@@ -6422,11 +6629,16 @@
                         "data": {
                           "type": "object",
                           "properties": {
-                            "estado": {
+                            "accion": {
                               "type": "string"
                             },
-                            "moderada": {
-                              "type": "boolean"
+                            "estadoModeracion": {
+                              "type": "string",
+                              "description": "Presente cuando `accion` fue aprobar/rechazar."
+                            },
+                            "estado": {
+                              "type": "string",
+                              "description": "Presente cuando `accion` fue pausar/cerrar."
                             }
                           }
                         }
@@ -6456,7 +6668,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "**Roles:** admin",
+        "description": "`aprobar`/`rechazar` cambian `estadoModeracion`. `pausar`/`cerrar` cambian `estado` — nunca ambos en la misma llamada. Transiciones de moderación válidas: pendiente→aprobada, pendiente→rechazada, auto_aprobada→rechazada, aprobada→rechazada (rechazada es terminal).\n\n**Roles:** admin",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"

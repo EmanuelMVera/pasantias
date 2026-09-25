@@ -87,7 +87,6 @@ async function sembrar() {
 
   // ── Empresa + equipo ──────────────────────────────────────────────────────
   const empresa = await Empresa.create({
-    usuarioId: uAdminEmpresa.id,
     razonSocial: fx.empresa.razonSocial,
     cuit: fx.empresa.cuit,
     rubro: 'Software',

@@ -295,7 +295,7 @@ exports.getSolicitudesReclutador = async (req, res) => {
   const [{ count, rows }, conteoPorEstado] = await Promise.all([
     SolicitudReclutador.findAndCountAll({
       where,
-      include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'usuarioId'] }],
+      include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial'] }],
       order: [['createdAt', 'DESC'], ['id', 'DESC']],
       limit,
       offset,

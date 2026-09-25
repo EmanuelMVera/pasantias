@@ -6,8 +6,8 @@ const { buildPagination, groupCount } = require('../utils/pagination');
 
 // Resolución canónica de empresa para un request autenticado.
 // Orden: (1) req.empresa inyectado por middleware → (2) membresía activa en
-// empresa_usuarios (cubre reclutador y admin_empresa) → (3) fallback legacy
-// por Empresa.usuarioId para cuentas creadas antes de la feature multi-usuario.
+// empresa_usuarios (única fuente de verdad desde RBAC-06 — cubre reclutador
+// y admin_empresa por igual).
 async function resolverEmpresaDelRequest(req) {
   if (req.empresa) return req.empresa;
 
@@ -15,9 +15,22 @@ async function resolverEmpresaDelRequest(req) {
     where: { usuarioId: req.usuario.id, activo: true },
     include: [{ model: Empresa, as: 'empresa' }],
   });
-  if (membresia?.empresa) return membresia.empresa;
+  return membresia?.empresa ?? null;
+}
 
-  return Empresa.findOne({ where: { usuarioId: req.usuario.id } });
+/**
+ * Devuelve los admin_empresa ACTIVOS de una empresa — normalmente uno solo
+ * (hoy no hay forma de crear más de uno desde la UI), pero el helper está
+ * pensado para notificar/habilitar a todos si en el futuro eso cambiara
+ * (RBAC-06 — reemplaza el uso de Empresa.usuarioId como "el dueño").
+ * @returns {Promise<Usuario[]>}
+ */
+async function obtenerAdminsActivos(empresaId) {
+  const membresias = await EmpresaUsuario.findAll({
+    where: { empresaId, rolInterno: 'admin_empresa', activo: true },
+    include: [{ model: Usuario, as: 'usuario' }],
+  });
+  return membresias.map((m) => m.usuario).filter(Boolean);
 }
 
 async function obtenerMetricasDashboard(empresaId) {
@@ -168,6 +181,7 @@ async function obtenerCandidatosConFoto(empresaId, { estado, page = 1, limit = 2
 
 module.exports = {
   resolverEmpresaDelRequest,
+  obtenerAdminsActivos,
   obtenerMetricasDashboard,
   obtenerOfertasConConteo,
   obtenerCandidatosConFoto,

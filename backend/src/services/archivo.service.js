@@ -24,14 +24,14 @@ const HttpError = require('../utils/httpError');
 
 // Misma resolución que empresa.service.js::resolverEmpresaDelRequest, pero
 // sin depender de verifyEmpresaMember (este endpoint también lo usan
-// alumnos/admin, que nunca pasan por ese middleware).
+// alumnos/admin, que nunca pasan por ese middleware). RBAC-06: exclusivamente
+// vía membresía activa en empresa_usuarios.
 async function _resolverEmpresaDelUsuario(usuarioId) {
   const membresia = await EmpresaUsuario.findOne({
     where: { usuarioId, activo: true },
     include: [{ model: Empresa, as: 'empresa' }],
   });
-  if (membresia?.empresa) return membresia.empresa;
-  return Empresa.findOne({ where: { usuarioId } });
+  return membresia?.empresa ?? null;
 }
 
 async function _empresaTienePostulacionDe(usuarioPropietarioId, empresaId) {

@@ -37,14 +37,15 @@ exports.postular = async (req, res) => {
     cambiadoPorUsuarioId: usuarioId,
   });
 
-  await crearNotificacion({
-    usuarioId: oferta.empresa.usuarioId,
+  const adminsEmpresa = await empresaService.obtenerAdminsActivos(oferta.empresaId);
+  await Promise.all(adminsEmpresa.map((admin) => crearNotificacion({
+    usuarioId: admin.id,
     titulo: 'Nueva postulación recibida',
     mensaje: `${req.usuario.nombre} ${req.usuario.apellido} se postuló a "${oferta.titulo}".`,
     tipo: 'postulacion',
     enlace: `/empresa/postulantes/${ofertaId}`,
     accionURL: `/empresa/postulantes/${ofertaId}`,
-  });
+  })));
 
   registrarAuditoria({
     req,

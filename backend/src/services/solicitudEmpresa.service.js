@@ -62,7 +62,6 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }) 
     const cuitLimpio = (solicitud.cuit || '').replace(/\D/g, '');
 
     nuevaEmpresa = await Empresa.create({
-      usuarioId:        nuevoUsuario.id,
       razonSocial:      solicitud.razonSocial,
       cuit:             cuitLimpio.length === 11 ? cuitLimpio : null,
       rubro:            solicitud.rubro,

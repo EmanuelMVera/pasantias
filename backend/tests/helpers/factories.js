@@ -71,7 +71,6 @@ async function crearEmpresaConAdmin(overrides = {}) {
     rol: 'empresa', activo: true, habilitado: true,
   });
   const empresa = await Empresa.create({
-    usuarioId: usuarioAdmin.id,
     razonSocial: `Empresa Test ${suf}`,
     cuit: cuitUnico(),
     estadoAprobacion: 'aprobada',

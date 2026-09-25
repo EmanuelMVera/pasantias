@@ -62,9 +62,9 @@ ejecute una vez: `CREATE EXTENSION pgcrypto; CREATE EXTENSION pg_trgm;`.
 
 ---
 
-## Las migraciones actuales (000 → 018)
+## Las migraciones actuales (000 → 019)
 
-19 archivos. `000` es el baseline; `001`–`018` son incrementales. Todas ya están
+20 archivos. `000` es el baseline; `001`–`019` son incrementales. Todas ya están
 aplicadas en las bases de desarrollo/CI y **son históricas** — no se tocan.
 
 | # | Archivo | Origen | Qué hace |
@@ -88,6 +88,7 @@ aplicadas en las bases de desarrollo/CI y **son históricas** — no se tocan.
 | 016 | `016-separar-estado-moderacion-oferta.js` | RBAC-04 | `ofertas.estado` pasa a solo ciclo de vida (`activa\|pausada\|cerrada`, saca `'rechazada'`); nueva columna `estadoModeracion` (`pendiente\|aprobada\|rechazada\|auto_aprobada`) reemplaza al booleano `moderada` (se elimina en la misma migración). Backfill de datos existentes + reemplazo de los índices `idx_ofertas_moderada_estado`/`idx_ofertas_estado_moderada_created` por sus equivalentes sobre `estadoModeracion`. |
 | 017 | `017-nivel-confianza-empresa.js` | RBAC-05 | `empresas.nivelConfianza` (STRING + CHECK, `estandar\|confiable`, default `'estandar'`) — política institucional que permite a una empresa de confianza operar con moderación posterior en vez de previa. |
 | 018 | `018-activity-log-confianza-empresa.js` | RBAC-05 | Agrega 4 valores al ENUM `activity_logs.accion`: `'marcar_empresa_confiable'`, `'revocar_confianza_empresa'`, `'auto_aprobar_solicitud_reclutador'`, `'oferta_auto_aprobada'`. |
+| 019 | `019-eliminar-empresa-usuarioid.js` | RBAC-06 | Elimina `empresas.usuarioId` (mecanismo legacy paralelo a `empresa_usuarios`). Backfillea cualquier empresa sin fila `admin_empresa`, valida que todas tengan una antes de seguir (aborta si no), reemplaza `unique_empresa_usuario_dueno` por el índice parcial `unique_admin_empresa_por_usuario ON empresa_usuarios("usuarioId") WHERE "rolInterno"='admin_empresa'`, y recién ahí dropea la columna. `EmpresaUsuario` queda como única fuente de verdad de "quién representa a una empresa". |
 
 `db:migrate:status` es la fuente de verdad de qué se aplicó en *esta* base.
 

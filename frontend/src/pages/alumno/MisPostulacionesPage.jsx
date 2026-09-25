@@ -182,10 +182,13 @@ export default function MisPostulacionesPage() {
                           Ver oferta
                         </Link>
                       )}
-                      {/* Chat: solo cuando la postulación está en estado activo */}
-                      {ESTADOS_HABILITAN_CHAT.includes(normalizarEstado(p.estado)) && p.oferta?.empresa?.usuarioId && (
+                      {/* Chat: solo cuando la postulación está en estado activo y hay
+                          un reclutador responsable identificado (creadaPorUsuarioId) —
+                          es quien realmente puede chatear con el candidato, no el
+                          admin_empresa (RBAC-06 / reglas de chat). */}
+                      {ESTADOS_HABILITAN_CHAT.includes(normalizarEstado(p.estado)) && p.oferta?.creadaPorUsuarioId && (
                         <Link
-                          to={`/chat/${p.oferta.empresa.usuarioId}`}
+                          to={`/chat/${p.oferta.creadaPorUsuarioId}`}
                           className={styles.btnChat}
                           title="Chatear con el reclutador de esta empresa"
                         >

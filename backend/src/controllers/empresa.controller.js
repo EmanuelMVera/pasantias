@@ -188,7 +188,7 @@ exports.getEmpresaPublica = async (req, res) => {
   const empresa = await Empresa.findOne({
     where: { id: req.params.id, estadoAprobacion: 'aprobada' },
     attributes: ['id', 'razonSocial', 'rubro', 'descripcion', 'ciudad',
-                 'direccion', 'telefono', 'sitioWeb', 'logo', 'usuarioId'],
+                 'direccion', 'telefono', 'sitioWeb', 'logo'],
   });
   if (!empresa) {
     return res.status(404).json({ success: false, message: 'Empresa no encontrada o no disponible.' });

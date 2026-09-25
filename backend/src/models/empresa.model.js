@@ -2,7 +2,12 @@
  * empresa.model.js — Modelo Sequelize para la tabla "empresas".
  *
  * Representa la información institucional de una empresa empleadora.
- * Cada empresa está vinculada a un Usuario con rol 'empresa'.
+ * Las personas asociadas a una empresa (quien la representa
+ * institucionalmente y los reclutadores) viven exclusivamente en
+ * `EmpresaUsuario` — ver empresaUsuario.model.js. `Empresa` en sí no tiene
+ * ninguna referencia directa a un usuario (RBAC-06: se eliminó
+ * `usuarioId`, el mecanismo "dueño directo" legacy que convivía con
+ * `EmpresaUsuario` desde el baseline del esquema — migración 019).
  *
  * Proceso de alta:
  * - La empresa se registra y queda en estado "pendiente"
@@ -17,16 +22,6 @@ module.exports = (sequelize) => {
   const Empresa = sequelize.define('Empresa', {
     // Identificador único autoincremental
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-
-    // Referencia al usuario dueño de esta empresa (clave foránea).
-    // unique: la relación es 1:1 — sin esto, un bug podía crear dos
-    // empresas para el mismo usuario sin que nada lo impidiera.
-    usuarioId: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      unique: true,
-      references: { model: 'usuarios', key: 'id' },
-    },
 
     // Nombre legal/comercial de la empresa
     razonSocial: { type: DataTypes.STRING(200), allowNull: false },

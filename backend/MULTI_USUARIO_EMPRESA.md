@@ -21,11 +21,12 @@ empresa (1) ───< empresa_usuarios (N) >─── usuario (N)
                    activo      →  true | false  (suspensión sin perder historial)
 ```
 
-`empresa_usuarios` es la fuente de verdad de los permisos dentro de la empresa.
-`verifyEmpresaMember` la resuelve en cada request y adjunta `req.empresa` +
-`req.miembroEmpresa`. Un usuario que es **dueño directo** de la empresa
-(`empresa.usuarioId === req.usuario.id`) obtiene una membresía **virtual**
-`admin_empresa` aunque no tenga fila en la tabla.
+`empresa_usuarios` es la **única** fuente de verdad de los permisos dentro de
+la empresa (RBAC-06, migración 019) — `Empresa` no tiene ninguna referencia
+directa a `Usuario`. `verifyEmpresaMember` resuelve `req.empresa` +
+`req.miembroEmpresa` en cada request exclusivamente a partir de una membresía
+activa en la tabla; no existe ningún fallback ni membresía virtual. Toda
+empresa tiene garantizada al menos una fila `admin_empresa` activa.
 
 ---
 

@@ -22,32 +22,10 @@ async function listarEquipo(empresa) {
     ],
   });
 
-  const adminPresenteEnTabla = equipo.some((m) => m.usuarioId === empresa.usuarioId);
-  let data = equipo.map((m) => m.toJSON());
-
-  // Cuentas creadas antes de la feature multi-usuario pueden no tener registro
-  // en empresa_usuarios; se inserta al admin virtualmente para que el frontend
-  // detecte correctamente su rol.
-  if (!adminPresenteEnTabla) {
-    const usuarioAdmin = await Usuario.findByPk(empresa.usuarioId, {
-      attributes: ['id', 'nombre', 'apellido', 'email', 'fotoPerfil', 'ultimoAcceso'],
-    });
-    if (usuarioAdmin) {
-      data.unshift({
-        id: null,
-        empresaId: empresa.id,
-        usuarioId: empresa.usuarioId,
-        rolInterno: 'admin_empresa',
-        activo: true,
-        esAdminVirtual: true,
-        usuario: usuarioAdmin.toJSON(),
-        createdAt: empresa.createdAt,
-        updatedAt: empresa.updatedAt,
-      });
-    }
-  }
-
-  return data;
+  // RBAC-06: empresa_usuarios es la única fuente de verdad — toda empresa
+  // tiene garantizada su fila admin_empresa real (migración 019), no hace
+  // falta insertar ninguna fila virtual.
+  return equipo.map((m) => m.toJSON());
 }
 
 /**
