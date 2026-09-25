@@ -11,7 +11,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { adminService } from '../../services/api';
+import { adminService } from '../../services/admin.service';
 import Modal from '../../components/Modal/Modal';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import { usePaginacion } from '../../hooks/usePaginacion';

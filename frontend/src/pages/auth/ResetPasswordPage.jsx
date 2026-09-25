@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { authService } from '../../services/api';
+import { authService } from '../../services/auth.service';
 import { calcularFortalezaPassword } from '../../utils/passwordStrength';
 import styles from './LoginPage.module.css';
 

@@ -14,7 +14,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { postulacionService } from '../../services/api';
+import { postulacionService } from '../../services/postulacion.service';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import { LISTA_ESTADOS_POSTULACION, ESTADOS_HABILITAN_CHAT, getEstadoInfo, normalizarEstado } from '../../constants/postulacionEstados';
 import styles from './MisPostulacionesPage.module.css';

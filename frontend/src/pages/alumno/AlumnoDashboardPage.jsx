@@ -14,7 +14,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { ofertaService, studentService } from '../../services/api';
+import { ofertaService } from '../../services/oferta.service';
+import { studentService } from '../../services/student.service';
 import styles from './AlumnoDashboardPage.module.css';
 
 // ── Tarjeta de métrica ────────────────────────────────────────────────────────

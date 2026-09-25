@@ -21,7 +21,7 @@
 
 import { createContext, useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { empresaService } from '../services/api';
+import { empresaService } from '../services/empresa.service';
 
 const EmpresaContext = createContext(null);
 

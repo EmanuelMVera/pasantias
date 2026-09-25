@@ -12,7 +12,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { postulacionService, abrirArchivoPrivado } from '../../services/api';
+import { postulacionService } from '../../services/postulacion.service';
+import { abrirArchivoPrivado } from '../../services/api';
 import Avatar from '../../components/Avatar/Avatar';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import { useEmpresa } from '../../hooks/useEmpresa';

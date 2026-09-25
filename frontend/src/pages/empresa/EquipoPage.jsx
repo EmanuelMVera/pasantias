@@ -13,7 +13,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { empresaService } from '../../services/api';
+import { empresaService } from '../../services/empresa.service';
 import { useEmpresa } from '../../hooks/useEmpresa';
 import Avatar from '../../components/Avatar/Avatar';
 import Modal from '../../components/Modal/Modal';

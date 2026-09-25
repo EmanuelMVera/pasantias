@@ -9,7 +9,7 @@
  */
 
 import { useState, useRef } from 'react';
-import { adminService } from '../../services/api';
+import { adminService } from '../../services/admin.service';
 import { filasACsv, descargarTexto } from '../../utils/csv';
 import styles from './AdminImportacionPage.module.css';
 

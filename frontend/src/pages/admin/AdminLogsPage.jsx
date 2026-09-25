@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { adminService } from '../../services/api';
+import { adminService } from '../../services/admin.service';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import PageHeader from '../../components/ui/PageHeader';
 import ExportMenu from '../../components/ui/ExportMenu';

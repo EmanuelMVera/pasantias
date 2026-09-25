@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ofertaService, postulacionService } from '../../services/api';
+import { ofertaService } from '../../services/oferta.service';
+import { postulacionService } from '../../services/postulacion.service';
 
 const TIPO_PUESTO_CONFIG = {
   pasante: { label: '🎓 Pasante', desc: 'Rol educativo. Sin requerimiento de experiencia previa.',  color: '#0891b2', bg: '#e0f2fe' },

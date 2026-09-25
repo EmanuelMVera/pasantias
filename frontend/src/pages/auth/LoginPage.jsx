@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { getRutaInicio } from '../../utils/rutas';
-import { demoService } from '../../services/api';
+import { demoService } from '../../services/demo.service';
 import styles from './LoginPage.module.css';
 
 export default function LoginPage() {

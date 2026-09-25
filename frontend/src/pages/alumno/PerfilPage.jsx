@@ -14,7 +14,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import { userService, abrirArchivoPrivado } from '../../services/api';
+import { userService } from '../../services/user.service';
+import { abrirArchivoPrivado } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import styles from './PerfilPage.module.css';
 

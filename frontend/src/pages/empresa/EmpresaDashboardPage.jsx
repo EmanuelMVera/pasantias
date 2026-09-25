@@ -11,7 +11,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { empresaService, ofertaService } from '../../services/api';
+import { empresaService } from '../../services/empresa.service';
+import { ofertaService } from '../../services/oferta.service';
 import { useEmpresa } from '../../hooks/useEmpresa';
 import { useAuth } from '../../hooks/useAuth';
 import Paginacion from '../../components/Paginacion/Paginacion';

@@ -13,7 +13,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { empresaService } from '../../services/api';
+import { empresaService } from '../../services/empresa.service';
 import Card from '../../components/ui/Card';
 import EmptyState from '../../components/ui/EmptyState';
 import styles from './EmpresaPublicaPage.module.css';

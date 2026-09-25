@@ -14,7 +14,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ofertaService } from '../../services/api';
+import { ofertaService } from '../../services/oferta.service';
 import { useEmpresa } from '../../hooks/useEmpresa';
 import { useAuth } from '../../hooks/useAuth';
 import OfertaForm from './OfertaForm';

@@ -16,7 +16,7 @@
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { solicitudEmpresaService } from '../../services/api';
+import { solicitudEmpresaService } from '../../services/solicitudEmpresa.service';
 import styles from './SolicitudEmpresaPage.module.css';
 
 // ── Lista de carreras disponibles ─────────────────────────────────────────────

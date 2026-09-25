@@ -22,7 +22,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { mensajeService } from '../services/api';
+import { mensajeService } from '../services/chat.service';
 import Avatar from '../components/Avatar/Avatar';
 import Modal from '../components/Modal/Modal';
 import Toast from '../components/ui/Toast';

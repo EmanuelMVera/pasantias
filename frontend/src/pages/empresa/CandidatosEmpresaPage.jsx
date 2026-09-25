@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { empresaService } from '../../services/api';
+import { empresaService } from '../../services/empresa.service';
 import Avatar from '../../components/Avatar/Avatar';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import TableResponsive from '../../components/ui/TableResponsive';

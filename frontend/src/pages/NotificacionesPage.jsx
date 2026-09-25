@@ -15,7 +15,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { notificacionService } from '../services/api';
+import { notificacionService } from '../services/notificacion.service';
 import Paginacion from '../components/Paginacion/Paginacion';
 import { usePaginacion } from '../hooks/usePaginacion';
 import styles from './NotificacionesPage.module.css';

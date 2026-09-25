@@ -23,7 +23,8 @@
  */
 
 import { createContext, useState, useEffect, useCallback } from 'react';
-import { authService, setSesionExpiradaHandler } from '../services/api';
+import { authService } from '../services/auth.service';
+import { setSesionExpiradaHandler } from '../services/api';
 
 // Crea el contexto. El valor null indica que aún no fue inicializado
 const AuthContext = createContext(null);

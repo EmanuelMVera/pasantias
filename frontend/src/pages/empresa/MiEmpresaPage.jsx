@@ -12,7 +12,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { empresaService } from '../../services/api';
+import { empresaService } from '../../services/empresa.service';
 import { useEmpresa } from '../../hooks/useEmpresa';
 import PageContainer from '../../components/ui/PageContainer';
 import styles from './MiEmpresaPage.module.css';

@@ -12,7 +12,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { ofertaService } from '../../services/api';
+import { ofertaService } from '../../services/oferta.service';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import styles from './OfertasPage.module.css';
 

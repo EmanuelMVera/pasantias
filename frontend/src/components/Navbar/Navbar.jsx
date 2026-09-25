@@ -14,7 +14,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useEmpresa } from '../../hooks/useEmpresa';
-import { notificacionService, mensajeService } from '../../services/api';
+import { notificacionService } from '../../services/notificacion.service';
+import { mensajeService } from '../../services/chat.service';
 import Avatar from '../Avatar/Avatar';
 import styles from './Navbar.module.css';
 

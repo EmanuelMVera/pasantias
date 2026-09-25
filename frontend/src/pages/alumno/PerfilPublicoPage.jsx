@@ -12,7 +12,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { userService, abrirArchivoPrivado } from '../../services/api';
+import { userService } from '../../services/user.service';
+import { abrirArchivoPrivado } from '../../services/api';
 import Avatar from '../../components/Avatar/Avatar';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';

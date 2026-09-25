@@ -18,7 +18,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { adminService } from '../../services/api';
+import { adminService } from '../../services/admin.service';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import TableResponsive from '../../components/ui/TableResponsive';
 import styles from './AdminEmpresasPage.module.css';
