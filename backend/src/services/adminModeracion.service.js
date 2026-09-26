@@ -14,6 +14,7 @@
  * decisión 2).
  */
 
+const { Op, fn, col, where: sqlWhere } = require('sequelize');
 const { Empresa, Usuario, EmpresaUsuario, Oferta } = require('../models');
 const { crearNotificacion } = require('../utils/notificador');
 const HttpError = require('../utils/httpError');
@@ -76,10 +77,67 @@ async function rechazarEmpresa(id, motivo, { actorUsuarioId, ip, requestId }) {
 
 // ── Listado general + nivel de confianza (RBAC-05) ─────────────────────────────
 
-async function listarEmpresas({ estadoAprobacion, nivelConfianza, page = 1, limit = 25, offset = 0 }) {
+// Escapa % _ \ para que lo que escribe el admin se busque literal dentro de ILIKE.
+const escaparLike = (texto) => texto.replace(/[\\%_]/g, '\\$&');
+
+const MAX_LARGO_BUSQUEDA = 100;
+
+// IDs de las empresas cuyo admin_empresa activo coincide con el patrón (nombre,
+// apellido, nombre completo o email). Se resuelve en una consulta aparte y se
+// filtra `Empresa.id IN (...)`: así el `limit` de la paginación sigue aplicando
+// sobre empresas (no sobre filas del join `equipo`, que es hasMany).
+async function idsEmpresasPorResponsable(patron) {
+  const filas = await EmpresaUsuario.findAll({
+    attributes: ['empresaId'],
+    where: { rolInterno: 'admin_empresa', activo: true },
+    include: [{
+      model: Usuario,
+      as: 'usuario',
+      required: true,
+      attributes: [],
+      where: {
+        [Op.or]: [
+          { nombre:   { [Op.iLike]: patron } },
+          { apellido: { [Op.iLike]: patron } },
+          { email:    { [Op.iLike]: patron } },
+          sqlWhere(fn('concat', col('usuario.nombre'), ' ', col('usuario.apellido')), { [Op.iLike]: patron }),
+        ],
+      },
+    }],
+    raw: true,
+  });
+  return filas.map((f) => f.empresaId);
+}
+
+/**
+ * Listado de empresas con filtros server-side (estado, confianza y búsqueda
+ * `q` por razón social, CUIT o responsable). La búsqueda se aplica ANTES de
+ * paginar: `pagination.total` es el total de empresas que matchean, no de la
+ * página actual.
+ */
+async function listarEmpresas({ estadoAprobacion, nivelConfianza, q, page = 1, limit = 25, offset = 0 }) {
   const where = {};
   if (estadoAprobacion) where.estadoAprobacion = estadoAprobacion;
   if (nivelConfianza) where.nivelConfianza = nivelConfianza;
+
+  const texto = typeof q === 'string' ? q.trim().slice(0, MAX_LARGO_BUSQUEDA) : '';
+  if (texto) {
+    const patron = `%${escaparLike(texto)}%`;
+    const condiciones = [{ razonSocial: { [Op.iLike]: patron } }];
+
+    // El CUIT se guarda solo con dígitos: si el texto parece un CUIT ("30-1111-8"),
+    // se compara por dígitos. Un texto con letras nunca busca por CUIT (evita que
+    // "Empresa 2" traiga todos los CUIT que contengan un 2).
+    if (/^[\d\-.\s]+$/.test(texto)) {
+      const digitos = texto.replace(/\D/g, '');
+      if (digitos) condiciones.push({ cuit: { [Op.like]: `%${digitos}%` } });
+    }
+
+    const idsResponsable = await idsEmpresasPorResponsable(patron);
+    if (idsResponsable.length) condiciones.push({ id: { [Op.in]: idsResponsable } });
+
+    where[Op.or] = condiciones;
+  }
 
   const { count, rows } = await Empresa.findAndCountAll({
     where,
@@ -87,6 +145,8 @@ async function listarEmpresas({ estadoAprobacion, nivelConfianza, page = 1, limi
     order: [['createdAt', 'DESC'], ['id', 'DESC']],
     limit,
     offset,
+    // `equipo` es hasMany: sin `distinct` el count se infla por el join.
+    distinct: true,
   });
 
   return { data: rows.map(_conAdminAplanado), pagination: buildPagination(count, { page, limit }) };

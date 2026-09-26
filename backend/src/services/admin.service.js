@@ -79,6 +79,13 @@ async function obtenerActividadReciente() {
   });
 }
 
+// `hasta` como "YYYY-MM-DD" (lo que manda un <input type="date">) significa "hasta el
+// final de ese día" (UTC, igual que `desde` arranca a las 00:00 UTC). Sin esto,
+// `new Date('2026-03-15')` es las 00:00 y el filtro excluía el día completo.
+// Cualquier otro formato (ISO con hora) se respeta tal cual.
+const SOLO_FECHA = /^\d{4}-\d{2}-\d{2}$/;
+const _finDeDia = (hasta) => new Date(SOLO_FECHA.test(hasta) ? `${hasta}T23:59:59.999Z` : hasta);
+
 function _whereLogs({ accion, usuarioId, entidad, desde, hasta }) {
   const where = {};
   if (accion)    where.accion    = accion;
@@ -87,7 +94,7 @@ function _whereLogs({ accion, usuarioId, entidad, desde, hasta }) {
   if (desde || hasta) {
     where.createdAt = {};
     if (desde) where.createdAt[Op.gte] = new Date(desde);
-    if (hasta) where.createdAt[Op.lte] = new Date(hasta);
+    if (hasta) where.createdAt[Op.lte] = _finDeDia(hasta);
   }
   return where;
 }

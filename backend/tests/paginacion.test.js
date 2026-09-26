@@ -83,18 +83,27 @@ describe('SCALE-03 · Paginación', () => {
       idsUsuarios.push(admin.id);
       const token = await loginYObtenerToken(admin.email, passwordPlana);
 
-      const res = await request(app)
-        .get('/api/admin/usuarios?rol=empresa&limit=100')
-        .set('Authorization', `Bearer ${token}`);
+      // Se recorren TODAS las páginas: no se puede asumir que la tabla entra en una sola
+      // (la base local de test acumula cientos de usuarios de corridas anteriores).
+      const ids = [];
+      let total;
+      for (let page = 1; page <= 50; page++) {
+        const res = await request(app)
+          .get(`/api/admin/usuarios?rol=empresa&limit=100&page=${page}`)
+          .set('Authorization', `Bearer ${token}`);
+        expect(res.status).toBe(200);
+        expect(res.body.pagination).toBeDefined();
+        total = res.body.pagination.total;
+        ids.push(...res.body.data.map((u) => u.id));
+        if (page >= res.body.pagination.totalPages) break;
+      }
 
-      expect(res.status).toBe(200);
-      expect(res.body.pagination).toBeDefined();
-      // total == filas devueltas cuando todo entra en una página
-      expect(res.body.pagination.total).toBe(res.body.data.length);
-      // sin duplicados por el join
-      const ids = res.body.data.map((u) => u.id);
+      // total == filas devueltas sumando todas las páginas (el join no lo infla)…
+      expect(total).toBe(ids.length);
+      // …y sin duplicados por el join
       expect(new Set(ids).size).toBe(ids.length);
-    });
+      expect(ids).toContain(usuarioAdmin.id);
+    }, 30_000);
   });
 
   // ── GET /api/postulaciones/oferta/:id (conteoPorEstado + filtro estado) ────

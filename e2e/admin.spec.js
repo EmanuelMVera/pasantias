@@ -12,31 +12,34 @@ test('admin: login → moderar oferta → gestionar solicitud', async ({ page })
     await page.goto('/admin/ofertas');
     await expect(page.getByRole('heading', { name: /moderaci[oó]n de ofertas/i })).toBeVisible();
 
-    // La oferta aparece en dos tablas (Pendientes / Historial). Acotamos a la
-    // sección "Pendientes de revisión", cuyo botón es "✅ Aprobar".
-    const seccionPendientes = page.locator('section').filter({
-      has: page.getByRole('heading', { name: /pendientes de revisi[oó]n/i }),
-    });
-    const fila = seccionPendientes.locator('tbody tr').filter({ hasText: fx.ofertaPendiente.titulo });
+    // La pestaña "Pendientes" es la que abre por defecto.
+    await expect(page.getByRole('tab', { name: /pendientes/i })).toHaveAttribute('aria-selected', 'true');
+
+    const fila = page.locator('tbody tr').filter({ hasText: fx.ofertaPendiente.titulo });
     await expect(fila).toBeVisible();
     await fila.getByRole('button', { name: /aprobar/i }).click();
 
     await expect(page.getByText(/oferta aprobada correctamente/i)).toBeVisible();
-    // ya no está en "Pendientes de revisión"
-    await expect(
-      seccionPendientes.locator('tbody tr').filter({ hasText: fx.ofertaPendiente.titulo }),
-    ).toHaveCount(0);
+    // ya no está en la cola de pendientes
+    await expect(page.locator('tbody tr').filter({ hasText: fx.ofertaPendiente.titulo })).toHaveCount(0);
   });
 
   await test.step('13. gestionar (aprobar) una solicitud de empresa', async () => {
     await page.goto('/admin/solicitudes');
-    await expect(page.getByRole('heading', { name: /solicitudes de empresa/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^solicitudes$/i })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /empresas/i })).toHaveAttribute('aria-selected', 'true');
 
-    const fila = page.locator('tr').filter({ hasText: fx.solicitud.razonSocial });
+    // La fila solo lleva "Revisar": la decisión se toma en el detalle.
+    const fila = page.locator('tbody tr').filter({ hasText: fx.solicitud.razonSocial });
     await expect(fila).toBeVisible();
-    await fila.locator('[id^="btn-aprobar-"]').click();
-    await fila.getByRole('button', { name: /s[ií], aprobar/i }).click();
+    await fila.getByRole('button', { name: /revisar/i }).click();
 
-    await expect(page.getByText(new RegExp(`${fx.solicitud.razonSocial}.*aprobada`, 'i'))).toBeVisible();
+    await page.locator('#btn-panel-aprobar').click();
+    await page.locator('#btn-confirmar-aprobar').click();
+
+    // El toast (role=status) es el único que menciona la razón social + "aprobada".
+    await expect(
+      page.locator('[role="status"]').filter({ hasText: new RegExp(`${fx.solicitud.razonSocial}.*aprobada`, 'i') }),
+    ).toBeVisible();
   });
 });

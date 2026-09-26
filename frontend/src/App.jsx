@@ -4,7 +4,7 @@
  * Define la estructura principal del sistema:
  * - Envuelve toda la app con el AuthProvider (contexto de autenticación)
  * - Configura el enrutador (BrowserRouter)
- * - Renderiza el TopBanner (logo institucional) y el Navbar (navegación)
+ * - Renderiza el Navbar (navegación + marca SisPasantías)
  * - Define todas las rutas de la aplicación y sus protecciones de acceso
  *
  * Tipos de rutas:
@@ -18,7 +18,7 @@
  * - egresado → /dashboard
  */
 
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import { EmpresaProvider } from './context/EmpresaContext';
@@ -70,7 +70,6 @@ import NotificacionesPage from './pages/NotificacionesPage';
 
 // Componentes de layout global que se muestran en todas las páginas
 import Navbar from './components/Navbar/Navbar';
-import TopBanner from './components/TopBanner/TopBanner';
 
 /**
  * ProtectedRoute — Componente de guardia de rutas.
@@ -292,23 +291,15 @@ function AppRoutes() {
 }
 
 /**
- * Chrome — Estructura visual común (banner + navbar + contenido).
+ * Chrome — Estructura visual común (navbar + contenido).
  *
- * El TopBanner institucional se oculta en las rutas de autenticación, que ya
- * tienen su propia cabecera con logo (evita ~100px de banner duplicado).
+ * La marca (Brand) vive dentro del navbar: ya no hay un banner institucional
+ * aparte, así que el alto del chrome autenticado es solo el del navbar.
  */
-const RUTAS_SIN_BANNER = ['/login', '/registro-empresa', '/forgot-password', '/reset-password'];
-
 function Chrome() {
-  const { pathname } = useLocation();
-  const ocultarBanner = RUTAS_SIN_BANNER.some(
-    (r) => pathname === r || pathname.startsWith(r + '/'),
-  );
-
   return (
     <>
       <a href="#contenido" className="skip-link">Saltar al contenido</a>
-      {!ocultarBanner && <TopBanner />}
       <Navbar />
       <main id="contenido">
         <AppRoutes />

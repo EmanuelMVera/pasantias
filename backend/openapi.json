@@ -1987,6 +1987,10 @@
               "rechazadas": {
                 "type": "integer"
               },
+              "solicitudesPendientes": {
+                "type": "integer",
+                "description": "Solicitudes de registro de empresa que esperan decisión del admin (SolicitudEmpresa.estado = pendiente). Es el número a mostrar como \"pendientes\": `pendientes` cuenta filas Empresa, que se crean recién al aprobar."
+              },
               "reclutadoresActivos": {
                 "type": "integer"
               },
@@ -1994,7 +1998,8 @@
                 "type": [
                   "number",
                   "null"
-                ]
+                ],
+                "description": "Histórico: promedio de días entre el envío de la solicitud de empresa y su aprobación (SolicitudEmpresa.revisadaEn − createdAt). `null` si todavía no se aprobó ninguna."
               },
               "conMasOfertas": {
                 "type": "array",
@@ -2056,10 +2061,12 @@
             "type": "object",
             "properties": {
               "total": {
-                "type": "integer"
+                "type": "integer",
+                "description": "Postulaciones que hoy figuran como contratadas (histórico)."
               },
               "enPeriodo": {
-                "type": "integer"
+                "type": "integer",
+                "description": "Postulaciones distintas que pasaron a \"contratado\" DENTRO del período (según el historial de estados), sin importar cuándo se postularon."
               },
               "tasaContratacion": {
                 "type": [
@@ -6372,7 +6379,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "**Roles:** admin",
+        "description": "Filtros server-side, aplicados antes de paginar (`pagination.total` cuenta las empresas que matchean). `q` busca por razón social, CUIT (solo si el texto parece un CUIT) o responsable (nombre, apellido o email del admin_empresa activo).\n\n**Roles:** admin",
         "parameters": [
           {
             "$ref": "#/components/parameters/pageParam"
@@ -6385,6 +6392,9 @@
           },
           {
             "$ref": "#/components/parameters/nivelConfianzaQuery"
+          },
+          {
+            "$ref": "#/components/parameters/qQuery"
           }
         ]
       }
@@ -6778,6 +6788,7 @@
           {
             "name": "desde",
             "in": "query",
+            "description": "Inclusivo, desde las 00:00 UTC de ese día.",
             "schema": {
               "type": "string",
               "format": "date"
@@ -6786,6 +6797,7 @@
           {
             "name": "hasta",
             "in": "query",
+            "description": "Inclusivo: cubre el día completo (hasta las 23:59:59.999 UTC).",
             "schema": {
               "type": "string",
               "format": "date"
@@ -6867,6 +6879,7 @@
           {
             "name": "desde",
             "in": "query",
+            "description": "Inclusivo, desde las 00:00 UTC de ese día.",
             "schema": {
               "type": "string",
               "format": "date"
@@ -6875,6 +6888,7 @@
           {
             "name": "hasta",
             "in": "query",
+            "description": "Inclusivo: cubre el día completo (hasta las 23:59:59.999 UTC).",
             "schema": {
               "type": "string",
               "format": "date"

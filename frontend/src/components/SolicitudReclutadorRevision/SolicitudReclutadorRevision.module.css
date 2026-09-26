@@ -1,0 +1,68 @@
+.cuerpo {
+  padding: 0 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.datos {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 0.4rem 0.75rem;
+  margin: 0;
+}
+
+.datos dt {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.datos dd {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.datos a { color: var(--primary); text-decoration: none; }
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.btnAprobar {
+  font-family: var(--font-primary);
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0.7rem 1.3rem;
+  min-height: 44px;
+  border-radius: 10px;
+  border: none;
+  color: #fff;
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  box-shadow: 0 3px 10px rgba(39,174,96,0.25);
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.btnAprobar:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+.btnAprobar:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+.confirmBox {
+  padding: 0.9rem 1rem;
+  border: 1px solid #a3e0bb;
+  border-left: 4px solid #27ae60;
+  background: #f1fbf5;
+  border-radius: 10px;
+}
+
+.confirmBox p {
+  margin: 0 0 0.8rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: #14532d;
+}

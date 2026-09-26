@@ -1,13 +1,8 @@
-.subtitle {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  margin-top: 0.25rem;
-}
-
 .card {
-  background: var(--surface, #fff);
-  border: 1px solid var(--border, #e2e8f0);
-  border-radius: var(--radius, 10px);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
   padding: 1.5rem;
   margin-bottom: 1.5rem;
 }
@@ -24,7 +19,7 @@
 }
 
 .hint code {
-  background: var(--surface-alt, #f1f5f9);
+  background: var(--primary-light);
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
   font-size: 0.82rem;
@@ -35,60 +30,54 @@
   overflow-wrap: anywhere;
 }
 
-.fileRow {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-top: 0.75rem;
-}
-
 .resumenGrid {
   display: flex;
-  gap: 1.5rem;
+  gap: 0.5rem 1.5rem;
   flex-wrap: wrap;
   margin: 1rem 0;
 }
 
-.resumenItem {
-  font-size: 0.9rem;
-}
-
-.resumenItem.ok strong {
-  color: var(--success, #27ae60);
-}
-
-.resumenItem.err strong {
-  color: var(--danger, #e74c3c);
-}
-
-.tableWrap {
-  overflow-x: auto;
-  margin: 1rem 0;
-}
+.resumenItem { font-size: 0.9rem; }
+.resumenItem.ok strong  { color: #1e8449; }
+.resumenItem.err strong { color: #a93226; }
 
 .errCell {
-  color: var(--danger, #e74c3c);
+  color: #a93226;
   font-size: 0.85rem;
 }
 
 .acciones {
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem 1rem;
   flex-wrap: wrap;
   margin-top: 1rem;
 }
 
+.acciones button { min-height: 44px; }
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
 .devTokensBox {
-  background: var(--warning-bg, #fff7ed);
-  border: 1px solid var(--warning, #e67e22);
-  border-radius: var(--radius, 8px);
+  background: #fff7ed;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius);
   padding: 1rem;
   margin: 1rem 0;
   font-size: 0.85rem;
+  overflow-wrap: anywhere;
 }
 
 .devTokensBox ul {
   margin: 0.5rem 0 0;
   padding-left: 1.25rem;
+}
+
+@media (max-width: 480px) {
+  .card { padding: 1.1rem; }
+  .acciones button { width: 100%; }
 }

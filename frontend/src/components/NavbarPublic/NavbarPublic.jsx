@@ -3,29 +3,23 @@
  *
  * Se muestra en la página de inicio (HomePage) cuando el visitante
  * no ha iniciado sesión. Incluye:
- * - Logo y nombre del sistema
- * - Subtítulo "Portal de Empleo"
- * - Botón para ir al login
+ * - Marca SisPasantías (components/Brand)
+ * - Botones de registro de empresa y de login
  *
  * Los estilos se cargan desde NavbarPublic.module.css (CSS Modules).
  */
 
 import { Link } from 'react-router-dom';
+import Brand from '../Brand/Brand';
 import styles from './NavbarPublic.module.css';
 
 export default function NavbarPublic() {
   return (
-    <nav className={styles.navbarPublic}>
+    <nav className={styles.navbarPublic} aria-label="Principal">
       <div className={styles.navbarPublicInner}>
 
-        {/* Logo / Nombre del sistema — redirige al inicio al hacer clic */}
-        <Link to="/" className={styles.navbarPublicBrand}>
-          <span className={styles.brandIcon}>🎓</span>
-          <div className={styles.brandText}>
-            <span className={styles.brandTitle}>SisPasantías</span>
-            <span className={styles.brandSubtitle}>Portal de Empleo</span>
-          </div>
-        </Link>
+        {/* Marca — redirige al inicio al hacer clic */}
+        <Brand to="/" variant="full" tone="dark" responsive className={styles.navbarPublicBrand} />
 
         {/* Acciones de la navbar pública */}
         <div className={styles.navbarPublicActions}>

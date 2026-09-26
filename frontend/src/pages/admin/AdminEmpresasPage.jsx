@@ -7,7 +7,11 @@
  * previa del admin — moderación posterior: el admin sigue pudiendo revisar,
  * pausar, rechazar o cerrar cualquier publicación después, y revocar la
  * confianza en cualquier momento sin afectar retroactivamente lo ya
- * publicado (solo rige para operaciones nuevas).
+ * publicado (solo rige para operaciones nuevas). Cambiar la confianza pide
+ * confirmación explícita en un modal que explica el alcance.
+ *
+ * Búsqueda (razón social, CUIT o responsable) y filtros se resuelven en el
+ * servidor antes de paginar: el total y las páginas son los de los resultados.
  *
  * No gestiona la aprobación inicial de una empresa nueva — eso sigue siendo
  * AdminSolicitudesPage.jsx (vía SolicitudEmpresa). Esta pantalla es el
@@ -17,198 +21,273 @@
  * Rol: admin
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { adminService } from '../../services/admin.service';
-import Paginacion from '../../components/Paginacion/Paginacion';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { usePaginacion } from '../../hooks/usePaginacion';
+import { useToast } from '../../hooks/useToast';
+import PageHeader from '../../components/ui/PageHeader';
+import SearchField from '../../components/ui/SearchField';
+import FilterGroup from '../../components/ui/FilterGroup';
 import TableResponsive from '../../components/ui/TableResponsive';
+import DataCard from '../../components/ui/DataCard';
+import EmptyState from '../../components/ui/EmptyState';
+import ConfirmModal from '../../components/ui/ConfirmModal';
+import Toast from '../../components/ui/Toast';
+import Paginacion from '../../components/Paginacion/Paginacion';
 import styles from './AdminEmpresasPage.module.css';
 
 const ESTADO_COLOR = {
-  pendiente: '#3498db',
-  aprobada:  '#27ae60',
-  rechazada: '#e74c3c',
+  pendiente: '#2e86c1',
+  aprobada:  '#1e8449',
+  rechazada: '#c0392b',
 };
 const ESTADO_LABEL = {
   pendiente: 'Pendiente',
   aprobada:  'Aprobada',
   rechazada: 'Rechazada',
 };
-const FILTROS_ESTADO = ['todas', 'pendiente', 'aprobada', 'rechazada'];
+const OPCIONES_ESTADO = [
+  { value: '', label: 'Todas' },
+  ...Object.entries(ESTADO_LABEL).map(([value, label]) => ({ value, label })),
+];
 
-const CONFIANZA_COLOR = { estandar: '#7f8c8d', confiable: '#16a085' };
-const CONFIANZA_LABEL = { estandar: 'Estándar', confiable: '🤝 Confiable' };
-const FILTROS_CONFIANZA = ['todas', 'estandar', 'confiable'];
+const CONFIANZA_COLOR = { estandar: '#707b7c', confiable: '#117a65' };
+const CONFIANZA_LABEL = { estandar: 'Estándar', confiable: 'Confiable' };
+const OPCIONES_CONFIANZA = [
+  { value: '', label: 'Todas' },
+  ...Object.entries(CONFIANZA_LABEL).map(([value, label]) => ({ value, label })),
+];
+
+const fechaAlta = (e) => (e.createdAt ? new Date(e.createdAt).toLocaleDateString('es-AR') : '—');
+const nombreResponsable = (e) => (e.usuario ? `${e.usuario.nombre} ${e.usuario.apellido}` : '—');
+
+function EstadoBadge({ estado }) {
+  return (
+    <span className="badge" style={{ background: ESTADO_COLOR[estado] ?? '#707b7c' }}>
+      {ESTADO_LABEL[estado] ?? estado}
+    </span>
+  );
+}
+
+function ConfianzaBadge({ nivel }) {
+  return (
+    <span className="badge" style={{ background: CONFIANZA_COLOR[nivel] ?? '#707b7c' }}>
+      {CONFIANZA_LABEL[nivel] ?? nivel}
+    </span>
+  );
+}
 
 export default function AdminEmpresasPage() {
-  const [empresas,        setEmpresas]        = useState([]);
-  const [pagination,      setPagination]      = useState(null);
-  const [page,            setPage]            = useState(1);
-  const [filtroEstado,    setFiltroEstado]    = useState('todas');
-  const [filtroConfianza, setFiltroConfianza] = useState('todas');
-  const [loading,         setLoading]         = useState(true);
-  const [accionando,      setAccionando]      = useState(null);
-  const [confirmando,     setConfirmando]     = useState(null); // id en confirmación inline
-  const [error,           setError]           = useState('');
-  const [mensaje,         setMensaje]         = useState('');
+  const esTabla = useMediaQuery('(min-width: 1024px)');
+  const { toast, showToast } = useToast(5000);
 
-  const cargar = useCallback(async (estado, nivelConfianza, pagina = 1) => {
+  const [empresas,   setEmpresas]   = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState('');
+
+  const [texto,          setTexto]          = useState('');
+  const [filtroEstado,   setFiltroEstado]   = useState('');
+  const [filtroConfianza, setFiltroConfianza] = useState('');
+  const q = useDebouncedValue(texto.trim(), 350);
+  const { page, setPage } = usePaginacion([q, filtroEstado, filtroConfianza]);
+
+  const [confirmar, setConfirmar] = useState(null); // { empresa, accion: 'marcar' | 'revocar' }
+  const [guardando, setGuardando] = useState(false);
+
+  // Descarta respuestas de consultas viejas (buscador escribiendo rápido).
+  const secuencia = useRef(0);
+
+  const cargar = useCallback(async () => {
+    const mia = ++secuencia.current;
     setLoading(true);
+    setError('');
     try {
-      const params = { page: pagina, limit: 25 };
-      if (estado && estado !== 'todas') params.estadoAprobacion = estado;
-      if (nivelConfianza && nivelConfianza !== 'todas') params.nivelConfianza = nivelConfianza;
+      const params = { page, limit: 25 };
+      if (filtroEstado)    params.estadoAprobacion = filtroEstado;
+      if (filtroConfianza) params.nivelConfianza   = filtroConfianza;
+      if (q)               params.q                = q;
       const res = await adminService.getEmpresas(params);
+      if (mia !== secuencia.current) return;
       setEmpresas(res.data?.data ?? []);
       setPagination(res.data?.pagination ?? null);
-      setPage(pagina);
     } catch {
-      setError('Error al cargar las empresas.');
+      if (mia !== secuencia.current) return;
+      setError('No se pudieron cargar las empresas.');
     } finally {
-      setLoading(false);
+      if (mia === secuencia.current) setLoading(false);
     }
-  }, []);
+  }, [page, filtroEstado, filtroConfianza, q]);
 
-  useEffect(() => { cargar(filtroEstado, filtroConfianza, 1); }, [filtroEstado, filtroConfianza, cargar]);
+  useEffect(() => { cargar(); }, [cargar]);
 
-  const handleCambiarConfianza = async (empresa) => {
-    const accion = empresa.nivelConfianza === 'confiable' ? 'revocar' : 'marcar';
-    setAccionando(empresa.id);
-    setConfirmando(null);
-    setError('');
-    setMensaje('');
+  const hayFiltros = Boolean(q || filtroEstado || filtroConfianza);
+  const limpiarFiltros = () => {
+    setTexto('');
+    setFiltroEstado('');
+    setFiltroConfianza('');
+  };
+
+  const aplicarConfianza = async () => {
+    const { empresa, accion } = confirmar;
+    setGuardando(true);
     try {
       await adminService.cambiarConfianzaEmpresa(empresa.id, accion);
-      setMensaje(accion === 'marcar'
-        ? `"${empresa.razonSocial}" ahora es una empresa de confianza.`
-        : `Se revocó la confianza institucional de "${empresa.razonSocial}".`);
-      cargar(filtroEstado, filtroConfianza, page);
+      showToast(
+        accion === 'marcar'
+          ? `"${empresa.razonSocial}" ahora es una empresa de confianza.`
+          : `Se revocó la confianza institucional de "${empresa.razonSocial}".`,
+        'success',
+      );
+      setConfirmar(null);
+      cargar();
     } catch (err) {
-      setError(err.response?.data?.message ?? 'Error al cambiar el nivel de confianza.');
+      setConfirmar(null);
+      setError(err.response?.data?.message ?? 'No se pudo cambiar el nivel de confianza.');
     } finally {
-      setAccionando(null);
+      setGuardando(false);
     }
   };
 
+  const botonConfianza = (e, extra = '') => {
+    const confiable = e.nivelConfianza === 'confiable';
+    return (
+      <button
+        type="button"
+        className={`${confiable ? 'btn-warn' : 'btn-ok'} ${extra}`.trim()}
+        onClick={() => setConfirmar({ empresa: e, accion: confiable ? 'revocar' : 'marcar' })}
+        aria-label={`${confiable ? 'Revocar confianza de' : 'Marcar como confiable a'} ${e.razonSocial}`}
+      >
+        {confiable ? 'Revocar confianza' : 'Marcar confiable'}
+      </button>
+    );
+  };
+
+  const total = pagination?.total ?? empresas.length;
+  const primeraCarga = loading && empresas.length === 0 && !error;
+
   return (
     <div className="page-container">
+      <Toast toast={toast} />
 
-      <div className="dashboard-header">
-        <h1>Empresas</h1>
+      <PageHeader
+        title="Empresas"
+        subtitle="Empresas registradas y su nivel de confianza institucional."
+      />
+
+      {error && <p className="error-msg" role="alert" style={{ marginBottom: '1rem' }}>{error}</p>}
+
+      <div className={styles.filtros}>
+        <SearchField
+          id="busqueda-empresa"
+          label="Buscar empresas"
+          placeholder="Buscar por empresa, CUIT o responsable…"
+          value={texto}
+          onChange={setTexto}
+        />
+        <div className={styles.grupos}>
+          <FilterGroup label="Estado" idPrefix="filtro-estado" options={OPCIONES_ESTADO} value={filtroEstado} onChange={setFiltroEstado} />
+          <FilterGroup label="Confianza" idPrefix="filtro-confianza" options={OPCIONES_CONFIANZA} value={filtroConfianza} onChange={setFiltroConfianza} />
+        </div>
       </div>
 
-      {error   && <p className={`error-msg ${styles.feedback}`}>⚠️ {error}</p>}
-      {mensaje && <p className={`success-msg ${styles.feedback}`}>✅ {mensaje}</p>}
+      <p className={styles.resultados} role="status" aria-live="polite">
+        {loading ? 'Buscando…' : `${total} empresa${total !== 1 ? 's' : ''} encontrada${total !== 1 ? 's' : ''}`}
+      </p>
 
-      <div className={styles.filtrosWrap}>
-        <div className={styles.filtros}>
-          {FILTROS_ESTADO.map((f) => {
-            const activo = filtroEstado === f;
-            const color = ESTADO_COLOR[f] ?? 'var(--primary)';
-            return (
-              <button
-                key={f}
-                onClick={() => setFiltroEstado(f)}
-                className={`${styles.filtro} ${activo ? styles.filtroActivo : ''}`}
-                style={activo ? { background: color, borderColor: color } : undefined}
-                aria-pressed={activo}
-              >
-                {f === 'todas' ? 'Todas' : ESTADO_LABEL[f]}
-              </button>
-            );
-          })}
-        </div>
-        <div className={styles.filtros}>
-          {FILTROS_CONFIANZA.map((f) => {
-            const activo = filtroConfianza === f;
-            const color = CONFIANZA_COLOR[f] ?? 'var(--primary)';
-            return (
-              <button
-                key={f}
-                onClick={() => setFiltroConfianza(f)}
-                className={`${styles.filtro} ${activo ? styles.filtroActivo : ''}`}
-                style={activo ? { background: color, borderColor: color } : undefined}
-                aria-pressed={activo}
-              >
-                {f === 'todas' ? 'Toda confianza' : CONFIANZA_LABEL[f]}
-              </button>
-            );
-          })}
-        </div>
-        <span className={styles.count}>
-          {loading ? '...' : `${pagination?.total ?? empresas.length} resultado${(pagination?.total ?? empresas.length) !== 1 ? 's' : ''}`}
-        </span>
-      </div>
-
-      {loading ? (
-        <p className="msg">Cargando...</p>
-      ) : empresas.length === 0 ? (
-        <div className={styles.emptyBox}>No hay empresas para el filtro seleccionado.</div>
-      ) : (
-        <TableResponsive minWidth={860}>
-            <thead>
-              <tr>
-                <th>Empresa</th>
-                <th>CUIT</th>
-                <th>Responsable</th>
-                <th>Estado</th>
-                <th>Confianza</th>
-                <th>Alta</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {empresas.map((e) => (
-                <tr key={e.id} className={accionando === e.id ? styles.rowBusy : ''}>
-                  <td><strong>{e.razonSocial}</strong></td>
-                  <td>{e.cuit ?? '—'}</td>
-                  <td>
-                    {e.usuario ? `${e.usuario.nombre} ${e.usuario.apellido}` : '—'}
-                    {e.usuario?.email && (
-                      <>
-                        <br />
-                        <small className={styles.emailSmall}>{e.usuario.email}</small>
-                      </>
-                    )}
-                  </td>
-                  <td>
-                    <span className="badge" style={{ background: ESTADO_COLOR[e.estadoAprobacion] ?? '#7f8c8d' }}>
-                      {ESTADO_LABEL[e.estadoAprobacion] ?? e.estadoAprobacion}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="badge" style={{ background: CONFIANZA_COLOR[e.nivelConfianza] ?? '#7f8c8d' }}>
-                      {CONFIANZA_LABEL[e.nivelConfianza] ?? e.nivelConfianza}
-                    </span>
-                  </td>
-                  <td className={styles.fechaCell}>
-                    {e.createdAt ? new Date(e.createdAt).toLocaleDateString('es-AR') : '—'}
-                  </td>
-                  <td>
-                    {accionando === e.id ? (
-                      <span className={styles.procesando}>Procesando...</span>
-                    ) : confirmando === e.id ? (
-                      <div className={styles.acciones}>
-                        <span className={styles.confirmarTexto}>¿Confirmar?</span>
-                        <button className="btn-ok" onClick={() => handleCambiarConfianza(e)}>Sí</button>
-                        <button className="btn-secondary" onClick={() => setConfirmando(null)}>No</button>
-                      </div>
-                    ) : (
-                      <button
-                        className={e.nivelConfianza === 'confiable' ? 'btn-warn' : 'btn-ok'}
-                        onClick={() => setConfirmando(e.id)}
-                      >
-                        {e.nivelConfianza === 'confiable' ? '↩️ Revocar confianza' : '🤝 Marcar confiable'}
-                      </button>
-                    )}
-                  </td>
+      {primeraCarga ? (
+        <p className="msg" role="status">Cargando empresas...</p>
+      ) : empresas.length === 0 && !error ? (
+        <EmptyState
+          icon="🏢"
+          title={hayFiltros ? 'No se encontraron empresas con esos criterios.' : 'Todavía no hay empresas registradas.'}
+          hint={hayFiltros ? 'Probá con otro texto o quitá algún filtro.' : undefined}
+        >
+          {hayFiltros && (
+            <button type="button" className="btn-secondary" onClick={limpiarFiltros}>Limpiar filtros</button>
+          )}
+        </EmptyState>
+      ) : empresas.length > 0 && (
+        <div className={loading ? styles.recargando : undefined} aria-busy={loading}>
+          {esTabla ? (
+            <TableResponsive minWidth={860}>
+              <thead>
+                <tr>
+                  <th>Empresa</th>
+                  <th>CUIT</th>
+                  <th>Responsable</th>
+                  <th>Estado</th>
+                  <th>Confianza</th>
+                  <th>Alta</th>
+                  <th>Acción</th>
                 </tr>
+              </thead>
+              <tbody>
+                {empresas.map((e) => (
+                  <tr key={e.id}>
+                    <td className="cell-break"><strong>{e.razonSocial}</strong></td>
+                    <td className={styles.cuit}>{e.cuit ?? '—'}</td>
+                    <td className="cell-break">
+                      {nombreResponsable(e)}
+                      {e.usuario?.email && <small className={styles.sub}>{e.usuario.email}</small>}
+                    </td>
+                    <td><EstadoBadge estado={e.estadoAprobacion} /></td>
+                    <td><ConfianzaBadge nivel={e.nivelConfianza} /></td>
+                    <td className={styles.fecha}>{fechaAlta(e)}</td>
+                    <td>{botonConfianza(e)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </TableResponsive>
+          ) : (
+            <div className={styles.cards}>
+              {empresas.map((e) => (
+                <DataCard
+                  key={e.id}
+                  title={e.razonSocial}
+                  subtitle={e.cuit ? `CUIT ${e.cuit}` : undefined}
+                  badge={<EstadoBadge estado={e.estadoAprobacion} />}
+                  fields={[
+                    { label: 'Responsable', value: e.usuario ? `${nombreResponsable(e)} · ${e.usuario.email}` : null },
+                    { label: 'Confianza', value: <ConfianzaBadge nivel={e.nivelConfianza} /> },
+                    { label: 'Alta', value: fechaAlta(e) },
+                  ]}
+                  actions={botonConfianza(e)}
+                />
               ))}
-            </tbody>
-        </TableResponsive>
+            </div>
+          )}
+        </div>
       )}
 
-      {!loading && (
-        <Paginacion pagination={pagination} onPageChange={(p) => cargar(filtroEstado, filtroConfianza, p)} />
+      {!primeraCarga && <Paginacion pagination={pagination} onPageChange={setPage} />}
+
+      {confirmar && (
+        <ConfirmModal
+          title={confirmar.accion === 'marcar' ? 'Marcar empresa como confiable' : 'Revocar confianza institucional'}
+          confirmLabel={confirmar.accion === 'marcar' ? 'Marcar como confiable' : 'Revocar confianza'}
+          tone={confirmar.accion === 'marcar' ? 'ok' : 'warn'}
+          busy={guardando}
+          onConfirm={aplicarConfianza}
+          onClose={() => setConfirmar(null)}
+          confirmId="btn-confirmar-confianza"
+        >
+          <p>Empresa: <strong>{confirmar.empresa.razonSocial}</strong></p>
+          {confirmar.accion === 'marcar' ? (
+            <p>
+              Las nuevas ofertas de esta empresa podrán publicarse automáticamente y sus altas de
+              reclutadores no requerirán aprobación previa. El administrador podrá seguir moderando o
+              revocando esta confianza posteriormente.
+            </p>
+          ) : (
+            <p>
+              Las nuevas ofertas y altas de reclutadores de esta empresa volverán a requerir aprobación
+              del administrador. Las publicaciones y reclutadores ya aprobados no se modifican.
+            </p>
+          )}
+        </ConfirmModal>
       )}
     </div>
   );

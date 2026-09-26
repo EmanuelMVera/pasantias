@@ -1,18 +1,56 @@
-/* ── Stats Grid ──────────────────────────────────────────────────────────── */
-.statsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
-  gap: 1rem;
-  margin-bottom: 2rem;
+/* ── Secciones del panel resumen ─────────────────────────────────────────── */
+.seccion {
+  margin-bottom: 2.25rem;
+  transition: opacity 0.2s;
 }
 
-/* ── Toolbar de estadísticas (período + export) ─────────────────────────── */
-.statsToolbar {
+/* Solo la sección del período se atenúa al recalcular (el resto no cambia). */
+.refrescando { opacity: 0.6; }
+
+.seccionHead {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  align-items: flex-end;
   justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.seccionTitulo {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--secondary);
+  display: flex;
   align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.seccionNota {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Rótulo "Histórico": el texto lo dice, el color no es lo único que informa. */
+.chipHistorico {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--secondary);
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+}
+
+/* ── Grilla de KPIs ──────────────────────────────────────────────────────── */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 1rem;
   margin-bottom: 1.25rem;
 }
 
@@ -28,11 +66,12 @@
   color: var(--text-muted);
 }
 
-/* ── Dos columnas (ofertas por área + ranking de empresas) ──────────────── */
+/* ── Dos columnas ────────────────────────────────────────────────────────── */
 .dobleColumna {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
   gap: 1.5rem;
+  align-items: start;
 }
 
 .rankingList {
@@ -71,29 +110,45 @@
 .rankingNombre { flex: 1; font-size: 0.88rem; color: var(--text); }
 .rankingValor { font-weight: 700; color: var(--primary); }
 
-/* ── Chart Container ─────────────────────────────────────────────────────── */
-.chartContainer {
+/* ── Tarjetas de gráfico y paneles ───────────────────────────────────────── */
+.chartContainer,
+.panel {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1.5rem;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   box-shadow: var(--shadow-card);
 }
 
-.chartContainer h2 {
+/* En la grilla de dos columnas el gap ya separa las tarjetas. */
+.dobleColumna > .chartContainer,
+.dobleColumna > .panel { margin-bottom: 0; }
+
+.chartContainer h3,
+.panelTitulo {
+  margin: 0 0 1rem;
   font-size: 0.82rem;
   font-weight: 700;
-  margin-bottom: 1rem;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.6px;
 }
 
-/* ── Sección "Actividad reciente" ─────────────────────────────────────────── */
-.adminSection { margin-bottom: 2.5rem; }
+.verMas {
+  display: inline-block;
+  margin-top: 1rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.verMas:hover { text-decoration: underline; }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .statsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .chartContainer,
+  .panel { padding: 1.1rem; }
 }

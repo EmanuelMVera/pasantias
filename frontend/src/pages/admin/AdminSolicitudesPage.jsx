@@ -1,64 +1,84 @@
 /**
- * AdminSolicitudesPage.jsx — Gestión de solicitudes de registro de empresa.
+ * AdminSolicitudesPage.jsx — Gestión de solicitudes (empresas y reclutadores).
  *
- * Permite al administrador:
- *  - Ver todas las solicitudes con filtro por estado
- *  - Ver el detalle completo de cada solicitud en un panel lateral
- *  - Aprobar (crea empresa + usuario + envía credenciales por email)
- *  - Rechazar (con motivo opcional + email de notificación)
+ * Una sola pantalla con dos pestañas — solo se renderiza la activa:
+ *  - Empresas: solicitudes de registro. La fila abre un detalle (panel lateral
+ *    en escritorio, Modal en pantallas angostas) donde se aprueba o rechaza.
+ *  - Reclutadores: altas solicitadas por empresas ya registradas. La fila abre
+ *    un Modal de revisión.
  *
- * Ruta: /admin/solicitudes
+ * Cada pestaña mantiene su propio estado (lista, filtro, página, conteos), se
+ * cargan ambas al montar para poder mostrar los pendientes en las pestañas, y
+ * un único botón "Actualizar" refresca la pestaña activa.
+ *
+ * Ruta: /admin/solicitudes  (`?tab=reclutadores` abre la segunda pestaña)
  * Acceso: solo rol 'admin'
- *
- * Orquesta dos secciones independientes (solicitudes de empresa y de
- * reclutadores — nunca se cruzan, cada una con su propio estado/paginación)
- * delegadas a SolicitudesEmpresaSection/SolicitudesReclutadorSection.
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { adminService } from '../../services/admin.service';
-import { ESTADO_CONFIG } from '../../components/EstadoSolicitudBadge/estadoSolicitud.utils';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useToast } from '../../hooks/useToast';
+import PageHeader from '../../components/ui/PageHeader';
+import Tabs, { TabPanel } from '../../components/ui/Tabs';
+import Toast from '../../components/ui/Toast';
+import Modal from '../../components/Modal/Modal';
 import SolicitudesStatsRow from '../../components/SolicitudesStatsRow/SolicitudesStatsRow';
+import SolicitudesFiltroEstado from '../../components/SolicitudesFiltroEstado/SolicitudesFiltroEstado';
 import RechazarSolicitudModal from '../../components/RechazarSolicitudModal/RechazarSolicitudModal';
 import SolicitudesEmpresaSection from '../../components/SolicitudesEmpresaSection/SolicitudesEmpresaSection';
+import SolicitudEmpresaDetalle from '../../components/SolicitudEmpresaDetalle/SolicitudEmpresaDetalle';
 import SolicitudesReclutadorSection from '../../components/SolicitudesReclutadorSection/SolicitudesReclutadorSection';
+import SolicitudReclutadorRevision from '../../components/SolicitudReclutadorRevision/SolicitudReclutadorRevision';
 import styles from './AdminSolicitudesPage.module.css';
 
 const sumar = (obj) => Object.values(obj).reduce((a, b) => a + b, 0);
 
+const statsDe = (conteo) => ({
+  total:     sumar(conteo),
+  pendiente: conteo.pendiente ?? 0,
+  aprobado:  conteo.aprobado  ?? 0,
+  rechazado: conteo.rechazado ?? 0,
+});
+
 export default function AdminSolicitudesPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') === 'reclutadores' ? 'reclutadores' : 'empresas';
+  const setTab = (t) => setSearchParams(t === 'empresas' ? {} : { tab: t }, { replace: true });
+
+  // El detalle de empresa va en un panel lateral si hay lugar, si no en un Modal.
+  const panelLateral = useMediaQuery('(min-width: 1101px)');
+  const { toast, showToast } = useToast(6000);
+  const [error, setError] = useState('');
+
+  // ── Estado: solicitudes de empresa ────────────────────────────────────────
   const [solicitudes, setSolicitudes] = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState('');
-  const [success,     setSuccess]     = useState('');
+  const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState(''); // '' | 'pendiente' | 'aprobado' | 'rechazado'
   const [paginationEmp, setPaginationEmp] = useState(null);
-  const [conteoEmp,     setConteoEmp]     = useState({});
-  const [pageEmp,       setPageEmp]       = useState(1);
-
-  // Panel de detalle / acción
-  const [detalle,    setDetalle]    = useState(null); // solicitud seleccionada
+  const [conteoEmp, setConteoEmp] = useState({});
+  const [pageEmp, setPageEmp] = useState(1);
+  const [detalle, setDetalle] = useState(null);          // solicitud abierta en el detalle
   const [accionando, setAccionando] = useState(false);
-  const [confirmando, setConfirmando] = useState(null); // id de solicitud en confirmación de aprobación
-
-  // Modal de rechazo (para ingresar el motivo)
+  const [confirmando, setConfirmando] = useState(false); // paso de confirmación de la aprobación
   const [modalRechazo, setModalRechazo] = useState(false);
-  const [motivo,       setMotivo]       = useState('');
+  const [motivo, setMotivo] = useState('');
 
-  // ── Estado: solicitudes de reclutadores (sección 2) ────────────────────────────────
-  const [solicitudesRecl,    setSolicitudesRecl]    = useState([]);
-  const [loadingRecl,        setLoadingRecl]        = useState(true);
-  const [filtroRecl,         setFiltroRecl]         = useState('');
-  const [paginationRecl,     setPaginationRecl]     = useState(null);
-  const [conteoRecl,         setConteoRecl]         = useState({});
-  const [pageRecl,           setPageRecl]           = useState(1);
-  const [confirmandoRecl,    setConfirmandoRecl]    = useState(null);
-  const [accionandoRecl,     setAccionandoRecl]     = useState(false);
-  const [modalRechazoRecl,   setModalRechazoRecl]   = useState(false);
-  const [detalleRecl,        setDetalleRecl]        = useState(null);
-  const [motivoRecl,         setMotivoRecl]         = useState('');
+  // ── Estado: solicitudes de reclutador ─────────────────────────────────────
+  const [solicitudesRecl, setSolicitudesRecl] = useState([]);
+  const [loadingRecl, setLoadingRecl] = useState(true);
+  const [filtroRecl, setFiltroRecl] = useState('');
+  const [paginationRecl, setPaginationRecl] = useState(null);
+  const [conteoRecl, setConteoRecl] = useState({});
+  const [pageRecl, setPageRecl] = useState(1);
+  const [detalleRecl, setDetalleRecl] = useState(null);
+  const [accionandoRecl, setAccionandoRecl] = useState(false);
+  const [confirmandoRecl, setConfirmandoRecl] = useState(false);
+  const [modalRechazoRecl, setModalRechazoRecl] = useState(false);
+  const [motivoRecl, setMotivoRecl] = useState('');
 
-  // ── Carga de datos ──────────────────────────────────────────────────
+  // ── Carga de datos ────────────────────────────────────────────────────────
   const cargar = useCallback(async (pagina = 1) => {
     setLoading(true);
     setError('');
@@ -71,7 +91,7 @@ export default function AdminSolicitudesPage() {
       setConteoEmp(res.data.conteoPorEstado ?? {});
       setPageEmp(pagina);
     } catch {
-      setError('No se pudieron cargar las solicitudes.');
+      setError('No se pudieron cargar las solicitudes de empresa.');
     } finally {
       setLoading(false);
     }
@@ -88,7 +108,7 @@ export default function AdminSolicitudesPage() {
       setConteoRecl(res.data.conteoPorEstado ?? {});
       setPageRecl(pagina);
     } catch {
-      // falla silenciosa — la sección muestra vacío
+      setError('No se pudieron cargar las solicitudes de reclutador.');
     } finally {
       setLoadingRecl(false);
     }
@@ -97,41 +117,38 @@ export default function AdminSolicitudesPage() {
   useEffect(() => { cargar(1);     }, [cargar]);
   useEffect(() => { cargarRecl(1); }, [cargarRecl]);
 
-  // ── Helpers de toast ────────────────────────────────────────────────────────
-  const showSuccess = (msg) => {
-    setSuccess(msg);
-    setTimeout(() => setSuccess(''), 4000);
-  };
+  // Un único "Actualizar", contextual a la pestaña activa (recarga la página actual).
+  const actualizar = () => (tab === 'empresas' ? cargar(pageEmp) : cargarRecl(pageRecl));
+  const actualizando = tab === 'empresas' ? loading : loadingRecl;
 
-  // ── Aprobar solicitud ───────────────────────────────────────────────────────
+  // ── Empresas: revisar / aprobar / rechazar ────────────────────────────────
+  const abrirDetalle = (solicitud) => { setDetalle(solicitud); setConfirmando(false); };
+  const cerrarDetalle = () => { setDetalle(null); setConfirmando(false); };
+
   const handleAprobar = async (solicitud) => {
-    if (confirmando !== solicitud.id) {
-      setConfirmando(solicitud.id);
-      return;
-    }
-    setConfirmando(null);
     setAccionando(true);
     setError('');
     try {
       const res = await adminService.aprobarSolicitud(solicitud.id);
       const { data } = res.data;
       const emailDestino = solicitud.responsableEmail || solicitud.email;
-      showSuccess(
-        `✅ "${solicitud.razonSocial}" aprobada. Credenciales enviadas a ${emailDestino}` +
+      showToast(
+        `"${solicitud.razonSocial}" aprobada. Credenciales enviadas a ${emailDestino}` +
         (data?.passwordGenerada ? ` (pwd dev: ${data.passwordGenerada})` : '') +
-        (data?.reclutadoresPendientes ? ` · ${data.reclutadoresPendientes} solicitud(es) de reclutador creadas.` : '')
+        (data?.reclutadoresPendientes ? ` · ${data.reclutadoresPendientes} solicitud(es) de reclutador creadas.` : ''),
+        'success',
       );
-      setDetalle(null);
+      cerrarDetalle();
       cargar(pageEmp);
+      cargarRecl(pageRecl); // la aprobación puede crear solicitudes de reclutador
     } catch (err) {
-      const msg = err.response?.data?.message ?? 'Error al aprobar la solicitud.';
-      setError(msg);
+      setError(err.response?.data?.message ?? 'Error al aprobar la solicitud.');
+      setConfirmando(false);
     } finally {
       setAccionando(false);
     }
   };
 
-  // ── Rechazar solicitud ──────────────────────────────────────────────────
   const abrirRechazo = (solicitud) => {
     setDetalle(solicitud);
     setMotivo('');
@@ -143,9 +160,9 @@ export default function AdminSolicitudesPage() {
     setAccionando(true);
     try {
       await adminService.rechazarSolicitud(detalle.id, motivo.trim() || undefined);
-      showSuccess(`❌ Solicitud de "${detalle.razonSocial}" rechazada. Notificación enviada.`);
+      showToast(`Solicitud de "${detalle.razonSocial}" rechazada. Notificación enviada.`, 'success');
       setModalRechazo(false);
-      setDetalle(null);
+      cerrarDetalle();
       cargar(pageEmp);
     } catch (err) {
       setError(err.response?.data?.message ?? 'Error al rechazar la solicitud.');
@@ -155,21 +172,26 @@ export default function AdminSolicitudesPage() {
     }
   };
 
-  // ── Handlers: solicitudes de reclutadores ──────────────────────────────────────
+  // ── Reclutadores: revisar / aprobar / rechazar ────────────────────────────
+  const abrirRevisionRecl = (sol) => { setDetalleRecl(sol); setConfirmandoRecl(false); };
+  const cerrarRevisionRecl = () => { setDetalleRecl(null); setConfirmandoRecl(false); };
+
   const handleAprobarRecl = async (sol) => {
-    if (confirmandoRecl !== sol.id) { setConfirmandoRecl(sol.id); return; }
-    setConfirmandoRecl(null);
     setAccionandoRecl(true);
+    setError('');
     try {
       const res = await adminService.aprobarSolicitudReclutador(sol.id);
       const { data } = res.data;
-      showSuccess(
-        `✅ Reclutador "${sol.nombre}" aprobado. Credenciales enviadas a ${sol.email}` +
-        (data?.passwordGenerada ? ` (pwd dev: ${data.passwordGenerada})` : '')
+      showToast(
+        `Reclutador "${sol.nombre}" aprobado. Credenciales enviadas a ${sol.email}` +
+        (data?.passwordGenerada ? ` (pwd dev: ${data.passwordGenerada})` : ''),
+        'success',
       );
+      cerrarRevisionRecl();
       cargarRecl(pageRecl);
     } catch (err) {
       setError(err.response?.data?.message ?? 'Error al aprobar.');
+      setConfirmandoRecl(false);
     } finally {
       setAccionandoRecl(false);
     }
@@ -186,9 +208,9 @@ export default function AdminSolicitudesPage() {
     setAccionandoRecl(true);
     try {
       await adminService.rechazarSolicitudReclutador(detalleRecl.id, motivoRecl.trim() || undefined);
-      showSuccess(`❌ Solicitud de "${detalleRecl.nombre}" rechazada. Notificación enviada a la empresa.`);
+      showToast(`Solicitud de "${detalleRecl.nombre}" rechazada. Notificación enviada a la empresa.`, 'success');
       setModalRechazoRecl(false);
-      setDetalleRecl(null);
+      cerrarRevisionRecl();
       cargarRecl(pageRecl);
     } catch (err) {
       setError(err.response?.data?.message ?? 'Error al rechazar.');
@@ -199,83 +221,118 @@ export default function AdminSolicitudesPage() {
   };
 
   // ── Estadísticas rápidas (del sidecar conteoPorEstado, sobre TODO el set) ──
-  const stats = {
-    total:     sumar(conteoEmp),
-    pendiente: conteoEmp.pendiente ?? 0,
-    aprobado:  conteoEmp.aprobado  ?? 0,
-    rechazado: conteoEmp.rechazado ?? 0,
-  };
-  const statsRecl = {
-    total:     sumar(conteoRecl),
-    pendiente: conteoRecl.pendiente ?? 0,
-    aprobado:  conteoRecl.aprobado  ?? 0,
-    rechazado: conteoRecl.rechazado ?? 0,
+  const stats = statsDe(conteoEmp);
+  const statsRecl = statsDe(conteoRecl);
+
+  const propsDetalleEmpresa = {
+    detalle,
+    accionando,
+    confirmando,
+    onPedirConfirmacion: () => setConfirmando(true),
+    onCancelarConfirmacion: () => setConfirmando(false),
+    onConfirmarAprobacion: handleAprobar,
+    onAbrirRechazo: abrirRechazo,
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="page-container">
+      <Toast toast={toast} />
 
-      {/* ── Cabecera ── */}
-      <div className="dashboard-header">
-        <div>
-          <h1>📋 Solicitudes de Empresa</h1>
-          <p className={styles.subtitle}>
-            Revisá, aprobá o rechazá las solicitudes de registro de nuevas empresas.
-          </p>
-        </div>
-        <button className="btn-secondary" onClick={cargar} disabled={loading}>
-          ↺ Actualizar
-        </button>
-      </div>
-
-      {/* ── Mensajes ── */}
-      {error   && <p className="error-msg" style={{ marginBottom: '1rem' }}>{error}</p>}
-      {success && <div className={styles.successToast}>{success}</div>}
-
-      {/* ── Tarjetas de resumen ── */}
-      <SolicitudesStatsRow items={[
-        { label: 'Total',     value: stats.total,     color: '#0073AD' },
-        { label: 'Pendientes', value: stats.pendiente, color: '#e67e22' },
-        { label: 'Aprobadas', value: stats.aprobado,  color: '#27ae60' },
-        { label: 'Rechazadas', value: stats.rechazado, color: '#c0392b' },
-      ]} />
-
-      {/* ── Filtros ── */}
-      <div className={styles.filtros}>
-        <span className={styles.filtroLabel}>Filtrar por estado:</span>
-        {['', 'pendiente', 'aprobado', 'rechazado'].map(est => (
-          <button
-            key={est}
-            id={`filtro-${est || 'todos'}`}
-            className={`${styles.filtroBtn} ${filtroEstado === est ? styles.filtroBtnActive : ''}`}
-            onClick={() => setFiltroEstado(est)}
-          >
-            {est === '' ? 'Todos' : ESTADO_CONFIG[est]?.label}
+      <PageHeader
+        title="Solicitudes"
+        subtitle="Gestioná solicitudes de empresas y altas de reclutadores."
+        actions={(
+          <button type="button" className="btn-secondary" onClick={actualizar} disabled={actualizando}>
+            Actualizar
           </button>
-        ))}
-      </div>
-
-      <SolicitudesEmpresaSection
-        solicitudes={solicitudes}
-        loading={loading}
-        filtroEstado={filtroEstado}
-        detalle={detalle}
-        onSelectDetalle={setDetalle}
-        onCerrarDetalle={() => setDetalle(null)}
-        confirmando={confirmando}
-        onCancelarConfirmacion={() => setConfirmando(null)}
-        accionando={accionando}
-        onAprobar={handleAprobar}
-        onAbrirRechazo={abrirRechazo}
-        paginationEmp={paginationEmp}
-        onPageChange={cargar}
+        )}
       />
 
-      {/* ── Modal de rechazo (empresas) ── */}
+      {error && <p className="error-msg" style={{ marginBottom: '1rem' }}>{error}</p>}
+
+      <Tabs
+        idPrefix="sol"
+        ariaLabel="Tipo de solicitud"
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { key: 'empresas', label: 'Empresas', count: stats.pendiente, alerta: true },
+          { key: 'reclutadores', label: 'Reclutadores', count: statsRecl.pendiente, alerta: true },
+        ]}
+      />
+
+      <TabPanel idPrefix="sol" tabKey={tab}>
+        {tab === 'empresas' ? (
+          <>
+            <SolicitudesStatsRow items={[
+              { label: 'Total',      value: stats.total,     color: '#0073AD' },
+              { label: 'Pendientes', value: stats.pendiente, color: '#e67e22' },
+              { label: 'Aprobadas',  value: stats.aprobado,  color: '#27ae60' },
+              { label: 'Rechazadas', value: stats.rechazado, color: '#c0392b' },
+            ]} />
+
+            <SolicitudesFiltroEstado value={filtroEstado} onChange={setFiltroEstado} idPrefix="filtro" />
+
+            <div className={`${styles.layout} ${detalle && panelLateral ? styles.conPanel : ''}`}>
+              <div className={styles.lista}>
+                <SolicitudesEmpresaSection
+                  solicitudes={solicitudes}
+                  loading={loading}
+                  filtroEstado={filtroEstado}
+                  detalleId={detalle?.id}
+                  onRevisar={abrirDetalle}
+                  paginationEmp={paginationEmp}
+                  onPageChange={cargar}
+                />
+              </div>
+
+              {detalle && panelLateral && (
+                <aside className={styles.detallePanel} aria-label="Detalle de solicitud">
+                  <div className={styles.detallePanelHeader}>
+                    <h2>Detalle de solicitud</h2>
+                    <button type="button" className={styles.cerrarDetalle} onClick={cerrarDetalle} aria-label="Cerrar detalle">✕</button>
+                  </div>
+                  <SolicitudEmpresaDetalle {...propsDetalleEmpresa} />
+                </aside>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <SolicitudesStatsRow items={[
+              { label: 'Total',      value: statsRecl.total,     color: '#0073AD' },
+              { label: 'Pendientes', value: statsRecl.pendiente, color: '#e67e22' },
+              { label: 'Aprobados',  value: statsRecl.aprobado,  color: '#27ae60' },
+              { label: 'Rechazados', value: statsRecl.rechazado, color: '#c0392b' },
+            ]} />
+
+            <SolicitudesFiltroEstado value={filtroRecl} onChange={setFiltroRecl} idPrefix="filtro-recl" />
+
+            <SolicitudesReclutadorSection
+              solicitudesRecl={solicitudesRecl}
+              loadingRecl={loadingRecl}
+              filtroRecl={filtroRecl}
+              onRevisar={abrirRevisionRecl}
+              paginationRecl={paginationRecl}
+              onPageChange={cargarRecl}
+            />
+          </>
+        )}
+      </TabPanel>
+
+      {/* Detalle de empresa en pantallas angostas: Modal (no queda apilado sin foco) */}
+      {detalle && !panelLateral && !modalRechazo && (
+        <Modal title="Detalle de solicitud" onClose={cerrarDetalle}>
+          <div className={styles.detalleModal}>
+            <SolicitudEmpresaDetalle {...propsDetalleEmpresa} />
+          </div>
+        </Modal>
+      )}
+
+      {/* Rechazo de empresa */}
       {modalRechazo && detalle && (
         <RechazarSolicitudModal
-          titulo="❌ Rechazar solicitud"
+          titulo="Rechazar solicitud"
           motivo={motivo}
           onMotivoChange={setMotivo}
           motivoInputId="motivo-rechazo"
@@ -293,60 +350,24 @@ export default function AdminSolicitudesPage() {
         </RechazarSolicitudModal>
       )}
 
-      {/* ──────────────────────────────────────────────── */}
-      {/* ── SECCIÓN 2: Solicitudes de Reclutadores ── */}
-      {/* ──────────────────────────────────────────────── */}
-      <div style={{ marginTop: '3rem' }}>
-        <div className="dashboard-header" style={{ marginBottom: '1.25rem' }}>
-          <div>
-            <h2>👤 Solicitudes de Reclutadores</h2>
-            <p className={styles.subtitle}>
-              Alta de reclutadores solicitada por empresas ya registradas.
-            </p>
-          </div>
-          <button className="btn-secondary" onClick={cargarRecl} disabled={loadingRecl}>↺ Actualizar</button>
-        </div>
-
-        {/* Stats reclutadores */}
-        <SolicitudesStatsRow style={{ marginBottom: '1rem' }} items={[
-          { label: 'Total',      value: statsRecl.total,     color: '#0073AD' },
-          { label: 'Pendientes', value: statsRecl.pendiente, color: '#e67e22' },
-          { label: 'Aprobados',  value: statsRecl.aprobado,  color: '#27ae60' },
-          { label: 'Rechazados', value: statsRecl.rechazado, color: '#c0392b' },
-        ]} />
-
-        {/* Filtros reclutadores */}
-        <div className={styles.filtros} style={{ marginBottom: '1rem' }}>
-          <span className={styles.filtroLabel}>Filtrar:</span>
-          {['', 'pendiente', 'aprobado', 'rechazado'].map(est => (
-            <button
-              key={est}
-              className={`${styles.filtroBtn} ${filtroRecl === est ? styles.filtroBtnActive : ''}`}
-              onClick={() => setFiltroRecl(est)}
-            >
-              {est === '' ? 'Todos' : ESTADO_CONFIG[est]?.label}
-            </button>
-          ))}
-        </div>
-
-        <SolicitudesReclutadorSection
-          solicitudesRecl={solicitudesRecl}
-          loadingRecl={loadingRecl}
-          filtroRecl={filtroRecl}
-          confirmandoRecl={confirmandoRecl}
-          onCancelarConfirmacion={() => setConfirmandoRecl(null)}
-          accionandoRecl={accionandoRecl}
-          onAprobar={handleAprobarRecl}
+      {/* Revisión de reclutador */}
+      {detalleRecl && !modalRechazoRecl && (
+        <SolicitudReclutadorRevision
+          solicitud={detalleRecl}
+          accionando={accionandoRecl}
+          confirmando={confirmandoRecl}
+          onPedirConfirmacion={() => setConfirmandoRecl(true)}
+          onCancelarConfirmacion={() => setConfirmandoRecl(false)}
+          onConfirmarAprobacion={handleAprobarRecl}
           onAbrirRechazo={abrirRechazoRecl}
-          paginationRecl={paginationRecl}
-          onPageChange={cargarRecl}
+          onClose={cerrarRevisionRecl}
         />
-      </div>
+      )}
 
-      {/* Modal de rechazo: reclutadores */}
+      {/* Rechazo de reclutador */}
       {modalRechazoRecl && detalleRecl && (
         <RechazarSolicitudModal
-          titulo="❌ Rechazar solicitud de reclutador"
+          titulo="Rechazar solicitud de reclutador"
           motivo={motivoRecl}
           onMotivoChange={setMotivoRecl}
           motivoInputId="motivo-rechazo-recl"
@@ -356,6 +377,7 @@ export default function AdminSolicitudesPage() {
           accionando={accionandoRecl}
           onClose={() => setModalRechazoRecl(false)}
           onConfirm={handleRechazarRecl}
+          confirmButtonId="btn-confirmar-rechazo-recl"
         >
           Vas a rechazar la solicitud de <strong>{detalleRecl.nombre}</strong> ({detalleRecl.email}).
           Se enviará una notificación a la empresa propietaria.

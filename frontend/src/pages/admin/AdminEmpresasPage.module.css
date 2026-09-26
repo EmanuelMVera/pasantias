@@ -1,79 +1,43 @@
 /* AdminEmpresasPage.module.css — listado general de empresas + confianza institucional. */
 
-.feedback { margin-bottom: 1rem; }
-
-.emptyBox {
-  padding: 2rem;
-  text-align: center;
-  color: var(--text-muted);
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.rowBusy { opacity: 0.5; }
-
-.fechaCell {
-  white-space: nowrap;
-  font-size: 0.82rem;
-}
-
-.emailSmall {
-  color: var(--text-muted);
-}
-
-.procesando {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-
-.acciones {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-
-.confirmarTexto {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-}
-
-/* ── Filtros ──────────────────────────────────────────────────────────────── */
-.filtrosWrap {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
-}
-
+/* ── Buscador + filtros ──────────────────────────────────────────────────── */
 .filtros {
   display: flex;
-  gap: 0.4rem;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.grupos {
+  display: flex;
   flex-wrap: wrap;
+  gap: 0.6rem 1.75rem;
 }
 
-.filtro {
-  padding: 4px 12px;
-  border-radius: 20px;
-  border: 1.5px solid var(--border);
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
+.resultados {
+  margin: 0 0 0.85rem;
   font-size: 0.82rem;
-  font-weight: 400;
-  font-family: var(--font-primary);
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
-}
-
-.filtroActivo {
-  color: #fff;
-  font-weight: 700;
-}
-
-.count {
   color: var(--text-muted);
-  font-size: 0.82rem;
-  margin-left: auto;
+}
+
+/* Recarga (cambio de filtro/página): la lista previa queda visible, atenuada. */
+.recargando { opacity: 0.55; transition: opacity 0.15s; }
+
+/* ── Celdas ──────────────────────────────────────────────────────────────── */
+.cuit  { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fecha { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; }
+
+.sub {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ── Cards (tablet / móvil) ──────────────────────────────────────────────── */
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
 }

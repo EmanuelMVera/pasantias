@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import NavbarPublic from '../components/NavbarPublic/NavbarPublic';
+import { BrandMark } from '../components/Brand/Brand';
 import styles from './HomePage.module.css';
 
 // ── Componente de partículas animadas ──────────────────────────────────────
@@ -319,7 +320,7 @@ export default function HomePage() {
       <footer className={styles.footer}>
         <div className={styles.footerInner}>
           <div className={styles.footerBrand}>
-            <span className={styles.footerIcon}>🎓</span>
+            <BrandMark size={36} />
             <div>
               <div className={styles.footerTitle}>SisPasantías</div>
               <div className={styles.footerSub}>Instituto Tecnológico Beltrán</div>

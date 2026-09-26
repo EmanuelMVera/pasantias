@@ -1,75 +1,63 @@
-/* AdminSolicitudesPage.module.css — Estilos para la gestión de solicitudes de empresa */
+/* AdminSolicitudesPage.module.css — layout lista + panel de detalle */
 
-/* ── Subtítulo ───────────────────────────────────────────────────────────────── */
-.subtitle {
-  font-size: 0.9rem;
-  color: var(--text-muted, #5a6a7a);
-  margin: 0.2rem 0 0;
+/* Lista a todo el ancho; con el panel abierto pasa a 2 columnas. */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
 }
 
-/* ── Toast de éxito ──────────────────────────────────────────────────────────── */
-.successToast {
-  background: #e8f8f0;
-  border: 1px solid #a3e0bb;
-  border-left: 4px solid #27ae60;
-  border-radius: 10px;
-  padding: 0.75rem 1.1rem;
-  font-size: 0.9rem;
-  color: #1a6b3a;
-  font-weight: 500;
-  margin-bottom: 1.25rem;
-  animation: slideIn 0.25s ease;
+.conPanel {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
 }
 
-@keyframes slideIn {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
+.lista { min-width: 0; }
+
+/* ── Panel lateral de detalle (solo ≥1101px; en pantallas angostas se usa Modal) ── */
+.detallePanel {
+  background: #fff;
+  border: 1px solid #dde6f0;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 16px rgba(0,115,173,0.08);
+  position: sticky;
+  top: calc(var(--chrome-min-h) + 1rem);
+  max-height: calc(100vh - var(--chrome-min-h) - 2rem);
+  overflow-y: auto;
 }
 
-/* ── Filtros ─────────────────────────────────────────────────────────────────── */
-.filtros {
+.detallePanelHeader {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 1.25rem;
-  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #edf2f7;
 }
 
-.filtroLabel {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  margin-right: 0.25rem;
+.detallePanelHeader h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--secondary, #2D3E50);
+  margin: 0;
 }
 
-.filtroBtn {
-  font-family: var(--font-primary);
-  font-size: 0.83rem;
-  font-weight: 600;
-  padding: 0.4rem 1rem;
-  border: 1.5px solid #d0dce6;
-  border-radius: 999px;
-  background: #f8fafc;
+.cerrarDetalle {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
   color: var(--text-muted);
   cursor: pointer;
-  transition: all 0.15s;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 6px;
+  transition: background 0.15s;
 }
 
-.filtroBtn:hover {
-  border-color: var(--primary, #0073AD);
-  color: var(--primary, #0073AD);
-}
+.cerrarDetalle:hover { background: #f0f4f7; }
 
-.filtroBtnActive {
-  background: var(--primary, #0073AD);
-  border-color: var(--primary, #0073AD);
-  color: #fff;
-}
-
-/* ── Responsive ──────────────────────────────────────────────────────────────── */
-@media (max-width: 480px) {
-  .filtros {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+/* Contenido del detalle dentro del Modal */
+.detalleModal {
+  padding: 0 1.5rem 1.5rem;
 }

@@ -12,6 +12,7 @@
 const { Op } = require('sequelize');
 const {
   sequelize, Usuario, Empresa, EmpresaUsuario, Oferta, Postulacion, PostulacionHistorialEstado,
+  SolicitudEmpresa,
 } = require('../models');
 const { groupCount } = require('../utils/pagination');
 
@@ -98,6 +99,7 @@ async function obtenerEstadisticasGenerales({ desde, hasta, periodoDias } = {}) 
     ofertasPorArea,
     empresasTopRaw,
     aprobacionEmpresas,
+    solicitudesEmpresaPendientes,
   ] = await Promise.all([
     Usuario.count({ where: { rol: 'alumno', activo: true } }),
     Usuario.count({ where: { rol: 'egresado', activo: true } }),
@@ -110,7 +112,15 @@ async function obtenerEstadisticasGenerales({ desde, hasta, periodoDias } = {}) 
     Postulacion.count(),
     Postulacion.count({ where: wherePeriodo }),
     Postulacion.count({ where: { estado: 'contratado' } }),
-    Postulacion.count({ where: { estado: 'contratado', ...wherePeriodo } }),
+    // Contrataciones OCURRIDAS en el período: postulaciones distintas cuyo pase a
+    // "contratado" quedó registrado en el historial dentro del rango. (Antes contaba
+    // postulaciones CREADAS en el período que hoy figuran contratadas: una postulación
+    // de hace 2 meses contratada ayer no aparecía en "últimos 30 días".)
+    PostulacionHistorialEstado.count({
+      where: { estadoNuevo: 'contratado', ...wherePeriodo },
+      distinct: true,
+      col: 'postulacionId',
+    }),
     Usuario.count({ where: { rol: { [Op.in]: ['alumno', 'egresado'] }, ...wherePeriodo } }),
     calcularEmbudo(),
     groupCount(Oferta, 'area', {}),
@@ -121,10 +131,15 @@ async function obtenerEstadisticasGenerales({ desde, hasta, periodoDias } = {}) 
       limit: 5,
       raw: true,
     }),
-    Empresa.findAll({
-      where: { estadoAprobacion: 'aprobada', aprobadaEn: { [Op.ne]: null } },
-      attributes: ['createdAt', 'aprobadaEn'],
+    // Tiempo de espera REAL: de que la empresa envió su solicitud a que el
+    // admin la aprobó. Empresa.createdAt no sirve — la fila Empresa se crea
+    // recién al aprobar la solicitud (solicitudEmpresa.service.js), así que
+    // aprobadaEn - createdAt da ~0.
+    SolicitudEmpresa.findAll({
+      where: { estado: 'aprobado', revisadaEn: { [Op.ne]: null } },
+      attributes: ['createdAt', 'revisadaEn'],
     }),
+    SolicitudEmpresa.count({ where: { estado: 'pendiente' } }),
   ]);
 
   const empresaIds = empresasTopRaw.map((e) => e.empresaId);
@@ -140,7 +155,7 @@ async function obtenerEstadisticasGenerales({ desde, hasta, periodoDias } = {}) 
 
   const tiempoPromedioAprobacionDias = aprobacionEmpresas.length
     ? Math.round(
-        (aprobacionEmpresas.reduce((acc, e) => acc + (new Date(e.aprobadaEn) - new Date(e.createdAt)), 0)
+        (aprobacionEmpresas.reduce((acc, e) => acc + (new Date(e.revisadaEn) - new Date(e.createdAt)), 0)
           / aprobacionEmpresas.length) / (24 * 60 * 60 * 1000) * 10
       ) / 10
     : null;
@@ -156,6 +171,9 @@ async function obtenerEstadisticasGenerales({ desde, hasta, periodoDias } = {}) 
     empresas: {
       aprobadas: empresasPorEstado.aprobada || 0,
       pendientes: empresasPorEstado.pendiente || 0,
+      // Lo que realmente espera decisión del admin: la fila Empresa se crea recién
+      // al aprobar la solicitud, así que `pendientes` (Empresa) casi siempre es 0.
+      solicitudesPendientes: solicitudesEmpresaPendientes,
       rechazadas: empresasPorEstado.rechazada || 0,
       reclutadoresActivos,
       tiempoPromedioAprobacionDias,

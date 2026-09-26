@@ -8,19 +8,28 @@
  * Ruta: /admin/importaciones — rol: admin
  */
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { adminService } from '../../services/admin.service';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { filasACsv, descargarTexto } from '../../utils/csv';
+import PageHeader from '../../components/ui/PageHeader';
+import FileDropzone from '../../components/ui/FileDropzone';
+import TableResponsive from '../../components/ui/TableResponsive';
+import DataCard from '../../components/ui/DataCard';
 import styles from './AdminImportacionPage.module.css';
 
+// Límites por defecto del backend (CSV_IMPORT_MAX_BYTES / CSV_IMPORT_MAX_ROWS).
+const HINT_ARCHIVO = 'CSV UTF-8 · máx. 2 MB · hasta 2000 filas';
+
 export default function AdminImportacionPage() {
+  const esTabla = useMediaQuery('(min-width: 1024px)');
+
   const [file, setFile] = useState(null);
   const [paso, setPaso] = useState('seleccion'); // 'seleccion' | 'preview' | 'resumen'
   const [analisis, setAnalisis] = useState(null);
   const [resumen, setResumen] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
-  const inputRef = useRef(null);
 
   const handleDescargarPlantilla = async () => {
     try {
@@ -31,8 +40,7 @@ export default function AdminImportacionPage() {
     }
   };
 
-  const handleFileChange = (e) => {
-    const f = e.target.files?.[0] ?? null;
+  const handleArchivo = (f) => {
     setFile(f);
     setAnalisis(null);
     setResumen(null);
@@ -96,100 +104,123 @@ export default function AdminImportacionPage() {
     setResumen(null);
     setError('');
     setPaso('seleccion');
-    if (inputRef.current) inputRef.current.value = '';
   };
+
+  const filasInvalidas = analisis ? analisis.filas.filter((f) => !f.ok) : [];
 
   return (
     <div className="page-container">
-      <div className="dashboard-header">
-        <div>
-          <h1>Importar alumnos/egresados</h1>
-          <p className={styles.subtitle}>Alta masiva por CSV (UTF-8). Exclusivo para administradores.</p>
-        </div>
-        <button className="btn-secondary" onClick={handleDescargarPlantilla}>
-          ⬇️ Descargar plantilla
-        </button>
-      </div>
+      <PageHeader
+        title="Importar alumnos/egresados"
+        subtitle="Alta masiva por CSV (UTF-8). Exclusivo para administradores."
+        actions={(
+          <button type="button" className="btn-secondary" onClick={handleDescargarPlantilla}>
+            Descargar plantilla
+          </button>
+        )}
+      />
 
-      {error && <p className="error-msg" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {error && <p className="error-msg" role="alert" style={{ marginBottom: '1rem' }}>{error}</p>}
 
       {/* ── Paso 1: selección de archivo ─────────────────────────────── */}
-      <div className={styles.card}>
-        <h2>1. Seleccioná el archivo CSV</h2>
+      <section className={styles.card} aria-labelledby="paso-1">
+        <h2 id="paso-1">1. Seleccioná el archivo CSV</h2>
         <p className={styles.hint}>
           Columnas: <code>legajo, nombre, apellido, email, rol, carrera, anioEgreso, telefono, ubicacion</code>.
           El rol debe ser <code>alumno</code> o <code>egresado</code>.
         </p>
-        <div className={styles.fileRow}>
-          <input ref={inputRef} type="file" accept=".csv,text/csv" onChange={handleFileChange} />
+        <FileDropzone
+          id="archivo-csv"
+          label="Archivo CSV de alumnos y egresados"
+          accept=".csv,text/csv"
+          file={file}
+          onFile={handleArchivo}
+          disabled={cargando}
+          hint={HINT_ARCHIVO}
+        />
+        <div className={styles.acciones}>
           <button
+            type="button"
             className="btn-primary"
             onClick={handlePrevisualizar}
             disabled={!file || cargando}
           >
-            {cargando && paso === 'seleccion' ? 'Analizando...' : '🔎 Previsualizar'}
+            {cargando && paso === 'seleccion' ? 'Analizando...' : 'Previsualizar'}
           </button>
         </div>
-      </div>
+      </section>
 
       {/* ── Paso 2: preview (dry-run) ─────────────────────────────────── */}
       {paso === 'preview' && analisis && (
-        <div className={styles.card}>
-          <h2>2. Previsualización</h2>
-          <div className={styles.resumenGrid}>
+        <section className={styles.card} aria-labelledby="paso-2">
+          <h2 id="paso-2">2. Previsualización</h2>
+          <div className={styles.resumenGrid} role="status">
             <span className={styles.resumenItem}>Total filas: <strong>{analisis.totalFilas}</strong></span>
             <span className={`${styles.resumenItem} ${styles.ok}`}>Válidas: <strong>{analisis.validas}</strong></span>
             <span className={`${styles.resumenItem} ${styles.err}`}>Inválidas: <strong>{analisis.invalidas}</strong></span>
           </div>
 
-          {analisis.invalidas > 0 && (
-            <div className={styles.tableWrap}>
-              <table className="tabla">
-                <thead>
-                  <tr>
-                    <th>Línea</th>
-                    <th>Legajo</th>
-                    <th>Email</th>
-                    <th>Errores</th>
+          {analisis.invalidas > 0 && (esTabla ? (
+            <TableResponsive minWidth={560}>
+              <thead>
+                <tr>
+                  <th>Línea</th>
+                  <th>Legajo</th>
+                  <th>Email</th>
+                  <th>Errores</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filasInvalidas.map((f) => (
+                  <tr key={f.linea}>
+                    <td>{f.linea}</td>
+                    <td>{f.fila.legajo || '—'}</td>
+                    <td className="cell-break">{f.fila.email || '—'}</td>
+                    <td className={`${styles.errCell} cell-break`}>{f.errores.join('; ')}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {analisis.filas.filter((f) => !f.ok).map((f) => (
-                    <tr key={f.linea}>
-                      <td>{f.linea}</td>
-                      <td>{f.fila.legajo || '—'}</td>
-                      <td>{f.fila.email || '—'}</td>
-                      <td className={styles.errCell}>{f.errores.join('; ')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                ))}
+              </tbody>
+            </TableResponsive>
+          ) : (
+            <div className={styles.cards}>
+              {filasInvalidas.map((f) => (
+                <DataCard
+                  key={f.linea}
+                  title={`Línea ${f.linea}`}
+                  subtitle={f.fila.email || undefined}
+                  fields={[
+                    { label: 'Legajo', value: f.fila.legajo },
+                    { label: 'Errores', value: f.errores.join('; ') },
+                  ]}
+                />
+              ))}
             </div>
-          )}
+          ))}
 
           <div className={styles.acciones}>
             {analisis.invalidas > 0 && (
-              <button className="btn-secondary" onClick={handleDescargarReporteErrores}>
-                ⬇️ Descargar reporte de errores
+              <button type="button" className="btn-secondary" onClick={handleDescargarReporteErrores}>
+                Descargar reporte de errores
               </button>
             )}
             <button
+              type="button"
               className="btn-primary"
               onClick={handleConfirmar}
               disabled={analisis.validas === 0 || cargando}
               title={analisis.validas === 0 ? 'No hay filas válidas para importar' : undefined}
             >
-              {cargando ? 'Importando...' : `✅ Confirmar importación (${analisis.validas})`}
+              {cargando ? 'Importando...' : `Confirmar importación (${analisis.validas})`}
             </button>
           </div>
-        </div>
+        </section>
       )}
 
       {/* ── Paso 3: resumen ──────────────────────────────────────────── */}
       {paso === 'resumen' && resumen && (
-        <div className={styles.card}>
-          <h2>3. Importación completada</h2>
-          <div className={styles.resumenGrid}>
+        <section className={styles.card} aria-labelledby="paso-3">
+          <h2 id="paso-3">3. Importación completada</h2>
+          <div className={styles.resumenGrid} role="status">
             <span className={styles.resumenItem}>Filas procesadas: <strong>{resumen.totalFilas}</strong></span>
             <span className={`${styles.resumenItem} ${styles.ok}`}>Usuarios creados: <strong>{resumen.totalCreados}</strong></span>
             <span className={`${styles.resumenItem} ${styles.err}`}>Filas inválidas: <strong>{resumen.totalInvalidas}</strong></span>
@@ -212,32 +243,30 @@ export default function AdminImportacionPage() {
           )}
 
           {resumen.creados?.length > 0 && (
-            <div className={styles.tableWrap}>
-              <table className="tabla">
-                <thead>
-                  <tr>
-                    <th>Nombre</th>
-                    <th>Email</th>
+            <TableResponsive minWidth={320}>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Email</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resumen.creados.map((c) => (
+                  <tr key={c.id}>
+                    <td className="cell-break">{c.nombre} {c.apellido}</td>
+                    <td className="cell-break">{c.email}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {resumen.creados.map((c) => (
-                    <tr key={c.id}>
-                      <td>{c.nombre} {c.apellido}</td>
-                      <td>{c.email}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </TableResponsive>
           )}
 
           <div className={styles.acciones}>
-            <button className="btn-secondary" onClick={handleReiniciar}>
+            <button type="button" className="btn-secondary" onClick={handleReiniciar}>
               Importar otro archivo
             </button>
           </div>
-        </div>
+        </section>
       )}
     </div>
   );

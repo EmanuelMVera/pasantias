@@ -16,20 +16,59 @@
 const { Op } = require('sequelize');
 const request = require('supertest');
 const app = require('../src/app');
-const { Postulacion, PostulacionHistorialEstado } = require('../src/models');
+const { Postulacion, PostulacionHistorialEstado, SolicitudEmpresa } = require('../src/models');
 const { obtenerEstadisticasGenerales, calcularEmbudo, pct } = require('../src/services/adminEstadisticas.service');
-const { crearAlumno, crearAdmin, crearEmpresaConAdmin, crearOferta, loginYObtenerToken } = require('./helpers/factories');
-const { limpiarUsuarios, cerrarConexion } = require('./helpers/cleanup');
+const {
+  crearAlumno, crearAdmin, crearEmpresaConAdmin, crearOferta, crearSolicitudEmpresaPendiente, loginYObtenerToken,
+} = require('./helpers/factories');
+const { limpiarUsuarios, limpiarSolicitudesEmpresa, cerrarConexion } = require('./helpers/cleanup');
 
 describe('adminEstadisticas — embudo de selección y estadísticas generales', () => {
   const idsUsuarios = [];
   const idsPostulaciones = [];
+  const idsSolicitudes = [];
 
   afterAll(async () => {
     await PostulacionHistorialEstado.destroy({ where: { postulacionId: { [Op.in]: idsPostulaciones } } });
     await Postulacion.destroy({ where: { id: { [Op.in]: idsPostulaciones } } });
     await limpiarUsuarios(idsUsuarios);
+    await limpiarSolicitudesEmpresa(idsSolicitudes);
     await cerrarConexion();
+  });
+
+  test('tiempoPromedioAprobacionDias se calcula sobre las solicitudes (envío → aprobación), no sobre la fila Empresa', async () => {
+    // La fila Empresa se crea recién al aprobar: aprobadaEn - createdAt daba ~0.
+    // El tiempo real de espera es SolicitudEmpresa.revisadaEn - createdAt.
+    const hace3Dias = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    const solicitud = await crearSolicitudEmpresaPendiente({ createdAt: hace3Dias });
+    idsSolicitudes.push(solicitud.id);
+    await solicitud.update({ estado: 'aprobado', revisadaEn: new Date() });
+
+    const aprobadas = await SolicitudEmpresa.findAll({
+      where: { estado: 'aprobado', revisadaEn: { [Op.ne]: null } },
+      attributes: ['createdAt', 'revisadaEn'],
+    });
+    const esperado = Math.round(
+      (aprobadas.reduce((acc, s) => acc + (new Date(s.revisadaEn) - new Date(s.createdAt)), 0) / aprobadas.length)
+      / (24 * 60 * 60 * 1000) * 10
+    ) / 10;
+
+    const data = await obtenerEstadisticasGenerales();
+    expect(data.empresas.tiempoPromedioAprobacionDias).toBe(esperado);
+    expect(data.empresas.tiempoPromedioAprobacionDias).toBeGreaterThan(0);
+  });
+
+  test('empresas.solicitudesPendientes cuenta las solicitudes que esperan decisión (no las filas Empresa)', async () => {
+    const antes = (await obtenerEstadisticasGenerales()).empresas.solicitudesPendientes;
+
+    const solicitud = await crearSolicitudEmpresaPendiente();
+    idsSolicitudes.push(solicitud.id);
+    const conUna = (await obtenerEstadisticasGenerales()).empresas.solicitudesPendientes;
+    expect(conUna).toBe(antes + 1);
+
+    await solicitud.update({ estado: 'aprobado', revisadaEn: new Date() });
+    const resuelta = (await obtenerEstadisticasGenerales()).empresas.solicitudesPendientes;
+    expect(resuelta).toBe(antes);
   });
 
   test('pct() nunca divide por cero — denominador 0 da null, nunca 0% engañoso', () => {
@@ -37,6 +76,40 @@ describe('adminEstadisticas — embudo de selección y estadísticas generales',
     expect(pct(0, 0)).toBeNull();
     expect(pct(0, 10)).toBe(0);
     expect(pct(5, 10)).toBe(50);
+  });
+
+  test('contrataciones.enPeriodo cuenta CUÁNDO se contrató (historial), no cuándo se postuló', async () => {
+    const enPeriodo = async (periodoDias) => (await obtenerEstadisticasGenerales({ periodoDias })).contrataciones.enPeriodo;
+    const base30 = await enPeriodo(30);
+    const base365 = await enPeriodo(365);
+
+    const { usuario: alumno1 } = await crearAlumno();
+    const { usuario: alumno2 } = await crearAlumno();
+    idsUsuarios.push(alumno1.id, alumno2.id);
+    const { empresa, usuarioAdmin } = await crearEmpresaConAdmin();
+    idsUsuarios.push(usuarioAdmin.id);
+    const oferta = await crearOferta(empresa);
+    const hace60Dias = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+
+    const contratada = async (alumno, { postuladaEn, contratadaEn }) => {
+      const post = await Postulacion.create({
+        usuarioId: alumno.id, ofertaId: oferta.id, estado: 'contratado',
+        fechaPostulacion: postuladaEn, createdAt: postuladaEn,
+      });
+      idsPostulaciones.push(post.id);
+      await PostulacionHistorialEstado.create({
+        postulacionId: post.id, estadoAnterior: 'entrevista', estadoNuevo: 'contratado',
+        cambiadoPorUsuarioId: alumno.id, createdAt: contratadaEn,
+      });
+    };
+
+    // A: se postuló hace 60 días y se contrató HOY  → cuenta en los últimos 30 días.
+    await contratada(alumno1, { postuladaEn: hace60Dias, contratadaEn: new Date() });
+    // B: se postuló y se contrató hace 60 días      → NO cuenta en 30 días, sí en 365.
+    await contratada(alumno2, { postuladaEn: hace60Dias, contratadaEn: hace60Dias });
+
+    expect(await enPeriodo(30)).toBe(base30 + 1);
+    expect(await enPeriodo(365)).toBe(base365 + 2);
   });
 
   test('embudo: ninguna tasa supera el 100% aunque haya más "contratado" que "entrevista" actuales', async () => {

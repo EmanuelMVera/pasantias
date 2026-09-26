@@ -1,77 +1,41 @@
 /* AdminUsuariosPage.module.css */
 
-/* ── Cabecera ────────────────────────────────────────────────────────────── */
-.subtitle {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  margin-top: 0.25rem;
+.headerAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
 }
 
-.successMsg {
-  background: #eafaf1;
-  border: 1px solid var(--success);
-  color: #1e8449;
-  border-radius: var(--radius);
-  padding: 0.6rem 1rem;
-  font-size: 0.88rem;
-  margin-bottom: 1rem;
-  font-weight: 600;
-}
+.headerAcciones > * { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
 
 /* ── Filtros ─────────────────────────────────────────────────────────────── */
 .filtros {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
-  margin-bottom: 1.5rem;
-  align-items: center;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 1.25rem;
 }
 
-.searchInput {
-  flex: 1;
-  min-width: 220px;
-  padding: 0.55rem 0.85rem;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-card);
-  color: var(--text-primary);
-  font-size: 0.9rem;
-  font-family: var(--font-primary);
-  transition: border-color 0.2s;
-}
-.searchInput:focus { outline: none; border-color: var(--primary); }
-
-.filterSelect {
-  padding: 0.55rem 0.85rem;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-card);
-  color: var(--text-primary);
-  font-size: 0.88rem;
-  font-family: var(--font-primary);
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-.filterSelect:focus { outline: none; border-color: var(--primary); }
-
-/* ── Tabla ───────────────────────────────────────────────────────────────── */
-.tableWrap {
-  overflow-x: auto;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  margin-bottom: 1.5rem;
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: min(100%, 170px);
 }
 
-.rowInactiva { opacity: 0.55; }
-.rowInactiva:hover { opacity: 0.75; }
-
-.idCell {
-  font-size: 0.78rem;
-  color: var(--text-muted);
+.campo label {
+  font-size: 0.8rem;
   font-weight: 700;
-  white-space: nowrap;
+  color: var(--text-muted);
 }
 
+.campo select { min-height: 44px; }
+.filtros > button { min-height: 44px; }
+
+.recargando { opacity: 0.55; transition: opacity 0.15s; }
+
+/* ── Celdas ──────────────────────────────────────────────────────────────── */
 .userCell {
   display: flex;
   align-items: center;
@@ -93,19 +57,17 @@
   letter-spacing: 0.5px;
 }
 
-.ubicacion {
+.nombreInactivo { color: var(--text-muted); }
+
+.sub {
   display: block;
-  color: var(--text-muted);
-  font-size: 0.75rem;
   margin-top: 0.1rem;
-}
-
-.emailCell {
-  font-size: 0.84rem;
+  font-size: 0.75rem;
+  font-weight: 400;
   color: var(--text-muted);
 }
 
-.fechaCell {
+.fecha {
   font-size: 0.82rem;
   color: var(--text-muted);
   white-space: nowrap;
@@ -121,33 +83,24 @@
   border: 1px solid color-mix(in srgb, var(--badge-color) 30%, transparent);
   font-size: 0.75rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
   white-space: nowrap;
 }
 
-/* ── Toggle botón activo/inactivo ────────────────────────────────────────── */
-.toggleOn, .toggleOff {
-  border: none;
+/* ── Estado (solo informativo: no es un control) ─────────────────────────── */
+.estadoActivo,
+.estadoInactivo {
+  display: inline-block;
   border-radius: 999px;
   padding: 0.22rem 0.7rem;
   font-size: 0.78rem;
   font-weight: 700;
-  cursor: pointer;
-  transition: opacity 0.2s;
-  font-family: var(--font-primary);
+  white-space: nowrap;
+  cursor: default;
 }
-.toggleOn {
-  background: #eafaf1;
-  color: #1e8449;
-  border: 1px solid #a9dfbf;
-}
-.toggleOff {
-  background: #fdf2f8;
-  color: #922b21;
-  border: 1px solid #f1948a;
-}
-.toggleOn:hover, .toggleOff:hover { opacity: 0.75; }
+
+.estadoActivo   { background: #eafaf1; color: #1e8449; border: 1px solid #a9dfbf; }
+.estadoInactivo { background: #fdf2f8; color: #922b21; border: 1px solid #f1948a; }
 
 /* ── Acciones ────────────────────────────────────────────────────────────── */
 .accionesBtns {
@@ -156,50 +109,17 @@
   flex-wrap: wrap;
 }
 
-/* ── Loading / Empty ─────────────────────────────────────────────────────── */
-.loadingWrap {
+.accionesBtns button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Cards (tablet / móvil) ──────────────────────────────────────────────── */
+.cards {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  padding: 3rem;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
 }
 
-.spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid var(--border);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.empty {
-  text-align: center;
-  padding: 3rem;
-  color: var(--text-muted);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-}
-.empty span { font-size: 2.5rem; }
-
-/* ── Modal overlay ───────────────────────────────────────────────────────── */
-.confirmIcon { font-size: 2.5rem; display: block; margin-bottom: 0.75rem; }
-.modalConfirm h2 { font-size: 1.2rem; margin-bottom: 0.5rem; }
-.modalConfirm p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
-
-.modalFooter {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.6rem;
-  margin-top: 1.25rem;
-}
-
-/* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .filtros { flex-direction: column; }
-  .searchInput { min-width: unset; width: 100%; }
+  .filtros { flex-direction: column; align-items: stretch; }
+  .campo { min-width: 0; }
 }

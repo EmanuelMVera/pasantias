@@ -1,0 +1,60 @@
+/* ── Brand ─────────────────────────────────────────────────────────────── */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  text-decoration: none;
+}
+
+a.brand:hover { text-decoration: none; }
+a.brand:hover .name { opacity: 0.85; }
+
+.mark {
+  flex-shrink: 0;
+  display: block;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.1;
+}
+
+.name {
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.tagline {
+  margin-top: 2px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Sobre fondo oscuro (navbar) */
+.light .name    { color: #ffffff; }
+.light .tagline { color: rgba(255, 255, 255, 0.72); }
+
+/* Sobre fondo claro */
+.dark .name    { color: var(--secondary); }
+.dark .tagline { color: var(--text-muted); }
+
+/* ── Degradación responsive (solo con la prop `responsive`) ───────────────
+   ≥1024px: completo · <1024px: compacto (sin descriptor) · ≤400px: solo símbolo */
+.responsive .tagline { display: none; }
+
+@media (min-width: 1024px) {
+  .responsive .tagline { display: block; }
+}
+
+@media (max-width: 400px) {
+  .responsive .text { display: none; }
+}

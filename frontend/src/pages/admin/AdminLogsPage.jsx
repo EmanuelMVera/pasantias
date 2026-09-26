@@ -1,218 +1,259 @@
 /**
- * AdminLogsPage.jsx — Visor de logs de auditoría del sistema.
+ * AdminLogsPage.jsx — Auditoría del sistema (visor de activity_logs).
  *
- * Muestra todas las acciones registradas en activity_logs:
- * - Filtros por tipo de acción, entidad, rango de fechas
- * - Paginación de 25 registros por página
- * - Badge de colores por tipo de acción
- * - Exportación a CSV
+ * Filtros por acción, entidad y rango de fechas con dos estados separados:
+ *   - EDITADOS (`borrador`): lo que la persona está tocando en el formulario.
+ *   - APLICADOS (`filtros`): lo que realmente se consultó. Solo cambian con
+ *     "Aplicar filtros" (o "Limpiar"). La tabla, el contador y la EXPORTACIÓN
+ *     usan siempre los aplicados, así lo exportado coincide con lo que se ve.
+ *
+ * Tabla compacta en escritorio (sin columna de ID) y cards en tablet/móvil.
+ * Paginación de 25 registros por página.
+ *
+ * Ruta: /admin/logs
+ * Rol: admin
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { adminService } from '../../services/admin.service';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useToast } from '../../hooks/useToast';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import PageHeader from '../../components/ui/PageHeader';
 import ExportMenu from '../../components/ui/ExportMenu';
+import TableResponsive from '../../components/ui/TableResponsive';
+import DataCard from '../../components/ui/DataCard';
+import EmptyState from '../../components/ui/EmptyState';
+import Toast from '../../components/ui/Toast';
 import { descargarBlob, nombreDesdeContentDisposition } from '../../utils/csv';
+import { OPCIONES_ACCION, OPCIONES_ENTIDAD, accionInfo, entidadLabel } from './auditoria.utils';
 import styles from './AdminLogsPage.module.css';
 
-/* Tipos de acción con etiqueta y color */
-const ACCIONES = {
-  login:                    { label: 'Login',              color: '#0073AD', icon: '🔑' },
-  logout:                   { label: 'Logout',             color: '#7f8c8d', icon: '🚪' },
-  crear_usuario:            { label: 'Crear usuario',      color: '#27ae60', icon: '👤+' },
-  editar_usuario:           { label: 'Editar usuario',     color: '#2980b9', icon: '✏️' },
-  eliminar_usuario:         { label: 'Eliminar usuario',   color: '#c0392b', icon: '🗑️' },
-  cambiar_rol:              { label: 'Cambiar rol',        color: '#8e44ad', icon: '🔄' },
-  toggle_usuario:           { label: 'Toggle cuenta',      color: '#e67e22', icon: '⚡' },
-  aprobar_empresa:          { label: 'Aprobar empresa',    color: '#27ae60', icon: '✅' },
-  rechazar_empresa:         { label: 'Rechazar empresa',   color: '#c0392b', icon: '❌' },
-  aprobar_oferta:           { label: 'Aprobar oferta',     color: '#27ae60', icon: '📢' },
-  rechazar_oferta:          { label: 'Rechazar oferta',    color: '#c0392b', icon: '🚫' },
-  crear_oferta:             { label: 'Nueva oferta',       color: '#0073AD', icon: '📝' },
-  pausar_oferta:            { label: 'Pausar oferta',      color: '#e67e22', icon: '⏸️' },
-  reactivar_oferta:         { label: 'Reactivar oferta',   color: '#27ae60', icon: '▶️' },
-  cerrar_oferta:            { label: 'Cerrar oferta',      color: '#7f8c8d', icon: '🔒' },
-  postular:                 { label: 'Postulación',        color: '#16a085', icon: '📋' },
-  cambiar_estado_postulacion: { label: 'Estado postulación', color: '#8e44ad', icon: '🔃' },
-  importar_alumnos_csv:     { label: 'Importar CSV',       color: '#2980b9', icon: '📥' },
-  exportar_logs:            { label: 'Exportar auditoría', color: '#8e44ad', icon: '⬇️' },
-  exportar_estadisticas:    { label: 'Exportar estadísticas', color: '#8e44ad', icon: '⬇️' },
-  sistema:                  { label: 'Sistema',            color: '#7f8c8d', icon: '⚙️' },
-};
+const FILTROS_VACIOS = { accion: '', entidad: '', desde: '', hasta: '' };
+
+const soloFecha = (iso) => new Date(iso).toLocaleDateString('es-AR');
+const soloHora = (iso) => new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+// Solo manda al backend los filtros con valor.
+const paramsDe = (f) => Object.fromEntries(Object.entries(f).filter(([, v]) => v));
+
+function AccionBadge({ accion }) {
+  const { label, color } = accionInfo(accion);
+  return <span className={styles.accionBadge} style={{ '--badge-color': color }}>{label}</span>;
+}
+
+function UsuarioCelda({ usuario }) {
+  if (!usuario) return <span className={styles.sistema}>Sistema</span>;
+  return (
+    <div className={styles.userCell}>
+      <span className={styles.avatar} aria-hidden="true">{usuario.nombre?.[0]}{usuario.apellido?.[0]}</span>
+      <div>
+        <span>{usuario.nombre} {usuario.apellido}</span>
+        <small className={styles.email}>{usuario.email}</small>
+      </div>
+    </div>
+  );
+}
+
+const entidadTexto = (log) => (log.entidad ? `${entidadLabel(log.entidad)}${log.entidadId ? ` #${log.entidadId}` : ''}` : null);
 
 export default function AdminLogsPage() {
-  const [logs,        setLogs]       = useState([]);
-  const [loading,     setLoading]    = useState(true);
-  const [error,       setError]      = useState('');
+  const esTabla = useMediaQuery('(min-width: 1024px)');
+  const { toast, showToast } = useToast(5000);
 
-  // Paginación (contrato común: { page, limit, total, totalPages })
+  const [logs,       setLogs]       = useState([]);
   const [pagination, setPagination] = useState(null);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState('');
 
-  // Filtros
-  const [filtroAccion, setFiltroAccion] = useState('');
-  const [filtroEntidad, setFiltroEntidad] = useState('');
-  const [desde,        setDesde]       = useState('');
-  const [hasta,        setHasta]       = useState('');
+  const [borrador, setBorrador] = useState(FILTROS_VACIOS); // editados (formulario)
+  const [filtros,  setFiltros]  = useState(FILTROS_VACIOS); // aplicados (consulta + export)
+  const [page,     setPage]     = useState(1);
+  const [errorFiltros, setErrorFiltros] = useState('');
 
-  /* ── Carga ───────────────────────────────────────────────────── */
-  const cargar = useCallback(async (p = 1) => {
+  const secuencia = useRef(0);
+
+  const cargar = useCallback(async () => {
+    const mia = ++secuencia.current;
     setLoading(true);
     setError('');
     try {
-      const params = { page: p, limit: 25 };
-      if (filtroAccion)  params.accion  = filtroAccion;
-      if (filtroEntidad) params.entidad = filtroEntidad;
-      if (desde)         params.desde   = desde;
-      if (hasta)         params.hasta   = hasta;
-
-      const res = await adminService.getLogs(params);
+      const res = await adminService.getLogs({ page, limit: 25, ...paramsDe(filtros) });
+      if (mia !== secuencia.current) return;
       setLogs(res.data.data ?? []);
       setPagination(res.data.pagination ?? null);
     } catch {
-      setError('No se pudieron cargar los logs del sistema.');
+      if (mia !== secuencia.current) return;
+      setError('No se pudieron cargar los registros de auditoría.');
     } finally {
-      setLoading(false);
+      if (mia === secuencia.current) setLoading(false);
     }
-  }, [filtroAccion, filtroEntidad, desde, hasta]);
+  }, [page, filtros]);
 
-  useEffect(() => { cargar(1); }, [cargar]);
+  useEffect(() => { cargar(); }, [cargar]);
 
-  /* ── Exportar (CSV / Excel / PDF) ────────────────────────────── */
+  const hayCambiosSinAplicar = Object.keys(FILTROS_VACIOS).some((k) => borrador[k] !== filtros[k]);
+  const hayFiltrosAplicados = Object.values(filtros).some(Boolean);
+
+  const setCampo = (campo) => (e) => {
+    setBorrador((b) => ({ ...b, [campo]: e.target.value }));
+    setErrorFiltros('');
+  };
+
+  const aplicar = (e) => {
+    e.preventDefault();
+    if (borrador.desde && borrador.hasta && borrador.desde > borrador.hasta) {
+      setErrorFiltros('La fecha "Desde" no puede ser posterior a "Hasta".');
+      return;
+    }
+    setErrorFiltros('');
+    setFiltros(borrador);
+    setPage(1);
+  };
+
+  const limpiar = () => {
+    setBorrador(FILTROS_VACIOS);
+    setFiltros(FILTROS_VACIOS);
+    setErrorFiltros('');
+    setPage(1);
+  };
+
+  // La exportación usa los filtros APLICADOS, no los que se están editando.
   const handleExport = async (format) => {
     try {
-      const params = { format };
-      if (filtroAccion)  params.accion  = filtroAccion;
-      if (filtroEntidad) params.entidad = filtroEntidad;
-      if (desde)         params.desde   = desde;
-      if (hasta)         params.hasta   = hasta;
-
-      const res = await adminService.exportarLogs(params);
-      const fallback = `logs-${new Date().toISOString().slice(0, 10)}.${format}`;
+      const res = await adminService.exportarLogs({ format, ...paramsDe(filtros) });
+      const fallback = `auditoria-${new Date().toISOString().slice(0, 10)}.${format}`;
       const nombre = nombreDesdeContentDisposition(res.headers['content-disposition'], fallback);
       descargarBlob(res.data, nombre);
+      showToast(`Exportación ${format.toUpperCase()} generada.`, 'success');
     } catch {
-      setError('Error al exportar los logs.');
+      showToast('No se pudo exportar la auditoría.', 'error');
     }
   };
 
-  /* ── Render ──────────────────────────────────────────────────── */
+  const total = pagination?.total ?? 0;
+  const primeraCarga = loading && logs.length === 0 && !error;
+
   return (
     <div className="page-container">
-      {/* Cabecera */}
+      <Toast toast={toast} />
+
       <PageHeader
-        title="Historial de Accesos"
-        subtitle={loading ? '...' : `${pagination?.total ?? 0} registro${(pagination?.total ?? 0) !== 1 ? 's' : ''} encontrado${(pagination?.total ?? 0) !== 1 ? 's' : ''}`}
+        title="Auditoría del sistema"
+        subtitle={loading && !pagination ? 'Cargando…' : `${total} registro${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`}
         actions={<ExportMenu id="btn-exportar-logs" formats={['csv', 'xlsx', 'pdf']} onExport={handleExport} />}
       />
 
-      {error && <p className="error-msg" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {error && <p className="error-msg" role="alert" style={{ marginBottom: '1rem' }}>{error}</p>}
 
-      {/* Filtros */}
-      <div className={styles.filtros}>
-        <select id="filtro-accion" className={styles.filterSelect} value={filtroAccion} onChange={(e) => setFiltroAccion(e.target.value)}>
-          <option value="">Todas las acciones</option>
-          {Object.entries(ACCIONES).map(([key, val]) => (
-            <option key={key} value={key}>{val.icon} {val.label}</option>
-          ))}
-        </select>
-
-        <select id="filtro-entidad" className={styles.filterSelect} value={filtroEntidad} onChange={(e) => setFiltroEntidad(e.target.value)}>
-          <option value="">Todas las entidades</option>
-          {['usuario', 'empresa', 'oferta', 'postulacion', 'activity_log', 'estadisticas'].map((e) => (
-            <option key={e} value={e}>{e}</option>
-          ))}
-        </select>
-
-        <div className={styles.dateGroup}>
-          <label>Desde</label>
-          <input type="date" className={styles.dateInput} value={desde} onChange={(e) => setDesde(e.target.value)} />
+      {/* noValidate: el rango inválido lo informa `errorFiltros` (accesible), no el globo nativo del navegador. */}
+      <form className={styles.filtros} onSubmit={aplicar} aria-label="Filtros de auditoría" noValidate>
+        <div className={styles.campo}>
+          <label htmlFor="filtro-accion">Acción</label>
+          <select id="filtro-accion" value={borrador.accion} onChange={setCampo('accion')}>
+            <option value="">Todas las acciones</option>
+            {OPCIONES_ACCION.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
         </div>
 
-        <div className={styles.dateGroup}>
-          <label>Hasta</label>
-          <input type="date" className={styles.dateInput} value={hasta} onChange={(e) => setHasta(e.target.value)} />
+        <div className={styles.campo}>
+          <label htmlFor="filtro-entidad">Entidad</label>
+          <select id="filtro-entidad" value={borrador.entidad} onChange={setCampo('entidad')}>
+            <option value="">Todas las entidades</option>
+            {OPCIONES_ENTIDAD.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
         </div>
 
-        <button className="btn-secondary" onClick={() => cargar(1)}>↺ Filtrar</button>
-        <button className={styles.clearBtn} onClick={() => { setFiltroAccion(''); setFiltroEntidad(''); setDesde(''); setHasta(''); }}>
-          ✕ Limpiar
-        </button>
-      </div>
+        <div className={styles.campo}>
+          <label htmlFor="filtro-desde">Desde</label>
+          <input
+            id="filtro-desde" type="date" value={borrador.desde} max={borrador.hasta || undefined}
+            onChange={setCampo('desde')} aria-invalid={Boolean(errorFiltros)}
+            aria-describedby={errorFiltros ? 'error-filtros' : undefined}
+          />
+        </div>
 
-      {/* Tabla */}
-      {loading ? (
-        <div className={styles.loadingWrap}>
-          <div className={styles.spinner} />
-          <p className="msg">Cargando logs...</p>
+        <div className={styles.campo}>
+          <label htmlFor="filtro-hasta">Hasta</label>
+          <input
+            id="filtro-hasta" type="date" value={borrador.hasta} min={borrador.desde || undefined}
+            onChange={setCampo('hasta')} aria-invalid={Boolean(errorFiltros)}
+            aria-describedby={errorFiltros ? 'error-filtros' : undefined}
+          />
         </div>
-      ) : logs.length === 0 ? (
-        <div className={styles.empty}>
-          <span>📋</span>
-          <p>No hay registros con los filtros actuales.</p>
+
+        <div className={styles.botones}>
+          <button type="submit" id="btn-aplicar-filtros" className="btn-primary">Aplicar filtros</button>
+          <button type="button" id="btn-limpiar-filtros" className="btn-secondary" onClick={limpiar}>Limpiar</button>
         </div>
-      ) : (
-        <>
-          <div className={styles.tableWrap}>
-            <table className="tabla">
+
+        {errorFiltros && <p id="error-filtros" className={styles.errorFiltros} role="alert">{errorFiltros}</p>}
+        {hayCambiosSinAplicar && !errorFiltros && (
+          <p className={styles.pendiente} role="status">
+            Cambiaste los filtros. Presioná “Aplicar filtros” para actualizar la lista y la exportación.
+          </p>
+        )}
+      </form>
+
+      {primeraCarga ? (
+        <p className="msg" role="status">Cargando registros...</p>
+      ) : logs.length === 0 && !error ? (
+        <EmptyState
+          icon="📋"
+          title={hayFiltrosAplicados ? 'No hay registros con los filtros aplicados.' : 'Todavía no hay registros de auditoría.'}
+        >
+          {hayFiltrosAplicados && (
+            <button type="button" className="btn-secondary" onClick={limpiar}>Limpiar filtros</button>
+          )}
+        </EmptyState>
+      ) : logs.length > 0 && (
+        <div className={loading ? styles.recargando : undefined} aria-busy={loading}>
+          {esTabla ? (
+            <TableResponsive minWidth={760}>
               <thead>
                 <tr>
-                  <th>ID</th>
                   <th>Fecha / Hora</th>
                   <th>Acción</th>
                   <th>Entidad</th>
-                  <th>Usuario responsable</th>
+                  <th>Usuario</th>
                   <th>IP</th>
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log) => {
-                  const def = ACCIONES[log.accion] ?? { label: log.accion, color: '#7f8c8d', icon: '•' };
-                  return (
-                    <tr key={log.id}>
-                      <td className={styles.idCell}>#{log.id}</td>
-                      <td className={styles.fechaCell}>
-                        <span>{new Date(log.createdAt).toLocaleDateString('es-AR')}</span>
-                        <small>{new Date(log.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</small>
-                      </td>
-                      <td>
-                        <span className={styles.accionBadge} style={{ '--badge-color': def.color }}>
-                          {def.icon} {def.label}
-                        </span>
-                      </td>
-                      <td>
-                        {log.entidad && (
-                          <span className={styles.entidadTag}>
-                            {log.entidad}{log.entidadId ? ` #${log.entidadId}` : ''}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        {log.usuario ? (
-                          <div className={styles.userCell}>
-                            <span className={styles.avatar}>
-                              {log.usuario.nombre?.[0]}{log.usuario.apellido?.[0]}
-                            </span>
-                            <div>
-                              <span>{log.usuario.nombre} {log.usuario.apellido}</span>
-                              <small className={styles.email}>{log.usuario.email}</small>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className={styles.sistema}>⚙️ Sistema</span>
-                        )}
-                      </td>
-                      <td className={styles.ipCell}>{log.ip || '—'}</td>
-                    </tr>
-                  );
-                })}
+                {logs.map((log) => (
+                  <tr key={log.id}>
+                    <td className={styles.fechaCell}>
+                      <span>{soloFecha(log.createdAt)}</span>
+                      <small>{soloHora(log.createdAt)}</small>
+                    </td>
+                    <td><AccionBadge accion={log.accion} /></td>
+                    <td>{entidadTexto(log) ?? '—'}</td>
+                    <td className="cell-break"><UsuarioCelda usuario={log.usuario} /></td>
+                    <td className={styles.ipCell}>{log.ip || '—'}</td>
+                  </tr>
+                ))}
               </tbody>
-            </table>
-          </div>
-
-          <Paginacion pagination={pagination} onPageChange={cargar} />
-        </>
+            </TableResponsive>
+          ) : (
+            <div className={styles.cards}>
+              {logs.map((log) => (
+                <DataCard
+                  key={log.id}
+                  title={accionInfo(log.accion).label}
+                  subtitle={`${soloFecha(log.createdAt)} · ${soloHora(log.createdAt)}`}
+                  fields={[
+                    { label: 'Entidad', value: entidadTexto(log) },
+                    { label: 'Usuario', value: log.usuario ? `${log.usuario.nombre} ${log.usuario.apellido} · ${log.usuario.email}` : 'Sistema' },
+                    { label: 'IP', value: log.ip },
+                  ]}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       )}
+
+      {!primeraCarga && <Paginacion pagination={pagination} onPageChange={setPage} />}
     </div>
   );
 }

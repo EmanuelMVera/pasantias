@@ -34,8 +34,8 @@ const logFilters = [
   { name: 'accion', in: 'query', schema: { type: 'string' } },
   { name: 'usuarioId', in: 'query', schema: { type: 'integer' } },
   { name: 'entidad', in: 'query', schema: { type: 'string' } },
-  { name: 'desde', in: 'query', schema: { type: 'string', format: 'date' } },
-  { name: 'hasta', in: 'query', schema: { type: 'string', format: 'date' } },
+  { name: 'desde', in: 'query', description: 'Inclusivo, desde las 00:00 UTC de ese día.', schema: { type: 'string', format: 'date' } },
+  { name: 'hasta', in: 'query', description: 'Inclusivo: cubre el día completo (hasta las 23:59:59.999 UTC).', schema: { type: 'string', format: 'date' } },
 ];
 
 module.exports = {
@@ -121,7 +121,11 @@ module.exports = {
   },
   '/api/admin/empresas': {
     get: adminOp({ id: 'adminEmpresasList', summary: 'Listar todas las empresas',
-      query: ['pageParam', 'limitParam', REF.param('estadoQuery'), REF.param('nivelConfianzaQuery')],
+      description:
+        'Filtros server-side, aplicados antes de paginar (`pagination.total` cuenta las empresas que ' +
+        'matchean). `q` busca por razón social, CUIT (solo si el texto parece un CUIT) o responsable ' +
+        '(nombre, apellido o email del admin_empresa activo).',
+      query: ['pageParam', 'limitParam', REF.param('estadoQuery'), REF.param('nivelConfianzaQuery'), REF.param('qQuery')],
       responses: { 200: paginated('Empresa') } }),
   },
   '/api/admin/empresas/{id}/confianza': {

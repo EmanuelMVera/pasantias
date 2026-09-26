@@ -22,51 +22,11 @@
   gap: 0.5rem;
 }
 
+/* La marca la dibuja components/Brand (se degrada sola: completa → compacta →
+   solo símbolo). Acá solo se permite que se achique antes que los botones. */
 .navbarPublicBrand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  text-decoration: none;
-  color: #1e293b;
-  /* Permite que el flex item se achique por debajo de su ancho intrínseco
-     (default de flexbox es min-width:auto) — sin esto, en viewports muy
-     angostos el título nunca cede espacio a los botones y desborda. */
   min-width: 0;
   flex-shrink: 1;
-}
-
-.navbarPublicBrand .brandText {
-  min-width: 0;
-  overflow: hidden;
-}
-
-.navbarPublicBrand .brandTitle {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: block;
-}
-
-.brandIcon {
-  font-size: 2rem;
-}
-
-.brandText {
-  display: flex;
-  flex-direction: column;
-}
-
-.brandTitle {
-  font-weight: 700;
-  font-size: 1.25rem;
-  line-height: 1;
-}
-
-.brandSubtitle {
-  font-size: 0.75rem;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .navbarPublicActions {
@@ -160,10 +120,6 @@
     gap: 0.4rem;
   }
 
-  .brandSubtitle {
-    display: none; /* deja solo "SisPasantías", sin el subtítulo */
-  }
-
   .btnEmpresa,
   .btnLogin {
     padding: 0.55rem 0.75rem;
@@ -180,10 +136,6 @@
 }
 
 @media (max-width: 380px) {
-  .brandIcon {
-    font-size: 1.5rem;
-  }
-
   .btnEmpresa,
   .btnLogin {
     padding: 0.5rem 0.6rem;
@@ -194,18 +146,6 @@
 @media (max-width: 360px) {
   .navbarPublicInner {
     padding: 0 0.6rem;
-  }
-
-  .navbarPublicBrand {
-    gap: 8px;
-  }
-
-  .brandIcon {
-    font-size: 1.3rem;
-  }
-
-  .brandTitle {
-    font-size: 1.05rem;
   }
 
   .navbarPublicActions {

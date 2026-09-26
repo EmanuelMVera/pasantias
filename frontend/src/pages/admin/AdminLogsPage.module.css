@@ -1,120 +1,79 @@
-/* AdminLogsPage.module.css */
+/* AdminLogsPage.module.css — Auditoría del sistema */
 
-/* ── Cabecera ────────────────────────────────────────────────────────────── */
-.subtitle {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  margin-top: 0.25rem;
-}
-
-/* ── Filtros ─────────────────────────────────────────────────────────────── */
+/* ── Filtros (formulario) ────────────────────────────────────────────────── */
 .filtros {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  margin-bottom: 1.5rem;
-  align-items: center;
-}
-
-.filterSelect {
-  padding: 0.55rem 0.85rem;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 0.85rem;
+  align-items: end;
   background: var(--bg-card);
-  color: var(--text-primary);
-  font-size: 0.88rem;
-  font-family: var(--font-primary);
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-.filterSelect:focus { outline: none; border-color: var(--primary); }
-
-.dateGroup {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
-.dateInput {
-  padding: 0.5rem 0.7rem;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-card);
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  font-family: var(--font-primary);
-  cursor: pointer;
-}
-.dateInput:focus { outline: none; border-color: var(--primary); }
-
-.clearBtn {
-  background: none;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.5rem 0.85rem;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: border-color 0.2s, color 0.2s;
-  font-family: var(--font-primary);
-}
-.clearBtn:hover { border-color: var(--danger, #c0392b); color: var(--danger, #c0392b); }
-
-/* ── Tabla ───────────────────────────────────────────────────────────────── */
-.tableWrap {
-  overflow-x: auto;
-  border-radius: var(--radius);
   border: 1px solid var(--border);
-  margin-bottom: 1.5rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.25rem;
 }
 
-.idCell {
-  font-size: 0.78rem;
-  color: var(--text-muted);
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.campo label {
+  font-size: 0.8rem;
   font-weight: 700;
-  white-space: nowrap;
+  color: var(--text-muted);
 }
 
+.campo select,
+.campo input {
+  width: 100%;
+  min-height: 44px;
+}
+
+.botones {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.botones button { min-height: 44px; }
+
+/* Mensajes del formulario ocupan toda la fila de la grilla. */
+.errorFiltros,
+.pendiente {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.errorFiltros { color: var(--danger, #c0392b); font-weight: 600; }
+.pendiente    { color: var(--text-muted); }
+
+.recargando { opacity: 0.55; transition: opacity 0.15s; }
+
+/* ── Celdas ──────────────────────────────────────────────────────────────── */
 .fechaCell {
   font-size: 0.82rem;
   white-space: nowrap;
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
 }
-.fechaCell small { color: var(--text-muted); }
+.fechaCell span,
+.fechaCell small { display: block; }
+.fechaCell small { color: var(--text-muted); margin-top: 0.1rem; }
 
-/* ── Acción badge ────────────────────────────────────────────────────────── */
 .accionBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
+  display: inline-block;
   padding: 0.22rem 0.65rem;
   border-radius: 999px;
   background: color-mix(in srgb, var(--badge-color) 12%, transparent);
   color: var(--badge-color);
   border: 1px solid color-mix(in srgb, var(--badge-color) 30%, transparent);
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   font-weight: 700;
-  white-space: nowrap;
 }
 
-/* ── Entidad tag ─────────────────────────────────────────────────────────── */
-.entidadTag {
-  display: inline-block;
-  padding: 0.18rem 0.55rem;
-  border-radius: var(--radius);
-  background: var(--bg-secondary, #f4f6f8);
-  border: 1px solid var(--border);
-  font-size: 0.76rem;
-  color: var(--text-muted);
-  font-family: monospace;
-}
-
-/* ── Usuario cell ────────────────────────────────────────────────────────── */
 .userCell {
   display: flex;
   align-items: center;
@@ -138,7 +97,7 @@
 .email {
   display: block;
   color: var(--text-muted);
-  font-size: 0.74rem;
+  font-size: 0.75rem;
 }
 
 .sistema {
@@ -153,79 +112,10 @@
   white-space: nowrap;
 }
 
-/* ── Detalle expandible ──────────────────────────────────────────────────── */
-.detalleCell { max-width: 200px; }
-
-.detalleSummary {
-  cursor: pointer;
-  color: var(--primary);
-  font-size: 0.82rem;
-  font-weight: 600;
-  user-select: none;
-}
-.detalleSummary:hover { text-decoration: underline; }
-
-.detallePre {
-  margin-top: 0.5rem;
-  padding: 0.6rem;
-  background: var(--bg-secondary, #f4f6f8);
-  border-radius: var(--radius);
-  font-size: 0.73rem;
-  overflow-x: auto;
-  max-width: 280px;
-  border: 1px solid var(--border);
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-/* ── Loading / Empty ─────────────────────────────────────────────────────── */
-.loadingWrap {
+/* ── Cards (tablet / móvil) ──────────────────────────────────────────────── */
+.cards {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  padding: 3rem;
-}
-
-.spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid var(--border);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.empty {
-  text-align: center;
-  padding: 3rem;
-  color: var(--text-muted);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-}
-.empty span { font-size: 2.5rem; }
-
-/* ── Paginación ──────────────────────────────────────────────────────────── */
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  margin-top: 0.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.pageInfo {
-  font-size: 0.88rem;
-  color: var(--text-muted);
-}
-.pageInfo strong { color: var(--text-primary); }
-
-/* ── Responsive ──────────────────────────────────────────────────────────── */
-@media (max-width: 768px) {
-  .filtros { flex-direction: column; align-items: stretch; }
-  .dateGroup { justify-content: space-between; }
+  gap: 0.85rem;
+  margin-bottom: 1rem;
 }

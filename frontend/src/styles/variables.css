@@ -51,9 +51,10 @@
   --maxw-form:   720px;   /* formularios (perfil, mi empresa) */
   --maxw-card:   460px;   /* tarjetas de auth (login) */
 
-  /* Alto aproximado del chrome (TopBanner + Navbar). Se usa para dimensionar
-     zonas a pantalla completa como el chat sin adivinar el valor en cada CSS. */
-  --chrome-min-h: 158px;
+  /* Alto del chrome = Navbar (60px + 3px de borde; Navbar.module.css). Es el
+     mismo en todos los anchos. Se usa para dimensionar zonas a pantalla
+     completa (chat) y offsets sticky (panel de detalle de solicitudes). */
+  --chrome-min-h: 63px;
 
   /* ── Breakpoints canónicos ───────────────────────────────────────────────── */
   /* @media no acepta var(): esto es documentación. Usar estos 3 valores en los

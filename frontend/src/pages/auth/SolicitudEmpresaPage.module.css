@@ -27,6 +27,12 @@
   margin-bottom: 1.75rem;
 }
 
+.brandRow {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+
 .headerBadge {
   display: inline-block;
   background: #e0f2fb;

@@ -4,7 +4,7 @@
 .chatLayout {
   display: flex;
   /* dvh (no vh) para que la barra de direcciones del navegador móvil no tape
-     la barra de input; descuenta el chrome (TopBanner + Navbar). */
+     la barra de input; descuenta el chrome (Navbar). */
   height: calc(100dvh - var(--chrome-min-h));
   min-height: 420px;
   max-width: 1200px;
@@ -86,8 +86,7 @@
 /* ── Responsive (móvil) ──────────────────────────────────────────────────── */
 @media (max-width: 700px) {
   .chatLayout {
-    /* En móvil el TopBanner es más bajo (~72px) + Navbar 58px. */
-    height: calc(100dvh - 130px);
+    /* El chrome mide lo mismo en móvil: no hace falta otra altura. */
     border-radius: 0;
     border-left: none;
     border-right: none;

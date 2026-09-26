@@ -1,0 +1,60 @@
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid var(--border);
+  overflow-x: auto;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  padding: 0.7rem 1.1rem;
+  min-height: 44px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-primary);
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab:hover { color: var(--secondary); }
+
+.tabActivo {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.count {
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  border-radius: 20px;
+  padding: 0.05rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabActivo .count {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* Hay pendientes: naranja (el número lo dice, el color solo refuerza). */
+.countAlerta,
+.tabActivo .countAlerta {
+  background: var(--warning);
+  color: #fff;
+}
+
+.panel:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+}

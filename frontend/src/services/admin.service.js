@@ -4,14 +4,7 @@ import api from './api';
 // Funciones para los endpoints de /api/admin (solo accesibles con rol admin)
 export const adminService = {
   // Dashboard y métricas
-  getStats:              () => api.get('/admin/stats'),
-  getDashboardGeneral:   () => api.get('/admin/dashboard-general'),
   getActividadReciente:  () => api.get('/admin/actividad-reciente'),
-
-  // Gestión de empresas
-  getEmpresasPendientes: () => api.get('/admin/empresas/pendientes'),
-  aprobarEmpresa:        (id) => api.patch(`/admin/empresas/${id}/aprobar`),
-  rechazarEmpresa:       (id) => api.patch(`/admin/empresas/${id}/rechazar`),
 
   // Listado general de empresas + nivel de confianza institucional (RBAC-05)
   getEmpresas:            (params) => api.get('/admin/empresas', { params }),
@@ -19,20 +12,14 @@ export const adminService = {
   cambiarConfianzaEmpresa: (id, accion) => api.patch(`/admin/empresas/${id}/confianza`, { accion }),
 
   // Moderación de ofertas
-  getOfertasPendientes:  () => api.get('/admin/ofertas/pendientes'),
   getTodasOfertas:       (params) => api.get('/admin/ofertas', { params }),
-  // accion: 'aprobar' | 'pausar' | 'rechazar' | 'cerrar'  (o legacy aprobada: bool)
-  moderarOferta:         (id, accion) => {
-    const body = typeof accion === 'boolean' ? { aprobada: accion } : { accion };
-    return api.patch(`/admin/ofertas/${id}/moderar`, body);
-  },
+  // accion: 'aprobar' | 'pausar' | 'rechazar' | 'cerrar'
+  moderarOferta:         (id, accion) => api.patch(`/admin/ofertas/${id}/moderar`, { accion }),
 
   // CRUD de usuarios (v1.4)
   getUsuarios:           (params) => api.get('/admin/usuarios', { params }),
-  getUsuario:            (id) => api.get(`/admin/usuarios/${id}`),
   crearUsuario:          (data) => api.post('/admin/usuarios', data),
   editarUsuario:         (id, data) => api.put(`/admin/usuarios/${id}`, data),
-  eliminarUsuario:       (id) => api.delete(`/admin/usuarios/${id}`),
   toggleUsuario:         (id) => api.patch(`/admin/usuarios/${id}/toggle`),
 
   // Logs del sistema (v1.4)

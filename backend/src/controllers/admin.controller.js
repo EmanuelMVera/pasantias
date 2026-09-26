@@ -191,9 +191,9 @@ exports.rechazarEmpresa = async (req, res) => {
 // ── Listado general de empresas + nivel de confianza (RBAC-05) ────────────────
 
 exports.getEmpresas = async (req, res) => {
-  const { estadoAprobacion, nivelConfianza } = req.query;
+  const { estadoAprobacion, nivelConfianza, q } = req.query;
   const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 25, maxLimit: 100 });
-  const { data, pagination } = await adminModeracionService.listarEmpresas({ estadoAprobacion, nivelConfianza, page, limit, offset });
+  const { data, pagination } = await adminModeracionService.listarEmpresas({ estadoAprobacion, nivelConfianza, q, page, limit, offset });
   return res.json({ success: true, data, pagination, total: pagination.total });
 };
 

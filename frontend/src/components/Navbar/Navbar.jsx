@@ -17,6 +17,7 @@ import { useEmpresa } from '../../hooks/useEmpresa';
 import { notificacionService } from '../../services/notificacion.service';
 import { mensajeService } from '../../services/chat.service';
 import Avatar from '../Avatar/Avatar';
+import Brand from '../Brand/Brand';
 import styles from './Navbar.module.css';
 
 export default function Navbar() {
@@ -63,13 +64,18 @@ export default function Navbar() {
       .catch(() => { });
   }, [usuario, location.pathname]);
 
-  /* ── Cerrar menú al hacer click fuera ────────────────────────────────── */
+  /* ── Cerrar menú de usuario: click fuera y Escape ─────────────────────── */
   useEffect(() => {
-    const handler = (e) => {
+    const onClick = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const onKey = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
   }, []);
 
   /* ── Menú móvil: Escape, click fuera y bloqueo de scroll ─────────────── */
@@ -121,14 +127,16 @@ export default function Navbar() {
         { to: '/empresa/equipo', label: 'Equipo' },
       ];
 
+  // Solo texto (sin emoji) en todos los roles: criterio único y sin ruido visual.
+  // La ruta de auditoría sigue siendo /admin/logs.
   const linksAdmin = [
     { to: '/admin', label: 'Panel' },
-    { to: '/admin/solicitudes', label: '📋 Solicitudes' },
-    { to: '/admin/empresas', label: '🏢 Empresas' },
-    { to: '/admin/ofertas', label: '📣 Ofertas' },
-    { to: '/admin/usuarios', label: '👥 Usuarios' },
-    { to: '/admin/importaciones', label: '📥 Importar' },
-    { to: '/admin/logs', label: 'Historial de Accesos' },
+    { to: '/admin/solicitudes', label: 'Solicitudes' },
+    { to: '/admin/empresas', label: 'Empresas' },
+    { to: '/admin/ofertas', label: 'Ofertas' },
+    { to: '/admin/usuarios', label: 'Usuarios' },
+    { to: '/admin/importaciones', label: 'Importar' },
+    { to: '/admin/logs', label: 'Auditoría' },
   ];
 
   const getLinks = () => {
@@ -165,15 +173,18 @@ export default function Navbar() {
       ? styles.notifBadgeNormal
       : '';
 
+  // La campana no es un NavLink: se marca activa a mano en /notificaciones.
+  const enNotificaciones = location.pathname === '/notificaciones';
+
+  // El admin tiene 7 links: pasa a hamburguesa antes que el resto de los roles.
+  const navClase = `${styles.navbar} ${usuario.rol === 'admin' ? styles.navbarWide : ''}`.trim();
+
   return (
-    <nav className={styles.navbar} ref={navRef}>
+    <nav className={navClase} ref={navRef} aria-label="Principal">
       <div className={styles.navbarInner}>
 
-        {/* Logo */}
-        <Link to="/" className={styles.navbarBrand}>
-          <span className={styles.brandIcon} aria-hidden="true">🎓</span>
-          <span>SisPasantías</span>
-        </Link>
+        {/* Marca: completa ≥1024px, compacta en tablet, solo símbolo en mobile */}
+        <Brand to="/" variant="full" tone="light" responsive className={styles.navbarBrand} onClick={() => setMobileOpen(false)} />
 
         {/* Links de navegación (desktop) */}
         <div className={styles.navbarLinks}>
@@ -221,32 +232,37 @@ export default function Navbar() {
 
           {/* Campana de notificaciones — siempre visible; badge solo si hay sin leer */}
           <button
-            className={`${styles.notifBadge} ${notifColor}`}
+            className={`${styles.notifBadge} ${notifColor} ${enNotificaciones ? styles.notifBadgeActivo : ''}`}
             title={noLeidas > 0 ? `${noLeidas} notificación${noLeidas !== 1 ? 'es' : ''} sin leer` : 'Notificaciones'}
             onClick={() => { setMobileOpen(false); navigate('/notificaciones'); }}
             aria-label="Notificaciones"
+            aria-current={enNotificaciones ? 'page' : undefined}
           >
             <span aria-hidden="true">🔔</span>{noLeidas > 0 && <> {noLeidas > 9 ? '9+' : noLeidas}</>}
           </button>
 
-          {/* Menú usuario */}
-          <div
-            ref={menuRef}
-            className={styles.userMenu}
-            onClick={() => { setMenuOpen(!menuOpen); setMobileOpen(false); }}
-            aria-haspopup="true"
-            aria-expanded={menuOpen}
-          >
-            {/* Avatar — logo de empresa para admin_empresa, foto personal para el resto */}
-            <Avatar
-              src={avatarSrc}
-              nombre={avatarNombre}
-              apellido={avatarApellido}
-              size={30}
-              style={{ fontSize: '0.82rem', border: '2px solid rgba(255, 255, 255, 0.3)' }}
-            />
-            <span className={styles.userName}>{nombrePrincipal}</span>
-            <span className={styles.arrow}>{menuOpen ? '▴' : '▾'}</span>
+          {/* Menú usuario: el trigger es un <button> (operable con teclado) y el
+              dropdown es su hermano, no su hijo (no se anidan controles). */}
+          <div ref={menuRef} className={styles.userMenuWrap}>
+            <button
+              type="button"
+              className={styles.userMenu}
+              onClick={() => { setMenuOpen(!menuOpen); setMobileOpen(false); }}
+              aria-haspopup="true"
+              aria-expanded={menuOpen}
+              aria-label={`Menú de usuario: ${nombrePrincipal}`}
+            >
+              {/* Avatar — logo de empresa para admin_empresa, foto personal para el resto */}
+              <Avatar
+                src={avatarSrc}
+                nombre={avatarNombre}
+                apellido={avatarApellido}
+                size={30}
+                style={{ fontSize: '0.82rem', border: '2px solid rgba(255, 255, 255, 0.3)' }}
+              />
+              <span className={styles.userName}>{nombrePrincipal}</span>
+              <span className={styles.arrow} aria-hidden="true">{menuOpen ? '▴' : '▾'}</span>
+            </button>
 
             {/* Dropdown */}
             {menuOpen && (
@@ -298,7 +314,7 @@ export default function Navbar() {
                 {noLeidas > 0 && (
                   <button
                     className={styles.dropdownNotif}
-                    onClick={(e) => { e.stopPropagation(); setMenuOpen(false); navigate('/notificaciones'); }}
+                    onClick={() => { setMenuOpen(false); navigate('/notificaciones'); }}
                   >
                     🔔 {noLeidas} notificación{noLeidas !== 1 ? 'es' : ''} sin leer
                     {prioridadAlta && <span className={styles.dropdownUrgente}>¡Urgente!</span>}

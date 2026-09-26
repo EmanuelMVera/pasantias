@@ -17,6 +17,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { solicitudEmpresaService } from '../../services/solicitudEmpresa.service';
+import Brand from '../../components/Brand/Brand';
 import styles from './SolicitudEmpresaPage.module.css';
 
 // ── Lista de carreras disponibles ─────────────────────────────────────────────
@@ -166,6 +167,9 @@ export default function SolicitudEmpresaPage() {
 
         {/* Encabezado */}
         <div className={styles.header}>
+          <div className={styles.brandRow}>
+            <Brand to="/" variant="full" tone="dark" />
+          </div>
           <span className={styles.headerBadge}>🏢 Empresas</span>
           <h1 className={styles.title}>Registrarse como empresa</h1>
           <p className={styles.subtitle}>

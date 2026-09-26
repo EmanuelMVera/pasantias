@@ -1,0 +1,17 @@
+.group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-right: 0.25rem;
+}
+
+@media (pointer: coarse) {
+  .group :global(.filter-chip) { min-height: 44px; }
+}

@@ -1,0 +1,81 @@
+.wrap { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.zona {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.zona:hover,
+.arrastrando {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+/* El input queda en el DOM (enfocable, con teclado) pero sin ocupar lugar visual. */
+.input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.zona:has(.input:focus-visible) {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.deshabilitada { opacity: 0.6; cursor: not-allowed; }
+
+.icono { font-size: 1.6rem; }
+.titulo { font-weight: 700; color: var(--secondary); font-size: 0.95rem; }
+.instruccion { font-size: 0.88rem; color: var(--text); }
+.enlace { color: var(--primary); font-weight: 700; text-decoration: underline; }
+.hint { font-size: 0.78rem; color: var(--text-muted); }
+
+.aviso { margin: 0; font-size: 0.85rem; color: var(--danger, #c0392b); font-weight: 600; }
+
+.seleccionado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--primary-light);
+}
+
+.nombre { display: flex; flex-direction: column; min-width: 0; }
+.nombre strong { overflow-wrap: anywhere; font-size: 0.9rem; }
+.nombre small { color: var(--text-muted); font-size: 0.78rem; }
+
+.quitar {
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.quitar:hover:not(:disabled) { border-color: var(--danger, #c0392b); color: var(--danger, #c0392b); }
+.quitar:disabled { opacity: 0.6; cursor: not-allowed; }

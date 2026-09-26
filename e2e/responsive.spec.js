@@ -2,10 +2,13 @@
 /**
  * responsive.spec.js — TEST-03 (Fase 3 de la iteración funcional/visual).
  *
- * Barrido responsive real: recorre las páginas obligatorias en los 8
- * viewports obligatorios (320x568 → 1366x768), para cada combinación:
+ * Barrido responsive real: recorre las páginas obligatorias en los 9
+ * viewports obligatorios (320x568 → 1920x1080), para cada combinación:
  *   - falla si document.documentElement.scrollWidth > clientWidth (scroll
  *     horizontal a nivel documento — nunca debería pasar);
+ *   - en las páginas del admin y desde 1366px, falla si una tabla necesita
+ *     scroll horizontal INTERNO (las tablas compactas deben entrar sin scroll;
+ *     por debajo de 1024px se muestran como cards);
  *   - guarda un screenshot en test-results/responsive/ (gitignored, ver
  *     .gitignore "/test-results/" — nunca se commitea);
  * y además ejercita: menú móvil (abrir/cerrar, click afuera, Escape),
@@ -32,7 +35,7 @@ fs.mkdirSync(SCREEN_DIR, { recursive: true });
 // minutos, no segundos, de más).
 test.setTimeout(60_000);
 
-/** Los 8 viewports obligatorios (sección 11 del pedido). */
+/** Los 9 viewports obligatorios (sección 11 del pedido + 1920 del rediseño del admin). */
 const VIEWPORTS = [
   { w: 320,  h: 568,  name: '320x568' },
   { w: 360,  h: 640,  name: '360x640' },
@@ -42,6 +45,7 @@ const VIEWPORTS = [
   { w: 768,  h: 1024, name: '768x1024' },
   { w: 1024, h: 768,  name: '1024x768' },
   { w: 1366, h: 768,  name: '1366x768' },
+  { w: 1920, h: 1080, name: '1920x1080' },
 ];
 
 const PAGINAS = {
@@ -49,7 +53,7 @@ const PAGINAS = {
   alumno:     ['/dashboard', '/ofertas', '/mis-postulaciones', '/perfil', '/chat', '/notificaciones'],
   adminEmpresa: ['/empresa', '/empresa/equipo', '/empresa/mi-empresa', '/empresa/candidatos', '/chat', '/notificaciones'],
   reclutador: ['/empresa', '/empresa/nueva-oferta', '/empresa/candidatos', '/chat', '/empresa/mi-empresa'],
-  admin:      ['/admin', '/admin/usuarios', '/admin/importaciones', '/admin/solicitudes', '/admin/ofertas', '/admin/logs'],
+  admin:      ['/admin', '/admin/usuarios', '/admin/importaciones', '/admin/solicitudes', '/admin/empresas', '/admin/ofertas', '/admin/logs', '/notificaciones'],
 };
 
 /** Nombre de archivo seguro a partir de una ruta ("/empresa/mi-empresa" → "empresa_mi-empresa"). */
@@ -62,7 +66,7 @@ function slug(rutaPagina) {
  * nivel documento, y guarda un screenshot. `grupo` solo se usa para el
  * nombre del archivo (no cambia el chequeo).
  */
-async function chequearPagina(page, grupo, rutaPagina, viewport) {
+async function chequearPagina(page, grupo, rutaPagina, viewport, { tablasSinScroll = false } = {}) {
   await page.setViewportSize({ width: viewport.w, height: viewport.h });
   await page.goto(rutaPagina);
   await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
@@ -83,6 +87,20 @@ async function chequearPagina(page, grupo, rutaPagina, viewport) {
     `scrollWidth=${overflow.scrollWidth} > clientWidth=${overflow.clientWidth} ` +
     `(screenshot: ${archivo})`
   ).toBeLessThanOrEqual(overflow.clientWidth + 1); // +1px de tolerancia por redondeo subpixel
+
+  // Las tablas compactas del admin no deben scrollear por dentro en pantallas de escritorio.
+  if (tablasSinScroll && viewport.w >= 1366) {
+    const tablas = await page.evaluate(() => [...document.querySelectorAll('.table-wrap')].map((el) => ({
+      scrollWidth: el.scrollWidth, clientWidth: el.clientWidth,
+    })));
+    for (const t of tablas) {
+      expect(
+        t.scrollWidth,
+        `Tabla con scroll horizontal interno en ${rutaPagina} a ${viewport.name}: ` +
+        `scrollWidth=${t.scrollWidth} > clientWidth=${t.clientWidth} (screenshot: ${archivo})`
+      ).toBeLessThanOrEqual(t.clientWidth + 1);
+    }
+  }
 }
 
 // ── Páginas públicas (sin login) ────────────────────────────────────────────
@@ -143,7 +161,7 @@ test.describe('Responsive — admin', () => {
     test(`admin @ ${viewport.name}`, async ({ page }) => {
       await login(page, fx.admin.email);
       for (const ruta of PAGINAS.admin) {
-        await test.step(ruta, async () => chequearPagina(page, 'admin', ruta, viewport));
+        await test.step(ruta, async () => chequearPagina(page, 'admin', ruta, viewport, { tablasSinScroll: true }));
       }
     });
   }
@@ -168,8 +186,14 @@ test.describe('Responsive — interacciones', () => {
     const panel = page.locator('#nav-mobile');
     await expect(panel).toBeVisible();
 
-    // Click afuera del panel cierra.
-    await page.mouse.click(10, 10);
+    // Click afuera del navbar cierra (abajo de todo: el navbar y su panel quedan arriba).
+    await page.mouse.click(10, 660);
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    // Tocar la marca (que lleva al inicio) también cierra el panel.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await page.getByRole('link', { name: 'SisPasantías' }).click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
 
     // Escape cierra.
@@ -190,6 +214,21 @@ test.describe('Responsive — interacciones', () => {
 
     await page.mouse.click(10, 10);
     await expect(avatarBtn).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('dropdown del usuario dentro del viewport en un móvil (375x667)', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await login(page, fx.admin.email);
+    await page.goto('/notificaciones');
+
+    const avatarBtn = page.locator('[aria-haspopup="true"]');
+    await avatarBtn.click();
+    const dropdown = avatarBtn.locator('xpath=following-sibling::*[1]');
+    await expect(dropdown).toBeVisible();
+    const box = await dropdown.boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(375 + 1);
+    expect(box.y + box.height).toBeLessThanOrEqual(667);
   });
 
   test('formulario de login usable en el viewport más angosto (320x568)', async ({ page }) => {

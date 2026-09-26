@@ -70,7 +70,10 @@ function dibujarEncabezadoPDF(doc, { titulo, subtitulo, generadoPor, filtrosText
   doc.moveDown(0.3);
   doc.font('Helvetica').fontSize(7.5).fillColor('#666');
   doc.text(`Generado: ${formatearFecha(new Date())}  ·  Por: ${generadoPor}`);
-  doc.text(`Filtros aplicados: ${filtrosTexto}`);
+  // Los reportes cuyas secciones ya rotulan su propio alcance (estadísticas) no
+  // pasan `filtrosTexto`: un "Filtros aplicados: período" global sugeriría que el
+  // período gobierna todo el documento, y solo gobierna la actividad del período.
+  if (filtrosTexto) doc.text(`Filtros aplicados: ${filtrosTexto}`);
   doc.moveDown(0.4);
   doc.strokeColor('#cccccc').lineWidth(0.5)
     .moveTo(doc.page.margins.left, doc.y)
@@ -83,19 +86,25 @@ function dibujarEncabezadoPDF(doc, { titulo, subtitulo, generadoPor, filtrosText
 function dibujarKPIs(doc, items, { porFila = 4 } = {}) {
   const anchoDisponible = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const anchoCard = anchoDisponible / porFila;
-  const yInicio = doc.y;
-  let maxYFila = yInicio;
-  items.forEach((item, i) => {
-    const col = i % porFila;
-    const fila = Math.floor(i / porFila);
-    const x = doc.page.margins.left + col * anchoCard;
-    const y = yInicio + fila * 38;
-    doc.font('Helvetica').fontSize(7.5).fillColor('#666').text(item.label, x, y, { width: anchoCard - 8 });
-    doc.font('Helvetica-Bold').fontSize(13).fillColor('#1e3a5f')
-      .text(item.value == null ? '—' : String(item.value), x, y + 11, { width: anchoCard - 8 });
-    maxYFila = Math.max(maxYFila, y + 32);
-  });
-  doc.y = maxYFila + 8;
+  const anchoTexto = anchoCard - 8;
+  let y = doc.y;
+  for (let inicio = 0; inicio < items.length; inicio += porFila) {
+    const fila = items.slice(inicio, inicio + porFila);
+    // El valor va debajo de la ALTURA REAL del rótulo: uno largo que se parte en
+    // dos líneas ya no queda pisado por el valor.
+    doc.font('Helvetica').fontSize(7.5);
+    const altoRotulo = Math.max(...fila.map((it) => doc.heightOfString(it.label, { width: anchoTexto })));
+    fila.forEach((item, col) => {
+      const x = doc.page.margins.left + col * anchoCard;
+      doc.font('Helvetica').fontSize(7.5).fillColor('#666').text(item.label, x, y, { width: anchoTexto });
+      doc.font('Helvetica-Bold').fontSize(13).fillColor('#1e3a5f')
+        .text(item.value == null ? '—' : String(item.value), x, y + altoRotulo + 2, { width: anchoTexto });
+    });
+    y += altoRotulo + 2 + 16 + 12; // rótulo + valor (13pt) + separación entre filas
+  }
+  // text(x, y) deja doc.x en la última columna: volver al margen para lo que siga.
+  doc.x = doc.page.margins.left;
+  doc.y = y;
 }
 
 function dibujarEncabezadoTablaPDF(doc, columnas, x, y) {
@@ -140,20 +149,61 @@ function dibujarTablaPDF(doc, { columnas, filas }) {
     }
     y += 14;
   });
+  doc.x = x;
   doc.y = y;
 }
 
+/** Deja `alto` puntos libres; si no entran en la página actual, abre una nueva. */
+function asegurarEspacio(doc, alto) {
+  if (doc.y + alto > doc.page.height - doc.page.margins.bottom - 20) doc.addPage();
+}
+
+/** Título de sección (con una nota gris opcional debajo). */
+function dibujarSeccionPDF(doc, titulo, nota) {
+  asegurarEspacio(doc, 70);
+  doc.moveDown(0.6);
+  doc.font('Helvetica-Bold').fontSize(10.5).fillColor('#1e3a5f').text(titulo);
+  if (nota) doc.font('Helvetica').fontSize(7.5).fillColor('#777').text(nota);
+  doc.moveDown(0.8);
+}
+
+/** Subtítulo + tabla; si no hay filas, un texto en vez de una tabla vacía. */
+function dibujarTablaConTituloPDF(doc, titulo, { columnas, filas }) {
+  asegurarEspacio(doc, 70);
+  doc.moveDown(1);
+  doc.font('Helvetica-Bold').fontSize(9).fillColor('#111').text(titulo);
+  doc.moveDown(0.2);
+  if (filas.length === 0) {
+    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#777').text('Sin datos para mostrar.');
+    return;
+  }
+  dibujarTablaPDF(doc, { columnas, filas });
+}
+
+/**
+ * Pie "… · Página X de N" en cada página.
+ *
+ * El pie va en el margen inferior, o sea FUERA del área de contenido de pdfkit:
+ * con `margins.bottom > 0` cada `text()` ahí se toma como desborde y agrega una
+ * página nueva — un reporte de 1 página salía de 2 (la 2ª vacía) y uno de N
+ * páginas duplicaba las páginas al dibujar los pies. Por eso, mientras se dibuja el
+ * pie el margen inferior se pone en 0 (y se restaura), y `lineBreak: false` evita
+ * que el texto se parta. N se lee UNA vez, antes de dibujar cualquier pie.
+ */
 function agregarPiePaginaPDF(doc, footerText) {
-  const range = doc.bufferedPageRange();
-  for (let i = range.start; i < range.start + range.count; i++) {
-    doc.switchToPage(i);
-    const numero = i - range.start + 1;
+  const { start, count } = doc.bufferedPageRange();
+  for (let i = 0; i < count; i++) {
+    doc.switchToPage(start + i);
+    const margenInferior = doc.page.margins.bottom;
+    const ancho = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    doc.page.margins.bottom = 0;
     doc.font('Helvetica').fontSize(6.5).fillColor('#888').text(
-      `${footerText}  ·  Página ${numero} de ${range.count}`,
+      `${footerText}  ·  Página ${i + 1} de ${count}`,
       doc.page.margins.left,
-      doc.page.height - doc.page.margins.bottom + 8,
-      { width: doc.page.width - doc.page.margins.left - doc.page.margins.right, align: 'center' }
+      doc.page.height - margenInferior + 8,
+      { width: ancho, align: 'center', lineBreak: false }
     );
+    doc.page.margins.bottom = margenInferior;
   }
 }
 
@@ -166,33 +216,54 @@ function celdaSegura(valor) {
   return neutralizarFormula(String(valor));
 }
 
+const AZUL_INSTITUCIONAL = 'FF1E3A5F';
+
+/** Encabezado azul institucional (fondo azul, texto blanco en negrita) en las celdas [1..columnas] de una fila. */
+function estilizarEncabezado(fila, columnas) {
+  for (let i = 1; i <= columnas; i++) {
+    const c = fila.getCell(i);
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: AZUL_INSTITUCIONAL } };
+    c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    c.alignment = { vertical: 'middle', wrapText: true };
+  }
+}
+
+/** Nota larga a todo el ancho (A:B), con ajuste de texto y alto fijo (las celdas combinadas no se autoajustan). */
+function agregarNotaCombinada(hoja, texto, { alto = 30, estilo } = {}) {
+  const fila = hoja.addRow([texto]);
+  hoja.mergeCells(fila.number, 1, fila.number, 2);
+  fila.getCell(1).alignment = { vertical: 'top', wrapText: true };
+  if (estilo) fila.getCell(1).font = estilo;
+  fila.height = alto;
+  return fila;
+}
+
+const ESTILO_NOTA = { italic: true, size: 8, color: { argb: 'FF888888' } };
+
 function crearHojaResumen(wb, { titulo, generadoPor, filtrosTexto, kpis }) {
   const hoja = wb.addWorksheet('Resumen');
-  hoja.columns = [{ width: 32 }, { width: 40 }];
+  hoja.columns = [{ width: 32 }, { width: 44 }];
   hoja.addRow(['SisPasantías', INSTITUCION]).font = { bold: true, size: 14 };
   hoja.addRow([titulo]).font = { bold: true, size: 12 };
   hoja.addRow([]);
   hoja.addRow(['Generado', formatearFecha(new Date())]);
   hoja.addRow(['Generado por', celdaSegura(generadoPor)]);
-  hoja.addRow(['Filtros aplicados', celdaSegura(filtrosTexto)]);
+  const filaFiltros = hoja.addRow(['Filtros aplicados', celdaSegura(filtrosTexto)]);
+  filaFiltros.getCell(2).alignment = { vertical: 'top', wrapText: true };
   hoja.addRow([]);
-  const filaHeaderKpi = hoja.addRow(['Métrica', 'Valor']);
-  filaHeaderKpi.font = { bold: true };
-  filaHeaderKpi.eachCell((c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } }; c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; });
+  estilizarEncabezado(hoja.addRow(['Métrica', 'Valor']), 2);
   for (const kpi of kpis) {
     hoja.addRow([kpi.label, kpi.value == null ? '—' : kpi.value]);
   }
   hoja.addRow([]);
-  hoja.addRow([CONFIDENCIALIDAD]).font = { italic: true, size: 8, color: { argb: 'FF888888' } };
+  agregarNotaCombinada(hoja, CONFIDENCIALIDAD, { estilo: ESTILO_NOTA });
   return hoja;
 }
 
 function crearHojaDatos(wb, { columnas, filas }) {
   const hoja = wb.addWorksheet('Datos');
   hoja.columns = columnas.map((c) => ({ header: c.header, key: c.key, width: c.width || 20 }));
-  const headerRow = hoja.getRow(1);
-  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  headerRow.eachCell((c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } }; });
+  estilizarEncabezado(hoja.getRow(1), columnas.length);
   hoja.views = [{ state: 'frozen', ySplit: 1 }];
 
   for (const fila of filas) {
@@ -211,18 +282,23 @@ function crearHojaDatos(wb, { columnas, filas }) {
   return hoja;
 }
 
-function crearHojaFiltros(wb, { filtrosTexto, generadoPor, totalFilas, limite }) {
+function crearHojaFiltros(wb, { filtrosTexto, generadoPor, totalFilas, limite, etiquetaFilas = 'Filas exportadas' }) {
   const hoja = wb.addWorksheet('Filtros y metadatos');
-  hoja.columns = [{ width: 28 }, { width: 50 }];
+  hoja.columns = [{ width: 28 }, { width: 56 }];
   hoja.addRow(['Filtros aplicados', celdaSegura(filtrosTexto)]);
   hoja.addRow(['Generado por', celdaSegura(generadoPor)]);
   hoja.addRow(['Generado', formatearFecha(new Date())]);
-  hoja.addRow(['Filas exportadas', totalFilas]);
+  hoja.addRow([etiquetaFilas, totalFilas]);
   if (limite && totalFilas >= limite) {
     hoja.addRow(['Aviso', `Se alcanzó el límite máximo de ${limite} filas — hay más resultados sin exportar. Acotá el rango de fechas u otros filtros.`]);
   }
-  hoja.addRow([CONFIDENCIALIDAD]);
-  hoja.getRow(1).font = { bold: true };
+  hoja.eachRow((fila) => {
+    fila.getCell(1).font = { bold: true };
+    fila.getCell(1).alignment = { vertical: 'top' };
+    fila.getCell(2).alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+  });
+  hoja.addRow([]);
+  agregarNotaCombinada(hoja, CONFIDENCIALIDAD, { estilo: ESTILO_NOTA });
   return hoja;
 }
 
@@ -309,21 +385,139 @@ async function generarLogsPDF(filtros, { generadoPor }) {
 
 // ── API pública: estadísticas ─────────────────────────────────────────────────
 
-function kpisEstadisticas(stats) {
+/**
+ * Las métricas de estadísticas se reparten en TRES bloques con alcance distinto —
+ * es la misma separación que el dashboard, y evita presentar el período como si
+ * fuera un filtro global del reporte:
+ *   - Estado actual:        "a hoy" (no depende del período).
+ *   - Actividad del período: SOLO estas tres dependen de `periodoDias`/`desde`-`hasta`.
+ *   - Indicadores históricos: acumulados desde el inicio del sistema.
+ *
+ * `tipo` le dice a cada formato cómo mostrar el valor: 'porcentaje' (en puntos, 19.6)
+ * y 'dias' se muestran con su unidad en el PDF y como número con formato en Excel.
+ */
+function describirPeriodo(periodo) {
+  const desde = new Date(periodo.desde);
+  const hasta = new Date(periodo.hasta);
+  const dias = Math.max(1, Math.round((hasta - desde) / (24 * 60 * 60 * 1000)));
+  const fecha = (d) => d.toLocaleDateString('es-AR');
+  return { dias, rango: `${fecha(desde)} – ${fecha(hasta)}` };
+}
+
+function bloquesEstadisticas(stats) {
+  const { dias, rango } = describirPeriodo(stats.periodo);
   return [
-    { label: 'Usuarios activos', value: stats.usuarios.totalActivos },
-    { label: 'Alumnos', value: stats.usuarios.alumnos },
-    { label: 'Egresados', value: stats.usuarios.egresados },
-    { label: 'Empresas aprobadas', value: stats.empresas.aprobadas },
-    { label: 'Empresas pendientes', value: stats.empresas.pendientes },
-    { label: 'Reclutadores activos', value: stats.empresas.reclutadoresActivos },
-    { label: 'Ofertas activas', value: stats.ofertas.activas },
-    { label: 'Ofertas pend. moderación', value: stats.ofertas.pendienteModeracion },
-    { label: 'Postulaciones (período)', value: stats.postulaciones.enPeriodo },
-    { label: 'Contrataciones (período)', value: stats.contrataciones.enPeriodo },
-    { label: 'Tasa de contratación', value: stats.contrataciones.tasaContratacion == null ? '—' : `${stats.contrataciones.tasaContratacion}%` },
-    { label: 'Altas de usuarios (período)', value: stats.usuarios.altasEnPeriodo },
+    {
+      titulo: 'Estado actual',
+      nota: 'Valores a la fecha de generación del reporte. No dependen del período.',
+      items: [
+        { label: 'Usuarios activos', value: stats.usuarios.totalActivos },
+        { label: 'Alumnos', value: stats.usuarios.alumnos },
+        { label: 'Egresados', value: stats.usuarios.egresados },
+        { label: 'Empresas aprobadas', value: stats.empresas.aprobadas },
+        { label: 'Solicitudes de empresa pendientes', value: stats.empresas.solicitudesPendientes },
+        { label: 'Reclutadores activos', value: stats.empresas.reclutadoresActivos },
+        { label: 'Ofertas activas', value: stats.ofertas.activas },
+        { label: 'Ofertas pendientes de moderación', value: stats.ofertas.pendienteModeracion },
+      ],
+    },
+    {
+      titulo: `Actividad del período — ${dias} días (${rango})`,
+      nota: 'Solo estas métricas dependen del período seleccionado.',
+      items: [
+        { label: 'Postulaciones', value: stats.postulaciones.enPeriodo },
+        { label: 'Contrataciones', value: stats.contrataciones.enPeriodo },
+        { label: 'Altas de alumnos y egresados', value: stats.usuarios.altasEnPeriodo },
+      ],
+    },
+    {
+      titulo: 'Indicadores históricos',
+      nota: 'Acumulados desde el inicio del sistema. No dependen del período.',
+      items: [
+        { label: 'Postulaciones totales', value: stats.postulaciones.total },
+        { label: 'Contrataciones totales', value: stats.contrataciones.total },
+        { label: 'Tasa de contratación', value: stats.contrataciones.tasaContratacion, tipo: 'porcentaje' },
+        { label: 'Tiempo promedio de aprobación de empresas', value: stats.empresas.tiempoPromedioAprobacionDias, tipo: 'dias' },
+      ],
+    },
   ];
+}
+
+function textoKpi({ value, tipo }) {
+  if (value == null) return '—';
+  if (tipo === 'porcentaje') return `${value}%`;
+  if (tipo === 'dias') return `${value} días`;
+  return String(value);
+}
+
+function filasEmbudo(stats) {
+  return [
+    { etapa: 'En revisión', cantidad: stats.embudo.enRevision },
+    { etapa: 'Preseleccionado', cantidad: stats.embudo.preseleccionado },
+    { etapa: 'Entrevista', cantidad: stats.embudo.entrevista },
+    { etapa: 'Contratado', cantidad: stats.embudo.contratado },
+  ];
+}
+
+function filasPorArea(stats) {
+  return Object.entries(stats.ofertas.porArea)
+    .map(([area, cantidad]) => ({ area, cantidad }))
+    .sort((a, b) => b.cantidad - a.cantidad || a.area.localeCompare(b.area, 'es'));
+}
+
+/** Resumen de estadísticas: los tres bloques, cada uno con su encabezado azul. Números como números. */
+function crearHojaResumenEstadisticas(wb, { generadoPor, stats }) {
+  const { dias, rango } = describirPeriodo(stats.periodo);
+  const hoja = wb.addWorksheet('Resumen');
+  hoja.columns = [{ width: 42 }, { width: 40 }];
+  hoja.addRow(['SisPasantías', INSTITUCION]).font = { bold: true, size: 14 };
+  hoja.addRow(['Estadísticas del sistema']).font = { bold: true, size: 12 };
+  hoja.addRow([]);
+  hoja.addRow(['Generado', formatearFecha(new Date())]);
+  hoja.addRow(['Generado por', celdaSegura(generadoPor)]);
+  const filaPeriodo = hoja.addRow(['Período de actividad', `${dias} días (${rango})`]);
+  filaPeriodo.getCell(2).alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+  hoja.addRow([]);
+
+  for (const bloque of bloquesEstadisticas(stats)) {
+    estilizarEncabezado(hoja.addRow([bloque.titulo, 'Valor']), 2);
+    hoja.lastRow.getCell(2).alignment = { vertical: 'middle', horizontal: 'right' };
+    const notaFila = hoja.addRow([bloque.nota]);
+    hoja.mergeCells(notaFila.number, 1, notaFila.number, 2);
+    notaFila.getCell(1).font = ESTILO_NOTA;
+    notaFila.getCell(1).alignment = { vertical: 'top', wrapText: true };
+
+    for (const item of bloque.items) {
+      const fila = hoja.addRow([item.label]);
+      const celda = fila.getCell(2);
+      if (item.value == null) {
+        celda.value = '—';
+      } else if (item.tipo === 'porcentaje') {
+        celda.value = Math.round(item.value * 10) / 1000; // 19.6 → 0.196, formateado como 19.6%
+        celda.numFmt = '0.0%';
+      } else if (item.tipo === 'dias') {
+        celda.value = item.value;
+        celda.numFmt = '0.0" días"';
+      } else {
+        celda.value = item.value;
+      }
+      celda.alignment = { horizontal: 'right' };
+      fila.getCell(1).alignment = { vertical: 'top', wrapText: true };
+    }
+    hoja.addRow([]);
+  }
+
+  agregarNotaCombinada(hoja, CONFIDENCIALIDAD, { estilo: ESTILO_NOTA });
+  return hoja;
+}
+
+function crearHojaSimple(wb, nombre, columnas, filas) {
+  const hoja = wb.addWorksheet(nombre);
+  hoja.columns = columnas.map((c) => ({ header: c.header, key: c.key, width: c.width }));
+  estilizarEncabezado(hoja.getRow(1), columnas.length);
+  hoja.views = [{ state: 'frozen', ySplit: 1 }];
+  for (const fila of filas) hoja.addRow(fila);
+  return hoja;
 }
 
 async function generarEstadisticasExcel(filtros, { generadoPor }) {
@@ -333,9 +527,9 @@ async function generarEstadisticasExcel(filtros, { generadoPor }) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'SisPasantías';
   wb.created = new Date();
-  crearHojaResumen(wb, { titulo: 'Estadísticas del sistema', generadoPor, filtrosTexto, kpis: kpisEstadisticas(stats) });
+  crearHojaResumenEstadisticas(wb, { generadoPor, stats });
 
-  const filasArea = Object.entries(stats.ofertas.porArea).map(([area, cantidad]) => ({ area, cantidad }));
+  const filasArea = filasPorArea(stats);
   crearHojaDatos(wb, {
     columnas: [
       { header: 'Área', key: 'area', width: 32 },
@@ -344,60 +538,55 @@ async function generarEstadisticasExcel(filtros, { generadoPor }) {
     filas: filasArea,
   });
 
-  const hojaEmbudo = wb.addWorksheet('Embudo de selección');
-  hojaEmbudo.columns = [{ header: 'Etapa', key: 'etapa', width: 26 }, { header: 'Cantidad', key: 'cantidad', width: 14 }];
-  hojaEmbudo.getRow(1).font = { bold: true };
-  hojaEmbudo.addRows([
-    { etapa: 'En revisión', cantidad: stats.embudo.enRevision },
-    { etapa: 'Preseleccionado', cantidad: stats.embudo.preseleccionado },
-    { etapa: 'Entrevista', cantidad: stats.embudo.entrevista },
-    { etapa: 'Contratado', cantidad: stats.embudo.contratado },
-  ]);
+  crearHojaSimple(wb, 'Embudo de selección',
+    [{ header: 'Etapa', key: 'etapa', width: 26 }, { header: 'Cantidad', key: 'cantidad', width: 14 }],
+    filasEmbudo(stats));
 
-  const hojaEmpresas = wb.addWorksheet('Empresas con más ofertas');
-  hojaEmpresas.columns = [{ header: 'Empresa', key: 'razonSocial', width: 34 }, { header: 'Ofertas', key: 'totalOfertas', width: 12 }];
-  hojaEmpresas.getRow(1).font = { bold: true };
-  for (const e of stats.empresas.conMasOfertas) {
-    hojaEmpresas.addRow({ razonSocial: celdaSegura(e.razonSocial), totalOfertas: e.totalOfertas });
-  }
+  crearHojaSimple(wb, 'Empresas con más ofertas',
+    [{ header: 'Empresa', key: 'razonSocial', width: 34 }, { header: 'Ofertas', key: 'totalOfertas', width: 12 }],
+    stats.empresas.conMasOfertas.map((e) => ({ razonSocial: celdaSegura(e.razonSocial), totalOfertas: e.totalOfertas })));
 
-  crearHojaFiltros(wb, { filtrosTexto, generadoPor, totalFilas: filasArea.length });
+  crearHojaFiltros(wb, { filtrosTexto, generadoPor, totalFilas: filasArea.length, etiquetaFilas: 'Áreas incluidas' });
 
   return { buffer: await bufferDeWorkbook(wb), filename: nombreArchivo('estadisticas', 'xlsx') };
 }
 
 async function generarEstadisticasPDF(filtros, { generadoPor }) {
   const stats = await adminEstadisticasService.obtenerEstadisticasGenerales(filtros);
-  const filtrosTexto = describirFiltros(filtros);
 
   const { doc, promesaBuffer } = crearDocumentoPDF({ orientacion: 'portrait' });
-  dibujarEncabezadoPDF(doc, { titulo: 'Estadísticas del sistema', generadoPor, filtrosTexto });
-  dibujarKPIs(doc, kpisEstadisticas(stats), { porFila: 3 });
+  // Sin `filtrosTexto`: el período NO es un filtro global — lo rotula la sección de actividad.
+  dibujarEncabezadoPDF(doc, { titulo: 'Estadísticas del sistema', generadoPor });
 
-  doc.font('Helvetica-Bold').fontSize(10).fillColor('#111').text('Embudo de selección', { underline: false });
-  doc.moveDown(0.2);
-  dibujarTablaPDF(doc, {
+  for (const bloque of bloquesEstadisticas(stats)) {
+    dibujarSeccionPDF(doc, bloque.titulo, bloque.nota);
+    asegurarEspacio(doc, 40 * Math.ceil(bloque.items.length / 4));
+    dibujarKPIs(doc, bloque.items.map((k) => ({ label: k.label, value: textoKpi(k) })), { porFila: 4 });
+  }
+
+  // Los desgloses van dentro de "Indicadores históricos" (acumulados, no dependen del período).
+  dibujarTablaConTituloPDF(doc, 'Embudo de selección', {
     columnas: [
       { header: 'Etapa', key: 'etapa', width: 250 },
       { header: 'Cantidad', key: 'cantidad', width: 100 },
     ],
-    filas: [
-      { etapa: 'En revisión', cantidad: stats.embudo.enRevision },
-      { etapa: 'Preseleccionado', cantidad: stats.embudo.preseleccionado },
-      { etapa: 'Entrevista', cantidad: stats.embudo.entrevista },
-      { etapa: 'Contratado', cantidad: stats.embudo.contratado },
-    ],
+    filas: filasEmbudo(stats),
   });
 
-  doc.moveDown(1);
-  doc.font('Helvetica-Bold').fontSize(10).fillColor('#111').text('Empresas con más ofertas publicadas');
-  doc.moveDown(0.2);
-  dibujarTablaPDF(doc, {
+  dibujarTablaConTituloPDF(doc, 'Empresas con más ofertas publicadas', {
     columnas: [
       { header: 'Empresa', key: 'razonSocial', width: 300 },
       { header: 'Ofertas', key: 'totalOfertas', width: 100 },
     ],
     filas: stats.empresas.conMasOfertas,
+  });
+
+  dibujarTablaConTituloPDF(doc, 'Ofertas por área', {
+    columnas: [
+      { header: 'Área', key: 'area', width: 300 },
+      { header: 'Cantidad', key: 'cantidad', width: 100 },
+    ],
+    filas: filasPorArea(stats),
   });
 
   agregarPiePaginaPDF(doc, CONFIDENCIALIDAD);

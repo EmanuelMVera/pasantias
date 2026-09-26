@@ -74,8 +74,9 @@ module.exports = {
         type: 'object',
         properties: {
           aprobadas: { type: 'integer' }, pendientes: { type: 'integer' }, rechazadas: { type: 'integer' },
+          solicitudesPendientes: { type: 'integer', description: 'Solicitudes de registro de empresa que esperan decisión del admin (SolicitudEmpresa.estado = pendiente). Es el número a mostrar como "pendientes": `pendientes` cuenta filas Empresa, que se crean recién al aprobar.' },
           reclutadoresActivos: { type: 'integer' },
-          tiempoPromedioAprobacionDias: { type: ['number', 'null'] },
+          tiempoPromedioAprobacionDias: { type: ['number', 'null'], description: 'Histórico: promedio de días entre el envío de la solicitud de empresa y su aprobación (SolicitudEmpresa.revisadaEn − createdAt). `null` si todavía no se aprobó ninguna.' },
           conMasOfertas: { type: 'array', items: { type: 'object', properties: { empresaId: { type: 'integer' }, razonSocial: { type: 'string' }, totalOfertas: { type: 'integer' } } } },
         },
       },
@@ -88,7 +89,14 @@ module.exports = {
         },
       },
       postulaciones: { type: 'object', properties: { total: { type: 'integer' }, enPeriodo: { type: 'integer' } } },
-      contrataciones: { type: 'object', properties: { total: { type: 'integer' }, enPeriodo: { type: 'integer' }, tasaContratacion: { type: ['number', 'null'] } } },
+      contrataciones: {
+        type: 'object',
+        properties: {
+          total: { type: 'integer', description: 'Postulaciones que hoy figuran como contratadas (histórico).' },
+          enPeriodo: { type: 'integer', description: 'Postulaciones distintas que pasaron a "contratado" DENTRO del período (según el historial de estados), sin importar cuándo se postularon.' },
+          tasaContratacion: { type: ['number', 'null'] },
+        },
+      },
       embudo: {
         type: 'object',
         properties: {

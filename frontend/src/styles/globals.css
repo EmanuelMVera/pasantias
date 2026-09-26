@@ -239,6 +239,16 @@ select { cursor: pointer; }
   outline-offset: 2px;
 }
 
+/* Foco visible por defecto para cualquier otro control interactivo (links,
+   botones sin clase global, pestañas). Solo con teclado, no al hacer click. */
+a:focus-visible,
+button:focus-visible,
+[role="tab"]:focus-visible,
+[role="menuitem"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 /* ── Estado de carga a nivel app ─────────────────────────────────────────── */
 .app-loading {
   text-align: center;

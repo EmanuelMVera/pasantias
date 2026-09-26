@@ -20,6 +20,7 @@ const {
   crearAlumno, crearAdmin, crearEmpresaConAdmin, loginYObtenerToken,
 } = require('./helpers/factories');
 const { limpiarUsuarios, cerrarConexion } = require('./helpers/cleanup');
+const { contarPaginasPdf, textoDePdf } = require('./helpers/pdf');
 
 describe('EXPORT — logs y estadísticas (PDF/Excel)', () => {
   const idsUsuarios = [];
@@ -95,10 +96,13 @@ describe('EXPORT — logs y estadísticas (PDF/Excel)', () => {
 
   // ── Excel: logs ──────────────────────────────────────────────────────────
 
+  // Los exports de logs se acotan por `usuarioId` (el del propio admin del test): la base
+  // local puede tener miles de logs acumulados y sin acotar cada export tocaba el tope de
+  // 5000 filas y superaba el timeout por defecto — el resultado dependía de la base, no del código.
   test('logs/export xlsx: MIME, Content-Disposition, workbook válido con 3 hojas', async () => {
-    const { token } = await tokenAdmin();
+    const { usuario: admin, token } = await tokenAdmin();
     const res = await request(app)
-      .get('/api/admin/logs/export?format=xlsx')
+      .get(`/api/admin/logs/export?format=xlsx&usuarioId=${admin.id}`)
       .set('Authorization', `Bearer ${token}`)
       .buffer(true)
       .parse((r, cb) => { const chunks = []; r.on('data', (c) => chunks.push(c)); r.on('end', () => cb(null, Buffer.concat(chunks))); });
@@ -147,9 +151,9 @@ describe('EXPORT — logs y estadísticas (PDF/Excel)', () => {
   });
 
   test('logs/export pdf: header %PDF- válido', async () => {
-    const { token } = await tokenAdmin();
+    const { usuario: admin, token } = await tokenAdmin();
     const res = await request(app)
-      .get('/api/admin/logs/export?format=pdf')
+      .get(`/api/admin/logs/export?format=pdf&usuarioId=${admin.id}`)
       .set('Authorization', `Bearer ${token}`)
       .buffer(true)
       .parse((r, cb) => { const chunks = []; r.on('data', (c) => chunks.push(c)); r.on('end', () => cb(null, Buffer.concat(chunks))); });
@@ -160,8 +164,8 @@ describe('EXPORT — logs y estadísticas (PDF/Excel)', () => {
   });
 
   test('logs/export csv (legacy, default) sigue funcionando igual que antes', async () => {
-    const { token } = await tokenAdmin();
-    const res = await request(app).get('/api/admin/logs/export').set('Authorization', `Bearer ${token}`);
+    const { usuario: admin, token } = await tokenAdmin();
+    const res = await request(app).get(`/api/admin/logs/export?usuarioId=${admin.id}`).set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/text\/csv/);
   });
@@ -218,6 +222,7 @@ describe('EXPORT — logs y estadísticas (PDF/Excel)', () => {
 
   // ── Límite de filas ──────────────────────────────────────────────────────
 
+  // Sin acotar por usuario a propósito: es la consulta más pesada posible (tope de filas).
   test('el export respeta el límite duro de filas (LOGS_EXPORT_LIMIT)', async () => {
     const { token } = await tokenAdmin();
     const adminService = require('../src/services/admin.service');
@@ -233,5 +238,57 @@ describe('EXPORT — logs y estadísticas (PDF/Excel)', () => {
     const datos = wb.getWorksheet('Datos');
     // rowCount incluye el header
     expect(datos.rowCount - 1).toBeLessThanOrEqual(adminService.LOGS_EXPORT_LIMIT);
+  }, 30_000);
+
+  // ── PDF: paginación real y pie "Página X de N" ───────────────────────────
+
+  describe('PDF: páginas reales y pie de página', () => {
+    const bajarPdf = async (url, token) => {
+      const res = await request(app)
+        .get(url)
+        .set('Authorization', `Bearer ${token}`)
+        .buffer(true)
+        .parse((r, cb) => { const chunks = []; r.on('data', (c) => chunks.push(c)); r.on('end', () => cb(null, Buffer.concat(chunks))); });
+      expect(res.status).toBe(200);
+      return res.body;
+    };
+
+    afterAll(async () => {
+      await ActivityLog.destroy({ where: { entidad: 'test_pdf_paginas' } });
+    });
+
+    test('un reporte corto (estadísticas) tiene exactamente 1 página — sin página vacía extra', async () => {
+      const { token } = await tokenAdmin();
+      const pdf = await bajarPdf('/api/admin/estadisticas/export?format=pdf&periodoDias=30', token);
+      expect(contarPaginasPdf(pdf)).toBe(1);
+      const texto = textoDePdf(pdf);
+      expect(texto).toContain('Página 1 de 1');
+      expect(texto).not.toContain('Página 2');
+    });
+
+    test('un reporte de auditoría sin filas tiene exactamente 1 página', async () => {
+      const { usuario: admin, token } = await tokenAdmin();
+      // El propio export deja un log del admin, así que se acota a una acción que este usuario no generó.
+      const pdf = await bajarPdf(`/api/admin/logs/export?format=pdf&usuarioId=${admin.id}&accion=cerrar_oferta`, token);
+      expect(contarPaginasPdf(pdf)).toBe(1);
+      expect(textoDePdf(pdf)).toContain('Página 1 de 1');
+    });
+
+    test('un reporte largo tiene N páginas reales y un pie "Página i de N" en cada una', async () => {
+      const { usuario: admin, token } = await tokenAdmin();
+      await ActivityLog.bulkCreate(Array.from({ length: 90 }, (_, i) => ({
+        usuarioId: admin.id, accion: 'sistema', entidad: 'test_pdf_paginas', entidadId: i + 1,
+        ip: '203.0.113.7', createdAt: new Date(Date.now() - i * 1000),
+      })));
+
+      const pdf = await bajarPdf(`/api/admin/logs/export?format=pdf&usuarioId=${admin.id}&entidad=test_pdf_paginas`, token);
+      const n = contarPaginasPdf(pdf);
+      expect(n).toBeGreaterThan(1);
+      expect(n).toBeLessThan(10); // 90 filas: unas pocas páginas, no el doble por el pie
+
+      const texto = textoDePdf(pdf);
+      for (let i = 1; i <= n; i++) expect(texto).toContain(`Página ${i} de ${n}`);
+      expect(texto).not.toContain(`de ${n + 1}`);
+    });
   });
 });

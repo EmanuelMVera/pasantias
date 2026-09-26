@@ -9,119 +9,195 @@
  * Las dos acciones de moderación y las dos de ciclo de vida nunca tocan el
  * campo del otro eje (ver adminModeracion.service.js en el backend).
  *
- * Sección 1: Ofertas pendientes de revisión (estadoModeracion=pendiente).
- * Sección 2: Historial de todas las ofertas con filtros por estado y por moderación.
+ * Una sola interfaz con dos pestañas (solo se renderiza la activa):
+ *   - Pendientes (n): cola de moderación (estadoModeracion=pendiente). Aprobar y
+ *     Rechazar a la vista; Pausar/Cerrar en el menú "⋯".
+ *   - Todas: historial con filtros por estado y por moderación.
+ * Ambas usan el mismo listado paginado (GET /admin/ofertas); el contador de
+ * "Pendientes" sale del total de esa misma consulta.
  *
- * Ruta: /admin/ofertas
+ * Rechazar y Cerrar son irreversibles (el backend no tiene transición de salida):
+ * piden confirmación en un modal. Aprobar y Pausar se ejecutan directo.
+ *
+ * Ruta: /admin/ofertas  (`?tab=todas` abre la segunda pestaña)
  * Rol: admin
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { adminService } from '../../services/admin.service';
-import Paginacion from '../../components/Paginacion/Paginacion';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { usePaginacion } from '../../hooks/usePaginacion';
+import { useToast } from '../../hooks/useToast';
+import PageHeader from '../../components/ui/PageHeader';
+import Tabs, { TabPanel } from '../../components/ui/Tabs';
+import FilterGroup from '../../components/ui/FilterGroup';
 import TableResponsive from '../../components/ui/TableResponsive';
+import DataCard from '../../components/ui/DataCard';
+import EmptyState from '../../components/ui/EmptyState';
+import ActionMenu from '../../components/ui/ActionMenu';
+import ConfirmModal from '../../components/ui/ConfirmModal';
+import Toast from '../../components/ui/Toast';
+import Paginacion from '../../components/Paginacion/Paginacion';
 import styles from './AdminOfertasPage.module.css';
+import {
+  ESTADO_COLOR, ESTADO_LABEL, MODERACION_COLOR, MODERACION_LABEL,
+  OPCIONES_ESTADO, OPCIONES_MODERACION,
+  puedeAprobar, puedeRechazar, puedePausar, puedeCerrar,
+} from './ofertasModeracion.utils';
 
-const ESTADO_COLOR = {
-  activa:  '#27ae60',
-  pausada: '#e67e22',
-  cerrada: '#7f8c8d',
-};
-const ESTADO_LABEL = {
-  activa:  'Activa',
-  pausada: 'Pausada',
-  cerrada: 'Cerrada',
-};
-const FILTROS_ESTADO = ['todas', 'activa', 'pausada', 'cerrada'];
+const RESULTADO_ACCION = { aprobar: 'aprobada', pausar: 'pausada', rechazar: 'rechazada', cerrar: 'cerrada' };
 
-const MODERACION_COLOR = {
-  pendiente:      '#3498db',
-  aprobada:       '#27ae60',
-  auto_aprobada:  '#16a085',
-  rechazada:      '#e74c3c',
+const ACCIONES_CON_CONFIRMACION = {
+  rechazar: {
+    titulo: 'Rechazar oferta',
+    confirmar: 'Rechazar oferta',
+    detalle: 'La empresa será notificada y la oferta dejará de estar disponible para los alumnos. Una oferta rechazada no se puede volver a aprobar.',
+  },
+  cerrar: {
+    titulo: 'Cerrar oferta',
+    confirmar: 'Cerrar oferta',
+    detalle: 'La oferta dejará de recibir postulaciones. El cierre es definitivo: una oferta cerrada no se puede reabrir.',
+  },
 };
-const MODERACION_LABEL = {
-  pendiente:      'Pendiente de revisión',
-  aprobada:       'Aprobada',
-  auto_aprobada:  'Publicación automática',
-  rechazada:      'Rechazada',
-};
-const FILTROS_MODERACION = ['todas', 'pendiente', 'aprobada', 'rechazada', 'auto_aprobada'];
 
-// Transiciones válidas — mismas reglas que el backend (adminModeracion.service.js
-// / oferta.service.js::TRANSICIONES_ESTADO) — solo para no ofrecer un botón que
-// el servidor va a rechazar; la autoridad real sigue siendo el backend.
-const TRANSICIONES_MODERACION = {
-  pendiente:     ['aprobada', 'rechazada'],
-  auto_aprobada: ['rechazada'],
-  aprobada:      ['rechazada'],
-  rechazada:     [],
-};
-const puedeAprobar  = (o) => (TRANSICIONES_MODERACION[o.estadoModeracion] || []).includes('aprobada');
-const puedeRechazar = (o) => (TRANSICIONES_MODERACION[o.estadoModeracion] || []).includes('rechazada');
-const puedePausar   = (o) => o.estado === 'activa';
-const puedeCerrar   = (o) => o.estado === 'activa' || o.estado === 'pausada';
+const fechaCorta = (o) => (o.createdAt ? new Date(o.createdAt).toLocaleDateString('es-AR') : '—');
+
+function EstadoBadge({ estado }) {
+  return (
+    <span className="badge" style={{ background: ESTADO_COLOR[estado] ?? '#707b7c' }}>
+      {ESTADO_LABEL[estado] ?? estado}
+    </span>
+  );
+}
+
+function ModeracionBadge({ estado }) {
+  return (
+    <span className="badge" style={{ background: MODERACION_COLOR[estado] ?? '#707b7c' }}>
+      {MODERACION_LABEL[estado] ?? estado}
+    </span>
+  );
+}
+
+/** Aprobar / Rechazar a la vista; Pausar y Cerrar en el menú secundario. */
+function AccionesOferta({ oferta, ocupado, onAccion }) {
+  const extras = [];
+  if (puedePausar(oferta)) extras.push({ key: 'pausar', label: 'Pausar publicación', onSelect: () => onAccion(oferta, 'pausar') });
+  if (puedeCerrar(oferta)) extras.push({ key: 'cerrar', label: 'Cerrar publicación', onSelect: () => onAccion(oferta, 'cerrar'), danger: true });
+
+  const aprobar = puedeAprobar(oferta);
+  const rechazar = puedeRechazar(oferta);
+  if (!aprobar && !rechazar && extras.length === 0) return <span className={styles.sinAcciones}>—</span>;
+
+  return (
+    <div className={styles.acciones}>
+      {aprobar && (
+        <button
+          type="button"
+          className="btn-ok"
+          disabled={ocupado}
+          onClick={() => onAccion(oferta, 'aprobar')}
+          aria-label={`Aprobar oferta ${oferta.titulo}`}
+          title="La oferta queda visible para los alumnos (si además está activa)"
+        >
+          Aprobar
+        </button>
+      )}
+      {rechazar && (
+        <button
+          type="button"
+          className="btn-danger"
+          disabled={ocupado}
+          onClick={() => onAccion(oferta, 'rechazar')}
+          aria-label={`Rechazar oferta ${oferta.titulo}`}
+          title="La empresa es notificada"
+        >
+          Rechazar
+        </button>
+      )}
+      <ActionMenu
+        label={`Más acciones para la oferta ${oferta.titulo}`}
+        items={extras}
+        disabled={ocupado}
+      />
+    </div>
+  );
+}
 
 export default function AdminOfertasPage() {
-  const [pendientes,   setPendientes]   = useState([]);
-  const [todas,        setTodas]        = useState([]);
-  const [paginationHist, setPaginationHist] = useState(null);
-  const [pageHist,     setPageHist]     = useState(1);
-  const [filtroEstado, setFiltroEstado] = useState('todas');
-  const [filtroModeracion, setFiltroModeracion] = useState('todas');
-  const [loading,      setLoading]      = useState(true);
-  const [loadingHist,  setLoadingHist]  = useState(true);
-  const [accionando,   setAccionando]   = useState(null);
-  const [error,        setError]        = useState('');
-  const [mensaje,      setMensaje]      = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') === 'todas' ? 'todas' : 'pendientes';
+  const setTab = (t) => setSearchParams(t === 'pendientes' ? {} : { tab: t }, { replace: true });
 
-  const cargarPendientes = useCallback(async () => {
+  const esTabla = useMediaQuery('(min-width: 1024px)');
+  const { toast, showToast } = useToast(5000);
+
+  const [ofertas,    setOfertas]    = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState('');
+  const [conteoPend, setConteoPend] = useState(null);
+  const [accionando, setAccionando] = useState(null); // id de la oferta en proceso
+  const [confirmar,  setConfirmar]  = useState(null); // { oferta, accion } esperando confirmación
+
+  const [filtroEstado,     setFiltroEstado]     = useState('');
+  const [filtroModeracion, setFiltroModeracion] = useState('');
+  const { page, setPage } = usePaginacion([tab, filtroEstado, filtroModeracion]);
+
+  // Descarta respuestas de consultas viejas (cambio rápido de pestaña/filtro).
+  const secuencia = useRef(0);
+
+  const cargar = useCallback(async () => {
+    const mia = ++secuencia.current;
     setLoading(true);
-    try {
-      const res = await adminService.getOfertasPendientes();
-      setPendientes(res.data?.data ?? []);
-    } catch {
-      setError('Error al cargar ofertas pendientes.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const cargarTodas = useCallback(async (estado, estadoModeracion, pagina = 1) => {
-    setLoadingHist(true);
-    try {
-      const params = { page: pagina, limit: 25 };
-      if (estado && estado !== 'todas') params.estado = estado;
-      if (estadoModeracion && estadoModeracion !== 'todas') params.estadoModeracion = estadoModeracion;
-      const res = await adminService.getTodasOfertas(params);
-      setTodas(res.data?.data ?? []);
-      setPaginationHist(res.data?.pagination ?? null);
-      setPageHist(pagina);
-    } catch {
-      // silencioso — el historial es secundario
-    } finally {
-      setLoadingHist(false);
-    }
-  }, []);
-
-  useEffect(() => { cargarPendientes(); }, [cargarPendientes]);
-  useEffect(() => { cargarTodas(filtroEstado, filtroModeracion, 1); }, [filtroEstado, filtroModeracion, cargarTodas]);
-
-  const handleAccion = async (id, accion) => {
-    setAccionando(id);
     setError('');
-    setMensaje('');
     try {
-      await adminService.moderarOferta(id, accion);
-      const labels = { aprobar: 'aprobada', pausar: 'pausada', rechazar: 'rechazada', cerrar: 'cerrada' };
-      setMensaje(`Oferta ${labels[accion]} correctamente.`);
-      // Quitar de pendientes solo si la acción resolvió la moderación —
-      // pausar/cerrar no cambian estadoModeracion, la oferta sigue pendiente.
-      if (accion === 'aprobar' || accion === 'rechazar') {
-        setPendientes((prev) => prev.filter((o) => o.id !== id));
+      const params = { page, limit: 25 };
+      if (tab === 'pendientes') {
+        params.estadoModeracion = 'pendiente';
+      } else {
+        if (filtroEstado)     params.estado           = filtroEstado;
+        if (filtroModeracion) params.estadoModeracion = filtroModeracion;
       }
-      // Refrescar historial (misma página)
-      cargarTodas(filtroEstado, filtroModeracion, pageHist);
+      const res = await adminService.getTodasOfertas(params);
+      if (mia !== secuencia.current) return;
+      const data = res.data?.data ?? [];
+      const pag = res.data?.pagination ?? null;
+      // Se resolvió la última oferta de la última página: volver a la anterior.
+      if (data.length === 0 && page > 1 && pag && pag.totalPages < page) {
+        setPage(pag.totalPages);
+        return;
+      }
+      setOfertas(data);
+      setPagination(pag);
+    } catch {
+      if (mia !== secuencia.current) return;
+      setError('No se pudieron cargar las ofertas.');
+    } finally {
+      if (mia === secuencia.current) setLoading(false);
+    }
+  }, [page, tab, filtroEstado, filtroModeracion, setPage]);
+
+  // Contador de la pestaña "Pendientes": total de la misma consulta paginada.
+  const cargarConteo = useCallback(async () => {
+    try {
+      const res = await adminService.getTodasOfertas({ estadoModeracion: 'pendiente', page: 1, limit: 1 });
+      setConteoPend(res.data?.pagination?.total ?? 0);
+    } catch {
+      setConteoPend(null);
+    }
+  }, []);
+
+  useEffect(() => { cargar(); }, [cargar]);
+  useEffect(() => { cargarConteo(); }, [cargarConteo]);
+
+  const ejecutarAccion = async (oferta, accion) => {
+    setAccionando(oferta.id);
+    setError('');
+    try {
+      await adminService.moderarOferta(oferta.id, accion);
+      showToast(`Oferta ${RESULTADO_ACCION[accion]} correctamente.`, 'success');
+      await Promise.all([cargar(), cargarConteo()]);
     } catch (err) {
       setError(err.response?.data?.message ?? 'Error al moderar la oferta.');
     } finally {
@@ -129,237 +205,154 @@ export default function AdminOfertasPage() {
     }
   };
 
-  const ofertasFiltradas = todas;
+  // Rechazar y Cerrar son irreversibles (no hay transición de salida en el backend):
+  // piden confirmación. Aprobar y Pausar se ejecutan directo (se pueden revertir).
+  const solicitarAccion = (oferta, accion) => {
+    if (ACCIONES_CON_CONFIRMACION[accion]) setConfirmar({ oferta, accion });
+    else ejecutarAccion(oferta, accion);
+  };
+
+  const confirmarAccion = async () => {
+    const { oferta, accion } = confirmar;
+    setConfirmar(null);
+    await ejecutarAccion(oferta, accion);
+  };
+
+  const hayFiltros = tab === 'todas' && Boolean(filtroEstado || filtroModeracion);
+  const total = pagination?.total ?? ofertas.length;
+  const plural = total !== 1;
+  const textoResultados = tab === 'pendientes'
+    ? `${total} oferta${plural ? 's' : ''} pendiente${plural ? 's' : ''} de revisión`
+    : `${total} oferta${plural ? 's' : ''} encontrada${plural ? 's' : ''}`;
+  const mostrarModeracion = tab === 'todas';
+  const primeraCarga = loading && ofertas.length === 0 && !error;
+
+  const listado = ofertas.length > 0 && (
+    <div className={loading ? styles.recargando : undefined} aria-busy={loading}>
+      {esTabla ? (
+        <TableResponsive minWidth={mostrarModeracion ? 820 : 720}>
+          <thead>
+            <tr>
+              <th>Oferta</th>
+              <th>Área / Modalidad</th>
+              <th>Estado</th>
+              {mostrarModeracion && <th>Moderación</th>}
+              <th>Publicada</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ofertas.map((o) => (
+              <tr key={o.id}>
+                <td className="cell-break">
+                  <strong>{o.titulo}</strong>
+                  <small className={styles.sub}>{o.empresa?.razonSocial ?? '—'}</small>
+                </td>
+                <td className="cell-break">
+                  {o.area ?? '—'}
+                  {o.modalidad && <small className={styles.sub}>{o.modalidad}</small>}
+                </td>
+                <td><EstadoBadge estado={o.estado} /></td>
+                {mostrarModeracion && <td><ModeracionBadge estado={o.estadoModeracion} /></td>}
+                <td className={styles.fecha}>{fechaCorta(o)}</td>
+                <td>
+                  <AccionesOferta oferta={o} ocupado={accionando === o.id} onAccion={solicitarAccion} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableResponsive>
+      ) : (
+        <div className={styles.cards}>
+          {ofertas.map((o) => (
+            <DataCard
+              key={o.id}
+              title={o.titulo}
+              subtitle={o.empresa?.razonSocial ?? undefined}
+              badge={<EstadoBadge estado={o.estado} />}
+              fields={[
+                { label: 'Área', value: o.area },
+                { label: 'Modalidad', value: o.modalidad },
+                { label: 'Moderación', value: mostrarModeracion ? <ModeracionBadge estado={o.estadoModeracion} /> : null },
+                { label: 'Publicada', value: fechaCorta(o) },
+              ]}
+              actions={<AccionesOferta oferta={o} ocupado={accionando === o.id} onAccion={solicitarAccion} />}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="page-container">
+      <Toast toast={toast} />
 
-      {/* ── Cabecera ── */}
-      <div className="dashboard-header">
-        <h1>Moderación de Ofertas</h1>
-        <span className={styles.headerCount}>
-          {pendientes.length} pendiente{pendientes.length !== 1 ? 's' : ''} de revisión
-        </span>
-      </div>
+      <PageHeader
+        title="Moderación de ofertas"
+        subtitle="Revisá las ofertas publicadas por las empresas y gestioná su estado."
+      />
 
-      {error   && <p className={`error-msg ${styles.feedback}`}>⚠️ {error}</p>}
-      {mensaje && <p className={`success-msg ${styles.feedback}`}>✅ {mensaje}</p>}
+      {error && <p className="error-msg" role="alert" style={{ marginBottom: '1rem' }}>{error}</p>}
 
-      {/* ── Sección 1: Pendientes ── */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Pendientes de revisión</h2>
+      <Tabs
+        idPrefix="ofe"
+        ariaLabel="Ofertas"
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { key: 'pendientes', label: 'Pendientes', count: conteoPend, alerta: true },
+          { key: 'todas', label: 'Todas' },
+        ]}
+      />
 
-        {loading ? (
-          <p className="msg">Cargando...</p>
-        ) : pendientes.length === 0 ? (
-          <div className={styles.emptyBox}>
-            No hay ofertas pendientes de moderación.
+      <TabPanel idPrefix="ofe" tabKey={tab}>
+        {tab === 'todas' && (
+          <div className={styles.filtros}>
+            <FilterGroup label="Estado" idPrefix="filtro-estado" options={OPCIONES_ESTADO} value={filtroEstado} onChange={setFiltroEstado} />
+            <FilterGroup label="Moderación" idPrefix="filtro-moderacion" options={OPCIONES_MODERACION} value={filtroModeracion} onChange={setFiltroModeracion} />
           </div>
-        ) : (
-          <TableResponsive minWidth={760}>
-              <thead>
-                <tr>
-                  <th>Oferta</th>
-                  <th>Empresa</th>
-                  <th>Área</th>
-                  <th>Modalidad</th>
-                  <th>Publicada</th>
-                  <th>Estado actual</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendientes.map((o) => (
-                  <tr key={o.id} className={accionando === o.id ? styles.rowBusy : ''}>
-                    <td>
-                      <strong>{o.titulo}</strong>
-                      <span className={styles.pendienteBadge}>⏳ Pendiente de revisión</span>
-                    </td>
-                    <td>{o.empresa?.razonSocial ?? '—'}</td>
-                    <td>{o.area ?? '—'}</td>
-                    <td>{o.modalidad ?? '—'}</td>
-                    <td className={styles.fechaCell}>
-                      {o.createdAt ? new Date(o.createdAt).toLocaleDateString('es-AR') : '—'}
-                    </td>
-                    <td>
-                      <span className="badge" style={{ background: ESTADO_COLOR[o.estado] ?? '#7f8c8d' }}>
-                        {ESTADO_LABEL[o.estado] ?? o.estado}
-                      </span>
-                    </td>
-                    <td>
-                      {accionando === o.id ? (
-                        <span className={styles.procesando}>Procesando...</span>
-                      ) : (
-                        <div className={styles.acciones}>
-                          <button
-                            className={`btn-ok ${styles.btnSm}`}
-                            onClick={() => handleAccion(o.id, 'aprobar')}
-                            title="Aprobar: la oferta queda visible para los alumnos (si además está activa)"
-                          >
-                            ✅ Aprobar
-                          </button>
-                          <button
-                            className={`btn-warn ${styles.btnSm}`}
-                            onClick={() => handleAccion(o.id, 'pausar')}
-                            title="Pausar: cambia el ciclo de vida de la publicación, no resuelve la moderación"
-                          >
-                            ⏸️ Pausar
-                          </button>
-                          <button
-                            className={`btn-danger ${styles.btnSm}`}
-                            onClick={() => handleAccion(o.id, 'rechazar')}
-                            title="Rechazar: la empresa es notificada"
-                          >
-                            ❌ Rechazar
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-          </TableResponsive>
-        )}
-      </section>
-
-      {/* ── Sección 2: Historial por estado / moderación ── */}
-      <section>
-        <div className={styles.histHead}>
-          <h2>Historial de ofertas</h2>
-          <div className={styles.histFiltros}>
-            {FILTROS_ESTADO.map((f) => {
-              const activo = filtroEstado === f;
-              const color = ESTADO_COLOR[f] ?? 'var(--primary)';
-              return (
-                <button
-                  key={f}
-                  onClick={() => setFiltroEstado(f)}
-                  className={`${styles.histFiltro} ${activo ? styles.histFiltroActivo : ''}`}
-                  style={activo ? { background: color, borderColor: color } : undefined}
-                  aria-pressed={activo}
-                >
-                  {f === 'todas' ? 'Todas' : ESTADO_LABEL[f]}
-                </button>
-              );
-            })}
-          </div>
-          <div className={styles.histFiltros}>
-            {FILTROS_MODERACION.map((f) => {
-              const activo = filtroModeracion === f;
-              const color = MODERACION_COLOR[f] ?? 'var(--primary)';
-              return (
-                <button
-                  key={f}
-                  onClick={() => setFiltroModeracion(f)}
-                  className={`${styles.histFiltro} ${activo ? styles.histFiltroActivo : ''}`}
-                  style={activo ? { background: color, borderColor: color } : undefined}
-                  aria-pressed={activo}
-                >
-                  {f === 'todas' ? 'Toda moderación' : MODERACION_LABEL[f]}
-                </button>
-              );
-            })}
-          </div>
-          <span className={styles.histCount}>
-            {loadingHist ? '...' : `${paginationHist?.total ?? ofertasFiltradas.length} resultado${(paginationHist?.total ?? ofertasFiltradas.length) !== 1 ? 's' : ''}`}
-          </span>
-        </div>
-
-        {loadingHist ? (
-          <p className="msg">Cargando historial...</p>
-        ) : ofertasFiltradas.length === 0 ? (
-          <div className={styles.emptyBox}>
-            No hay ofertas para el filtro seleccionado.
-          </div>
-        ) : (
-          <TableResponsive minWidth={860}>
-              <thead>
-                <tr>
-                  <th>Oferta</th>
-                  <th>Empresa</th>
-                  <th>Área</th>
-                  <th>Modalidad</th>
-                  <th>Estado</th>
-                  <th>Moderación</th>
-                  <th>Publicada</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ofertasFiltradas.map((o) => (
-                  <tr key={o.id} className={accionando === o.id ? styles.rowBusy : ''}>
-                    <td>
-                      <strong>{o.titulo}</strong>
-                    </td>
-                    <td>{o.empresa?.razonSocial ?? '—'}</td>
-                    <td>{o.area ?? '—'}</td>
-                    <td>{o.modalidad ?? '—'}</td>
-                    <td>
-                      <span className="badge" style={{ background: ESTADO_COLOR[o.estado] ?? '#7f8c8d' }}>
-                        {ESTADO_LABEL[o.estado] ?? o.estado}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="badge" style={{ background: MODERACION_COLOR[o.estadoModeracion] ?? '#7f8c8d' }}>
-                        {MODERACION_LABEL[o.estadoModeracion] ?? o.estadoModeracion}
-                      </span>
-                    </td>
-                    <td className={styles.fechaCell}>
-                      {o.createdAt ? new Date(o.createdAt).toLocaleDateString('es-AR') : '—'}
-                    </td>
-                    <td>
-                      {accionando === o.id ? (
-                        <span className={styles.procesando}>Procesando...</span>
-                      ) : (
-                        <div className={styles.acciones}>
-                          {puedeAprobar(o) && (
-                            <button
-                              className={`btn-ok ${styles.btnXs}`}
-                              onClick={() => handleAccion(o.id, 'aprobar')}
-                            >
-                              Aprobar
-                            </button>
-                          )}
-                          {puedeRechazar(o) && (
-                            <button
-                              className={`btn-danger ${styles.btnXs}`}
-                              onClick={() => handleAccion(o.id, 'rechazar')}
-                            >
-                              Rechazar
-                            </button>
-                          )}
-                          {puedePausar(o) && (
-                            <button
-                              className={`btn-warn ${styles.btnXs}`}
-                              onClick={() => handleAccion(o.id, 'pausar')}
-                            >
-                              Pausar
-                            </button>
-                          )}
-                          {puedeCerrar(o) && (
-                            <button
-                              className={`btn-secondary ${styles.btnXs}`}
-                              onClick={() => handleAccion(o.id, 'cerrar')}
-                            >
-                              Cerrar
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-          </TableResponsive>
         )}
 
-        {!loadingHist && (
-          <Paginacion
-            pagination={paginationHist}
-            onPageChange={(p) => cargarTodas(filtroEstado, filtroModeracion, p)}
-          />
-        )}
-      </section>
+        <p className={styles.resultados} role="status" aria-live="polite">
+          {loading ? 'Cargando…' : textoResultados}
+        </p>
+
+        {primeraCarga ? (
+          <p className="msg" role="status">Cargando ofertas...</p>
+        ) : ofertas.length === 0 && !error ? (
+          <EmptyState
+            icon={tab === 'pendientes' ? '✅' : '📭'}
+            title={tab === 'pendientes' ? 'No hay ofertas pendientes de moderación.' : 'No hay ofertas para los filtros seleccionados.'}
+            hint={tab === 'pendientes' ? 'Cuando una empresa estándar publique una oferta, va a aparecer acá.' : undefined}
+          >
+            {hayFiltros && (
+              <button type="button" className="btn-secondary" onClick={() => { setFiltroEstado(''); setFiltroModeracion(''); }}>
+                Limpiar filtros
+              </button>
+            )}
+          </EmptyState>
+        ) : listado}
+
+        {!primeraCarga && <Paginacion pagination={pagination} onPageChange={setPage} />}
+      </TabPanel>
+
+      {confirmar && (
+        <ConfirmModal
+          title={ACCIONES_CON_CONFIRMACION[confirmar.accion].titulo}
+          confirmLabel={ACCIONES_CON_CONFIRMACION[confirmar.accion].confirmar}
+          tone={confirmar.accion === 'rechazar' ? 'danger' : 'warn'}
+          onConfirm={confirmarAccion}
+          onClose={() => setConfirmar(null)}
+          confirmId="btn-confirmar-accion-oferta"
+        >
+          <p>
+            Oferta: <strong>{confirmar.oferta.titulo}</strong>
+            {confirmar.oferta.empresa?.razonSocial && <> · {confirmar.oferta.empresa.razonSocial}</>}
+          </p>
+          <p>{ACCIONES_CON_CONFIRMACION[confirmar.accion].detalle}</p>
+        </ConfirmModal>
+      )}
     </div>
   );
 }

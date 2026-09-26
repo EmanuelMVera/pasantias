@@ -19,7 +19,15 @@
 
 .actividadItem:hover { border-color: var(--primary); }
 
-.actividadIcon { font-size: 1.1rem; flex-shrink: 0; }
+/* Punto discreto en lugar de un emoji repetido en cada fila. */
+.punto {
+  width: 8px;
+  height: 8px;
+  margin-top: 0.4rem;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+}
 
 .actividadBody {
   display: flex;

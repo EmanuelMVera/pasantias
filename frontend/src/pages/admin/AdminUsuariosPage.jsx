@@ -2,31 +2,46 @@
  * AdminUsuariosPage.jsx — Gestión completa de usuarios del sistema.
  *
  * Permite al administrador:
- * - Ver todos los usuarios con filtros por rol, estado y búsqueda de texto
+ * - Ver los usuarios con filtros por rol, estado y búsqueda de texto (server-side)
  * - Crear nuevos usuarios con cualquier rol
  * - Editar datos, rol y estado de usuarios existentes
- * - Eliminar (desactivar) usuarios
- * - Activar/desactivar cuentas con un toggle
+ * - Suspender / reactivar cuentas — SIEMPRE desde el botón de acción y con
+ *   confirmación en un modal. El badge de estado de la tabla es solo informativo
+ *   (no es un control): un click accidental sobre él no cambia nada.
+ *
+ * Tabla compacta en escritorio (sin columna de ID) y cards en tablet/móvil.
+ *
+ * Ruta: /admin/usuarios — rol: admin
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { adminService } from '../../services/admin.service';
-import Modal from '../../components/Modal/Modal';
+import { useAuth } from '../../hooks/useAuth';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { usePaginacion } from '../../hooks/usePaginacion';
+import { useToast } from '../../hooks/useToast';
+import PageHeader from '../../components/ui/PageHeader';
+import SearchField from '../../components/ui/SearchField';
+import TableResponsive from '../../components/ui/TableResponsive';
+import DataCard from '../../components/ui/DataCard';
+import EmptyState from '../../components/ui/EmptyState';
+import ConfirmModal from '../../components/ui/ConfirmModal';
+import Toast from '../../components/ui/Toast';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import UsuarioFormModal from '../../components/UsuarioFormModal/UsuarioFormModal';
-import { usePaginacion } from '../../hooks/usePaginacion';
 import styles from './AdminUsuariosPage.module.css';
 
 /* Roles disponibles en el sistema */
 const ROLES = ['alumno', 'egresado', 'empresa', 'admin'];
 
-/* Etiquetas y colores para cada rol */
+/* Etiquetas y colores para cada rol (con contraste suficiente sobre su fondo tintado) */
 const ROL_BADGE = {
   alumno:   { label: 'Alumno',   color: '#0073AD' },
-  egresado: { label: 'Egresado', color: '#8e44ad' },
-  empresa:  { label: 'Empresa',  color: '#e67e22' },
-  admin:    { label: 'Admin',    color: '#c0392b' },
+  egresado: { label: 'Egresado', color: '#7d3c98' },
+  empresa:  { label: 'Empresa',  color: '#a04000' },
+  admin:    { label: 'Admin',    color: '#a93226' },
 };
 
 /* Etiquetas para rolInterno dentro de empresa_usuarios */
@@ -41,7 +56,7 @@ const ROL_INTERNO_LABEL = {
 
 /**
  * Devuelve { label, sub, color } para el badge de rol.
- * Para usuarios 'empresa' muestra el rolInterno (Propietario/Reclutador/etc.)
+ * Para usuarios 'empresa' muestra el rolInterno (Administrador/Reclutador/etc.)
  * y el nombre de la empresa como subtexto.
  */
 function getRolInfo(u) {
@@ -49,11 +64,17 @@ function getRolInfo(u) {
     const mem      = u.membresiasEmpresa[0];
     const rolLabel = ROL_INTERNO_LABEL[mem.rolInterno] ?? mem.rolInterno;
     const empresa  = mem.empresa?.razonSocial ?? '';
-    return { label: rolLabel, sub: empresa, color: '#e67e22' };
+    return { label: rolLabel, sub: empresa, color: ROL_BADGE.empresa.color };
   }
-  const badge = ROL_BADGE[u.rol] ?? { label: u.rol, color: '#666' };
+  const badge = ROL_BADGE[u.rol] ?? { label: u.rol, color: '#566573' };
   return { label: badge.label, sub: '', color: badge.color };
 }
+
+const formatUltimoAcceso = (u) => (
+  u.ultimoAcceso
+    ? new Date(u.ultimoAcceso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })
+    : 'Nunca'
+);
 
 /* Estado inicial del formulario (crear/editar) */
 const FORM_VACIO = {
@@ -63,53 +84,79 @@ const FORM_VACIO = {
   legajo: '',
 };
 
+/* Badge de estado: SOLO visual (span, sin onClick). El texto y el símbolo lo distinguen sin depender del color. */
+function EstadoBadge({ activo }) {
+  return (
+    <span className={activo ? styles.estadoActivo : styles.estadoInactivo}>
+      {activo ? '● Activo' : '○ Inactivo'}
+    </span>
+  );
+}
+
+function RolBadge({ info }) {
+  return (
+    <>
+      <span className={styles.rolBadge} style={{ '--badge-color': info.color }}>{info.label}</span>
+      {info.sub && <small className={styles.sub}>{info.sub}</small>}
+    </>
+  );
+}
+
 export default function AdminUsuariosPage() {
-  const [usuarios,    setUsuarios]   = useState([]);
-  const [loading,     setLoading]    = useState(true);
-  const [error,       setError]      = useState('');
-  const [success,     setSuccess]    = useState('');
+  const { usuario: yo } = useAuth();
+  const esTabla = useMediaQuery('(min-width: 1024px)');
+  const { toast, showToast } = useToast(4000);
+
+  const [usuarios, setUsuarios] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState('');
 
   // Filtros
-  const [busqueda,    setBusqueda]   = useState('');
-  const [filtroRol,   setFiltroRol]  = useState('');
+  const [texto,        setTexto]        = useState('');
+  const [filtroRol,    setFiltroRol]    = useState('');
   const [filtroActivo, setFiltroActivo] = useState('');
+  const q = useDebouncedValue(texto.trim(), 350);
 
   // Paginación (contrato común SCALE-03)
-  const { page, setPage } = usePaginacion([filtroRol, filtroActivo, busqueda]);
+  const { page, setPage } = usePaginacion([filtroRol, filtroActivo, q]);
   const [pagination, setPagination] = useState(null);
 
-  // Modal
-  const [modal,       setModal]      = useState(null);   // null | 'crear' | 'editar' | 'confirmar'
-  const [editando,    setEditando]   = useState(null);   // usuario a editar
-  const [eliminando,  setEliminando] = useState(null);   // usuario a eliminar
-  const [form,        setForm]       = useState(FORM_VACIO);
+  // Modales
+  const [modal,       setModal]       = useState(null); // null | 'crear' | 'editar'
+  const [editando,    setEditando]    = useState(null); // usuario a editar
+  const [suspendiendo, setSuspendiendo] = useState(null); // usuario en el modal Suspender/Reactivar
+  const [form,        setForm]        = useState(FORM_VACIO);
   const [formLoading, setFormLoading] = useState(false);
-  const [formError,   setFormError]  = useState('');
+  const [formError,   setFormError]   = useState('');
+  const [guardando,   setGuardando]   = useState(false);
+
+  const secuencia = useRef(0);
 
   /* ── Carga de usuarios con filtros ────────────────────────────────── */
   const cargar = useCallback(async () => {
+    const mia = ++secuencia.current;
     setLoading(true);
     setError('');
     try {
       const params = { page, limit: 25 };
       if (filtroRol)           params.rol    = filtroRol;
-      if (filtroActivo !== '') params.activo  = filtroActivo;
-      if (busqueda)            params.q       = busqueda;
+      if (filtroActivo !== '') params.activo = filtroActivo;
+      if (q)                   params.q      = q;
       const res = await adminService.getUsuarios(params);
+      if (mia !== secuencia.current) return;
       setUsuarios(res.data.data ?? res.data ?? []);
       setPagination(res.data.pagination ?? null);
     } catch {
+      if (mia !== secuencia.current) return;
       setError('No se pudieron cargar los usuarios.');
     } finally {
-      setLoading(false);
+      if (mia === secuencia.current) setLoading(false);
     }
-  }, [filtroRol, filtroActivo, busqueda, page]);
+  }, [filtroRol, filtroActivo, q, page]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
   /* ── Helpers de UI ────────────────────────────────────────────────── */
-  const showSuccess = (msg) => { setSuccess(msg); setTimeout(() => setSuccess(''), 3000); };
-
   const abrirCrear = () => { setForm(FORM_VACIO); setFormError(''); setModal('crear'); };
   const abrirEditar = (u) => {
     setEditando(u);
@@ -117,8 +164,7 @@ export default function AdminUsuariosPage() {
     setFormError('');
     setModal('editar');
   };
-  const abrirConfirmar = (u) => { setEliminando(u); setModal('confirmar'); };
-  const cerrarModal = () => { setModal(null); setEditando(null); setEliminando(null); setFormError(''); };
+  const cerrarModal = () => { setModal(null); setEditando(null); setFormError(''); };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -132,7 +178,7 @@ export default function AdminUsuariosPage() {
     setFormError('');
     try {
       await adminService.crearUsuario(form);
-      showSuccess('Usuario creado correctamente.');
+      showToast('Usuario creado correctamente.', 'success');
       cerrarModal();
       cargar();
     } catch (err) {
@@ -151,7 +197,7 @@ export default function AdminUsuariosPage() {
       const payload = { ...form };
       if (!payload.password) delete payload.password; // No enviar si está vacío
       await adminService.editarUsuario(editando.id, payload);
-      showSuccess('Usuario actualizado.');
+      showToast('Usuario actualizado.', 'success');
       cerrarModal();
       cargar();
     } catch (err) {
@@ -161,165 +207,165 @@ export default function AdminUsuariosPage() {
     }
   };
 
-  /* ── Suspender / Reactivar cuenta (desde el modal de confirmación) ── */
+  /* ── Suspender / Reactivar cuenta (único camino para cambiar el estado desde la tabla) ── */
   const handleSuspender = async () => {
+    setGuardando(true);
     try {
-      await adminService.toggleUsuario(eliminando.id);
-      const nuevoEstado = !eliminando.activo;
-      setUsuarios((prev) => prev.map((u) =>
-        u.id === eliminando.id ? { ...u, activo: nuevoEstado } : u
-      ));
-      showSuccess(nuevoEstado ? 'Cuenta reactivada.' : 'Cuenta suspendida.');
-      cerrarModal();
-    } catch {
-      setError('Error al cambiar el estado de la cuenta.');
-      cerrarModal();
+      await adminService.toggleUsuario(suspendiendo.id);
+      showToast(suspendiendo.activo ? 'Cuenta suspendida.' : 'Cuenta reactivada.', 'success');
+      setSuspendiendo(null);
+      cargar();
+    } catch (err) {
+      setSuspendiendo(null);
+      setError(err.response?.data?.message ?? 'Error al cambiar el estado de la cuenta.');
+    } finally {
+      setGuardando(false);
     }
   };
 
-  /* ── Toggle activo (botón rápido en columna Estado) ──────────────── */
-  const handleToggle = async (id) => {
-    try {
-      await adminService.toggleUsuario(id);
-      setUsuarios((prev) => prev.map((u) => u.id === id ? { ...u, activo: !u.activo } : u));
-    } catch {
-      setError('Error al cambiar el estado del usuario.');
-    }
+  const hayFiltros = Boolean(q || filtroRol || filtroActivo !== '');
+  const limpiarFiltros = () => { setTexto(''); setFiltroRol(''); setFiltroActivo(''); };
+
+  const botonesAccion = (u) => {
+    const propia = u.id === yo?.id;
+    const nombre = `${u.nombre} ${u.apellido}`;
+    return (
+      <div className={styles.accionesBtns}>
+        <button type="button" className="btn-small" onClick={() => abrirEditar(u)} aria-label={`Editar a ${nombre}`}>
+          Editar
+        </button>
+        <button
+          type="button"
+          className={u.activo ? 'btn-danger' : 'btn-ok'}
+          onClick={() => setSuspendiendo(u)}
+          disabled={propia}
+          aria-label={propia ? 'No podés suspender tu propia cuenta' : `${u.activo ? 'Suspender' : 'Reactivar'} la cuenta de ${nombre}`}
+          title={propia ? 'No podés suspender tu propia cuenta' : undefined}
+        >
+          {u.activo ? 'Suspender' : 'Reactivar'}
+        </button>
+      </div>
+    );
   };
+
+  const total = pagination?.total ?? usuarios.length;
+  const primeraCarga = loading && usuarios.length === 0 && !error;
 
   /* ── Render ───────────────────────────────────────────────────────── */
   return (
     <div className="page-container">
-      {/* Cabecera */}
-      <div className="dashboard-header">
-        <div>
-          <h1>Gestión de Usuarios</h1>
-          <p className={styles.subtitle}>
-            {loading ? '...' : `${pagination?.total ?? usuarios.length} usuario${(pagination?.total ?? usuarios.length) !== 1 ? 's' : ''} encontrado${(pagination?.total ?? usuarios.length) !== 1 ? 's' : ''}`}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <Link to="/admin/importaciones" className="btn-secondary">📥 Importar CSV</Link>
-          <button id="btn-crear-usuario" className="btn-primary" onClick={abrirCrear}>
-            + Nuevo Usuario
-          </button>
-        </div>
-      </div>
+      <Toast toast={toast} />
 
-      {/* Mensajes */}
-      {error   && <p className="error-msg" style={{ marginBottom: '1rem' }}>{error}</p>}
-      {success && <p className={styles.successMsg}>{success}</p>}
+      <PageHeader
+        title="Gestión de usuarios"
+        subtitle={loading && !pagination ? 'Cargando…' : `${total} usuario${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`}
+        actions={(
+          <div className={styles.headerAcciones}>
+            <Link to="/admin/importaciones" className="btn-secondary">Importar CSV</Link>
+            <button id="btn-crear-usuario" type="button" className="btn-primary" onClick={abrirCrear}>
+              + Nuevo usuario
+            </button>
+          </div>
+        )}
+      />
+
+      {error && <p className="error-msg" role="alert" style={{ marginBottom: '1rem' }}>{error}</p>}
 
       {/* Filtros */}
       <div className={styles.filtros}>
-        <input
+        <SearchField
           id="busqueda-usuario"
-          className={styles.searchInput}
-          type="text"
-          placeholder="🔍  Buscar por nombre o email..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
+          label="Buscar usuarios"
+          placeholder="Buscar por nombre o email…"
+          value={texto}
+          onChange={setTexto}
         />
-        <select id="filtro-rol" className={styles.filterSelect} value={filtroRol} onChange={(e) => setFiltroRol(e.target.value)}>
-          <option value="">Todos los roles</option>
-          {ROLES.map((r) => <option key={r} value={r}>{ROL_BADGE[r]?.label ?? r}</option>)}
-        </select>
-        <select id="filtro-activo" className={styles.filterSelect} value={filtroActivo} onChange={(e) => setFiltroActivo(e.target.value)}>
-          <option value="">Todos los estados</option>
-          <option value="true">Activos</option>
-          <option value="false">Inactivos</option>
-        </select>
-        <button className="btn-secondary" onClick={cargar}>↺ Actualizar</button>
+        <div className={styles.campo}>
+          <label htmlFor="filtro-rol">Rol</label>
+          <select id="filtro-rol" value={filtroRol} onChange={(e) => setFiltroRol(e.target.value)}>
+            <option value="">Todos los roles</option>
+            {ROLES.map((r) => <option key={r} value={r}>{ROL_BADGE[r]?.label ?? r}</option>)}
+          </select>
+        </div>
+        <div className={styles.campo}>
+          <label htmlFor="filtro-activo">Estado</label>
+          <select id="filtro-activo" value={filtroActivo} onChange={(e) => setFiltroActivo(e.target.value)}>
+            <option value="">Todos los estados</option>
+            <option value="true">Activos</option>
+            <option value="false">Inactivos</option>
+          </select>
+        </div>
+        <button type="button" className="btn-secondary" onClick={cargar} disabled={loading}>Actualizar</button>
       </div>
 
-      {/* Tabla */}
-      {loading ? (
-        <div className={styles.loadingWrap}>
-          <div className={styles.spinner} />
-          <p className="msg">Cargando usuarios...</p>
-        </div>
-      ) : usuarios.length === 0 ? (
-        <div className={styles.empty}>
-          <span>👤</span>
-          <p>No se encontraron usuarios con los filtros actuales.</p>
-        </div>
-      ) : (
-        <div className={styles.tableWrap}>
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Nombre</th>
-                <th>Email</th>
-                <th>Rol</th>
-                <th>Estado</th>
-                <th>Último acceso</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {usuarios.map((u) => {
-                const rolInfo = getRolInfo(u);
-                return (
-                  <tr key={u.id} className={u.activo ? '' : styles.rowInactiva}>
-                    <td className={styles.idCell}>#{u.id}</td>
+      {primeraCarga ? (
+        <p className="msg" role="status">Cargando usuarios...</p>
+      ) : usuarios.length === 0 && !error ? (
+        <EmptyState
+          icon="👤"
+          title={hayFiltros ? 'No se encontraron usuarios con los filtros actuales.' : 'Todavía no hay usuarios.'}
+        >
+          {hayFiltros && <button type="button" className="btn-secondary" onClick={limpiarFiltros}>Limpiar filtros</button>}
+        </EmptyState>
+      ) : usuarios.length > 0 && (
+        <div className={loading ? styles.recargando : undefined} aria-busy={loading}>
+          {esTabla ? (
+            <TableResponsive minWidth={820}>
+              <thead>
+                <tr>
+                  <th>Usuario</th>
+                  <th>Rol</th>
+                  <th>Estado</th>
+                  <th>Último acceso</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usuarios.map((u) => (
+                  <tr key={u.id}>
                     <td>
                       <div className={styles.userCell}>
-                        <span className={styles.avatar}>{u.nombre?.[0]}{u.apellido?.[0]}</span>
-                        <div>
-                          <strong>{u.nombre} {u.apellido}</strong>
-                          {u.ubicacion && <small className={styles.ubicacion}>{u.ubicacion}</small>}
+                        <span className={styles.avatar} aria-hidden="true">{u.nombre?.[0]}{u.apellido?.[0]}</span>
+                        <div className="cell-break">
+                          <strong className={u.activo ? undefined : styles.nombreInactivo}>{u.nombre} {u.apellido}</strong>
+                          <small className={styles.sub}>{u.email}</small>
+                          {u.ubicacion && <small className={styles.sub}>{u.ubicacion}</small>}
                         </div>
                       </div>
                     </td>
-                    <td className={styles.emailCell}>{u.email}</td>
-                    <td>
-                      <div>
-                        <span className={styles.rolBadge} style={{ '--badge-color': rolInfo.color }}>
-                          {rolInfo.label}
-                        </span>
-                        {rolInfo.sub && (
-                          <small className={styles.ubicacion} style={{ display: 'block', marginTop: '3px' }}>
-                            🏢 {rolInfo.sub}
-                          </small>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <button
-                        className={u.activo ? styles.toggleOn : styles.toggleOff}
-                        onClick={() => handleToggle(u.id)}
-                        title={u.activo ? 'Click para desactivar' : 'Click para activar'}
-                      >
-                        {u.activo ? '● Activo' : '○ Inactivo'}
-                      </button>
-                    </td>
-                    <td className={styles.fechaCell}>
-                      {u.ultimoAcceso
-                        ? new Date(u.ultimoAcceso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })
-                        : '—'}
-                    </td>
-                    <td>
-                      <div className={styles.accionesBtns}>
-                        <button className="btn-small" onClick={() => abrirEditar(u)} title="Editar usuario">✏️ Editar</button>
-                        <button
-                          className={`btn-small ${u.activo ? 'btn-danger' : 'btn-ok'}`}
-                          onClick={() => abrirConfirmar(u)}
-                          title={u.activo ? 'Suspender cuenta' : 'Reactivar cuenta'}
-                        >
-                          {u.activo ? '🔒 Suspender' : '🔓 Reactivar'}
-                        </button>
-                      </div>
-                    </td>
+                    <td className="cell-break"><RolBadge info={getRolInfo(u)} /></td>
+                    <td><EstadoBadge activo={u.activo} /></td>
+                    <td className={styles.fecha}>{formatUltimoAcceso(u)}</td>
+                    <td>{botonesAccion(u)}</td>
                   </tr>
+                ))}
+              </tbody>
+            </TableResponsive>
+          ) : (
+            <div className={styles.cards}>
+              {usuarios.map((u) => {
+                const rol = getRolInfo(u);
+                return (
+                  <DataCard
+                    key={u.id}
+                    title={`${u.nombre} ${u.apellido}`}
+                    subtitle={u.email}
+                    badge={<EstadoBadge activo={u.activo} />}
+                    fields={[
+                      { label: 'Rol', value: <RolBadge info={rol} /> },
+                      { label: 'Último acceso', value: formatUltimoAcceso(u) },
+                      { label: 'Ubicación', value: u.ubicacion },
+                    ]}
+                    actions={botonesAccion(u)}
+                  />
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
       )}
 
-      {!loading && <Paginacion pagination={pagination} onPageChange={setPage} />}
+      {!primeraCarga && <Paginacion pagination={pagination} onPageChange={setPage} />}
 
       {/* ── Modal Crear / Editar ─────────────────────────────────────── */}
       {(modal === 'crear' || modal === 'editar') && (
@@ -336,39 +382,30 @@ export default function AdminUsuariosPage() {
       )}
 
       {/* ── Modal Confirmar Suspender / Reactivar ────────────────────── */}
-      {modal === 'confirmar' && eliminando && (
-        <Modal
-          onClose={cerrarModal}
-          ariaLabel={eliminando.activo ? 'Suspender cuenta' : 'Reactivar cuenta'}
-          className={styles.modalConfirm}
-          maxWidth={420}
-          style={{ padding: '2rem', textAlign: 'center' }}
+      {suspendiendo && (
+        <ConfirmModal
+          title={suspendiendo.activo ? 'Suspender cuenta' : 'Reactivar cuenta'}
+          confirmLabel={suspendiendo.activo ? 'Suspender cuenta' : 'Reactivar cuenta'}
+          tone={suspendiendo.activo ? 'danger' : 'ok'}
+          busy={guardando}
+          onConfirm={handleSuspender}
+          onClose={() => setSuspendiendo(null)}
+          confirmId="btn-confirmar-suspender"
         >
-            <span className={styles.confirmIcon}>{eliminando.activo ? '🔒' : '🔓'}</span>
-            <h2>{eliminando.activo ? 'Suspender cuenta' : 'Reactivar cuenta'}</h2>
-            <p>
-              {eliminando.activo ? (
-                <>
-                  La cuenta de <strong>{eliminando.nombre} {eliminando.apellido}</strong> ({eliminando.email}) quedará{' '}
-                  <strong>inactiva</strong>. El usuario no podrá iniciar sesión. Los datos se conservan.
-                </>
-              ) : (
-                <>
-                  La cuenta de <strong>{eliminando.nombre} {eliminando.apellido}</strong> ({eliminando.email}) quedará{' '}
-                  <strong>activa</strong> nuevamente y podrá iniciar sesión.
-                </>
-              )}
-            </p>
-            <div className={styles.modalFooter}>
-              <button className="btn-secondary" onClick={cerrarModal}>Cancelar</button>
-              <button
-                className={eliminando.activo ? 'btn-danger' : 'btn-ok'}
-                onClick={handleSuspender}
-              >
-                {eliminando.activo ? '🔒 Sí, suspender' : '🔓 Sí, reactivar'}
-              </button>
-            </div>
-        </Modal>
+          <p>
+            {suspendiendo.activo ? (
+              <>
+                La cuenta de <strong>{suspendiendo.nombre} {suspendiendo.apellido}</strong> ({suspendiendo.email}) quedará{' '}
+                <strong>inactiva</strong>. El usuario no podrá iniciar sesión. Los datos se conservan.
+              </>
+            ) : (
+              <>
+                La cuenta de <strong>{suspendiendo.nombre} {suspendiendo.apellido}</strong> ({suspendiendo.email}) quedará{' '}
+                <strong>activa</strong> nuevamente y podrá iniciar sesión.
+              </>
+            )}
+          </p>
+        </ConfirmModal>
       )}
     </div>
   );
