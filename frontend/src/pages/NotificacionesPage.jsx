@@ -17,19 +17,22 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { notificacionService } from '../services/notificacion.service';
 import Paginacion from '../components/Paginacion/Paginacion';
+import PageHeader from '../components/ui/PageHeader';
+import EmptyState from '../components/ui/EmptyState';
+import Icon from '../components/ui/Icon';
 import { usePaginacion } from '../hooks/usePaginacion';
 import styles from './NotificacionesPage.module.css';
 
 // Cada tab de filtro → valor del query param `leida` del backend
 const FILTRO_A_LEIDA = { todas: undefined, 'no-leidas': 'false', leidas: 'true' };
 
-/* ── Configuración visual por tipo ─────────────────────────────────────────── */
+/* ── Configuración visual por tipo (ícono de ui/Icon + color de acento) ───── */
 const TIPO_CONFIG = {
-  postulacion: { icon: '📋', label: 'Postulación',  color: '#3498db' },
-  estado:      { icon: '🔄', label: 'Estado',       color: '#8e44ad' },
-  oferta:      { icon: '📢', label: 'Oferta',       color: '#27ae60' },
-  chat:        { icon: '💬', label: 'Mensaje',      color: '#16a085' },
-  sistema:     { icon: '⚙️', label: 'Sistema',      color: '#7f8c8d' },
+  postulacion: { icon: 'send',      label: 'Postulación',  color: '#0073AD' },
+  estado:      { icon: 'refresh',   label: 'Estado',       color: '#6d44a8' },
+  oferta:      { icon: 'briefcase', label: 'Oferta',       color: '#1f8a4c' },
+  chat:        { icon: 'message',   label: 'Mensaje',      color: '#127a6c' },
+  sistema:     { icon: 'settings',  label: 'Sistema',      color: '#4d5b6a' },
 };
 
 const VISUAL_CONFIG = {
@@ -39,7 +42,11 @@ const VISUAL_CONFIG = {
   error:   { bg: '#fef2f2', border: '#fecaca', text: '#991b1b' },
 };
 
-const FILTROS = ['todas', 'no-leidas', 'leidas'];
+const FILTROS = [
+  { key: 'todas', label: 'Todas' },
+  { key: 'no-leidas', label: 'Sin leer' },
+  { key: 'leidas', label: 'Leídas' },
+];
 
 /* ── Formatea fecha relativa ────────────────────────────────────────────────── */
 function formatearFecha(fecha) {
@@ -74,7 +81,7 @@ function NotifCard({ notif, onLeer, onEliminar }) {
   return (
     <div
       className={`${styles.notifCard} ${!notif.leida ? styles.noLeida : ''}`}
-      style={!notif.leida ? { background: visual.bg, borderLeftColor: visual.border } : {}}
+      style={!notif.leida ? { background: visual.bg } : undefined}
       onClick={handleClick}
       role="button"
       tabIndex={0}
@@ -84,8 +91,8 @@ function NotifCard({ notif, onLeer, onEliminar }) {
       }}
     >
       {/* Ícono del tipo */}
-      <div className={styles.notifIcon} style={{ background: `${tipo.color}18`, color: tipo.color }} aria-hidden="true">
-        {tipo.icon}
+      <div className={styles.notifIcon} style={{ background: `${tipo.color}14`, color: tipo.color }} aria-hidden="true">
+        <Icon name={tipo.icon} size={20} />
       </div>
 
       {/* Contenido */}
@@ -95,7 +102,9 @@ function NotifCard({ notif, onLeer, onEliminar }) {
             {tipo.label}
           </span>
           {notif.prioridad === 'alta' || notif.prioridad === 'urgente' ? (
-            <span className={styles.notifUrgente}>🔴 Urgente</span>
+            <span className={styles.notifUrgente}>
+              <Icon name="alert" size={13} strokeWidth={2.2} /> Urgente
+            </span>
           ) : null}
           <span className={styles.notifFecha}>{formatearFecha(notif.createdAt)}</span>
         </div>
@@ -104,7 +113,7 @@ function NotifCard({ notif, onLeer, onEliminar }) {
         <p className={styles.notifMensaje}>{notif.mensaje}</p>
 
         {(notif.accionURL || notif.enlace) && (
-          <span className={styles.notifAccion}>Ver más →</span>
+          <span className={styles.notifAccion}>Ver más <Icon name="arrowRight" size={14} /></span>
         )}
       </div>
 
@@ -117,7 +126,7 @@ function NotifCard({ notif, onLeer, onEliminar }) {
             aria-label="Marcar como leída"
             onClick={() => onLeer(notif.id)}
           >
-            <span aria-hidden="true">✓</span>
+            <Icon name="check" size={16} strokeWidth={2.2} />
           </button>
         )}
         <button
@@ -126,7 +135,7 @@ function NotifCard({ notif, onLeer, onEliminar }) {
           aria-label="Eliminar notificación"
           onClick={() => onEliminar(notif.id)}
         >
-          <span aria-hidden="true">✕</span>
+          <Icon name="trash" size={16} />
         </button>
       </div>
 
@@ -218,45 +227,48 @@ export default function NotificacionesPage() {
     <div className="page-container">
 
       {/* ── Cabecera ────────────────────────────────────────────────────── */}
-      <div className="dashboard-header">
-        <div>
-          <h1>Notificaciones</h1>
-          <p className={styles.headerSub}>
-            {noLeidasCount > 0
-              ? `Tenés ${noLeidasCount} notificación${noLeidasCount !== 1 ? 'es' : ''} sin leer`
-              : 'Todas las notificaciones al día ✓'}
-          </p>
-        </div>
-        {noLeidasCount > 0 && (
-          <button className="btn-secondary" onClick={handleLeerTodas}>
-            ✓ Marcar todas como leídas
+      <PageHeader
+        title="Notificaciones"
+        subtitle={noLeidasCount > 0
+          ? `Tenés ${noLeidasCount} notificación${noLeidasCount !== 1 ? 'es' : ''} sin leer`
+          : 'Todas las notificaciones al día.'}
+        actions={noLeidasCount > 0 && (
+          <button type="button" className="btn-secondary" onClick={handleLeerTodas}>
+            <Icon name="checkCircle" size={18} />
+            Marcar todas como leídas
           </button>
         )}
-      </div>
+      />
 
       {/* Mensajes */}
-      {error   && <p className="error-msg" style={{ marginBottom: '1rem' }}>⚠️ {error}</p>}
-      {success && <div className={styles.successBanner}>✅ {success}</div>}
+      {error   && <p className={`error-msg ${styles.mensaje}`} role="alert">{error}</p>}
+      {success && <div className={styles.successBanner} role="status">{success}</div>}
 
-      {/* ── Filtro tabs ─────────────────────────────────────────────────── */}
-      <div className={styles.filtroTabs}>
-        {FILTROS.map((f) => {
-          const label = f === 'todas' ? 'Todas' : f === 'no-leidas' ? 'Sin leer' : 'Leídas';
-          // Solo "Sin leer" tiene un contador siempre disponible (sinLeerCount);
-          // el resto muestra el total de la página activa cuando lo es.
-          const count = f === 'no-leidas' ? noLeidasCount
-                      : (filtro === f ? pagination?.total : null);
-          return (
+      {/* ── Filtro (control segmentado) ─────────────────────────────────────
+          Solo "Sin leer" lleva contador (y solo si hay): es el único conteo que
+          el backend informa siempre. El total del filtro activo va debajo. */}
+      <div className={styles.filtroBar}>
+        <div className={styles.filtroTabs} role="group" aria-label="Filtrar notificaciones">
+          {FILTROS.map(({ key, label }) => (
             <button
-              key={f}
-              className={`${styles.filtroTab} ${filtro === f ? styles.filtroActivo : ''}`}
-              onClick={() => setFiltro(f)}
+              key={key}
+              type="button"
+              className={`${styles.filtroTab} ${filtro === key ? styles.filtroActivo : ''}`}
+              aria-pressed={filtro === key}
+              onClick={() => setFiltro(key)}
             >
               {label}
-              {count != null && <span className={styles.filtroCount}>{count}</span>}
+              {key === 'no-leidas' && noLeidasCount > 0 && (
+                <span className={styles.filtroCount}>{noLeidasCount}</span>
+              )}
             </button>
-          );
-        })}
+          ))}
+        </div>
+        {!loading && pagination && (
+          <p className={styles.resultados} role="status" aria-live="polite">
+            {pagination.total} notificaci{pagination.total !== 1 ? 'ones' : 'ón'}
+          </p>
+        )}
       </div>
 
       {/* ── Lista ───────────────────────────────────────────────────────── */}
@@ -265,16 +277,15 @@ export default function NotificacionesPage() {
           {[1, 2, 3, 4].map((i) => <div key={i} className={styles.skeletonItem} />)}
         </div>
       ) : notifsFiltradas.length === 0 ? (
-        <div className={styles.emptyState}>
-          <span>{filtro === 'no-leidas' ? '✅' : '🔔'}</span>
-          <p>
-            {filtro === 'no-leidas'
-              ? '¡Sin notificaciones pendientes! Estás al día.'
-              : filtro === 'leidas'
-              ? 'No hay notificaciones leídas todavía.'
-              : 'Todavía no tenés ninguna notificación.'}
-          </p>
-        </div>
+        <EmptyState
+          className={styles.emptyState}
+          iconName={filtro === 'no-leidas' ? 'checkCircle' : 'bell'}
+          title={filtro === 'no-leidas'
+            ? '¡Sin notificaciones pendientes! Estás al día.'
+            : filtro === 'leidas'
+            ? 'No hay notificaciones leídas todavía.'
+            : 'Todavía no tenés ninguna notificación.'}
+        />
       ) : (
         <>
           <div className={styles.notifList}>

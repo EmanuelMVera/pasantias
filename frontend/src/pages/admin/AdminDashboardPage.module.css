@@ -1,8 +1,14 @@
-/* ── Secciones del panel resumen ─────────────────────────────────────────── */
+/* ── Panel resumen del admin ───────────────────────────────────────────── */
+.error { margin-bottom: var(--space-5); }
+.errorInline { margin-top: var(--space-3); }
+
 .seccion {
-  margin-bottom: 2.25rem;
-  transition: opacity 0.2s;
+  margin-bottom: var(--space-6);
 }
+
+/* Cards de la página: el espaciado lo da la grilla/sección, no el margen de Card. */
+.bloque { margin-bottom: var(--space-6); transition: opacity 0.2s; }
+.bloqueGrid { margin-bottom: 0; }
 
 /* Solo la sección del período se atenúa al recalcular (el resto no cambia). */
 .refrescando { opacity: 0.6; }
@@ -10,145 +16,187 @@
 .seccionHead {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 0.75rem 1.5rem;
-  margin-bottom: 1rem;
+  gap: var(--space-1) var(--space-5);
+  margin-bottom: var(--space-4);
 }
 
-.seccionTitulo {
+/* (.seccion h2) le gana a `.page-container h2` sin !important. */
+.seccion .seccionTitulo {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   font-weight: 700;
-  color: var(--secondary);
+  color: var(--text-strong);
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
 .seccionNota {
-  margin: 0.2rem 0 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--text-soft);
 }
 
 /* Rótulo "Histórico": el texto lo dice, el color no es lo único que informa. */
 .chipHistorico {
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--secondary);
-  background: var(--bg-card2);
-  border: 1px solid var(--border);
+  color: var(--neutral-text);
+  background: var(--neutral-soft);
   border-radius: 999px;
   padding: 0.15rem 0.6rem;
 }
 
-/* ── Grilla de KPIs ──────────────────────────────────────────────────────── */
-.statsGrid {
+/* ── KPIs de "Estado actual" ─────────────────────────────────────────────
+   7 tarjetas: 2 columnas en teléfono, 4 en tablet/desktop (4 + 3) y las 7 en
+   una fila en pantallas anchas. Si una tarjeta queda angosta, StatCard pone
+   el ícono arriba del texto (container query). */
+.kpiGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.25rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
 }
 
-.periodoSelector {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+@media (min-width: 640px) {
+  .kpiGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); }
 }
 
-.embudoNota {
-  margin-top: 0.75rem;
-  font-size: 0.8rem;
-  color: var(--text-muted);
+@media (min-width: 1680px) {
+  .kpiGrid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 }
 
-/* ── Dos columnas ────────────────────────────────────────────────────────── */
-.dobleColumna {
+/* ── Actividad del período ── */
+.periodoGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+/* ── Indicadores históricos: dos columnas (métricas + áreas | embudo + ranking) ── */
+.historicoGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: var(--space-5);
   align-items: start;
 }
 
+.columna {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.kpiPar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.vacio {
+  margin: 0;
+  padding: var(--space-5) 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+}
+
+/* ── Ranking de empresas ── */
 .rankingList {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
 }
 
 .rankingItem {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.25rem;
-  border-bottom: 1px solid var(--border);
+  gap: var(--space-3);
+  min-height: 48px;
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .rankingItem:last-child { border-bottom: none; }
 
 .rankingPos {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: var(--primary-light);
-  color: var(--primary-dark);
-  font-size: 0.75rem;
-  font-weight: 700;
+  background: var(--info-soft);
+  color: var(--info-text);
+  font-size: 0.8rem;
+  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.rankingNombre { flex: 1; font-size: 0.88rem; color: var(--text); }
-.rankingValor { font-weight: 700; color: var(--primary); }
-
-/* ── Tarjetas de gráfico y paneles ───────────────────────────────────────── */
-.chartContainer,
-.panel {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-  box-shadow: var(--shadow-card);
+.rankingNombre {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow-wrap: break-word;
 }
 
-/* En la grilla de dos columnas el gap ya separa las tarjetas. */
-.dobleColumna > .chartContainer,
-.dobleColumna > .panel { margin-bottom: 0; }
+.rankingValor {
+  font-family: var(--font-numeric);
+  font-weight: 800;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
-.chartContainer h3,
-.panelTitulo {
-  margin: 0 0 1rem;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
+.rankingUnidad {
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+/* ── Atención + actividad ── */
+.dobleColumna {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+  align-items: start;
 }
 
 .verMas {
-  display: inline-block;
-  margin-top: 1rem;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
   font-size: 0.88rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--primary);
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .verMas:hover { text-decoration: underline; }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
-@media (max-width: 640px) {
-  .statsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .chartContainer,
-  .panel { padding: 1.1rem; }
+@media (max-width: 1199.98px) {
+  .historicoGrid,
+  .dobleColumna { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 767.98px) {
+  .periodoGrid { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+  .seccion { margin-bottom: var(--space-5); }
+  .bloque { margin-bottom: var(--space-5); }
+}
+
+@media (max-width: 420px) {
+  .kpiPar { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bloque { transition: none; }
 }

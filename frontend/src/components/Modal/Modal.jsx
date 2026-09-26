@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useId, useRef } from 'react';
+import Icon from '../ui/Icon';
 import styles from './Modal.module.css';
 
 export default function Modal({
@@ -90,7 +91,9 @@ export default function Modal({
         {title && (
           <div className={styles.header}>
             <h3 id={headerTitleId}>{title}</h3>
-            <button className={styles.close} onClick={onClose} aria-label="Cerrar">✕</button>
+            <button type="button" className={styles.close} onClick={onClose} aria-label="Cerrar">
+              <Icon name="close" size={20} />
+            </button>
           </div>
         )}
         {children}

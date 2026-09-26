@@ -22,6 +22,8 @@
 
   /* ── Tipografías ─────────────────────────────────────────────────────────── */
   --font-primary:  'Raleway', 'Montserrat', sans-serif;
+  /* Cifras destacadas (KPIs, contadores): el "0" de Raleway se lee como "o". */
+  --font-numeric:  'Montserrat', 'Raleway', sans-serif;
 
   /* ── Textos ──────────────────────────────────────────────────────────────── */
   --text:          #222222;
@@ -45,11 +47,58 @@
   --space-xl:  2rem;
   --space-2xl: 2.5rem;
 
+  /* Escala numérica (4 · 8 · 12 · 16 · 24 · 32 · 48). Preferir estos en CSS
+     nuevo; los --space-xs..2xl de arriba quedan por compatibilidad. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* ── Superficies y lenguaje "SaaS" (shell admin + componentes compartidos) ── */
+  --app-bg:        #f5f7fa;
+  --surface:       #ffffff;
+  --surface-muted: #f8fafc;
+  --surface-hover: #f3f8fc;
+  --border-soft:   #e3e9f0;
+  --text-strong:   #1f3147;
+  --text-soft:     #6b7c8f;
+
+  --sidebar-bg:     #0f2a47;
+  --sidebar-hover:  rgba(255, 255, 255, 0.08);
+  --sidebar-text:   rgba(255, 255, 255, 0.78);
+  --sidebar-border: rgba(255, 255, 255, 0.10);
+  --table-head:     #1e3a5f;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  --shadow-xs: 0 1px 2px rgba(16, 42, 71, 0.06);
+  --shadow-sm: 0 1px 3px rgba(16, 42, 71, 0.06), 0 4px 12px rgba(16, 42, 71, 0.04);
+  --shadow-pop: 0 10px 30px rgba(16, 42, 71, 0.16);
+
+  /* Tonos semánticos suaves (fondo) + texto con contraste AA sobre ellos. */
+  --info-soft:     #e6f2fa;  --info-text:    #0b5f8f;
+  --success-soft:  #e3f5ea;  --success-text: #1b6b3e;
+  --warning-soft:  #fdf0e1;  --warning-text: #9a4c05;
+  --danger-soft:   #fdecea;  --danger-text:  #a93226;
+  --violet-soft:   #efe8fa;  --violet-text:  #5e3796;
+  --neutral-soft:  #eef1f4;  --neutral-text: #4d5b6a;
+
+  /* Shell admin */
+  --sidebar-w:      248px;
+  --sidebar-rail-w: 76px;
+  --topbar-h:       64px;
+
   /* ── Anchos máximos de layout ────────────────────────────────────────────── */
   --maxw-page:   1100px;  /* .page-container por defecto */
   --maxw-narrow: 780px;   /* detalle de oferta, lecturas largas */
   --maxw-form:   720px;   /* formularios (perfil, mi empresa) */
   --maxw-card:   460px;   /* tarjetas de auth (login) */
+  --maxw-admin:  1600px;  /* contenido dentro del shell del admin */
 
   /* Alto del chrome = Navbar (60px + 3px de borde; Navbar.module.css). Es el
      mismo en todos los anchos. Se usa para dimensionar zonas a pantalla

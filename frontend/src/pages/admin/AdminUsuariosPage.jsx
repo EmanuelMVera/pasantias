@@ -29,6 +29,7 @@ import DataCard from '../../components/ui/DataCard';
 import EmptyState from '../../components/ui/EmptyState';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import Toast from '../../components/ui/Toast';
+import Icon from '../../components/ui/Icon';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import UsuarioFormModal from '../../components/UsuarioFormModal/UsuarioFormModal';
 import styles from './AdminUsuariosPage.module.css';
@@ -36,12 +37,12 @@ import styles from './AdminUsuariosPage.module.css';
 /* Roles disponibles en el sistema */
 const ROLES = ['alumno', 'egresado', 'empresa', 'admin'];
 
-/* Etiquetas y colores para cada rol (con contraste suficiente sobre su fondo tintado) */
+/* Etiquetas y tonos (clases globales .badge-tone-*) para cada rol */
 const ROL_BADGE = {
-  alumno:   { label: 'Alumno',   color: '#0073AD' },
-  egresado: { label: 'Egresado', color: '#7d3c98' },
-  empresa:  { label: 'Empresa',  color: '#a04000' },
-  admin:    { label: 'Admin',    color: '#a93226' },
+  alumno:   { label: 'Alumno',   tone: 'blue' },
+  egresado: { label: 'Egresado', tone: 'violet' },
+  empresa:  { label: 'Empresa',  tone: 'orange' },
+  admin:    { label: 'Admin',    tone: 'red' },
 };
 
 /* Etiquetas para rolInterno dentro de empresa_usuarios */
@@ -55,7 +56,7 @@ const ROL_INTERNO_LABEL = {
 };
 
 /**
- * Devuelve { label, sub, color } para el badge de rol.
+ * Devuelve { label, sub, tone } para el badge de rol.
  * Para usuarios 'empresa' muestra el rolInterno (Administrador/Reclutador/etc.)
  * y el nombre de la empresa como subtexto.
  */
@@ -64,10 +65,10 @@ function getRolInfo(u) {
     const mem      = u.membresiasEmpresa[0];
     const rolLabel = ROL_INTERNO_LABEL[mem.rolInterno] ?? mem.rolInterno;
     const empresa  = mem.empresa?.razonSocial ?? '';
-    return { label: rolLabel, sub: empresa, color: ROL_BADGE.empresa.color };
+    return { label: rolLabel, sub: empresa, tone: ROL_BADGE.empresa.tone };
   }
-  const badge = ROL_BADGE[u.rol] ?? { label: u.rol, color: '#566573' };
-  return { label: badge.label, sub: '', color: badge.color };
+  const badge = ROL_BADGE[u.rol] ?? { label: u.rol, tone: 'gray' };
+  return { label: badge.label, sub: '', tone: badge.tone };
 }
 
 const formatUltimoAcceso = (u) => (
@@ -96,7 +97,7 @@ function EstadoBadge({ activo }) {
 function RolBadge({ info }) {
   return (
     <>
-      <span className={styles.rolBadge} style={{ '--badge-color': info.color }}>{info.label}</span>
+      <span className={`badge badge-tone-${info.tone}`}>{info.label}</span>
       {info.sub && <small className={styles.sub}>{info.sub}</small>}
     </>
   );
@@ -232,6 +233,7 @@ export default function AdminUsuariosPage() {
     return (
       <div className={styles.accionesBtns}>
         <button type="button" className="btn-small" onClick={() => abrirEditar(u)} aria-label={`Editar a ${nombre}`}>
+          <Icon name="edit" size={15} />
           Editar
         </button>
         <button
@@ -261,15 +263,19 @@ export default function AdminUsuariosPage() {
         subtitle={loading && !pagination ? 'Cargando…' : `${total} usuario${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`}
         actions={(
           <div className={styles.headerAcciones}>
-            <Link to="/admin/importaciones" className="btn-secondary">Importar CSV</Link>
+            <Link to="/admin/importaciones" className="btn-secondary">
+              <Icon name="upload" size={18} />
+              Importar CSV
+            </Link>
             <button id="btn-crear-usuario" type="button" className="btn-primary" onClick={abrirCrear}>
-              + Nuevo usuario
+              <Icon name="plus" size={18} strokeWidth={2.2} />
+              Nuevo usuario
             </button>
           </div>
         )}
       />
 
-      {error && <p className="error-msg" role="alert" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {error && <p className={`error-msg ${styles.error}`} role="alert">{error}</p>}
 
       {/* Filtros */}
       <div className={styles.filtros}>
@@ -281,28 +287,31 @@ export default function AdminUsuariosPage() {
           onChange={setTexto}
         />
         <div className={styles.campo}>
-          <label htmlFor="filtro-rol">Rol</label>
+          <label htmlFor="filtro-rol" className={styles.srOnly}>Rol</label>
           <select id="filtro-rol" value={filtroRol} onChange={(e) => setFiltroRol(e.target.value)}>
             <option value="">Todos los roles</option>
             {ROLES.map((r) => <option key={r} value={r}>{ROL_BADGE[r]?.label ?? r}</option>)}
           </select>
         </div>
         <div className={styles.campo}>
-          <label htmlFor="filtro-activo">Estado</label>
+          <label htmlFor="filtro-activo" className={styles.srOnly}>Estado</label>
           <select id="filtro-activo" value={filtroActivo} onChange={(e) => setFiltroActivo(e.target.value)}>
             <option value="">Todos los estados</option>
             <option value="true">Activos</option>
             <option value="false">Inactivos</option>
           </select>
         </div>
-        <button type="button" className="btn-secondary" onClick={cargar} disabled={loading}>Actualizar</button>
+        <button type="button" className="btn-secondary" onClick={cargar} disabled={loading}>
+          <Icon name="refresh" size={18} />
+          Actualizar
+        </button>
       </div>
 
       {primeraCarga ? (
         <p className="msg" role="status">Cargando usuarios...</p>
       ) : usuarios.length === 0 && !error ? (
         <EmptyState
-          icon="👤"
+          iconName="users"
           title={hayFiltros ? 'No se encontraron usuarios con los filtros actuales.' : 'Todavía no hay usuarios.'}
         >
           {hayFiltros && <button type="button" className="btn-secondary" onClick={limpiarFiltros}>Limpiar filtros</button>}
@@ -378,6 +387,7 @@ export default function AdminUsuariosPage() {
           formError={formError}
           formLoading={formLoading}
           rolOptions={ROLES.map((r) => ({ value: r, label: ROL_BADGE[r]?.label ?? r }))}
+          esPropia={modal === 'editar' && editando?.id === yo?.id}
         />
       )}
 

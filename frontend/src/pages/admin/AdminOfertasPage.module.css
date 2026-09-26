@@ -1,44 +1,57 @@
 /* AdminOfertasPage.module.css — moderación de ofertas (tabs Pendientes / Todas). */
 
+.error { margin-bottom: var(--space-4); }
+
+/* Filtros de "Todas" en una barra/card liviana */
 .filtros {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem 1.75rem;
-  margin-bottom: 0.85rem;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
 }
 
 .resultados {
-  margin: 0 0 0.85rem;
-  font-size: 0.82rem;
-  color: var(--text-muted);
+  margin: 0 0 var(--space-3);
+  font-size: 0.86rem;
+  color: var(--text-soft);
 }
 
 .recargando { opacity: 0.55; transition: opacity 0.15s; }
 
 /* ── Celdas ──────────────────────────────────────────────────────────────── */
-.fecha { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; }
+.fecha { font-size: 0.86rem; color: var(--text-soft); white-space: nowrap; }
 
 .sub {
   display: block;
   margin-top: 0.1rem;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 400;
-  color: var(--text-muted);
+  color: var(--text-soft);
 }
 
 .acciones {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: var(--space-2);
 }
 
-.sinAcciones { color: var(--text-muted); }
+.sinAcciones { color: var(--text-soft); }
 
 /* ── Cards (tablet / móvil) ──────────────────────────────────────────────── */
 .cards {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
-  margin-bottom: 1rem;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+@media (max-width: 480px) {
+  .filtros { padding: var(--space-3); }
 }

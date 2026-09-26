@@ -1,37 +1,71 @@
 /**
  * StatCard.jsx — tarjeta de métrica (KPI) reutilizable.
  *
- * Unifica los `.metricCard`/`.statCard` casi duplicados que hoy existen por
- * separado en EmpresaDashboardPage, AdminDashboardPage y EquipoPage. Si se
- * pasa `onClick`, se renderiza como botón (navegación/filtro); si no, como
- * tarjeta estática. `loading` muestra un skeleton en vez del valor.
+ *   <StatCard iconName="users" tone="blue" label="Alumnos activos" value={120} />
+ *   <StatCard iconName="inbox" tone="orange" label="Solicitudes pendientes" value={3}
+ *             onClick={() => navigate('/admin/solicitudes')} actionHint="Ver solicitudes" />
  *
- *   <StatCard icon="📢" label="Ofertas activas" value={12} color="var(--success)" />
- *   <StatCard icon="📋" label="Postulaciones" value={40} onClick={() => navigate(...)} />
+ * - `iconName`: ícono de ui/Icon dentro de un círculo tintado según `tone`
+ *   (blue | green | teal | violet | orange | red | neutral).
+ * - `onClick`: se renderiza como <button> (navegación/filtro) y muestra `actionHint`.
+ * - `hint`: texto secundario debajo del valor (dato real, nunca tendencias inventadas).
+ * - `loading`: skeleton en vez del valor.
+ * - `compact`: variante más baja para filas de KPIs secundarios.
+ * - Si la tarjeta queda angosta (<210px) el ícono pasa arriba del texto
+ *   (container query), así la grilla puede tener muchas columnas sin apretar.
  */
 
+import Icon from './Icon';
 import styles from './StatCard.module.css';
 
-export default function StatCard({ icon, label, value, color, tooltip, onClick, loading = false }) {
+export default function StatCard({
+  iconName,
+  tone = 'blue',
+  label,
+  value,
+  hint,
+  tooltip,
+  onClick,
+  actionHint,
+  loading = false,
+  compact = false,
+}) {
+  const clases = [
+    styles.card,
+    styles[`tone_${tone}`] ?? styles.tone_blue,
+    compact ? styles.compact : '',
+    onClick ? styles.clickable : '',
+  ].filter(Boolean).join(' ');
+
   if (loading) {
-    return <div className={styles.card} aria-hidden="true"><div className={styles.skeleton} /></div>;
+    return (
+      <div className={clases} aria-hidden="true">
+        <div className={styles.skeleton} />
+      </div>
+    );
   }
 
   const contenido = (
-    <>
-      {icon && <span className={styles.icon} aria-hidden="true">{icon}</span>}
-      <span className={styles.value}>{value == null ? '—' : value}</span>
-      <span className={styles.label}>{label}</span>
-    </>
+    <span className={styles.inner}>
+      {iconName && (
+        <span className={styles.icon}>
+          <Icon name={iconName} size={compact ? 20 : 22} />
+        </span>
+      )}
+      <span className={styles.body}>
+        <span className={styles.label}>{label}</span>
+        <span className={styles.value}>{value == null ? '—' : value}</span>
+        {hint && <span className={styles.hint}>{hint}</span>}
+        {onClick && actionHint && (
+          <span className={styles.action}>
+            {actionHint} <Icon name="arrowRight" size={14} />
+          </span>
+        )}
+      </span>
+    </span>
   );
 
-  const props = {
-    className: `${styles.card} ${onClick ? styles.clickable : ''}`,
-    style: color ? { '--card-color': color } : undefined,
-    title: tooltip,
-  };
-
   return onClick
-    ? <button type="button" onClick={onClick} {...props}>{contenido}</button>
-    : <div {...props}>{contenido}</div>;
+    ? <button type="button" onClick={onClick} className={clases} title={tooltip}>{contenido}</button>
+    : <div className={clases} title={tooltip}>{contenido}</div>;
 }

@@ -12,6 +12,7 @@
  * (ver hooks/useDebouncedValue).
  */
 
+import Icon from './Icon';
 import styles from './SearchField.module.css';
 
 export default function SearchField({ id, label, value, onChange, placeholder, maxLength = 100 }) {
@@ -19,7 +20,7 @@ export default function SearchField({ id, label, value, onChange, placeholder, m
     <div className={styles.field}>
       <label htmlFor={id} className={styles.label}>{label}</label>
       <div className={styles.control}>
-        <span className={styles.icono} aria-hidden="true">🔍</span>
+        <span className={styles.icono}><Icon name="search" size={18} /></span>
         <input
           id={id}
           type="search"
@@ -37,7 +38,7 @@ export default function SearchField({ id, label, value, onChange, placeholder, m
             onClick={() => onChange('')}
             aria-label="Borrar búsqueda"
           >
-            ✕
+            <Icon name="close" size={16} />
           </button>
         )}
       </div>

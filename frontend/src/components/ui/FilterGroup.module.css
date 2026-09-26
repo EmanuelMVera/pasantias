@@ -2,16 +2,57 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
 }
 
 .label {
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--text-muted);
-  margin-right: 0.25rem;
+  color: var(--text-soft);
+}
+
+/* Control segmentado: opciones unidas en una sola pieza con borde suave. */
+.segment {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  max-width: 100%;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+}
+
+.option {
+  min-height: 34px;
+  padding: 0.3rem 0.85rem;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.option:hover { background: var(--surface); color: var(--primary-dark); }
+
+.optionActive,
+.optionActive:hover {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 90, 135, 0.3);
+}
+
+.option:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
 }
 
 @media (pointer: coarse) {
-  .group :global(.filter-chip) { min-height: 44px; }
+  .option { min-height: 44px; }
 }

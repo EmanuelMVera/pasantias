@@ -1,0 +1,346 @@
+/* ── Shell ─────────────────────────────────────────────────────────────────
+   Grid de 2 columnas: sidebar fija (sticky) + columna de contenido.
+   Breakpoints: ≥1280 completa · 1024–1279 rail · <1024 drawer. */
+.shell {
+  /* Alto del chrome dentro del shell = topbar (offsets sticky, p. ej. el
+     panel de detalle de Solicitudes). */
+  --chrome-min-h: var(--topbar-h);
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  min-height: 100vh;
+  background: var(--app-bg);
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────────────── */
+/* La celda de la grilla (aside) se estira a todo el alto del contenido con el
+   fondo navy; el interior es sticky y ocupa la ventana. */
+.sidebar {
+  background: var(--sidebar-bg);
+  color: #fff;
+  z-index: 120;
+}
+
+.sidebarInner {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.sidebar a:focus-visible,
+.sidebar button:focus-visible {
+  outline-color: #fff;
+}
+
+.sidebarBrand {
+  display: flex;
+  align-items: center;
+  min-height: var(--topbar-h);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--sidebar-border);
+}
+
+.brandFull { display: flex; min-width: 0; }
+.brandMark { display: none; }
+
+.sidebarNav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-5) var(--space-3);
+  flex: 1;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 46px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  color: var(--sidebar-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.navItem:hover {
+  background: var(--sidebar-hover);
+  color: #fff;
+  text-decoration: none;
+}
+
+.navItemActive,
+.navItemActive:hover {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.navIcon { flex-shrink: 0; }
+
+.navLabel { white-space: nowrap; }
+
+.sidebarFooter {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0 var(--space-4) var(--space-4);
+  padding: var(--space-4) var(--space-2) 0;
+  border-top: 1px solid var(--sidebar-border);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.footerIcon { flex-shrink: 0; margin-top: 1px; }
+
+/* ── Topbar ────────────────────────────────────────────────────────────── */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  height: var(--topbar-h);
+  padding: 0 var(--space-6);
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid var(--border-soft);
+  backdrop-filter: saturate(1.4) blur(6px);
+}
+
+.topbarLeft,
+.topbarRight {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.topbarLeft { gap: var(--space-3); }
+.topbarRight { gap: var(--space-2); flex-shrink: 0; }
+
+.menuToggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+
+.menuToggle:hover { background: var(--surface-hover); }
+
+.topbarBrand { display: none; min-width: 0; }
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.crumbRoot { color: var(--text-soft); }
+.crumbSep { color: var(--text-soft); flex-shrink: 0; }
+
+.crumbCurrent {
+  color: var(--text-strong);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-strong);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.bell:hover { background: var(--surface-hover); }
+
+/* /notificaciones abierta (equivale al estado activo de un link) */
+.bellActive {
+  background: var(--info-soft);
+  color: var(--primary);
+}
+
+.bellCount {
+  position: absolute;
+  top: 4px;
+  right: 3px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 99px;
+  border: 2px solid var(--surface);
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hay notificaciones de prioridad alta/urgente sin leer */
+.bellCountAlta {
+  background: #d93025;
+  animation: pulse 1.8s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.7; }
+}
+
+.topbarDivider {
+  width: 1px;
+  height: 28px;
+  margin: 0 var(--space-2);
+  background: var(--border-soft);
+}
+
+/* ── Contenido ─────────────────────────────────────────────────────────────
+   Las páginas usan la clase global .page-container: dentro del shell se
+   ensancha (aprovecha 1366/1440/1920) y adopta el estilo de encabezado SaaS. */
+.column :global(main) { flex: 1; min-width: 0; }
+
+.column :global(.page-container) {
+  max-width: var(--maxw-admin);
+  padding: var(--space-6) var(--space-6) var(--space-7);
+}
+
+.column :global(.page-container h1) {
+  border-left: none;
+  padding-left: 0;
+  font-size: clamp(1.5rem, 1.1rem + 1.2vw, 1.875rem);
+  color: var(--text-strong);
+  letter-spacing: -0.01em;
+}
+
+.column :global(.dashboard-header) { margin-bottom: var(--space-5); }
+
+.backdrop { display: none; }
+
+/* ── Rail: 1024–1279px ─────────────────────────────────────────────────── */
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+  .shell { grid-template-columns: var(--sidebar-rail-w) minmax(0, 1fr); }
+
+  .sidebarBrand { justify-content: center; padding: var(--space-4) 0; }
+  .brandFull { display: none; }
+  .brandMark { display: inline-flex; }
+
+  .sidebarNav { padding: var(--space-5) var(--space-3); align-items: stretch; }
+
+  .navItem {
+    justify-content: center;
+    padding: 0;
+    min-height: 48px;
+  }
+
+  /* Texto fuera de pantalla pero presente: es el nombre accesible del link. */
+  .navLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+  }
+
+  .sidebarFooter { justify-content: center; margin: 0 var(--space-3) var(--space-4); padding: var(--space-4) 0 0; }
+  .footerText { display: none; }
+
+  .topbar { padding: 0 var(--space-5); }
+}
+
+/* ── Drawer: <1024px ───────────────────────────────────────────────────── */
+@media (max-width: 1023.98px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(var(--sidebar-w), 86vw);
+    height: 100dvh;
+    overflow: hidden;
+    z-index: 300;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 0.2s ease, visibility 0s linear 0.2s;
+    box-shadow: none;
+  }
+
+  .sidebarOpen {
+    transform: none;
+    visibility: visible;
+    transition: transform 0.2s ease, visibility 0s;
+    box-shadow: 8px 0 30px rgba(0, 0, 0, 0.25);
+  }
+
+  .backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 250;
+    background: rgba(15, 42, 71, 0.45);
+    animation: fadeBackdrop 0.2s ease;
+  }
+
+  .menuToggle { display: inline-flex; }
+  .topbarBrand { display: inline-flex; }
+  .crumbs { display: none; }
+
+  .topbar { padding: 0 var(--space-4); }
+
+  .column :global(.page-container) {
+    padding: var(--space-5) var(--space-4) var(--space-6);
+  }
+}
+
+@media (max-width: 480px) {
+  .topbar { padding: 0 var(--space-3); gap: var(--space-2); }
+  .topbarLeft { gap: var(--space-2); }
+  .topbarDivider { display: none; }
+}
+
+@keyframes fadeBackdrop {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar, .sidebarOpen { transition: none; }
+  .bellCountAlta { animation: none; }
+}

@@ -15,6 +15,7 @@
  *   mark     → [símbolo]
  * responsive: degrada por CSS (sin JS) full → compact (<1024px) → mark (≤400px).
  * tone: 'light' (texto claro, para fondos oscuros) | 'dark' (texto oscuro).
+ * plainTagline: descriptor en minúscula tipo oración (sidebar del admin).
  */
 
 import { Link } from 'react-router-dom';
@@ -58,11 +59,13 @@ export default function Brand({
   size = 36,
   className = '',
   onClick,
+  plainTagline = false,
 }) {
   const clases = [
     styles.brand,
     tone === 'dark' ? styles.dark : styles.light,
     responsive ? styles.responsive : '',
+    plainTagline ? styles.plain : '',
     className,
   ].filter(Boolean).join(' ');
 
@@ -73,7 +76,9 @@ export default function Brand({
         <span className={styles.text}>
           <span className={styles.name}>SisPasantías</span>
           {variant === 'full' && (
-            <span className={styles.tagline}>Portal Institucional de Empleo</span>
+            <span className={styles.tagline}>
+              {plainTagline ? 'Portal institucional de empleo' : 'Portal Institucional de Empleo'}
+            </span>
           )}
         </span>
       )}

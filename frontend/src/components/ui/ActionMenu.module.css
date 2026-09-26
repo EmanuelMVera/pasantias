@@ -6,9 +6,9 @@
   min-height: 32px;
   padding: 0 0.5rem;
   background: transparent;
-  border: 1.5px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-soft);
   font-size: 1.1rem;
   line-height: 1;
   font-weight: 700;
@@ -34,9 +34,9 @@
   gap: 0.15rem;
   padding: 0.35rem;
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop);
 }
 
 .item {
@@ -61,9 +61,9 @@
   outline: none;
 }
 
-.itemDanger { color: #a93226; }
+.itemDanger { color: var(--danger-text); }
 .itemDanger:hover,
-.itemDanger:focus-visible { background: #fdecea; }
+.itemDanger:focus-visible { background: var(--danger-soft); }
 
 @media (pointer: coarse) {
   .trigger { min-width: 44px; min-height: 44px; }

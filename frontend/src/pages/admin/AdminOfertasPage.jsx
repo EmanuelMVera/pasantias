@@ -12,6 +12,8 @@
  * Una sola interfaz con dos pestañas (solo se renderiza la activa):
  *   - Pendientes (n): cola de moderación (estadoModeracion=pendiente). Aprobar y
  *     Rechazar a la vista; Pausar/Cerrar en el menú "⋯".
+ *     En ofertas ya moderadas (aprobada / publicación automática) "Rechazar
+ *     publicación" es excepcional: va dentro del menú "⋯", no como botón rojo.
  *   - Todas: historial con filtros por estado y por moderación.
  * Ambas usan el mismo listado paginado (GET /admin/ofertas); el contador de
  * "Pendientes" sale del total de esa misma consulta.
@@ -38,10 +40,11 @@ import EmptyState from '../../components/ui/EmptyState';
 import ActionMenu from '../../components/ui/ActionMenu';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import Toast from '../../components/ui/Toast';
+import Icon from '../../components/ui/Icon';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import styles from './AdminOfertasPage.module.css';
 import {
-  ESTADO_COLOR, ESTADO_LABEL, MODERACION_COLOR, MODERACION_LABEL,
+  ESTADO_TONO, ESTADO_LABEL, MODERACION_TONO, MODERACION_LABEL,
   OPCIONES_ESTADO, OPCIONES_MODERACION,
   puedeAprobar, puedeRechazar, puedePausar, puedeCerrar,
 } from './ofertasModeracion.utils';
@@ -65,7 +68,7 @@ const fechaCorta = (o) => (o.createdAt ? new Date(o.createdAt).toLocaleDateStrin
 
 function EstadoBadge({ estado }) {
   return (
-    <span className="badge" style={{ background: ESTADO_COLOR[estado] ?? '#707b7c' }}>
+    <span className={`badge badge-tone-${ESTADO_TONO[estado] ?? 'gray'}`}>
       {ESTADO_LABEL[estado] ?? estado}
     </span>
   );
@@ -73,20 +76,31 @@ function EstadoBadge({ estado }) {
 
 function ModeracionBadge({ estado }) {
   return (
-    <span className="badge" style={{ background: MODERACION_COLOR[estado] ?? '#707b7c' }}>
+    <span className={`badge badge-tone-${MODERACION_TONO[estado] ?? 'gray'}`}>
       {MODERACION_LABEL[estado] ?? estado}
     </span>
   );
 }
 
-/** Aprobar / Rechazar a la vista; Pausar y Cerrar en el menú secundario. */
+/**
+ * Acciones de una fila (máximo dos botones fuertes a la vista):
+ * - Pendiente de moderación → Aprobar + Rechazar visibles.
+ * - Ya moderada → Rechazar pasa al menú "⋯" como "Rechazar publicación".
+ * Pausar y Cerrar siempre en el menú secundario. Mismas reglas de transición
+ * que el backend (ofertasModeracion.utils).
+ */
 function AccionesOferta({ oferta, ocupado, onAccion }) {
+  const aprobar = puedeAprobar(oferta);
+  const enCola = oferta.estadoModeracion === 'pendiente';
+  const rechazar = puedeRechazar(oferta) && enCola;
+
   const extras = [];
   if (puedePausar(oferta)) extras.push({ key: 'pausar', label: 'Pausar publicación', onSelect: () => onAccion(oferta, 'pausar') });
   if (puedeCerrar(oferta)) extras.push({ key: 'cerrar', label: 'Cerrar publicación', onSelect: () => onAccion(oferta, 'cerrar'), danger: true });
+  if (puedeRechazar(oferta) && !enCola) {
+    extras.push({ key: 'rechazar', label: 'Rechazar publicación', onSelect: () => onAccion(oferta, 'rechazar'), danger: true });
+  }
 
-  const aprobar = puedeAprobar(oferta);
-  const rechazar = puedeRechazar(oferta);
   if (!aprobar && !rechazar && extras.length === 0) return <span className={styles.sinAcciones}>—</span>;
 
   return (
@@ -100,6 +114,7 @@ function AccionesOferta({ oferta, ocupado, onAccion }) {
           aria-label={`Aprobar oferta ${oferta.titulo}`}
           title="La oferta queda visible para los alumnos (si además está activa)"
         >
+          <Icon name="check" size={16} strokeWidth={2.2} />
           Aprobar
         </button>
       )}
@@ -293,7 +308,7 @@ export default function AdminOfertasPage() {
         subtitle="Revisá las ofertas publicadas por las empresas y gestioná su estado."
       />
 
-      {error && <p className="error-msg" role="alert" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {error && <p className={`error-msg ${styles.error}`} role="alert">{error}</p>}
 
       <Tabs
         idPrefix="ofe"
@@ -301,8 +316,8 @@ export default function AdminOfertasPage() {
         value={tab}
         onChange={setTab}
         tabs={[
-          { key: 'pendientes', label: 'Pendientes', count: conteoPend, alerta: true },
-          { key: 'todas', label: 'Todas' },
+          { key: 'pendientes', label: 'Pendientes', icon: 'clock', count: conteoPend, alerta: true },
+          { key: 'todas', label: 'Todas', icon: 'list' },
         ]}
       />
 
@@ -322,7 +337,7 @@ export default function AdminOfertasPage() {
           <p className="msg" role="status">Cargando ofertas...</p>
         ) : ofertas.length === 0 && !error ? (
           <EmptyState
-            icon={tab === 'pendientes' ? '✅' : '📭'}
+            iconName={tab === 'pendientes' ? 'checkCircle' : 'briefcase'}
             title={tab === 'pendientes' ? 'No hay ofertas pendientes de moderación.' : 'No hay ofertas para los filtros seleccionados.'}
             hint={tab === 'pendientes' ? 'Cuando una empresa estándar publique una oferta, va a aparecer acá.' : undefined}
           >

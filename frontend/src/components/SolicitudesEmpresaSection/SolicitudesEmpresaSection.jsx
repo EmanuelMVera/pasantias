@@ -29,7 +29,7 @@ export default function SolicitudesEmpresaSection({
   if (solicitudes.length === 0) {
     return (
       <EmptyState
-        icon="📭"
+        iconName="inbox"
         title={`No hay solicitudes${filtroEstado ? ` con estado "${filtroEstado}"` : ''}.`}
       />
     );
@@ -58,6 +58,7 @@ export default function SolicitudesEmpresaSection({
                 <tr
                   key={s.id}
                   className={`${styles.fila} ${detalleId === s.id ? styles.filaActiva : ''}`}
+                  aria-current={detalleId === s.id ? 'true' : undefined}
                   onClick={() => onRevisar(s)}
                 >
                   <td className="cell-break">

@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { adminService } from '../../services/admin.service';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { filasACsv, descargarTexto } from '../../utils/csv';
+import Icon from '../../components/ui/Icon';
 import PageHeader from '../../components/ui/PageHeader';
 import FileDropzone from '../../components/ui/FileDropzone';
 import TableResponsive from '../../components/ui/TableResponsive';
@@ -115,20 +116,24 @@ export default function AdminImportacionPage() {
         subtitle="Alta masiva por CSV (UTF-8). Exclusivo para administradores."
         actions={(
           <button type="button" className="btn-secondary" onClick={handleDescargarPlantilla}>
+            <Icon name="download" size={18} />
             Descargar plantilla
           </button>
         )}
       />
 
-      {error && <p className="error-msg" role="alert" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {error && <p className={`error-msg ${styles.error}`} role="alert">{error}</p>}
 
       {/* ── Paso 1: selección de archivo ─────────────────────────────── */}
       <section className={styles.card} aria-labelledby="paso-1">
-        <h2 id="paso-1">1. Seleccioná el archivo CSV</h2>
-        <p className={styles.hint}>
-          Columnas: <code>legajo, nombre, apellido, email, rol, carrera, anioEgreso, telefono, ubicacion</code>.
-          El rol debe ser <code>alumno</code> o <code>egresado</code>.
-        </p>
+        <h2 id="paso-1"><span className={styles.pasoNum} aria-hidden="true">1</span><span className={styles.srOnly}>1. </span>Seleccioná el archivo CSV</h2>
+        <div className={styles.formato}>
+          <Icon name="info" size={18} />
+          <p>
+            Columnas: <code>legajo, nombre, apellido, email, rol, carrera, anioEgreso, telefono, ubicacion</code>.
+            El rol debe ser <code>alumno</code> o <code>egresado</code>.
+          </p>
+        </div>
         <FileDropzone
           id="archivo-csv"
           label="Archivo CSV de alumnos y egresados"
@@ -145,6 +150,7 @@ export default function AdminImportacionPage() {
             onClick={handlePrevisualizar}
             disabled={!file || cargando}
           >
+            <Icon name="eye" size={18} />
             {cargando && paso === 'seleccion' ? 'Analizando...' : 'Previsualizar'}
           </button>
         </div>
@@ -153,7 +159,7 @@ export default function AdminImportacionPage() {
       {/* ── Paso 2: preview (dry-run) ─────────────────────────────────── */}
       {paso === 'preview' && analisis && (
         <section className={styles.card} aria-labelledby="paso-2">
-          <h2 id="paso-2">2. Previsualización</h2>
+          <h2 id="paso-2"><span className={styles.pasoNum} aria-hidden="true">2</span><span className={styles.srOnly}>2. </span>Previsualización</h2>
           <div className={styles.resumenGrid} role="status">
             <span className={styles.resumenItem}>Total filas: <strong>{analisis.totalFilas}</strong></span>
             <span className={`${styles.resumenItem} ${styles.ok}`}>Válidas: <strong>{analisis.validas}</strong></span>
@@ -200,6 +206,7 @@ export default function AdminImportacionPage() {
           <div className={styles.acciones}>
             {analisis.invalidas > 0 && (
               <button type="button" className="btn-secondary" onClick={handleDescargarReporteErrores}>
+                <Icon name="download" size={18} />
                 Descargar reporte de errores
               </button>
             )}
@@ -210,6 +217,7 @@ export default function AdminImportacionPage() {
               disabled={analisis.validas === 0 || cargando}
               title={analisis.validas === 0 ? 'No hay filas válidas para importar' : undefined}
             >
+              <Icon name="check" size={18} strokeWidth={2.2} />
               {cargando ? 'Importando...' : `Confirmar importación (${analisis.validas})`}
             </button>
           </div>
@@ -219,7 +227,7 @@ export default function AdminImportacionPage() {
       {/* ── Paso 3: resumen ──────────────────────────────────────────── */}
       {paso === 'resumen' && resumen && (
         <section className={styles.card} aria-labelledby="paso-3">
-          <h2 id="paso-3">3. Importación completada</h2>
+          <h2 id="paso-3"><span className={styles.pasoNum} aria-hidden="true">3</span><span className={styles.srOnly}>3. </span>Importación completada</h2>
           <div className={styles.resumenGrid} role="status">
             <span className={styles.resumenItem}>Filas procesadas: <strong>{resumen.totalFilas}</strong></span>
             <span className={`${styles.resumenItem} ${styles.ok}`}>Usuarios creados: <strong>{resumen.totalCreados}</strong></span>
@@ -263,6 +271,7 @@ export default function AdminImportacionPage() {
 
           <div className={styles.acciones}>
             <button type="button" className="btn-secondary" onClick={handleReiniciar}>
+              <Icon name="refresh" size={18} />
               Importar otro archivo
             </button>
           </div>

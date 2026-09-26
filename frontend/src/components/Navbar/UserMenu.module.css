@@ -1,0 +1,173 @@
+/* El wrapper posiciona el dropdown; el trigger es un <button> reseteado. */
+.wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 44px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: var(--font-primary);
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+  user-select: none;
+  text-align: left;
+}
+
+/* ── Sobre fondo oscuro (Navbar) ─────────────────────────────────────────── */
+.triggerDark { padding: 0.35rem 0.75rem; }
+.triggerDark:hover { background: rgba(0, 115, 173, 0.4); }
+.triggerDark:focus-visible { outline-color: #fff; }
+.triggerDark .name { color: #fff; font-size: 0.88rem; font-weight: 600; }
+.triggerDark .chevron { color: rgba(255, 255, 255, 0.65); }
+
+/* ── Sobre fondo claro (topbar del admin) ────────────────────────────────── */
+.triggerLight { padding: 0.3rem 0.5rem 0.3rem 0.35rem; }
+.triggerLight:hover { background: var(--surface-hover); }
+.triggerLight .name { color: var(--text-strong); font-size: 0.9rem; font-weight: 700; }
+.triggerLight .chevron { color: var(--text-soft); }
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.role {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.chevron {
+  display: inline-flex;
+  transition: transform 0.15s;
+}
+
+.chevronOpen { transform: rotate(180deg); }
+
+/* ── Dropdown ────────────────────────────────────────────────────────────── */
+/* Ancho acotado al viewport (en 320px nunca desborda) y suficiente para
+   emails largos; el email se corta con elipsis + title, nunca en mitad de
+   una palabra. */
+.dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: max-content;
+  min-width: 240px;
+  max-width: min(320px, calc(100vw - 24px));
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  box-shadow: var(--shadow-pop);
+  animation: slideDown 0.15s ease;
+  z-index: 200;
+}
+
+.dropdownName {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-strong);
+  overflow-wrap: break-word;
+}
+
+.dropdownEmail {
+  font-size: 0.84rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdownInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.84rem;
+  color: var(--text-soft);
+  overflow-wrap: break-word;
+}
+
+.dropdownRole {
+  font-size: 0.72rem;
+  width: fit-content;
+}
+
+.dropdownDivider {
+  height: 1px;
+  background: var(--border-soft);
+  margin: var(--space-1) 0;
+}
+
+.dropdownNotif,
+.dropdownLogout {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.75rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: var(--font-primary);
+  text-align: left;
+}
+
+.dropdownNotif {
+  flex-wrap: wrap;
+  background: var(--warning-soft);
+  color: var(--warning-text);
+  border: 1px solid #f8d9b0;
+}
+
+.dropdownNotif:hover { background: #fbe3c6; }
+
+.dropdownUrgente {
+  background: var(--danger);
+  color: #fff;
+  border-radius: 99px;
+  padding: 0.05rem 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.dropdownLogout {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+  border: 1px solid #f5c6c0;
+}
+
+.dropdownLogout:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .triggerDark .identity { display: none; }
+  .triggerDark { padding: 0.35rem 0.4rem; gap: 0.35rem; }
+}
+
+@media (max-width: 767px) {
+  .triggerLight .identity { display: none; }
+}

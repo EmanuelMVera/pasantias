@@ -1,82 +1,35 @@
 /**
- * Navbar.jsx — Barra de navegación principal del sistema (usuarios autenticados).
+ * Navbar.jsx — Barra de navegación de alumno/egresado y empresa.
  *
- * Mejoras v2:
- * - Badge de notificaciones con prioridad (alta → rojo, media → naranja, baja → gris)
- * - Badge de mensajes no leídos (chat)
- * - Clic en badge de notificaciones navega a /notificaciones
- * - Avatar con fotoPerfil del usuario
- * - Dropdown muestra nombre + email + rol + datos adicionales
- * - Sticky + shadow al hacer scroll
+ * El admin del sistema NO usa este navbar: tiene su propio shell con sidebar
+ * + topbar (components/AdminShell). Ver `Chrome` en App.jsx.
+ *
+ * - Badge de notificaciones con prioridad (alta → rojo) y de mensajes de chat.
+ * - La campana navega a /notificaciones (y se marca activa ahí).
+ * - Avatar + dropdown del usuario en UserMenu (compartido con la topbar admin).
  */
 
 import { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useEmpresa } from '../../hooks/useEmpresa';
-import { notificacionService } from '../../services/notificacion.service';
-import { mensajeService } from '../../services/chat.service';
-import Avatar from '../Avatar/Avatar';
+import { useNotifCounters } from '../../hooks/useNotifCounters';
 import Brand from '../Brand/Brand';
+import Icon from '../ui/Icon';
+import UserMenu from './UserMenu';
 import styles from './Navbar.module.css';
 
 export default function Navbar() {
-  const { usuario, logout } = useAuth();
+  const { usuario } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   // Gratis para usuarios no-empresa: EmpresaContext corta su fetch antes de
   // pedir nada si `usuario.rol !== 'empresa'` — no duplica requests.
-  const { empresa, esAdminEmpresa, esReclutador } = useEmpresa();
+  const { esReclutador } = useEmpresa();
+  const { noLeidas, prioridadAlta, mensajesNL } = useNotifCounters(usuario);
 
-  const [noLeidas, setNoLeidas] = useState(0);
-  const [prioridadAlta, setPrioridadAlta] = useState(false);
-  const [mensajesNL, setMensajesNL] = useState(0);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const menuRef = useRef(null);
   const navRef = useRef(null);
-
-  /* ── Recargar contadores al cambiar de ruta ──────────────────────────── */
-  useEffect(() => {
-    if (!usuario) return;
-
-    // Notificaciones: el conteo usa el endpoint dedicado (más liviano que traer
-    // la lista completa); la lista solo se pide para saber si hay alguna sin
-    // leer de prioridad alta/urgente y así colorear el badge.
-    notificacionService.sinLeerCount()
-      .then(({ data }) => setNoLeidas(data.count ?? 0))
-      .catch(() => { });
-
-    notificacionService.getAll({ leida: false, limit: 20 })
-      .then(({ data }) => {
-        const sinLeer = data.data ?? data ?? [];
-        setPrioridadAlta(sinLeer.some((n) => n.prioridad === 'alta' || n.tipoVisual === 'urgente'));
-      })
-      .catch(() => { });
-
-    // Mensajes no leídos
-    mensajeService.getConversaciones()
-      .then(({ data }) => {
-        const lista = data.data ?? data ?? [];
-        const total = lista.reduce((acc, c) => acc + (c.mensajesNoLeidos ?? 0), 0);
-        setMensajesNL(total);
-      })
-      .catch(() => { });
-  }, [usuario, location.pathname]);
-
-  /* ── Cerrar menú de usuario: click fuera y Escape ─────────────────────── */
-  useEffect(() => {
-    const onClick = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
-    };
-    const onKey = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
-    document.addEventListener('mousedown', onClick);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onClick);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, []);
 
   /* ── Menú móvil: Escape, click fuera y bloqueo de scroll ─────────────── */
   useEffect(() => {
@@ -94,15 +47,6 @@ export default function Navbar() {
       document.body.style.overflow = '';
     };
   }, [mobileOpen]);
-
-  const handleLogout = async () => {
-    setMenuOpen(false);
-    // Esperar a que se limpie la sesión ANTES de navegar: si no, `usuario`
-    // sigue presente, AppRoutes rebota a la home del rol y esa página dispara
-    // fetches que terminan en 401 → hard redirect a /login.
-    await logout();
-    navigate('/');
-  };
 
   if (!usuario) return null;
 
@@ -127,44 +71,7 @@ export default function Navbar() {
         { to: '/empresa/equipo', label: 'Equipo' },
       ];
 
-  // Solo texto (sin emoji) en todos los roles: criterio único y sin ruido visual.
-  // La ruta de auditoría sigue siendo /admin/logs.
-  const linksAdmin = [
-    { to: '/admin', label: 'Panel' },
-    { to: '/admin/solicitudes', label: 'Solicitudes' },
-    { to: '/admin/empresas', label: 'Empresas' },
-    { to: '/admin/ofertas', label: 'Ofertas' },
-    { to: '/admin/usuarios', label: 'Usuarios' },
-    { to: '/admin/importaciones', label: 'Importar' },
-    { to: '/admin/logs', label: 'Auditoría' },
-  ];
-
-  const getLinks = () => {
-    switch (usuario.rol) {
-      case 'admin': return linksAdmin;
-      case 'empresa': return linksEmpresa;
-      case 'alumno':
-      case 'egresado':
-      default: return linksAlumnoEgresado;
-    }
-  };
-
-  const links = getLinks();
-
-  /* ── Identidad mostrada en el avatar/dropdown ────────────────────────── *
-   * admin_empresa se muestra representando a la EMPRESA (logo + razón
-   * social) — su responsabilidad es la cuenta corporativa. El reclutador se
-   * muestra como PERSONA (foto/nombre personal) — es un operativo del
-   * equipo, no "la empresa". El backend sigue siendo la única autoridad de
-   * permisos; esto es puramente identidad visual (EmpresaContext ya lo
-   * documenta así). */
-  const esVistaEmpresaAdmin = usuario.rol === 'empresa' && esAdminEmpresa;
-  const esVistaReclutador = usuario.rol === 'empresa' && esReclutador;
-
-  const avatarSrc = esVistaEmpresaAdmin ? (empresa?.logo || null) : usuario.fotoPerfil;
-  const avatarNombre = esVistaEmpresaAdmin ? (empresa?.razonSocial || usuario.nombre) : usuario.nombre;
-  const avatarApellido = esVistaEmpresaAdmin ? '' : usuario.apellido;
-  const nombrePrincipal = esVistaEmpresaAdmin ? (empresa?.razonSocial || usuario.nombre) : usuario.nombre;
+  const links = usuario.rol === 'empresa' ? linksEmpresa : linksAlumnoEgresado;
 
   /* ── Color del badge de notificaciones según prioridad ───────────────── */
   const notifColor = prioridadAlta
@@ -176,11 +83,8 @@ export default function Navbar() {
   // La campana no es un NavLink: se marca activa a mano en /notificaciones.
   const enNotificaciones = location.pathname === '/notificaciones';
 
-  // El admin tiene 7 links: pasa a hamburguesa antes que el resto de los roles.
-  const navClase = `${styles.navbar} ${usuario.rol === 'admin' ? styles.navbarWide : ''}`.trim();
-
   return (
-    <nav className={navClase} ref={navRef} aria-label="Principal">
+    <nav className={styles.navbar} ref={navRef} aria-label="Principal">
       <div className={styles.navbarInner}>
 
         {/* Marca: completa ≥1024px, compacta en tablet, solo símbolo en mobile */}
@@ -211,24 +115,22 @@ export default function Navbar() {
             aria-expanded={mobileOpen}
             aria-controls="nav-mobile"
           >
-            <span aria-hidden="true">{mobileOpen ? '✕' : '☰'}</span>
+            <Icon name={mobileOpen ? 'close' : 'menu'} size={22} />
           </button>
 
-          {/* Badge de mensajes no leídos — oculto para admin del sistema */}
-          {usuario.rol !== 'admin' && (
-            <Link
-              to="/chat"
-              className={`${styles.iconBadgeBtn} ${mensajesNL > 0 ? styles.iconBadgeActive : ''}`}
-              title={mensajesNL > 0 ? `${mensajesNL} mensaje${mensajesNL !== 1 ? 's' : ''} sin leer` : 'Chat'}
-              aria-label="Chat"
-              onClick={() => setMobileOpen(false)}
-            >
-              <span aria-hidden="true">💬</span>
-              {mensajesNL > 0 && (
-                <span className={styles.iconBadgeCount}>{mensajesNL > 9 ? '9+' : mensajesNL}</span>
-              )}
-            </Link>
-          )}
+          {/* Mensajes no leídos */}
+          <Link
+            to="/chat"
+            className={`${styles.iconBadgeBtn} ${mensajesNL > 0 ? styles.iconBadgeActive : ''}`}
+            title={mensajesNL > 0 ? `${mensajesNL} mensaje${mensajesNL !== 1 ? 's' : ''} sin leer` : 'Chat'}
+            aria-label="Chat"
+            onClick={() => setMobileOpen(false)}
+          >
+            <Icon name="message" size={20} />
+            {mensajesNL > 0 && (
+              <span className={styles.iconBadgeCount}>{mensajesNL > 9 ? '9+' : mensajesNL}</span>
+            )}
+          </Link>
 
           {/* Campana de notificaciones — siempre visible; badge solo si hay sin leer */}
           <button
@@ -238,96 +140,15 @@ export default function Navbar() {
             aria-label="Notificaciones"
             aria-current={enNotificaciones ? 'page' : undefined}
           >
-            <span aria-hidden="true">🔔</span>{noLeidas > 0 && <> {noLeidas > 9 ? '9+' : noLeidas}</>}
+            <Icon name="bell" size={18} />{noLeidas > 0 && <span>{noLeidas > 9 ? '9+' : noLeidas}</span>}
           </button>
 
-          {/* Menú usuario: el trigger es un <button> (operable con teclado) y el
-              dropdown es su hermano, no su hijo (no se anidan controles). */}
-          <div ref={menuRef} className={styles.userMenuWrap}>
-            <button
-              type="button"
-              className={styles.userMenu}
-              onClick={() => { setMenuOpen(!menuOpen); setMobileOpen(false); }}
-              aria-haspopup="true"
-              aria-expanded={menuOpen}
-              aria-label={`Menú de usuario: ${nombrePrincipal}`}
-            >
-              {/* Avatar — logo de empresa para admin_empresa, foto personal para el resto */}
-              <Avatar
-                src={avatarSrc}
-                nombre={avatarNombre}
-                apellido={avatarApellido}
-                size={30}
-                style={{ fontSize: '0.82rem', border: '2px solid rgba(255, 255, 255, 0.3)' }}
-              />
-              <span className={styles.userName}>{nombrePrincipal}</span>
-              <span className={styles.arrow} aria-hidden="true">{menuOpen ? '▴' : '▾'}</span>
-            </button>
-
-            {/* Dropdown */}
-            {menuOpen && (
-              <div className={styles.dropdown}>
-                {esVistaEmpresaAdmin ? (
-                  <>
-                    <span className={styles.dropdownName}>{empresa?.razonSocial || 'Mi empresa'}</span>
-                    <span className={styles.dropdownInfo}>Responsable: {usuario.nombre} {usuario.apellido}</span>
-                    <span className={styles.dropdownInfo}>{usuario.email}</span>
-                    <span className={`${styles.dropdownRole} badge badge-${usuario.rol}`}>
-                      Administrador de empresa
-                    </span>
-                  </>
-                ) : esVistaReclutador ? (
-                  <>
-                    <span className={styles.dropdownName}>{usuario.nombre} {usuario.apellido}</span>
-                    <span className={styles.dropdownInfo}>{usuario.email}</span>
-                    {empresa?.razonSocial && (
-                      <span className={styles.dropdownInfo}>🏢 {empresa.razonSocial}</span>
-                    )}
-                    <span className={`${styles.dropdownRole} badge badge-${usuario.rol}`}>
-                      Reclutador
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className={styles.dropdownName}>
-                      {usuario.nombre} {usuario.apellido}
-                    </span>
-                    <span className={styles.dropdownInfo}>{usuario.email}</span>
-                    <span className={`${styles.dropdownRole} badge badge-${usuario.rol}`}>
-                      {usuario.rol}
-                    </span>
-                  </>
-                )}
-
-                {/* Datos adicionales */}
-                {usuario.telefono && (
-                  <span className={styles.dropdownInfo}>📞 {usuario.telefono}</span>
-                )}
-                {usuario.ubicacion && (
-                  <span className={styles.dropdownInfo}>📍 {usuario.ubicacion}</span>
-                )}
-
-                {/* Separador */}
-                <div className={styles.dropdownDivider} />
-
-                {/* Notificaciones pendientes con prioridad */}
-                {noLeidas > 0 && (
-                  <button
-                    className={styles.dropdownNotif}
-                    onClick={() => { setMenuOpen(false); navigate('/notificaciones'); }}
-                  >
-                    🔔 {noLeidas} notificación{noLeidas !== 1 ? 'es' : ''} sin leer
-                    {prioridadAlta && <span className={styles.dropdownUrgente}>¡Urgente!</span>}
-                  </button>
-                )}
-
-                {/* Cerrar sesión */}
-                <button onClick={handleLogout} className={styles.dropdownLogout}>
-                  Cerrar sesión
-                </button>
-              </div>
-            )}
-          </div>
+          <UserMenu
+            tone="dark"
+            noLeidas={noLeidas}
+            prioridadAlta={prioridadAlta}
+            onOpen={() => setMobileOpen(false)}
+          />
         </div>
       </div>
 

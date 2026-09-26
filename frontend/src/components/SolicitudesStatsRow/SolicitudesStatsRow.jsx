@@ -1,20 +1,18 @@
+import StatCard from '../ui/StatCard';
 import styles from './SolicitudesStatsRow.module.css';
 
 /**
- * SolicitudesStatsRow.jsx — fila de tarjetas de resumen (total/pendientes/etc.)
- * usada tanto para solicitudes de empresa como de reclutadores en
- * AdminSolicitudesPage.jsx (mismo bloque, antes duplicado 2 veces).
+ * SolicitudesStatsRow.jsx — fila compacta de KPIs (total/pendientes/etc.)
+ * usada para solicitudes de empresa y de reclutadores en AdminSolicitudesPage.
+ * Los valores vienen del `conteoPorEstado` del backend.
  *
- *   <SolicitudesStatsRow items={[{ label, value, color }, ...]} />
+ *   <SolicitudesStatsRow items={[{ label, value, iconName, tone }, ...]} />
  */
-export default function SolicitudesStatsRow({ items, style }) {
+export default function SolicitudesStatsRow({ items }) {
   return (
-    <div className={styles.statsRow} style={style}>
-      {items.map(({ label, value, color }) => (
-        <div key={label} className={styles.statCard} style={{ '--stat-color': color }}>
-          <span className={styles.statValue}>{value}</span>
-          <span className={styles.statLabel}>{label}</span>
-        </div>
+    <div className={styles.statsRow}>
+      {items.map(({ label, value, iconName, tone }) => (
+        <StatCard key={label} compact iconName={iconName} tone={tone} label={label} value={value} />
       ))}
     </div>
   );

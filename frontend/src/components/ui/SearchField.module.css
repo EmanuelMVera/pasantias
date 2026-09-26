@@ -20,19 +20,19 @@
   left: 0.8rem;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 0.85rem;
+  display: inline-flex;
   pointer-events: none;
-  opacity: 0.6;
+  color: var(--text-soft);
 }
 
 /* Sobrescribe el estilo global de <input> (padding/borde) con la variante con ícono. */
 .input {
   width: 100%;
   min-height: 44px;
-  padding: 0.55rem 2.6rem 0.55rem 2.3rem;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-card);
+  padding: 0.55rem 2.6rem 0.55rem 2.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
   color: var(--text);
   font-size: 0.9rem;
   font-family: var(--font-primary);
@@ -54,7 +54,9 @@
   border-radius: 6px;
   background: transparent;
   color: var(--text-muted);
-  font-size: 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
 }
 

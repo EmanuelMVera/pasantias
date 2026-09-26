@@ -19,6 +19,7 @@ import { adminService } from '../../services/admin.service';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useToast } from '../../hooks/useToast';
 import Paginacion from '../../components/Paginacion/Paginacion';
+import Icon from '../../components/ui/Icon';
 import PageHeader from '../../components/ui/PageHeader';
 import ExportMenu from '../../components/ui/ExportMenu';
 import TableResponsive from '../../components/ui/TableResponsive';
@@ -144,7 +145,7 @@ export default function AdminLogsPage() {
         actions={<ExportMenu id="btn-exportar-logs" formats={['csv', 'xlsx', 'pdf']} onExport={handleExport} />}
       />
 
-      {error && <p className="error-msg" role="alert" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {error && <p className={`error-msg ${styles.error}`} role="alert">{error}</p>}
 
       {/* noValidate: el rango inválido lo informa `errorFiltros` (accesible), no el globo nativo del navegador. */}
       <form className={styles.filtros} onSubmit={aplicar} aria-label="Filtros de auditoría" noValidate>
@@ -183,7 +184,10 @@ export default function AdminLogsPage() {
         </div>
 
         <div className={styles.botones}>
-          <button type="submit" id="btn-aplicar-filtros" className="btn-primary">Aplicar filtros</button>
+          <button type="submit" id="btn-aplicar-filtros" className="btn-primary">
+            <Icon name="filter" size={18} />
+            Aplicar filtros
+          </button>
           <button type="button" id="btn-limpiar-filtros" className="btn-secondary" onClick={limpiar}>Limpiar</button>
         </div>
 
@@ -199,7 +203,7 @@ export default function AdminLogsPage() {
         <p className="msg" role="status">Cargando registros...</p>
       ) : logs.length === 0 && !error ? (
         <EmptyState
-          icon="📋"
+          iconName="history"
           title={hayFiltrosAplicados ? 'No hay registros con los filtros aplicados.' : 'Todavía no hay registros de auditoría.'}
         >
           {hayFiltrosAplicados && (

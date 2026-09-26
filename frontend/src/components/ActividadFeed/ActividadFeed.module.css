@@ -1,42 +1,92 @@
-/* ── Actividad reciente ───────────────────────────────────────────────────── */
-.actividadList {
+/* ── Timeline de actividad reciente ───────────────────────────────────────
+   Punto de color (tono de la acción, el mismo de la Auditoría) sobre una línea
+   vertical, ícono por entidad, texto y hora a la derecha. */
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
 }
 
-.actividadItem {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.7rem 1rem;
-  font-size: 0.88rem;
-  transition: border-color 0.15s;
+.item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 12px 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  min-height: 56px;
 }
 
-.actividadItem:hover { border-color: var(--primary); }
+/* Línea vertical que une los puntos */
+.item::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border-soft);
+}
 
-/* Punto discreto en lugar de un emoji repetido en cada fila. */
-.punto {
-  width: 8px;
-  height: 8px;
-  margin-top: 0.4rem;
+.item:first-child::before { top: 50%; }
+.item:last-child::before { bottom: 50%; }
+.item:only-child::before { display: none; }
+
+.dot {
+  position: relative;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: var(--primary);
-  flex-shrink: 0;
+  background: var(--accion-color, var(--primary));
+  box-shadow: 0 0 0 3px var(--surface);
 }
 
-.actividadBody {
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-soft);
+  color: var(--accion-color, var(--primary));
+}
+
+.body {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
-  flex: 1;
+  gap: 1px;
+  min-width: 0;
 }
 
-.actividadFecha {
-  font-size: 0.78rem;
-  color: var(--text-muted);
+.titulo {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-strong);
+  overflow-wrap: break-word;
+}
+
+.entidad {
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+.meta {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.fecha {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 480px) {
+  .item { grid-template-columns: 12px minmax(0, 1fr) auto; }
+  .icon { display: none; }
 }

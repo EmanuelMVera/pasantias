@@ -28,7 +28,7 @@ export default function SolicitudesReclutadorSection({
   if (solicitudesRecl.length === 0) {
     return (
       <EmptyState
-        icon="📢"
+        iconName="userPlus"
         title={`No hay solicitudes de reclutadores${filtroRecl ? ` con estado "${filtroRecl}"` : ''}.`}
       />
     );

@@ -5,12 +5,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.3rem;
-  padding: 1.5rem 1rem;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
   text-align: center;
-  border: 2px dashed var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-card);
+  border: 2px dashed #c9d6e3;
+  border-radius: var(--radius-lg);
+  background: var(--surface-muted);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
@@ -40,11 +40,21 @@
 
 .deshabilitada { opacity: 0.6; cursor: not-allowed; }
 
-.icono { font-size: 1.6rem; }
-.titulo { font-weight: 700; color: var(--secondary); font-size: 0.95rem; }
-.instruccion { font-size: 0.88rem; color: var(--text); }
+.icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--space-1);
+  border-radius: 50%;
+  background: var(--info-soft);
+  color: var(--primary);
+}
+.titulo { font-weight: 700; color: var(--text-strong); font-size: 1rem; }
+.instruccion { font-size: 0.9rem; color: var(--text); }
 .enlace { color: var(--primary); font-weight: 700; text-decoration: underline; }
-.hint { font-size: 0.78rem; color: var(--text-muted); }
+.hint { font-size: 0.8rem; color: var(--text-soft); }
 
 .aviso { margin: 0; font-size: 0.85rem; color: var(--danger, #c0392b); font-weight: 600; }
 

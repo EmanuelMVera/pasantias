@@ -8,6 +8,9 @@ import styles from './UsuarioFormModal.module.css';
  *
  * modo: 'crear' | 'editar'
  * rolOptions: [{ value, label }] — roles asignables.
+ * esPropia: el admin se está editando a sí mismo → no puede cambiar su propio
+ *   rol ni desactivar su cuenta (misma protección que el botón Suspender; el
+ *   backend sigue siendo la autoridad).
  */
 export default function UsuarioFormModal({
   modo,
@@ -18,9 +21,10 @@ export default function UsuarioFormModal({
   formError,
   formLoading,
   rolOptions,
+  esPropia = false,
 }) {
   return (
-    <Modal title={modo === 'crear' ? '+ Nuevo Usuario' : '✏️ Editar Usuario'} onClose={onClose}>
+    <Modal title={modo === 'crear' ? 'Nuevo usuario' : 'Editar usuario'} onClose={onClose}>
         <form onSubmit={onSubmit} className={styles.form}>
           {formError && <p className="error-msg">{formError}</p>}
 
@@ -48,7 +52,11 @@ export default function UsuarioFormModal({
           <div className={styles.formRow}>
             <div className="form-group">
               <label htmlFor="u-rol">Rol *</label>
-              <select id="u-rol" name="rol" value={form.rol} onChange={onChange} required>
+              <select
+                id="u-rol" name="rol" value={form.rol} onChange={onChange} required
+                disabled={esPropia}
+                aria-describedby={esPropia ? 'u-nota-propia' : undefined}
+              >
                 {rolOptions.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
             </div>
@@ -78,10 +86,20 @@ export default function UsuarioFormModal({
           )}
 
           {modo === 'editar' && (
-            <label className={styles.checkboxLabel}>
-              <input name="activo" type="checkbox" checked={form.activo} onChange={onChange} />
+            <label className={`${styles.checkboxLabel} ${esPropia ? styles.checkboxDisabled : ''}`}>
+              <input
+                name="activo" type="checkbox" checked={form.activo} onChange={onChange}
+                disabled={esPropia}
+                aria-describedby={esPropia ? 'u-nota-propia' : undefined}
+              />
               <span>Cuenta activa</span>
             </label>
+          )}
+
+          {esPropia && (
+            <p id="u-nota-propia" className={styles.notaPropia}>
+              Es tu propia cuenta: no podés cambiar tu rol ni desactivarla desde acá.
+            </p>
           )}
 
           <div className={styles.modalFooter}>

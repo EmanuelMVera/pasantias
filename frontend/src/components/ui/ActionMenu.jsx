@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import Icon from './Icon';
 import styles from './ActionMenu.module.css';
 
 const ANCHO_MENU = 190;
@@ -98,7 +99,7 @@ export default function ActionMenu({ items, label = 'Más acciones', disabled = 
         disabled={disabled}
         onClick={alternar}
       >
-        <span aria-hidden="true">⋯</span>
+        <Icon name="dots" size={18} />
       </button>
 
       {abierto && createPortal(

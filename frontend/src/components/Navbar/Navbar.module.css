@@ -158,6 +158,10 @@
 
 /* ── Badge de notificaciones ─────────────────────────────────────────────── */
 .notifBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 34px;
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.3);
   color: #fff;
@@ -196,142 +200,12 @@
   50%       { opacity: 0.7; }
 }
 
-/* ── User menu ───────────────────────────────────────────────────────────── */
-/* El wrapper posiciona el dropdown; el trigger es un <button> reseteado. */
-.userMenuWrap {
-  position: relative;
-}
-
-.userMenu {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  padding: 0.35rem 0.75rem;
-  border: none;
-  background: none;
-  font-family: var(--font-primary);
-  border-radius: 6px;
-  transition: background 0.15s;
-  user-select: none;
-}
-
-.userMenu:hover {
-  background: rgba(0, 115, 173, 0.4);
-}
-
-.userName {
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: #fff;
-}
-
-.arrow {
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-/* ── Dropdown ────────────────────────────────────────────────────────────── */
-.dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-top: 3px solid var(--primary);
-  border-radius: var(--radius);
-  padding: 0.75rem;
-  min-width: 200px;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
-  animation: slideDown 0.15s ease;
-  z-index: 200;
-}
-
-.dropdownInfo {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  word-break: break-all;
-}
-
-.dropdownRole {
-  font-size: 0.75rem;
-  width: fit-content;
-}
-
-.dropdownLogout {
-  margin-top: 0.25rem;
-  background: #fdecea;
-  color: var(--danger);
-  border: 1px solid #f5b7b1;
-  border-radius: 6px;
-  padding: 0.5rem;
-  font-size: 0.88rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.15s;
-  font-family: var(--font-primary);
-  text-align: center;
-}
-
-.dropdownLogout:hover {
-  background: var(--danger);
-  color: #fff;
-}
-
-/* Nombre completo en el dropdown */
-.dropdownName {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--secondary);
-}
-
-/* Divisor */
-.dropdownDivider {
-  height: 1px;
-  background: var(--border);
-  margin: 0.1rem 0;
-}
-
-/* Botón de notificaciones dentro del dropdown */
-.dropdownNotif {
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fde68a;
-  border-radius: 6px;
-  padding: 0.45rem 0.75rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-  font-family: var(--font-primary);
-  text-align: left;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-
-.dropdownNotif:hover { background: #fde68a; }
-
-/* Badge urgente dentro del botón de notif */
-.dropdownUrgente {
-  background: var(--danger);
-  color: #fff;
-  border-radius: 99px;
-  padding: 0.05rem 0.45rem;
-  font-size: 0.7rem;
-  font-weight: 800;
-}
-
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 /* Los links inline no entran por debajo de cierto ancho: pasan al panel
-   hamburguesa. Alumno/empresa (≤4 links) colapsan a ≤1100px; el admin (7
-   links) colapsa antes (.navbarWide). Los umbrales se validan en
-   e2e/responsive.spec.js (ningún link en 2 líneas, sin pisar la campana ni el
-   avatar, sin scroll horizontal). */
+   hamburguesa (≤4 links: colapsan a ≤1100px). El admin no usa este navbar:
+   tiene su propio shell (components/AdminShell). Validado en
+   e2e/responsive.spec.js (sin pisar la campana ni el avatar, sin scroll
+   horizontal). */
 @media (max-width: 1100px) {
   .navbarLinks {
     display: none;
@@ -342,21 +216,7 @@
   }
 }
 
-@media (max-width: 1279px) {
-  .navbarWide .navbarLinks {
-    display: none;
-  }
-
-  .navbarWide .navbarToggle {
-    display: flex;
-  }
-}
-
 @media (max-width: 640px) {
-  .userName {
-    display: none;
-  }
-
   /* Apretar la barra para que quepa en teléfonos angostos (evita ~46px de
      scroll horizontal que arrastraba a todas las páginas autenticadas). */
   .navbarInner {
@@ -370,10 +230,5 @@
 
   .notifBadge {
     padding: 0.25rem 0.5rem;
-  }
-
-  .userMenu {
-    padding: 0.35rem 0.4rem;
-    gap: 0.35rem;
   }
 }

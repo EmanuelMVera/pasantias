@@ -8,7 +8,7 @@
   color: var(--text-muted);
 }
 
-.fechaCell { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; }
+.fechaCell { font-size: 0.86rem; color: var(--text-soft); white-space: nowrap; }
 
 .cards {
   display: flex;

@@ -15,6 +15,9 @@ body {
   color: var(--text);
   min-height: 100vh;
   line-height: 1.6;
+  /* Raleway trae números "old-style" por defecto (fechas y montos bailan):
+     se fuerzan números de altura uniforme. */
+  font-variant-numeric: lining-nums;
 }
 
 a {
@@ -91,26 +94,32 @@ input:focus, select:focus, textarea:focus {
 select { cursor: pointer; }
 
 /* ── Buttons ─────────────────────────────────────────────────────────────── */
+/* Todos los botones globales son inline-flex: admiten un <Icon> al lado del
+   texto sin desalinearse. */
 .btn-primary {
   background: var(--primary);
   color: #fff;
-  border: none;
+  border: 1px solid var(--primary);
   border-radius: var(--radius);
-  padding: 0.75rem 1.5rem;
-  font-size: 0.95rem;
+  padding: 0.65rem 1.25rem;
+  min-height: 42px;
+  font-size: 0.93rem;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+  transition: background 0.2s, box-shadow 0.2s, border-color 0.2s;
   font-family: var(--font-primary);
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
   text-align: center;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
 }
 
 .btn-primary:hover {
   background: var(--primary-dark);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(0, 115, 173, 0.3);
+  border-color: var(--primary-dark);
+  box-shadow: 0 4px 12px rgba(0, 115, 173, 0.25);
   text-decoration: none;
   color: #fff;
 }
@@ -122,28 +131,42 @@ select { cursor: pointer; }
 }
 
 .btn-secondary {
-  background: transparent;
+  background: var(--surface, #fff);
   color: var(--primary);
-  border: 1.5px solid var(--primary);
+  border: 1px solid #b9d3e6;
   border-radius: var(--radius);
-  padding: 0.6rem 1.2rem;
+  padding: 0.55rem 1.1rem;
+  min-height: 40px;
   font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
   font-family: var(--font-primary);
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
   text-align: center;
 }
 
 .btn-secondary:hover {
-  background: var(--primary);
-  color: #fff;
+  background: var(--info-soft);
+  border-color: var(--primary);
+  color: var(--primary-dark);
   text-decoration: none;
 }
 
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .btn-small {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 32px;
   background: var(--primary-light);
   color: var(--primary-dark);
   border: none;
@@ -164,8 +187,13 @@ select { cursor: pointer; }
 }
 
 .btn-warn {
-  background: #fef3c7;
-  color: #b45309;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 32px;
+  background: var(--warning-soft);
+  color: var(--warning-text);
   border: none;
   border-radius: 6px;
   padding: 0.3rem 0.75rem;
@@ -179,8 +207,13 @@ select { cursor: pointer; }
 .btn-warn:hover { background: var(--warning); color: #fff; }
 
 .btn-ok {
-  background: #d5f5e3;
-  color: #1a7a4a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 32px;
+  background: var(--success-soft);
+  color: var(--success-text);
   border: none;
   border-radius: 6px;
   padding: 0.3rem 0.75rem;
@@ -194,8 +227,13 @@ select { cursor: pointer; }
 .btn-ok:hover { background: var(--success); color: #fff; }
 
 .btn-danger {
-  background: #fdecea;
-  color: #a93226;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 32px;
+  background: var(--danger-soft);
+  color: var(--danger-text);
   border: none;
   border-radius: 6px;
   padding: 0.3rem 0.75rem;
@@ -207,6 +245,19 @@ select { cursor: pointer; }
 }
 
 .btn-danger:hover { background: var(--danger); color: #fff; }
+
+.btn-small:disabled,
+.btn-warn:disabled,
+.btn-ok:disabled,
+.btn-danger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-small:disabled:hover { background: var(--primary-light); color: var(--primary-dark); }
+.btn-warn:disabled:hover { background: var(--warning-soft); color: var(--warning-text); }
+.btn-ok:disabled:hover { background: var(--success-soft); color: var(--success-text); }
+.btn-danger:disabled:hover { background: var(--danger-soft); color: var(--danger-text); }
 
 .btn-back {
   background: transparent;
@@ -375,8 +426,8 @@ button:focus-visible,
 .filter-chip {
   padding: 0.35rem 0.9rem;
   border-radius: 99px;
-  border: 1.5px solid var(--border);
-  background: transparent;
+  border: 1px solid var(--border);
+  background: var(--surface, #fff);
   color: var(--text);
   cursor: pointer;
   font-size: 0.85rem;
@@ -431,32 +482,43 @@ button:focus-visible,
 .oferta-card p { color: var(--text-muted); font-size: 0.88rem; }
 
 /* ── Badges ──────────────────────────────────────────────────────────────── */
+/* Estilo suave: fondo tenue + texto oscuro del mismo tono (contraste AA).
+   El color nunca va solo: el badge siempre dice el estado en texto.
+   `.badge` sin modificador conserva texto blanco para los usos con fondo
+   inline sólido. */
 .badge {
-  display: inline-block;
-  padding: 0.2rem 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.18rem 0.65rem;
   border-radius: 20px;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 700;
+  line-height: 1.5;
   color: #fff;
   width: fit-content;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  white-space: nowrap;
+  letter-spacing: 0.1px;
 }
 
-.badge-sin_experiencia, .badge-en_revision { background: #7f8c8d; }
-.badge-junior, .badge-preseleccionado      { background: #2980b9; }
-.badge-semi_senior, .badge-entrevista_programada, .badge-entrevista { background: #8e44ad; }
-.badge-no_seleccionado, .badge-rechazado { background: var(--danger); }
-.badge-contratado      { background: var(--success); }
-.badge-activa          { background: var(--success); }
-.badge-pausada         { background: var(--warning); }
-.badge-cerrada         { background: #7f8c8d; }
+.badge-sin_experiencia, .badge-en_revision,
+.badge-cerrada, .badge-tone-gray        { background: var(--neutral-soft); color: var(--neutral-text); }
+.badge-junior, .badge-preseleccionado,
+.badge-tone-blue                        { background: var(--info-soft);    color: var(--info-text); }
+.badge-semi_senior, .badge-entrevista_programada, .badge-entrevista,
+.badge-tone-violet                      { background: var(--violet-soft);  color: var(--violet-text); }
+.badge-no_seleccionado, .badge-rechazado,
+.badge-tone-red                         { background: var(--danger-soft);  color: var(--danger-text); }
+.badge-contratado, .badge-activa,
+.badge-tone-green                       { background: var(--success-soft); color: var(--success-text); }
+.badge-pausada, .badge-tone-orange      { background: var(--warning-soft); color: var(--warning-text); }
+.badge-tone-teal                        { background: #e0f4f1;             color: #0f6457; }
 
 /* ── Badges de rol ─────────────────────────────────────────────────────────── */
-.badge-admin    { background: #8e44ad; }
-.badge-empresa  { background: #1a5276; }
-.badge-alumno   { background: var(--primary); }
-.badge-egresado { background: #2471a3; }
+.badge-admin    { background: var(--violet-soft); color: var(--violet-text); }
+.badge-empresa  { background: #e4ecf5;            color: #1a4a7a; }
+.badge-alumno   { background: var(--info-soft);   color: var(--info-text); }
+.badge-egresado { background: #e3eef8;            color: #1d5f93; }
 
 /* ── Detalle Oferta ──────────────────────────────────────────────────────── */
 .detalle-container { max-width: 780px; }
@@ -577,9 +639,10 @@ button:focus-visible,
 .table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-card);
+  background: var(--surface, #fff);
+  border-radius: var(--radius-lg, 12px);
+  border: 1px solid var(--border-soft, var(--border));
+  box-shadow: var(--shadow-xs, var(--shadow-card));
 }
 
 .table-wrap .tabla {
@@ -603,25 +666,30 @@ button:focus-visible,
   box-shadow: var(--shadow-card);
 }
 
+/* Encabezado navy liviano, filas blancas de ~56px, separadores de 1px y hover
+   muy suave: un único lenguaje de tabla para toda la app. */
 .tabla th {
-  background: var(--secondary);
+  background: var(--table-head, var(--secondary));
   color: #fff;
-  padding: 0.85rem 1rem;
+  padding: 0.8rem 1rem;
   text-align: left;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
+  font-size: 0.8rem;
+  letter-spacing: 0.2px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .tabla td {
-  padding: 0.85rem 1rem;
-  border-top: 1px solid var(--border);
+  padding: 0.9rem 1rem;
+  border-top: 1px solid var(--border-soft, var(--border));
   font-size: 0.9rem;
   color: var(--text);
+  vertical-align: middle;
 }
 
-.tabla tr:hover td { background: var(--primary-light); }
+.tabla tbody tr:first-child td { border-top: none; }
+
+.tabla tr:hover td { background: var(--surface-hover, var(--primary-light)); }
 
 /* ── Oferta (empresa) Form ───────────────────────────────────────────────── */
 .oferta-form {

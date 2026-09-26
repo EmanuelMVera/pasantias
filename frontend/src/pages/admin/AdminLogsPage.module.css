@@ -1,41 +1,53 @@
 /* AdminLogsPage.module.css — Auditoría del sistema */
 
-/* ── Filtros (formulario) ────────────────────────────────────────────────── */
+.error { margin-bottom: var(--space-4); }
+
+/* ── Filtros: toolbar/card compacta ──────────────────────────────────────── */
 .filtros {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
-  gap: 0.85rem;
+  gap: var(--space-3) var(--space-4);
   align-items: end;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-card);
-  padding: 1rem 1.1rem;
-  margin-bottom: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-5);
+}
+
+/* En desktop: los 4 campos y los botones en una sola fila. */
+@media (min-width: 1280px) {
+  .filtros { grid-template-columns: repeat(4, minmax(0, 1fr)) auto; }
 }
 
 .campo {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: var(--space-1);
   min-width: 0;
 }
 
 .campo label {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-soft);
 }
 
 .campo select,
 .campo input {
   width: 100%;
   min-height: 44px;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 0.9rem;
 }
 
 .botones {
   display: flex;
-  gap: 0.6rem;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
@@ -46,69 +58,77 @@
 .pendiente {
   grid-column: 1 / -1;
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
 }
 
-.errorFiltros { color: var(--danger, #c0392b); font-weight: 600; }
-.pendiente    { color: var(--text-muted); }
+.errorFiltros { color: var(--danger-text); font-weight: 600; }
+
+.pendiente {
+  color: var(--warning-text);
+  background: var(--warning-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+}
 
 .recargando { opacity: 0.55; transition: opacity 0.15s; }
 
 /* ── Celdas ──────────────────────────────────────────────────────────────── */
 .fechaCell {
-  font-size: 0.82rem;
+  font-size: 0.86rem;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .fechaCell span,
 .fechaCell small { display: block; }
-.fechaCell small { color: var(--text-muted); margin-top: 0.1rem; }
+.fechaCell small { color: var(--text-soft); margin-top: 0.1rem; }
 
+/* El color de cada acción viene del catálogo (auditoria.utils) vía --badge-color. */
 .accionBadge {
   display: inline-block;
-  padding: 0.22rem 0.65rem;
+  padding: 0.18rem 0.65rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--badge-color) 12%, transparent);
+  background: color-mix(in srgb, var(--badge-color) 11%, white);
   color: var(--badge-color);
-  border: 1px solid color-mix(in srgb, var(--badge-color) 30%, transparent);
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .userCell {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .avatar {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary), #004f7a);
-  color: #fff;
+  background: var(--info-soft);
+  color: var(--info-text);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 800;
   flex-shrink: 0;
 }
 
 .email {
   display: block;
-  color: var(--text-muted);
-  font-size: 0.75rem;
+  color: var(--text-soft);
+  font-size: 0.8rem;
 }
 
 .sistema {
-  color: var(--text-muted);
-  font-size: 0.82rem;
+  color: var(--text-soft);
+  font-size: 0.86rem;
 }
 
 .ipCell {
-  font-family: monospace;
-  font-size: 0.8rem;
-  color: var(--text-muted);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.82rem;
+  color: var(--text-soft);
   white-space: nowrap;
 }
 
@@ -116,6 +136,10 @@
 .cards {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
-  margin-bottom: 1rem;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+@media (max-width: 480px) {
+  .filtros { padding: var(--space-3); }
 }

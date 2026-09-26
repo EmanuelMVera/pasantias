@@ -39,6 +39,17 @@ a.brand:hover .name { opacity: 0.85; }
   white-space: nowrap;
 }
 
+/* Descriptor tipo oración (sin mayúsculas ni tracking): más legible y entra
+   en el ancho de la sidebar. */
+.plain .tagline {
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.plain .name { font-size: 1.15rem; }
+
 /* Sobre fondo oscuro (navbar) */
 .light .name    { color: #ffffff; }
 .light .tagline { color: rgba(255, 255, 255, 0.72); }

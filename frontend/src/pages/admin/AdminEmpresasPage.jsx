@@ -35,13 +35,15 @@ import DataCard from '../../components/ui/DataCard';
 import EmptyState from '../../components/ui/EmptyState';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import Toast from '../../components/ui/Toast';
+import Icon from '../../components/ui/Icon';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import styles from './AdminEmpresasPage.module.css';
 
-const ESTADO_COLOR = {
-  pendiente: '#2e86c1',
-  aprobada:  '#1e8449',
-  rechazada: '#c0392b',
+// Tonos de badge (clases globales .badge-tone-*): el texto siempre acompaña al color.
+const ESTADO_TONO = {
+  pendiente: 'blue',
+  aprobada:  'green',
+  rechazada: 'red',
 };
 const ESTADO_LABEL = {
   pendiente: 'Pendiente',
@@ -53,7 +55,7 @@ const OPCIONES_ESTADO = [
   ...Object.entries(ESTADO_LABEL).map(([value, label]) => ({ value, label })),
 ];
 
-const CONFIANZA_COLOR = { estandar: '#707b7c', confiable: '#117a65' };
+const CONFIANZA_TONO = { estandar: 'gray', confiable: 'teal' };
 const CONFIANZA_LABEL = { estandar: 'Estándar', confiable: 'Confiable' };
 const OPCIONES_CONFIANZA = [
   { value: '', label: 'Todas' },
@@ -65,7 +67,7 @@ const nombreResponsable = (e) => (e.usuario ? `${e.usuario.nombre} ${e.usuario.a
 
 function EstadoBadge({ estado }) {
   return (
-    <span className="badge" style={{ background: ESTADO_COLOR[estado] ?? '#707b7c' }}>
+    <span className={`badge badge-tone-${ESTADO_TONO[estado] ?? 'gray'}`}>
       {ESTADO_LABEL[estado] ?? estado}
     </span>
   );
@@ -73,7 +75,8 @@ function EstadoBadge({ estado }) {
 
 function ConfianzaBadge({ nivel }) {
   return (
-    <span className="badge" style={{ background: CONFIANZA_COLOR[nivel] ?? '#707b7c' }}>
+    <span className={`badge badge-tone-${CONFIANZA_TONO[nivel] ?? 'gray'}`}>
+      {nivel === 'confiable' && <Icon name="shield" size={14} strokeWidth={2} />}
       {CONFIANZA_LABEL[nivel] ?? nivel}
     </span>
   );
@@ -160,6 +163,7 @@ export default function AdminEmpresasPage() {
         onClick={() => setConfirmar({ empresa: e, accion: confiable ? 'revocar' : 'marcar' })}
         aria-label={`${confiable ? 'Revocar confianza de' : 'Marcar como confiable a'} ${e.razonSocial}`}
       >
+        <Icon name={confiable ? 'close' : 'shield'} size={16} />
         {confiable ? 'Revocar confianza' : 'Marcar confiable'}
       </button>
     );
@@ -177,16 +181,18 @@ export default function AdminEmpresasPage() {
         subtitle="Empresas registradas y su nivel de confianza institucional."
       />
 
-      {error && <p className="error-msg" role="alert" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {error && <p className={`error-msg ${styles.error}`} role="alert">{error}</p>}
 
-      <div className={styles.filtros}>
-        <SearchField
-          id="busqueda-empresa"
-          label="Buscar empresas"
-          placeholder="Buscar por empresa, CUIT o responsable…"
-          value={texto}
-          onChange={setTexto}
-        />
+      <div className={styles.toolbar}>
+        <div className={styles.busqueda}>
+          <SearchField
+            id="busqueda-empresa"
+            label="Buscar empresas"
+            placeholder="Buscar por empresa, CUIT o responsable…"
+            value={texto}
+            onChange={setTexto}
+          />
+        </div>
         <div className={styles.grupos}>
           <FilterGroup label="Estado" idPrefix="filtro-estado" options={OPCIONES_ESTADO} value={filtroEstado} onChange={setFiltroEstado} />
           <FilterGroup label="Confianza" idPrefix="filtro-confianza" options={OPCIONES_CONFIANZA} value={filtroConfianza} onChange={setFiltroConfianza} />
@@ -201,7 +207,7 @@ export default function AdminEmpresasPage() {
         <p className="msg" role="status">Cargando empresas...</p>
       ) : empresas.length === 0 && !error ? (
         <EmptyState
-          icon="🏢"
+          iconName="building"
           title={hayFiltros ? 'No se encontraron empresas con esos criterios.' : 'Todavía no hay empresas registradas.'}
           hint={hayFiltros ? 'Probá con otro texto o quitá algún filtro.' : undefined}
         >

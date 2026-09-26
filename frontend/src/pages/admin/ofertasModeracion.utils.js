@@ -1,11 +1,12 @@
-// Etiquetas, colores y reglas de transición de la moderación de ofertas
+// Etiquetas, tonos de badge y reglas de transición de la moderación de ofertas
 // (AdminOfertasPage). Vive en un .js aparte para que el componente exporte solo
 // el componente (react-refresh/only-export-components).
 
-export const ESTADO_COLOR = {
-  activa:  '#1e8449',
-  pausada: '#b9770e',
-  cerrada: '#707b7c',
+// Tonos de las clases globales .badge-tone-* (el texto siempre acompaña al color).
+export const ESTADO_TONO = {
+  activa:  'green',
+  pausada: 'orange',
+  cerrada: 'gray',
 };
 export const ESTADO_LABEL = {
   activa:  'Activa',
@@ -13,11 +14,11 @@ export const ESTADO_LABEL = {
   cerrada: 'Cerrada',
 };
 
-export const MODERACION_COLOR = {
-  pendiente:     '#2e86c1',
-  aprobada:      '#1e8449',
-  auto_aprobada: '#117a65',
-  rechazada:     '#c0392b',
+export const MODERACION_TONO = {
+  pendiente:     'blue',
+  aprobada:      'green',
+  auto_aprobada: 'teal',
+  rechazada:     'red',
 };
 export const MODERACION_LABEL = {
   pendiente:     'Pendiente de revisión',

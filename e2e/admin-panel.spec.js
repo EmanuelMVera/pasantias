@@ -389,8 +389,13 @@ test.describe('admin — ofertas', () => {
     const fila = page.locator('tbody tr').filter({ hasText: fx.ofertaActiva.titulo });
     await expect(fila).toBeVisible();
 
+    // La oferta ya está moderada: no hay un botón rojo "Rechazar" suelto en la
+    // fila; la acción excepcional vive en el menú "⋯" ("Rechazar publicación").
+    await expect(fila.getByRole('button', { name: /^rechazar oferta/i })).toHaveCount(0);
+
     // Rechazar (irreversible): modal con el alcance
-    await fila.getByRole('button', { name: /^rechazar oferta/i }).click();
+    await fila.getByRole('button', { name: /más acciones/i }).click();
+    await page.getByRole('menuitem', { name: /rechazar publicaci[oó]n/i }).click();
     let modal = page.getByRole('dialog');
     await expect(modal).toContainText(/no se puede volver a aprobar/i);
     await expect(modal).toContainText(fx.ofertaActiva.titulo);

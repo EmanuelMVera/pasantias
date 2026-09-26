@@ -17,6 +17,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import Icon from './Icon';
 import styles from './FileDropzone.module.css';
 
 function formatearTamano(bytes) {
@@ -76,7 +77,7 @@ export default function FileDropzone({ id, label, accept, file, onFile, disabled
         onDragLeave={() => setArrastrando(false)}
         onDrop={onDrop}
       >
-        <span className={styles.icono} aria-hidden="true">📄</span>
+        <span className={styles.icono}><Icon name="upload" size={26} /></span>
         <span className={styles.titulo}>{label}</span>
         <span className={styles.instruccion}>
           Arrastrá el archivo acá o <span className={styles.enlace}>elegilo desde tu equipo</span>

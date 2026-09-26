@@ -1,57 +1,74 @@
+/* Tablist con subrayado. Antes, `overflow-x:auto` + tabs con `margin-bottom:-2px`
+   generaban overflow vertical de 2px → el navegador dibujaba una scrollbar
+   vertical (thumb azul global) al extremo derecho. Ahora el indicador es un
+   box-shadow interno (no desborda), el eje Y queda oculto y la scrollbar
+   horizontal (solo si hay tabs que no entran) no se pinta. */
 .tabs {
   display: flex;
-  gap: 0.25rem;
-  margin-bottom: 1.5rem;
-  border-bottom: 2px solid var(--border);
+  gap: var(--space-1);
+  margin-bottom: var(--space-5);
+  border-bottom: 1px solid var(--border-soft);
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
 }
+
+.tabs::-webkit-scrollbar { display: none; }
 
 .tab {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   flex-shrink: 0;
   background: none;
   border: none;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
-  padding: 0.7rem 1.1rem;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  padding: 0.65rem 1rem;
   min-height: 44px;
   font-size: 0.92rem;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text-soft);
   cursor: pointer;
   font-family: var(--font-primary);
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, box-shadow 0.15s, background 0.15s;
 }
 
-.tab:hover { color: var(--secondary); }
+.tab:hover {
+  color: var(--text-strong);
+  background: var(--surface-hover);
+}
+
+.tab:focus-visible { outline-offset: -2px; }
 
 .tabActivo {
   color: var(--primary);
-  border-bottom-color: var(--primary);
+  box-shadow: inset 0 -2px 0 var(--primary);
 }
 
+.icon { display: inline-flex; }
+
 .count {
-  background: var(--primary-light);
-  color: var(--primary-dark);
+  min-width: 22px;
+  text-align: center;
+  background: var(--neutral-soft);
+  color: var(--neutral-text);
   border-radius: 20px;
-  padding: 0.05rem 0.5rem;
+  padding: 0.05rem 0.45rem;
   font-size: 0.75rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .tabActivo .count {
-  background: var(--primary);
-  color: #fff;
+  background: var(--info-soft);
+  color: var(--info-text);
 }
 
 /* Hay pendientes: naranja (el número lo dice, el color solo refuerza). */
 .countAlerta,
 .tabActivo .countAlerta {
-  background: var(--warning);
-  color: #fff;
+  background: var(--warning-soft);
+  color: var(--warning-text);
 }
 
 .panel:focus-visible {

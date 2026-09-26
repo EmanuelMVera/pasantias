@@ -4,7 +4,7 @@
  * Define la estructura principal del sistema:
  * - Envuelve toda la app con el AuthProvider (contexto de autenticación)
  * - Configura el enrutador (BrowserRouter)
- * - Renderiza el Navbar (navegación + marca SisPasantías)
+ * - Renderiza el chrome: Navbar (alumno/empresa) o AdminShell (admin)
  * - Define todas las rutas de la aplicación y sus protecciones de acceso
  *
  * Tipos de rutas:
@@ -70,6 +70,7 @@ import NotificacionesPage from './pages/NotificacionesPage';
 
 // Componentes de layout global que se muestran en todas las páginas
 import Navbar from './components/Navbar/Navbar';
+import AdminShell from './components/AdminShell/AdminShell';
 
 /**
  * ProtectedRoute — Componente de guardia de rutas.
@@ -291,12 +292,28 @@ function AppRoutes() {
 }
 
 /**
- * Chrome — Estructura visual común (navbar + contenido).
+ * Chrome — Estructura visual común.
  *
- * La marca (Brand) vive dentro del navbar: ya no hay un banner institucional
- * aparte, así que el alto del chrome autenticado es solo el del navbar.
+ * - Rol admin: shell propio (sidebar + topbar, components/AdminShell).
+ * - Resto (alumno/egresado/empresa y páginas públicas): navbar horizontal; la
+ *   marca vive dentro del navbar, así que el alto del chrome es solo el suyo.
  */
 function Chrome() {
+  const { usuario } = useAuth();
+
+  if (usuario?.rol === 'admin') {
+    return (
+      <>
+        <a href="#contenido" className="skip-link">Saltar al contenido</a>
+        <AdminShell>
+          <main id="contenido">
+            <AppRoutes />
+          </main>
+        </AdminShell>
+      </>
+    );
+  }
+
   return (
     <>
       <a href="#contenido" className="skip-link">Saltar al contenido</a>

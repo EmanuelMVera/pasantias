@@ -8,9 +8,11 @@
  * - `role="tablist" / "tab" / "tabpanel"`, `aria-selected`, `aria-controls`.
  * - Flechas ← → Home End mueven el foco Y la selección (roving tabindex).
  * - `count` opcional (pendientes); `alerta` lo resalta en naranja (hay algo por atender).
+ * - `icon` opcional: nombre de un ícono de `ui/Icon` (decorativo).
  */
 
 import { useRef } from 'react';
+import Icon from './Icon';
 import styles from './Tabs.module.css';
 
 export function TabPanel({ idPrefix, tabKey, children }) {
@@ -61,6 +63,7 @@ export default function Tabs({ tabs, value, onChange, idPrefix = 'tabs', ariaLab
             className={`${styles.tab} ${activo ? styles.tabActivo : ''}`}
             onClick={() => onChange(t.key)}
           >
+            {t.icon && <span className={styles.icon}><Icon name={t.icon} size={18} /></span>}
             {t.label}
             {t.count != null && (
               <span className={`${styles.count} ${t.alerta && t.count > 0 ? styles.countAlerta : ''}`}>

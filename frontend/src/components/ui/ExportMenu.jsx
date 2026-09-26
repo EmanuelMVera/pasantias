@@ -11,10 +11,11 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
+import Icon from './Icon';
 import styles from './ExportMenu.module.css';
 
 const ETIQUETAS = { csv: 'CSV', xlsx: 'Excel (.xlsx)', pdf: 'PDF' };
-const ICONOS = { csv: '📄', xlsx: '📊', pdf: '📕' };
+const ICONOS = { csv: 'file', xlsx: 'fileSheet', pdf: 'file' };
 
 export default function ExportMenu({ formats = ['xlsx', 'pdf'], onExport, label = 'Exportar', disabled = false, id }) {
   const [abierto, setAbierto] = useState(false);
@@ -50,13 +51,14 @@ export default function ExportMenu({ formats = ['xlsx', 'pdf'], onExport, label 
       <button
         type="button"
         id={id}
-        className="btn-secondary"
+        className={`btn-secondary ${styles.trigger}`}
         onClick={() => setAbierto((v) => !v)}
-        aria-haspopup="true"
+        aria-haspopup="menu"
         aria-expanded={abierto}
         disabled={disabled || ocupado}
       >
-        {ocupado ? `Generando ${ETIQUETAS[exportando]}…` : `⬇️ ${label}`}
+        <Icon name="download" size={18} />
+        {ocupado ? `Generando ${ETIQUETAS[exportando]}…` : label}
       </button>
       {abierto && (
         <div className={styles.menu} role="menu">
@@ -68,7 +70,8 @@ export default function ExportMenu({ formats = ['xlsx', 'pdf'], onExport, label 
               className={styles.item}
               onClick={() => elegir(f)}
             >
-              <span aria-hidden="true">{ICONOS[f] || '⬇️'}</span> {ETIQUETAS[f] || f.toUpperCase()}
+              <Icon name={ICONOS[f] || 'download'} size={18} />
+              {ETIQUETAS[f] || f.toUpperCase()}
             </button>
           ))}
         </div>

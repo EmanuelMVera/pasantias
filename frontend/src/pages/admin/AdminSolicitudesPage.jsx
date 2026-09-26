@@ -24,6 +24,7 @@ import PageHeader from '../../components/ui/PageHeader';
 import Tabs, { TabPanel } from '../../components/ui/Tabs';
 import Toast from '../../components/ui/Toast';
 import Modal from '../../components/Modal/Modal';
+import Icon from '../../components/ui/Icon';
 import SolicitudesStatsRow from '../../components/SolicitudesStatsRow/SolicitudesStatsRow';
 import SolicitudesFiltroEstado from '../../components/SolicitudesFiltroEstado/SolicitudesFiltroEstado';
 import RechazarSolicitudModal from '../../components/RechazarSolicitudModal/RechazarSolicitudModal';
@@ -243,12 +244,13 @@ export default function AdminSolicitudesPage() {
         subtitle="Gestioná solicitudes de empresas y altas de reclutadores."
         actions={(
           <button type="button" className="btn-secondary" onClick={actualizar} disabled={actualizando}>
+            <Icon name="refresh" size={18} />
             Actualizar
           </button>
         )}
       />
 
-      {error && <p className="error-msg" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {error && <p className={`error-msg ${styles.error}`}>{error}</p>}
 
       <Tabs
         idPrefix="sol"
@@ -256,8 +258,8 @@ export default function AdminSolicitudesPage() {
         value={tab}
         onChange={setTab}
         tabs={[
-          { key: 'empresas', label: 'Empresas', count: stats.pendiente, alerta: true },
-          { key: 'reclutadores', label: 'Reclutadores', count: statsRecl.pendiente, alerta: true },
+          { key: 'empresas', label: 'Empresas', icon: 'building', count: stats.pendiente, alerta: true },
+          { key: 'reclutadores', label: 'Reclutadores', icon: 'userPlus', count: statsRecl.pendiente, alerta: true },
         ]}
       />
 
@@ -265,13 +267,15 @@ export default function AdminSolicitudesPage() {
         {tab === 'empresas' ? (
           <>
             <SolicitudesStatsRow items={[
-              { label: 'Total',      value: stats.total,     color: '#0073AD' },
-              { label: 'Pendientes', value: stats.pendiente, color: '#e67e22' },
-              { label: 'Aprobadas',  value: stats.aprobado,  color: '#27ae60' },
-              { label: 'Rechazadas', value: stats.rechazado, color: '#c0392b' },
+              { label: 'Total',      value: stats.total,     iconName: 'list',        tone: 'blue' },
+              { label: 'Pendientes', value: stats.pendiente, iconName: 'clock',       tone: 'orange' },
+              { label: 'Aprobadas',  value: stats.aprobado,  iconName: 'checkCircle', tone: 'green' },
+              { label: 'Rechazadas', value: stats.rechazado, iconName: 'xCircle',     tone: 'red' },
             ]} />
 
-            <SolicitudesFiltroEstado value={filtroEstado} onChange={setFiltroEstado} idPrefix="filtro" />
+            <div className={styles.toolbar}>
+              <SolicitudesFiltroEstado value={filtroEstado} onChange={setFiltroEstado} idPrefix="filtro" />
+            </div>
 
             <div className={`${styles.layout} ${detalle && panelLateral ? styles.conPanel : ''}`}>
               <div className={styles.lista}>
@@ -290,7 +294,9 @@ export default function AdminSolicitudesPage() {
                 <aside className={styles.detallePanel} aria-label="Detalle de solicitud">
                   <div className={styles.detallePanelHeader}>
                     <h2>Detalle de solicitud</h2>
-                    <button type="button" className={styles.cerrarDetalle} onClick={cerrarDetalle} aria-label="Cerrar detalle">✕</button>
+                    <button type="button" className={styles.cerrarDetalle} onClick={cerrarDetalle} aria-label="Cerrar detalle">
+                      <Icon name="close" size={20} />
+                    </button>
                   </div>
                   <SolicitudEmpresaDetalle {...propsDetalleEmpresa} />
                 </aside>
@@ -300,13 +306,15 @@ export default function AdminSolicitudesPage() {
         ) : (
           <>
             <SolicitudesStatsRow items={[
-              { label: 'Total',      value: statsRecl.total,     color: '#0073AD' },
-              { label: 'Pendientes', value: statsRecl.pendiente, color: '#e67e22' },
-              { label: 'Aprobados',  value: statsRecl.aprobado,  color: '#27ae60' },
-              { label: 'Rechazados', value: statsRecl.rechazado, color: '#c0392b' },
+              { label: 'Total',      value: statsRecl.total,     iconName: 'list',        tone: 'blue' },
+              { label: 'Pendientes', value: statsRecl.pendiente, iconName: 'clock',       tone: 'orange' },
+              { label: 'Aprobados',  value: statsRecl.aprobado,  iconName: 'checkCircle', tone: 'green' },
+              { label: 'Rechazados', value: statsRecl.rechazado, iconName: 'xCircle',     tone: 'red' },
             ]} />
 
-            <SolicitudesFiltroEstado value={filtroRecl} onChange={setFiltroRecl} idPrefix="filtro-recl" />
+            <div className={styles.toolbar}>
+              <SolicitudesFiltroEstado value={filtroRecl} onChange={setFiltroRecl} idPrefix="filtro-recl" />
+            </div>
 
             <SolicitudesReclutadorSection
               solicitudesRecl={solicitudesRecl}

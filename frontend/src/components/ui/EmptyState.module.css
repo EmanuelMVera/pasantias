@@ -10,10 +10,23 @@
   margin-bottom: 0.75rem;
 }
 
+.iconSvg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--space-3);
+  border-radius: 50%;
+  background: var(--info-soft);
+  color: var(--primary);
+}
+
 .title {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
+  font-weight: 700;
   margin: 0;
-  color: var(--text);
+  color: var(--text-strong);
 }
 
 .hint {

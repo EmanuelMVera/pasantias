@@ -1,7 +1,7 @@
 export const ESTADO_CONFIG = {
-  pendiente: { label: 'Pendiente', color: '#e67e22', bg: '#fef3e2', icon: '🕐' },
-  aprobado:  { label: 'Aprobado',  color: '#27ae60', bg: '#e8f8f0', icon: '✅' },
-  rechazado: { label: 'Rechazado', color: '#c0392b', bg: '#fdecea', icon: '❌' },
+  pendiente: { label: 'Pendiente', tone: 'orange', icon: 'clock' },
+  aprobado:  { label: 'Aprobado',  tone: 'green',  icon: 'checkCircle' },
+  rechazado: { label: 'Rechazado', tone: 'red',    icon: 'xCircle' },
 };
 
 export function formatFecha(iso) {

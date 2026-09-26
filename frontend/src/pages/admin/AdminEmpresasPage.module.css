@@ -1,23 +1,37 @@
 /* AdminEmpresasPage.module.css — listado general de empresas + confianza institucional. */
 
-/* ── Buscador + filtros ──────────────────────────────────────────────────── */
-.filtros {
+.error { margin-bottom: var(--space-4); }
+
+/* ── Barra de búsqueda + filtros (card liviana horizontal) ──────────────── */
+.toolbar {
   display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4) var(--space-5);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+}
+
+.busqueda {
+  display: flex;
+  flex: 1 1 320px;
+  min-width: min(100%, 260px);
 }
 
 .grupos {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem 1.75rem;
+  gap: var(--space-3) var(--space-5);
 }
 
 .resultados {
-  margin: 0 0 0.85rem;
-  font-size: 0.82rem;
-  color: var(--text-muted);
+  margin: 0 0 var(--space-3);
+  font-size: 0.86rem;
+  color: var(--text-soft);
 }
 
 /* Recarga (cambio de filtro/página): la lista previa queda visible, atenuada. */
@@ -25,19 +39,23 @@
 
 /* ── Celdas ──────────────────────────────────────────────────────────────── */
 .cuit  { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.fecha { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; }
+.fecha { font-size: 0.86rem; color: var(--text-soft); white-space: nowrap; }
 
 .sub {
   display: block;
   margin-top: 0.1rem;
-  font-size: 0.75rem;
-  color: var(--text-muted);
+  font-size: 0.8rem;
+  color: var(--text-soft);
 }
 
 /* ── Cards (tablet / móvil) ──────────────────────────────────────────────── */
 .cards {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
-  margin-bottom: 1rem;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+@media (max-width: 480px) {
+  .toolbar { padding: var(--space-3); }
 }

@@ -4,48 +4,82 @@
   padding: 0;
   display: flex;
   flex-direction: column;
+  gap: var(--space-3);
 }
 
 .item {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--border);
-  min-height: 52px;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  min-height: 68px;
 }
 
-.item:last-child { border-bottom: none; }
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--info-soft);
+  color: var(--primary);
+}
+
+.tone_blue   { background: var(--info-soft);    color: var(--primary); }
+.tone_orange { background: var(--warning-soft); color: #c2610c; }
+.tone_violet { background: var(--violet-soft);  color: #6d44a8; }
 
 .info {
   display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
 
+.title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.label {
+  font-size: 0.84rem;
+  color: var(--text-soft);
+}
+
+.ok { color: var(--text-soft); }
+
 .count {
-  font-size: 1.35rem;
+  font-family: var(--font-numeric);
+  min-width: 40px;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: var(--neutral-soft);
+  color: var(--neutral-text);
+  font-size: 1rem;
   font-weight: 800;
-  line-height: 1;
-  color: var(--text-muted);
-  min-width: 1.6ch;
+  text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
-.countActivo { color: var(--warning); }
-
-.label {
-  font-size: 0.92rem;
-  color: var(--text);
+.countActivo {
+  background: var(--warning-soft);
+  color: var(--warning-text);
 }
 
-.ok {
-  color: var(--text-muted);
-  font-size: 0.82rem;
-}
+.cta { display: flex; justify-content: flex-end; min-width: 0; }
 
-@media (max-width: 480px) {
-  .item { flex-wrap: wrap; }
+@media (max-width: 560px) {
+  .item {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .cta { grid-column: 1 / -1; justify-content: stretch; }
+  .cta :global(.btn-secondary) { width: 100%; min-height: 44px; }
+  .cta:empty { display: none; }
 }

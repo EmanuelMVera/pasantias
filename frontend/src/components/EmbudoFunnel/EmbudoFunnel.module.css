@@ -1,0 +1,119 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.funnel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.figure {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.row {
+  display: flex;
+  justify-content: center;
+  height: 40px;
+}
+
+/* Barra centrada con los bordes inferiores recortados: lectura de embudo. */
+.bar {
+  width: var(--ancho);
+  height: 100%;
+  border-radius: 6px;
+  clip-path: polygon(0 0, 100% 0, 94% 100%, 6% 100%);
+  transition: width 0.3s ease;
+}
+
+.bar0 { background: #1b5e96; }
+.bar1 { background: #2f80c2; }
+.bar2 { background: #5aa2dc; }
+.bar3 { background: #2fa36b; }
+
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.legendItem {
+  display: grid;
+  grid-template-columns: 12px auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 46px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.legendItem:last-child { border-bottom: none; }
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.legendValue {
+  font-family: var(--font-numeric);
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  min-width: 3ch;
+}
+
+.legendLabel {
+  font-size: 0.88rem;
+  color: var(--text-soft);
+}
+
+.tasas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-soft);
+}
+
+.tasa {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tasa dt {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  line-height: 1.3;
+}
+
+.tasa dd {
+  font-family: var(--font-numeric);
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .funnel { grid-template-columns: minmax(0, 1fr); }
+  .figure { max-width: 320px; width: 100%; margin: 0 auto; }
+  .tasas { grid-template-columns: minmax(0, 1fr); }
+  .tasa { flex-direction: row; justify-content: space-between; gap: var(--space-3); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar { transition: none; }
+}

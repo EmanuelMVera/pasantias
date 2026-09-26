@@ -1,7 +1,11 @@
 /* ── Filas ───────────────────────────────────────────────────────────────── */
 .fila { cursor: pointer; }
 
-.filaActiva td { background: #e8f4fb !important; }
+/* Fila con el detalle abierto: gana al hover global de .tabla sin !important. */
+.fila.filaActiva td,
+.fila.filaActiva:hover td { background: var(--info-soft); }
+
+.fila.filaActiva td:first-child { box-shadow: inset 3px 0 0 var(--primary); }
 
 .sub {
   display: block;
@@ -11,8 +15,8 @@
   color: var(--text-muted);
 }
 
-.emailCell { font-size: 0.85rem; color: var(--text-muted); }
-.fechaCell { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; }
+.emailCell { font-size: 0.86rem; color: var(--text-soft); }
+.fechaCell { font-size: 0.86rem; color: var(--text-soft); white-space: nowrap; }
 
 /* ── Tags de carreras ────────────────────────────────────────────────────── */
 .carrerasTags {
@@ -24,8 +28,8 @@
 .carreraTag {
   font-size: 0.75rem;
   font-weight: 600;
-  background: #e0f2fb;
-  color: #0073AD;
+  background: var(--info-soft);
+  color: var(--info-text);
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
   white-space: nowrap;
@@ -34,8 +38,8 @@
 .carreraMas {
   font-size: 0.75rem;
   font-weight: 600;
-  background: #f0f4f7;
-  color: var(--text-muted);
+  background: var(--neutral-soft);
+  color: var(--neutral-text);
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
 }
