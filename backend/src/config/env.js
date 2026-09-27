@@ -86,6 +86,22 @@ function resolveTrustProxy(raw) {
   return s;
 }
 
+/**
+ * Convierte una duración estilo jsonwebtoken/`ms` ('8h', '7d', '30m', '45s',
+ * '2w') o un número de segundos ('3600') a milisegundos. Devuelve null si el
+ * formato no es válido.
+ */
+const UNIDADES_MS = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000, w: 604_800_000 };
+function duracionAMs(valor) {
+  if (valor == null) return null;
+  const txt = String(valor).trim().toLowerCase();
+  const m = /^(\d+)\s*(s|m|h|d|w)?$/.exec(txt);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isSafeInteger(n) || n <= 0) return null;
+  return m[2] ? n * UNIDADES_MS[m[2]] : n * 1000; // sin unidad = segundos (como jsonwebtoken)
+}
+
 function deepFreeze(obj) {
   Object.getOwnPropertyNames(obj).forEach((k) => {
     const v = obj[k];
@@ -135,9 +151,15 @@ function loadConfig(raw = process.env) {
     isDev: !isProd && !isTest,
     port: raw.PORT != null && String(raw.PORT).trim() !== '' ? Number(raw.PORT) : 5000,
 
+    // Dos duraciones de sesión ("Recordarme" en el login):
+    //  - expiresIn (JWT_EXPIRES_IN, 7d): sesión PERSISTENTE — también fija el
+    //    maxAge de la cookie `token` cuando el usuario marca "Recordarme".
+    //  - sessionExpiresIn (JWT_SESSION_EXPIRES_IN, opcional, 8h): sesión sin
+    //    "Recordarme" — cookie de sesión del navegador + JWT corto.
     jwt: {
       secret: jwtSecret || '',
       expiresIn: raw.JWT_EXPIRES_IN || '7d',
+      sessionExpiresIn: raw.JWT_SESSION_EXPIRES_IN || '8h',
     },
 
     urls: {
@@ -249,6 +271,12 @@ function validateConfig(c) {
   };
 
   // ── siempre (cualquier entorno) ──
+  if (duracionAMs(c.jwt.expiresIn) == null) {
+    errors.push('JWT_EXPIRES_IN debe ser una duración válida (ej. 7d, 12h, 3600).');
+  }
+  if (duracionAMs(c.jwt.sessionExpiresIn) == null) {
+    errors.push('JWT_SESSION_EXPIRES_IN debe ser una duración válida (ej. 8h, 30m, 3600).');
+  }
   if (c._raw.PORT != null && String(c._raw.PORT).trim() !== ''
     && (!Number.isInteger(c.port) || c.port < 1 || c.port > 65535)) {
     errors.push('PORT debe ser un entero entre 1 y 65535.');
@@ -350,6 +378,7 @@ module.exports = {
   loadConfig,
   validateConfig,
   validateEnv,
+  duracionAMs,
   // exportados para tests
   normalizeUrl,
   parseOrigins,

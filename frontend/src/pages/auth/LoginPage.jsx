@@ -13,7 +13,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Buscamos si hay un email guardado en localStorage para autocompletar el campo y marcar "Recordarme"
+  // "Recordarme" controla dos cosas: la sesión persistente (el backend emite una
+  // cookie de 7 días en vez de una de sesión del navegador) y, por comodidad,
+  // recordar el email en este equipo. Si hay un email guardado, se autocompleta
+  // y el checkbox arranca marcado.
   useEffect(() => {
     const savedEmail = localStorage.getItem('rememberedEmail');
     if (savedEmail) {
@@ -75,15 +78,14 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const usuario = await login(form.email, form.password);
+      const usuario = await login(form.email, form.password, form.remember);
 
-      // --- LÓGICA DE RECORDARME ---
+      // Recordar (o dejar de recordar) el email en este equipo.
       if (form.remember) {
         localStorage.setItem('rememberedEmail', form.email);
       } else {
         localStorage.removeItem('rememberedEmail');
       }
-      // ----------------------------
 
       navigate(getRutaInicio(usuario.rol), { replace: true });
     } catch (err) {

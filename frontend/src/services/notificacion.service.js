@@ -8,4 +8,6 @@ export const notificacionService = {
   leer:         (id) => api.patch(`/notificaciones/${id}/leer`),
   leerTodas:    () => api.patch('/notificaciones/leer-todas'),
   eliminar:     (id) => api.delete(`/notificaciones/${id}`),
+  // Borra SOLO las notificaciones propias ya leídas (nunca las pendientes).
+  eliminarLeidas: () => api.delete('/notificaciones/leidas'),
 };

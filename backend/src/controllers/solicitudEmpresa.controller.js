@@ -1,6 +1,7 @@
 'use strict';
 
 const { SolicitudEmpresa } = require('../models');
+const { notificarAdminsSistema } = require('../utils/notificador');
 
 /**
  * POST /api/solicitudes-empresa
@@ -53,6 +54,15 @@ async function crearSolicitud(req, res) {
       puestos:     puestos?.trim()     || null,
       reclutadores: reclutadoresLimpios,
       estado: 'pendiente',
+    });
+
+    // Aviso in-app a los admins del sistema: hay algo nuevo para revisar.
+    // Fire-and-forget: un fallo al notificar no impide registrar la solicitud.
+    notificarAdminsSistema({
+      titulo: 'Nueva solicitud de empresa',
+      mensaje: `"${solicitud.razonSocial}" solicitó registrarse en SisPasantías.`,
+      accionURL: '/admin/solicitudes',
+      logKey: 'notif_admin_solicitud_empresa_fallo',
     });
 
     return res.status(201).json({

@@ -2412,7 +2412,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Setea la cookie `token` (HttpOnly) y además devuelve el `token` en el body. CSRF exento.",
+        "description": "Setea la cookie `token` (HttpOnly) y además devuelve el `token` en el body. CSRF exento. Sin `remember` (o `false`): cookie de sesión del navegador (sin Max-Age) y JWT de JWT_SESSION_EXPIRES_IN (8h). Con `remember: true`: cookie persistente y JWT de JWT_EXPIRES_IN (7d).",
         "security": [],
         "requestBody": {
           "required": true,
@@ -2431,6 +2431,11 @@
                   },
                   "password": {
                     "type": "string"
+                  },
+                  "remember": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "\"Recordarme\": sesión persistente."
                   }
                 }
               }
@@ -5355,6 +5360,58 @@
           {
             "$ref": "#/components/parameters/id"
           },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ]
+      }
+    },
+    "/api/notificaciones/leidas": {
+      "delete": {
+        "tags": [
+          "notificaciones"
+        ],
+        "operationId": "notificacionesEliminarLeidas",
+        "summary": "Eliminar mis notificaciones ya leídas",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "eliminadas"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "eliminadas": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403Csrf"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Borra solo las notificaciones del usuario autenticado con `leida=true`. Las no leídas y las de otros usuarios no se tocan.",
+        "parameters": [
           {
             "$ref": "#/components/parameters/csrfHeader"
           }

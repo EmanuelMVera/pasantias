@@ -4,7 +4,7 @@ const { EmpresaUsuario, Usuario, SolicitudReclutador } = require('../models');
 const HttpError = require('../utils/httpError');
 const authService = require('./auth.service');
 const solicitudReclutadorService = require('./solicitudReclutador.service');
-const { crearNotificacion } = require('../utils/notificador');
+const { crearNotificacion, notificarAdminsSistema } = require('../utils/notificador');
 const { registrarAuditoria } = require('../utils/auditLog');
 const logger = require('../utils/logger');
 
@@ -184,6 +184,16 @@ async function solicitarReclutador(empresa, { nombre, apellido, email }, ctx = {
       .catch((e) => logger.error({ err: e }, 'email_reclutador_auto_aprobado_fallo'));
 
     notificarAdminsReclutadorAutoAprobado(solicitud, empresa); // fire-and-forget
+  } else {
+    // Empresa estándar: la solicitud queda PENDIENTE de aprobación → aviso a
+    // los admins del sistema (fire-and-forget). En la rama confiable no se
+    // manda este aviso: solo el informativo de alta automática de arriba.
+    notificarAdminsSistema({
+      titulo: 'Nueva solicitud de reclutador',
+      mensaje: `"${empresa.razonSocial}" solicitó sumar a ${solicitud.nombre} ${solicitud.apellido} a su equipo de reclutamiento.`,
+      accionURL: '/admin/solicitudes?tab=reclutadores',
+      logKey: 'notif_admin_solicitud_reclutador_fallo',
+    });
   }
 
   return solicitud;

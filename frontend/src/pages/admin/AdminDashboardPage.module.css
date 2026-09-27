@@ -104,6 +104,72 @@
   color: var(--text-soft);
 }
 
+/* ── Ofertas por área — variante lista (≤480px) ── */
+.areasLista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.areaItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.areaNombre {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  line-height: 1.3;
+}
+
+.areaFila {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.areaPista {
+  flex: 1;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+
+.areaBarra {
+  display: block;
+  width: var(--ancho);
+  height: 100%;
+  border-radius: 6px;
+  background: var(--primary);
+}
+
+.areaValor {
+  min-width: 2.5ch;
+  text-align: right;
+  font-family: var(--font-numeric);
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--text-strong);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ── Ranking de empresas ── */
 .rankingList {
   list-style: none;

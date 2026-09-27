@@ -313,6 +313,7 @@ export default function AdminOfertasPage() {
       <Tabs
         idPrefix="ofe"
         ariaLabel="Ofertas"
+        stretch
         value={tab}
         onChange={setTab}
         tabs={[

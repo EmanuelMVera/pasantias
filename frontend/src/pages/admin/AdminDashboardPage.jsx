@@ -61,10 +61,42 @@ const TOOLTIP_STYLE = {
   fontSize: 13,
 };
 
+/**
+ * Variante móvil de "Ofertas por área": mismos datos que el gráfico, como
+ * lista (nombre completo arriba, barra proporcional al máximo y el valor en
+ * texto). Sin librería: la barra es un div con ancho relativo.
+ */
+function AreasLista({ data }) {
+  const max = Math.max(...data.map((d) => d.valor), 0);
+  return (
+    <ol className={styles.areasLista} aria-label="Ofertas por área">
+      {data.map((d) => (
+        <li key={d.name} className={styles.areaItem}>
+          <span className={styles.areaNombre}>{d.name}</span>
+          <span className={styles.areaFila}>
+            <span className={styles.areaPista} aria-hidden="true">
+              <span
+                className={styles.areaBarra}
+                style={{ '--ancho': `${max > 0 ? Math.max((d.valor / max) * 100, 2) : 0}%` }}
+              />
+            </span>
+            <span className={styles.areaValor}>
+              {fmt(d.valor)} <span className={styles.srOnly}>{d.valor === 1 ? 'oferta' : 'ofertas'}</span>
+            </span>
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const { toast, showToast } = useToast(5000);
   const angosto = useMediaQuery('(max-width: 560px)');
+  // ≤480px: "Ofertas por área" como lista (etiqueta arriba + barra) en vez del
+  // gráfico horizontal, para que los nombres largos de área no se corten.
+  const areasEnLista = useMediaQuery('(max-width: 480px)');
 
   const [periodoDias, setPeriodoDias] = useState(30);
   const [stats, setStats] = useState(null);
@@ -229,6 +261,7 @@ export default function AdminDashboardPage() {
             label="Período"
             hideLabel
             ariaLabel="Período de la actividad"
+            gridMobile
             options={PERIODOS}
             value={periodoDias}
             onChange={setPeriodoDias}
@@ -295,7 +328,9 @@ export default function AdminDashboardPage() {
 
             {!cargando && stats && (
               <Card as="section" titleId="sec-areas" title="Ofertas por área" subtitle="Cantidad de ofertas publicadas en cada área." headingLevel={3} className={styles.bloqueGrid}>
-                {areaData.length > 0 ? (
+                {areaData.length > 0 && areasEnLista ? (
+                  <AreasLista data={areaData} />
+                ) : areaData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={Math.max(180, areaData.length * 44)}>
                     <BarChart data={areaData} layout="vertical" margin={{ left: angosto ? 0 : 8, right: angosto ? 8 : 24, top: 4, bottom: 4 }} barSize={18}>
                       <CartesianGrid horizontal={false} stroke="#eef2f6" />

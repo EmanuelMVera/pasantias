@@ -13,6 +13,6 @@ const OPCIONES = [
  */
 export default function SolicitudesFiltroEstado({ value, onChange, idPrefix = 'filtro' }) {
   return (
-    <FilterGroup label="Estado" options={OPCIONES} value={value} onChange={onChange} idPrefix={idPrefix} />
+    <FilterGroup label="Estado" options={OPCIONES} value={value} onChange={onChange} idPrefix={idPrefix} gridMobile />
   );
 }

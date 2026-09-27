@@ -210,6 +210,14 @@ El sistema tiene **dos tipos de log distintos, con propósitos distintos**:
 **Regla:** eventos de negocio/seguridad → `registrarAuditoria`. Todo lo demás → `logger`
 (`src/utils/logger.js`). Nunca meter ruido técnico en `activity_logs`, nunca auditar con `console`.
 
+**Auditoría ≠ notificación.** La auditoría es el registro **completo** de acciones del sistema.
+Una **notificación** (`src/utils/notificador.js`) es un aviso dirigido a un usuario porque pasó algo
+que debe conocer o revisar. No se crea una notificación por cada `ActivityLog`: nunca por logins,
+exportaciones, navegación, ediciones ni por acciones que el propio destinatario acaba de hacer.
+Hoy los admins del sistema reciben avisos solo por: nueva solicitud de empresa, nueva solicitud de
+reclutador de una empresa estándar, oferta pendiente de moderación, oferta publicada
+automáticamente y reclutador agregado automáticamente (empresas de confianza).
+
 - **Nivel de log**: env `LOG_LEVEL` (`debug|info|warn|error|fatal|silent`). Default: `debug` en
   desarrollo (incluye el SQL de Sequelize), `info` en producción, `silent` en tests.
 - **Retención**: `npm run logs:archivar` (dry-run) / `npm run logs:archivar -- --apply`.

@@ -13,11 +13,17 @@ module.exports = {
   '/api/auth/login': {
     post: operation({
       tag: T, id: 'authLogin', summary: 'Iniciar sesión',
-      description: 'Setea la cookie `token` (HttpOnly) y además devuelve el `token` en el body. CSRF exento.',
+      description: 'Setea la cookie `token` (HttpOnly) y además devuelve el `token` en el body. CSRF exento. '
+        + 'Sin `remember` (o `false`): cookie de sesión del navegador (sin Max-Age) y JWT de JWT_SESSION_EXPIRES_IN (8h). '
+        + 'Con `remember: true`: cookie persistente y JWT de JWT_EXPIRES_IN (7d).',
       security: [],
       body: {
         type: 'object', required: ['email', 'password'],
-        properties: { email: { type: 'string', format: 'email' }, password: { type: 'string' } },
+        properties: {
+          email: { type: 'string', format: 'email' },
+          password: { type: 'string' },
+          remember: { type: 'boolean', default: false, description: '"Recordarme": sesión persistente.' },
+        },
       },
       responses: { 200: named('LoginResponse') },
       errors: ['401', '429'],

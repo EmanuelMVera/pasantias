@@ -53,6 +53,15 @@ const leerUna = async (req, res) => {
   return res.json({ success: true, message: 'Notificación marcada como leída.' });
 };
 
+// Borrado masivo acotado: solo las notificaciones del propio usuario Y ya
+// leídas. Las pendientes (leida=false) nunca se tocan.
+const eliminarLeidas = async (req, res) => {
+  const eliminadas = await Notificacion.destroy({
+    where: { usuarioId: req.usuario.id, leida: true },
+  });
+  return res.json({ success: true, eliminadas });
+};
+
 const eliminarNotificacion = async (req, res) => {
   await Notificacion.destroy({
     where: { id: req.params.id, usuarioId: req.usuario.id },
@@ -65,5 +74,6 @@ module.exports = {
   getSinLeerCount,
   leerTodas,
   leerUna,
+  eliminarLeidas,
   eliminarNotificacion,
 };

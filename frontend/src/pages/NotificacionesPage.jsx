@@ -9,6 +9,8 @@
  * - Marcar una notificación como leída (clic en card)
  * - Marcar todas como leídas
  * - Eliminar notificaciones individualmente
+ * - Eliminar todas las notificaciones YA LEÍDAS (con confirmación; las
+ *   pendientes nunca se borran en bloque)
  * - Navegar a la acción asociada (accionURL o enlace)
  * - Indicadores visuales de prioridad y tipo
  */
@@ -20,6 +22,7 @@ import Paginacion from '../components/Paginacion/Paginacion';
 import PageHeader from '../components/ui/PageHeader';
 import EmptyState from '../components/ui/EmptyState';
 import Icon from '../components/ui/Icon';
+import ConfirmModal from '../components/ui/ConfirmModal';
 import { usePaginacion } from '../hooks/usePaginacion';
 import styles from './NotificacionesPage.module.css';
 
@@ -154,6 +157,8 @@ export default function NotificacionesPage() {
   const [success,  setSuccess]  = useState('');
   const [pagination, setPagination] = useState(null);
   const [noLeidasCount, setNoLeidasCount] = useState(0);
+  const [confirmarBorrado, setConfirmarBorrado] = useState(false);
+  const [borrando, setBorrando] = useState(false);
   const { page, setPage } = usePaginacion([filtro]);
 
   const refrescarSinLeer = useCallback(() => {
@@ -221,6 +226,32 @@ export default function NotificacionesPage() {
     }
   };
 
+  /* Eliminar leídas (con confirmación). Cuántas hay se deduce de datos reales:
+     en "Leídas" es el total del filtro; en "Todas", total − sin leer. */
+  const leidasCount = loading || !pagination ? 0
+    : filtro === 'leidas' ? pagination.total
+    : filtro === 'todas' ? Math.max(0, pagination.total - noLeidasCount)
+    : 0;
+
+  const handleEliminarLeidas = async () => {
+    setBorrando(true);
+    try {
+      const { data } = await notificacionService.eliminarLeidas();
+      const n = data.eliminadas ?? 0;
+      setConfirmarBorrado(false);
+      setSuccess(`Se eliminaron ${n} notificaci${n !== 1 ? 'ones' : 'ón'} leída${n !== 1 ? 's' : ''}.`);
+      setTimeout(() => setSuccess(''), 3000);
+      // noLeidasCount no cambia: solo se borraron leídas.
+      if (page !== 1) setPage(1);
+      else await cargar();
+    } catch {
+      setConfirmarBorrado(false);
+      setError('No se pudieron eliminar las notificaciones leídas.');
+    } finally {
+      setBorrando(false);
+    }
+  };
+
   const notifsFiltradas = notifs;
 
   return (
@@ -264,11 +295,19 @@ export default function NotificacionesPage() {
             </button>
           ))}
         </div>
-        {!loading && pagination && (
-          <p className={styles.resultados} role="status" aria-live="polite">
-            {pagination.total} notificaci{pagination.total !== 1 ? 'ones' : 'ón'}
-          </p>
-        )}
+        <div className={styles.filtroAcciones}>
+          {!loading && pagination && (
+            <p className={styles.resultados} role="status" aria-live="polite">
+              {pagination.total} notificaci{pagination.total !== 1 ? 'ones' : 'ón'}
+            </p>
+          )}
+          {leidasCount > 0 && (
+            <button type="button" className="btn-secondary" onClick={() => setConfirmarBorrado(true)}>
+              <Icon name="trash" size={17} />
+              Eliminar leídas
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Lista ───────────────────────────────────────────────────────── */}
@@ -300,6 +339,23 @@ export default function NotificacionesPage() {
           </div>
           <Paginacion pagination={pagination} onPageChange={setPage} />
         </>
+      )}
+
+      {confirmarBorrado && (
+        <ConfirmModal
+          title="Eliminar notificaciones leídas"
+          confirmLabel="Eliminar leídas"
+          tone="danger"
+          busy={borrando}
+          onConfirm={handleEliminarLeidas}
+          onClose={() => setConfirmarBorrado(false)}
+          confirmId="btn-confirmar-eliminar-leidas"
+        >
+          <p>
+            Se eliminarán <strong>{leidasCount}</strong> notificaci{leidasCount !== 1 ? 'ones' : 'ón'} ya
+            leída{leidasCount !== 1 ? 's' : ''}. Las notificaciones pendientes se conservarán.
+          </p>
+        </ConfirmModal>
       )}
     </div>
   );

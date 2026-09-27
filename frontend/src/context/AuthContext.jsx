@@ -78,10 +78,12 @@ export const AuthProvider = ({ children }) => {
   /**
    * Inicia sesión con email y contraseña. El backend setea la cookie HttpOnly;
    * acá solo guardamos el usuario en memoria.
+   * @param {boolean} [remember=false] "Recordarme": sesión persistente (cookie
+   *   de 7 días). Sin él, la cookie es de sesión del navegador y el JWT dura 8h.
    * @returns {Object} Datos del usuario autenticado (normalizados)
    */
-  const login = async (email, password) => {
-    const { data } = await authService.login({ email, password });
+  const login = async (email, password, remember = false) => {
+    const { data } = await authService.login({ email, password, remember: remember === true });
     const normalizado = normalizarUsuario(data.usuario);
     setUsuario(normalizado);
     return normalizado;

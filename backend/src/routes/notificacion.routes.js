@@ -11,6 +11,8 @@
  * - GET    /sin-leer-count  → Devuelve solo el conteo de no leídas (para el badge)
  * - PATCH  /leer-todas      → Marca todas como leídas
  * - PATCH  /:id/leer        → Marca una notificación específica como leída
+ * - DELETE /leidas          → Elimina TODAS las notificaciones propias ya leídas
+ *                             (nunca las no leídas ni las de otro usuario)
  * - DELETE /:id             → Elimina una notificación propia
  */
 
@@ -22,6 +24,7 @@ const {
   getSinLeerCount,
   leerTodas,
   leerUna,
+  eliminarLeidas,
   eliminarNotificacion,
 } = require('../controllers/notificacion.controller');
 
@@ -29,6 +32,7 @@ router.get('/',                verifyToken, asyncHandler(getNotificaciones));
 router.get('/sin-leer-count',  verifyToken, asyncHandler(getSinLeerCount));
 router.patch('/leer-todas',    verifyToken, asyncHandler(leerTodas));
 router.patch('/:id/leer',      verifyToken, asyncHandler(leerUna));
+router.delete('/leidas',       verifyToken, asyncHandler(eliminarLeidas));
 router.delete('/:id',          verifyToken, asyncHandler(eliminarNotificacion));
 
 module.exports = router;

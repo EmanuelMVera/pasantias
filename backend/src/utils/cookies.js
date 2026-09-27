@@ -8,6 +8,10 @@
  * El seteo/borrado usa `res.cookie` / `res.clearCookie`, que son built-in de Express.
  */
 
+const { config, duracionAMs } = require('../config/env');
+
+const SIETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
+
 /**
  * @param {import('express').Request} req
  * @returns {Record<string,string>}
@@ -28,8 +32,18 @@ function parseCookies(req) {
   return out;
 }
 
-/** Opciones base de la cookie de sesión (JWT). */
-function cookieOptionsToken() {
+/**
+ * Opciones de la cookie de sesión (JWT).
+ *
+ * - `persistent: false` (login SIN "Recordarme"): cookie de SESIÓN del
+ *   navegador — sin `maxAge`/`Expires`, el navegador la descarta al cerrar
+ *   la sesión. El JWT que lleva además expira en JWT_SESSION_EXPIRES_IN (8h).
+ * - `persistent: true` (CON "Recordarme"): `maxAge` = JWT_EXPIRES_IN (7d).
+ *
+ * El resto de los atributos (httpOnly/secure/sameSite/domain/path) es idéntico
+ * en ambos casos: así `cookieClearOptions()` borra cualquiera de las dos.
+ */
+function cookieOptionsToken({ persistent = false } = {}) {
   const isProd = process.env.NODE_ENV === 'production';
   const sameSite = (process.env.COOKIE_SAMESITE || 'lax').toLowerCase();
   return {
@@ -38,13 +52,18 @@ function cookieOptionsToken() {
     sameSite,
     domain: process.env.COOKIE_DOMAIN || undefined,
     path: '/',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    ...(persistent ? { maxAge: duracionAMs(config.jwt.expiresIn) || SIETE_DIAS_MS } : {}),
   };
 }
 
-/** Opciones de la cookie CSRF — igual que la de token pero legible por JS. */
+/**
+ * Opciones de la cookie CSRF — mismos atributos que la de token pero legible
+ * por JS. Sigue siendo persistente (no autentica por sí sola: el double-submit
+ * solo exige que header y cookie coincidan). Si falta, csrf.js la re-emite en
+ * el próximo request, así que tampoco rompe una sesión corta.
+ */
 function cookieOptionsCsrf() {
-  return { ...cookieOptionsToken(), httpOnly: false };
+  return { ...cookieOptionsToken({ persistent: true }), httpOnly: false };
 }
 
 /**
@@ -54,8 +73,7 @@ function cookieOptionsCsrf() {
  * Punto único: antes esto estaba duplicado en auth.controller.js.
  */
 function cookieClearOptions() {
-  const { maxAge, ...rest } = cookieOptionsToken();
-  return rest;
+  return cookieOptionsToken({ persistent: false });
 }
 
 module.exports = { parseCookies, cookieOptionsToken, cookieOptionsCsrf, cookieClearOptions };

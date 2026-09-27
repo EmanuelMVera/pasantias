@@ -33,6 +33,7 @@
   font-size: 0.8rem;
   font-weight: 400;
   color: var(--text-soft);
+  overflow-wrap: anywhere;
 }
 
 .acciones {

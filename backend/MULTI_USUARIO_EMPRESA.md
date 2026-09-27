@@ -48,7 +48,9 @@ al aprobar.
 
 ```
 admin_empresa → POST /api/empresas/equipo/solicitar { nombre, apellido, email }
-             → queda una SolicitudReclutador 'pendiente' + notificación al admin
+             → queda una SolicitudReclutador 'pendiente' + notificación in-app a los admins
+               del sistema ("Nueva solicitud de reclutador", → /admin/solicitudes?tab=reclutadores)
+               (empresa de confianza: alta automática + aviso "Reclutador agregado automáticamente")
 admin        → GET  /api/admin/solicitudes-reclutador
              → PATCH /api/admin/solicitudes-reclutador/:id/aprobar
              → se crea Usuario (rol 'empresa') + EmpresaUsuario (rolInterno 'reclutador')

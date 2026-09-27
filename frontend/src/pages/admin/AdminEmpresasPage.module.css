@@ -41,11 +41,13 @@
 .cuit  { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .fecha { font-size: 0.86rem; color: var(--text-soft); white-space: nowrap; }
 
+/* Email del responsable: se corta solo si no entra. */
 .sub {
   display: block;
   margin-top: 0.1rem;
   font-size: 0.8rem;
   color: var(--text-soft);
+  overflow-wrap: anywhere;
 }
 
 /* ── Cards (tablet / móvil) ──────────────────────────────────────────────── */

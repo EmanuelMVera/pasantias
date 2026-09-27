@@ -118,6 +118,7 @@
   display: block;
   color: var(--text-soft);
   font-size: 0.8rem;
+  overflow-wrap: anywhere;
 }
 
 .sistema {

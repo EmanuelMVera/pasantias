@@ -57,6 +57,55 @@ describe('EMPRESA CONFIANZA (RBAC-05)', () => {
     expect(cuentaCreada).toBeNull();
   });
 
+  test('empresa estándar: la solicitud de reclutador pendiente notifica a los admins del sistema', async () => {
+    const { admin } = await crearAdminSistema();
+    const { usuarioAdmin, empresa, passwordPlana } = await crearEmpresaConAdmin();
+    idsUsuarios.push(usuarioAdmin.id);
+    const token = await loginYObtenerToken(usuarioAdmin.email, passwordPlana);
+
+    const email = `pendiente-notif-${Date.now()}@test.local`;
+    const res = await request(app)
+      .post('/api/empresas/equipo/solicitar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre: 'Lucía', apellido: 'Ferrari', email });
+    expect(res.status).toBe(201);
+
+    const notif = await esperarNotificacion({ usuarioId: admin.id, titulo: 'Nueva solicitud de reclutador' });
+    expect(notif).not.toBeNull();
+    expect(notif.mensaje).toContain(empresa.razonSocial);
+    expect(notif.mensaje).toContain('Lucía Ferrari');
+    expect(notif.accionURL).toBe('/admin/solicitudes?tab=reclutadores');
+    expect(notif.tipo).toBe('sistema');
+
+    // Nunca además el aviso de alta automática para el mismo evento.
+    expect(await Notificacion.count({
+      where: { usuarioId: admin.id, titulo: '🤝 Reclutador agregado automáticamente' },
+    })).toBe(0);
+  });
+
+  test('empresa confiable: NO genera el aviso de solicitud pendiente, solo el de alta automática', async () => {
+    const { admin } = await crearAdminSistema();
+    const { usuarioAdmin, passwordPlana } = await crearEmpresaConAdmin({ empresa: { nivelConfianza: 'confiable' } });
+    idsUsuarios.push(usuarioAdmin.id);
+    const token = await loginYObtenerToken(usuarioAdmin.email, passwordPlana);
+
+    const email = `auto-notif-${Date.now()}@test.local`;
+    const res = await request(app)
+      .post('/api/empresas/equipo/solicitar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre: 'Tomás', apellido: 'Confiable', email });
+    expect(res.status).toBe(201);
+    const creado = await Usuario.findOne({ where: { email } });
+    if (creado) idsUsuarios.push(creado.id);
+
+    const auto = await esperarNotificacion({ usuarioId: admin.id, titulo: '🤝 Reclutador agregado automáticamente' });
+    expect(auto).not.toBeNull();
+    await new Promise((r) => setTimeout(r, 150));
+    expect(await Notificacion.count({
+      where: { usuarioId: admin.id, titulo: 'Nueva solicitud de reclutador' },
+    })).toBe(0);
+  });
+
   test('empresa estándar: oferta creada por un reclutador queda pendiente y no visible', async () => {
     const { empresa } = await crearEmpresaConAdmin();
     const { usuarioReclutador, passwordPlana } = await agregarReclutador(empresa);

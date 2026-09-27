@@ -8,9 +8,12 @@ const { config } = require('../config/env');
 // usuarios.tokenVersion en cada request. Incrementar la columna (cambio de
 // contraseña, "cerrar sesión en todos los dispositivos") invalida de golpe
 // cualquier token viejo, sin necesidad de una tabla de sesiones (EST-08 §5.3).
-const generarToken = (usuario) =>
+//
+// `persistente` = el usuario marcó "Recordarme": JWT de larga duración
+// (JWT_EXPIRES_IN, 7d). Si no, sesión corta (JWT_SESSION_EXPIRES_IN, 8h).
+const generarToken = (usuario, { persistente = false } = {}) =>
   jwt.sign({ id: usuario.id, rol: usuario.rol, tokenVersion: usuario.tokenVersion ?? 0 }, config.jwt.secret, {
-    expiresIn: config.jwt.expiresIn,
+    expiresIn: persistente ? config.jwt.expiresIn : config.jwt.sessionExpiresIn,
   });
 
 // Hash del token de recupero — se persiste esto, nunca el token en claro.

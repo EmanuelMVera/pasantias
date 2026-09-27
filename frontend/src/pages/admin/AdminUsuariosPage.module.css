@@ -81,12 +81,14 @@
 
 .nombreInactivo { color: var(--text-soft); }
 
+/* Emails y ubicación: se cortan solo si una palabra (un email largo) no entra. */
 .sub {
   display: block;
   margin-top: 0.1rem;
   font-size: 0.8rem;
   font-weight: 400;
   color: var(--text-soft);
+  overflow-wrap: anywhere;
 }
 
 .fecha {

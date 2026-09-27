@@ -9,6 +9,9 @@
  * - Flechas ← → Home End mueven el foco Y la selección (roving tabindex).
  * - `count` opcional (pendientes); `alerta` lo resalta en naranja (hay algo por atender).
  * - `icon` opcional: nombre de un ícono de `ui/Icon` (decorativo).
+ * - `stretch`: las pestañas se reparten el ancho en partes iguales (grilla).
+ *   En teléfonos angostos el contador puede bajar de línea, pero el label y el
+ *   ícono nunca se cortan y no aparece scroll horizontal.
  */
 
 import { useRef } from 'react';
@@ -29,7 +32,7 @@ export function TabPanel({ idPrefix, tabKey, children }) {
   );
 }
 
-export default function Tabs({ tabs, value, onChange, idPrefix = 'tabs', ariaLabel }) {
+export default function Tabs({ tabs, value, onChange, idPrefix = 'tabs', ariaLabel, stretch = false }) {
   const refs = useRef({});
 
   const onKeyDown = (e) => {
@@ -47,7 +50,12 @@ export default function Tabs({ tabs, value, onChange, idPrefix = 'tabs', ariaLab
   };
 
   return (
-    <div className={styles.tabs} role="tablist" aria-label={ariaLabel} onKeyDown={onKeyDown}>
+    <div
+      className={`${styles.tabs} ${stretch ? styles.tabsStretch : ''}`}
+      role="tablist"
+      aria-label={ariaLabel}
+      onKeyDown={onKeyDown}
+    >
       {tabs.map((t) => {
         const activo = t.key === value;
         return (
@@ -64,7 +72,7 @@ export default function Tabs({ tabs, value, onChange, idPrefix = 'tabs', ariaLab
             onClick={() => onChange(t.key)}
           >
             {t.icon && <span className={styles.icon}><Icon name={t.icon} size={18} /></span>}
-            {t.label}
+            <span className={styles.label}>{t.label}</span>
             {t.count != null && (
               <span className={`${styles.count} ${t.alerta && t.count > 0 ? styles.countAlerta : ''}`}>
                 {t.count}

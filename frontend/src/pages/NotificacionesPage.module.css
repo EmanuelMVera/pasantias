@@ -78,6 +78,19 @@
   color: #fff;
 }
 
+.filtroAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.filtroAcciones :global(.btn-secondary) { min-height: 40px; }
+
+@media (pointer: coarse) {
+  .filtroAcciones :global(.btn-secondary) { min-height: 44px; }
+}
+
 .resultados {
   margin: 0;
   font-size: 0.86rem;

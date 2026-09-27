@@ -255,6 +255,7 @@ export default function AdminSolicitudesPage() {
       <Tabs
         idPrefix="sol"
         ariaLabel="Tipo de solicitud"
+        stretch
         value={tab}
         onChange={setTab}
         tabs={[

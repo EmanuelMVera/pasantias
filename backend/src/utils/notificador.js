@@ -15,6 +15,14 @@
  *     tipo: 'postulacion',
  *     enlace: '/empresa/postulaciones/3',
  *   });
+ *
+ * ── AUDITORÍA ≠ NOTIFICACIÓN ────────────────────────────────────────────────
+ * AUDITORÍA (utils/auditLog.js → activity_logs): registro COMPLETO de acciones
+ *   del sistema (logins, exports, ediciones, aprobaciones…). Es exhaustiva.
+ * NOTIFICACIÓN (este archivo): aviso dirigido a un usuario porque ocurrió algo
+ *   que debe conocer o revisar (algo nuevo pendiente, un cambio que lo afecta).
+ * No se notifica cada ActivityLog: nada de logins, exportaciones, ediciones ni
+ * acciones que el propio destinatario acaba de hacer. Ver backend/README.md §8b.
  */
 
 'use strict';
@@ -68,4 +76,44 @@ async function _enviarEmailNotificacion({ usuarioId, titulo, mensaje, enlace }) 
   }
 }
 
-module.exports = { crearNotificacion };
+/**
+ * Notifica a TODOS los administradores del sistema activos (rol admin,
+ * activo y habilitado). Pensado para cosas nuevas que requieren su atención
+ * (p. ej. una solicitud pendiente de revisión), no para eventos rutinarios.
+ *
+ * Nunca lanza: se usa fire-and-forget desde el flujo principal, y un fallo
+ * al notificar no debe impedir la operación que lo originó.
+ *
+ * @param {object} datos
+ * @param {string} datos.titulo
+ * @param {string} datos.mensaje
+ * @param {string} datos.accionURL  ruta interna donde se resuelve el aviso
+ * @param {string} [datos.tipo='sistema']
+ * @param {string} [datos.tipoVisual='info']
+ * @param {string} [datos.logKey='notif_admins_fallo']  clave del log si falla
+ * @returns {Promise<number>} cantidad de notificaciones creadas
+ */
+async function notificarAdminsSistema({
+  titulo, mensaje, accionURL, tipo = 'sistema', tipoVisual = 'info', logKey = 'notif_admins_fallo',
+}) {
+  try {
+    const admins = await Usuario.findAll({
+      where: { rol: 'admin', activo: true, habilitado: true },
+      attributes: ['id'],
+    });
+    const resultados = await Promise.allSettled(admins.map((admin) =>
+      crearNotificacion({
+        usuarioId: admin.id, titulo, mensaje, tipo, tipoVisual,
+        enlace: accionURL, accionURL,
+      })
+    ));
+    const fallidas = resultados.filter((r) => r.status === 'rejected');
+    if (fallidas.length) logger.error({ err: fallidas[0].reason, fallidas: fallidas.length }, logKey);
+    return resultados.length - fallidas.length;
+  } catch (err) {
+    logger.error({ err }, logKey);
+    return 0;
+  }
+}
+
+module.exports = { crearNotificacion, notificarAdminsSistema };

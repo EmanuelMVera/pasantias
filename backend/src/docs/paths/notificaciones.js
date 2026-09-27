@@ -46,6 +46,24 @@ module.exports = {
     }),
   },
 
+  '/api/notificaciones/leidas': {
+    delete: operation({
+      tag: T, id: 'notificacionesEliminarLeidas', summary: 'Eliminar mis notificaciones ya leídas',
+      description: 'Borra solo las notificaciones del usuario autenticado con `leida=true`. Las no leídas y las de otros usuarios no se tocan.',
+      csrf: true,
+      responses: {
+        200: {
+          description: 'OK',
+          content: { 'application/json': { schema: {
+            type: 'object', required: ['success', 'eliminadas'],
+            properties: { success: { type: 'boolean' }, eliminadas: { type: 'integer', minimum: 0 } },
+          } } },
+        },
+      },
+      errors: ['401', '403csrf'],
+    }),
+  },
+
   '/api/notificaciones/{id}': {
     delete: operation({
       tag: T, id: 'notificacionesEliminar', summary: 'Eliminar una notificación',

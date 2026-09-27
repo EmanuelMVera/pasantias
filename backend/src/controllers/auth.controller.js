@@ -25,9 +25,13 @@ const logger = require('../utils/logger');
 /**
  * POST /api/auth/login
  * Autentica un usuario con email y contraseña.
+ *
+ * `remember` ("Recordarme"): solo `true` (o el string exacto 'true') pide una
+ * sesión persistente; cualquier otro valor → sesión corta (fail-safe).
  */
 exports.login = async (req, res) => {
   const { email, password } = req.body;
+  const remember = req.body?.remember === true || req.body?.remember === 'true';
 
   const usuario = await Usuario.findOne({ where: { email } });
   // Mismo mensaje para "no existe" y "password incorrecta" (más abajo) —
@@ -42,11 +46,13 @@ exports.login = async (req, res) => {
   const match = await authService.compararPassword(password, usuario.password);
   if (!match) throw new HttpError(401, 'Credenciales inválidas.');
 
-  const token = authService.generarToken(usuario);
+  const token = authService.generarToken(usuario, { persistente: remember });
 
   // SEC-02: el token va en una cookie HttpOnly. Se mantiene también en el body
   // por transición (clientes API / suite de tests con header Authorization).
-  res.cookie('token', token, cookieOptionsToken());
+  // Sin "Recordarme" es una cookie de sesión (sin maxAge); con "Recordarme",
+  // persistente por JWT_EXPIRES_IN.
+  res.cookie('token', token, cookieOptionsToken({ persistent: remember }));
 
   // Actualiza ultimoAcceso de forma no bloqueante (fire-and-forget)
   usuario.update({ ultimoAcceso: new Date() }).catch((err) =>
@@ -59,7 +65,7 @@ exports.login = async (req, res) => {
     accion: 'login',
     entidad: 'usuario',
     entidadId: usuario.id,
-    detalle: { rol: usuario.rol, email: usuario.email },
+    detalle: { rol: usuario.rol, email: usuario.email, recordarme: remember },
   });
 
   return res.json({

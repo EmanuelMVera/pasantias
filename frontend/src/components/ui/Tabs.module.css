@@ -47,6 +47,42 @@
 
 .icon { display: inline-flex; }
 
+.label { white-space: nowrap; }
+
+/* ── Variante stretch: pestañas de igual ancho ─────────────────────────── */
+.tabsStretch {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+
+.tabsStretch .tab {
+  justify-content: center;
+  text-align: center;
+  min-width: 0;
+}
+
+/* En desktop/tablet las pestañas estiradas no ocupan todo el ancho: se ven
+   como las normales (alineadas a la izquierda, ancho por contenido). */
+@media (min-width: 641px) {
+  .tabsStretch {
+    display: flex;
+  }
+
+  .tabsStretch .tab { justify-content: flex-start; }
+}
+
+/* Teléfonos angostos: si no entra todo en una línea, el contador baja. */
+@media (max-width: 400px) {
+  .tabsStretch .tab {
+    flex-wrap: wrap;
+    column-gap: 6px;
+    row-gap: 2px;
+    padding: 0.55rem 0.4rem;
+    font-size: 0.9rem;
+  }
+}
+
 .count {
   min-width: 22px;
   text-align: center;

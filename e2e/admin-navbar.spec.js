@@ -143,6 +143,70 @@ test.describe('Shell admin — drawer en tablet/móvil', () => {
   }
 });
 
+test.describe('Admin @ 320px — ajustes finos de mobile', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await login(page, fx.admin.email);
+  });
+
+  const sinScrollHorizontal = async (page) => {
+    const d = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(d).toBeLessThanOrEqual(1);
+  };
+
+  test('Panel: selector de período 2×2 y "Ofertas por área" como lista legible', async ({ page }) => {
+    await page.goto('/admin');
+    const grupo = page.getByRole('group', { name: /per[ií]odo de la actividad/i });
+    const botones = grupo.getByRole('button');
+    await expect(botones).toHaveCount(4);
+    const cajas = await botones.evaluateAll((els) => els.map((e) => {
+      const r = e.getBoundingClientRect();
+      return { top: Math.round(r.top), left: r.left, right: r.right, height: r.height };
+    }));
+    // 2 filas de 2, dentro del viewport y con target táctil de 44px.
+    expect(new Set(cajas.map((c) => c.top)).size).toBe(2);
+    for (const c of cajas) {
+      expect(c.left).toBeGreaterThanOrEqual(0);
+      expect(c.right).toBeLessThanOrEqual(320);
+      expect(c.height).toBeGreaterThanOrEqual(44);
+    }
+
+    // Ofertas por área: lista (nombre completo arriba + barra + valor), sin recortes.
+    const areas = page.getByRole('list', { name: 'Ofertas por área' });
+    await expect(areas).toBeVisible();
+    const recortes = await areas.locator('li > span:first-child').evaluateAll((els) =>
+      els.filter((e) => e.scrollWidth > e.clientWidth + 1).length);
+    expect(recortes).toBe(0);
+
+    await sinScrollHorizontal(page);
+  });
+
+  test('Solicitudes: las dos pestañas entran completas', async ({ page }) => {
+    await page.goto('/admin/solicitudes');
+    const tabs = page.getByRole('tab');
+    await expect(tabs).toHaveCount(2);
+    const info = await tabs.evaluateAll((els) => els.map((e) => {
+      const r = e.getBoundingClientRect();
+      const label = e.querySelector('span:not([class*="icon"]):not([class*="count"])');
+      return {
+        left: r.left, right: r.right, height: r.height,
+        labelCortado: label ? label.scrollWidth > label.clientWidth + 1 : true,
+        conIcono: !!e.querySelector('svg'),
+      };
+    }));
+    for (const t of info) {
+      expect(t.left).toBeGreaterThanOrEqual(0);
+      expect(t.right).toBeLessThanOrEqual(320);
+      expect(t.height).toBeGreaterThanOrEqual(44);
+      expect(t.labelCortado).toBe(false);
+      expect(t.conIcono).toBe(true);
+    }
+    const overflow = await page.getByRole('tablist').evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    await sinScrollHorizontal(page);
+  });
+});
+
 test.describe('Shell admin — menú de usuario y pestañas', () => {
   test('dropdown muestra identidad y "Cerrar sesión" cierra la sesión', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 768 });

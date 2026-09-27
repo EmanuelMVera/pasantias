@@ -47,4 +47,7 @@
   .card {
     padding: var(--space-4);
   }
+
+  /* Las acciones bajan debajo del título: que ocupen todo el ancho. */
+  .actions { width: 100%; }
 }
