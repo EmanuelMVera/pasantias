@@ -79,6 +79,9 @@
   letter-spacing: 0.5px;
 }
 
+/* Los admins del sistema se muestran con el logo de SisPasantías. */
+.avatarLogo { flex-shrink: 0; }
+
 .nombreInactivo { color: var(--text-soft); }
 
 /* Emails y ubicación: se cortan solo si una palabra (un email largo) no entra. */

@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useEmpresa } from '../../hooks/useEmpresa';
 import Avatar from '../Avatar/Avatar';
+import { BrandMark } from '../Brand/Brand';
 import Icon from '../ui/Icon';
 import styles from './UserMenu.module.css';
 
@@ -85,13 +86,18 @@ export default function UserMenu({ tone = 'dark', noLeidas = 0, prioridadAlta = 
         aria-expanded={open}
         aria-label={`Menú de usuario: ${nombrePrincipal}`}
       >
-        <Avatar
-          src={avatarSrc}
-          nombre={avatarNombre}
-          apellido={avatarApellido}
-          size={claro ? 36 : 30}
-          style={claro ? { fontSize: '0.85rem' } : { fontSize: '0.82rem', border: '2px solid rgba(255, 255, 255, 0.3)' }}
-        />
+        {/* El admin del sistema se identifica con el logo de SisPasantías. */}
+        {usuario.rol === 'admin' ? (
+          <BrandMark size={claro ? 36 : 30} className={styles.brandAvatar} />
+        ) : (
+          <Avatar
+            src={avatarSrc}
+            nombre={avatarNombre}
+            apellido={avatarApellido}
+            size={claro ? 36 : 30}
+            style={claro ? { fontSize: '0.85rem' } : { fontSize: '0.82rem', border: '2px solid rgba(255, 255, 255, 0.3)' }}
+          />
+        )}
         <span className={styles.identity}>
           <span className={styles.name}>{claro ? (esVistaEmpresaAdmin ? nombrePrincipal : nombreCompleto) : nombrePrincipal}</span>
           {mostrarRol && <span className={styles.role}>{rolLegible}</span>}

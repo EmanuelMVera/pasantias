@@ -33,6 +33,9 @@
 .triggerLight .name { color: var(--text-strong); font-size: 0.9rem; font-weight: 700; }
 .triggerLight .chevron { color: var(--text-soft); }
 
+/* Avatar del admin del sistema: el símbolo de SisPasantías. */
+.brandAvatar { flex-shrink: 0; }
+
 .identity {
   display: flex;
   flex-direction: column;

@@ -31,6 +31,7 @@ import ConfirmModal from '../../components/ui/ConfirmModal';
 import Toast from '../../components/ui/Toast';
 import Icon from '../../components/ui/Icon';
 import Paginacion from '../../components/Paginacion/Paginacion';
+import { BrandMark } from '../../components/Brand/Brand';
 import UsuarioFormModal from '../../components/UsuarioFormModal/UsuarioFormModal';
 import styles from './AdminUsuariosPage.module.css';
 
@@ -334,7 +335,9 @@ export default function AdminUsuariosPage() {
                   <tr key={u.id}>
                     <td>
                       <div className={styles.userCell}>
-                        <span className={styles.avatar} aria-hidden="true">{u.nombre?.[0]}{u.apellido?.[0]}</span>
+                        {u.rol === 'admin'
+                          ? <BrandMark size={36} className={styles.avatarLogo} />
+                          : <span className={styles.avatar} aria-hidden="true">{u.nombre?.[0]}{u.apellido?.[0]}</span>}
                         <div className="cell-break">
                           <strong className={u.activo ? undefined : styles.nombreInactivo}>{u.nombre} {u.apellido}</strong>
                           <small className={styles.sub}>{u.email}</small>

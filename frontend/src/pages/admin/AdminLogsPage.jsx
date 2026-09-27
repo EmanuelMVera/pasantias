@@ -19,6 +19,7 @@ import { adminService } from '../../services/admin.service';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useToast } from '../../hooks/useToast';
 import Paginacion from '../../components/Paginacion/Paginacion';
+import { BrandMark } from '../../components/Brand/Brand';
 import Icon from '../../components/ui/Icon';
 import PageHeader from '../../components/ui/PageHeader';
 import ExportMenu from '../../components/ui/ExportMenu';
@@ -47,7 +48,9 @@ function UsuarioCelda({ usuario }) {
   if (!usuario) return <span className={styles.sistema}>Sistema</span>;
   return (
     <div className={styles.userCell}>
-      <span className={styles.avatar} aria-hidden="true">{usuario.nombre?.[0]}{usuario.apellido?.[0]}</span>
+      {usuario.rol === 'admin'
+        ? <BrandMark size={32} className={styles.avatarLogo} />
+        : <span className={styles.avatar} aria-hidden="true">{usuario.nombre?.[0]}{usuario.apellido?.[0]}</span>}
       <div>
         <span>{usuario.nombre} {usuario.apellido}</span>
         <small className={styles.email}>{usuario.email}</small>

@@ -114,6 +114,9 @@
   flex-shrink: 0;
 }
 
+/* Acciones de un admin del sistema: logo de SisPasantías como avatar. */
+.avatarLogo { flex-shrink: 0; }
+
 .email {
   display: block;
   color: var(--text-soft);
