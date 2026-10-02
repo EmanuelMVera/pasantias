@@ -5,6 +5,10 @@ import api from './api';
 export const empresaService = {
   getDashboard:          () => api.get('/empresas/dashboard'),
   getMisOfertas:         (params) => api.get('/empresas/mis-ofertas', { params }),
+  // Gobierno (solo admin_empresa): asigna o cambia el reclutador responsable de una oferta.
+  asignarResponsableOferta: (ofertaId, responsableId) => api.patch(`/empresas/ofertas/${ofertaId}/responsable`, { responsableId }),
+  // Ficha de contacto de un reclutador (el backend decide quién puede verla).
+  getPerfilReclutador:   (usuarioId) => api.get(`/empresas/reclutadores/${usuarioId}/perfil`),
   getMiEmpresa:          () => api.get('/empresas/mi-empresa'),
   getPublico:            (empresaId) => api.get(`/empresas/${empresaId}`), // Perfil de empresa (datos públicos, pero requiere sesión)
   updateMiEmpresa:       (data) => api.put('/empresas/mi-empresa', data),

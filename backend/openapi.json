@@ -1753,6 +1753,8 @@
                   "revocar_confianza_empresa",
                   "auto_aprobar_solicitud_reclutador",
                   "oferta_auto_aprobada",
+                  "asignar_responsable_oferta",
+                  "reasignar_responsable_oferta",
                   "sistema"
                 ]
               },
@@ -2108,6 +2110,52 @@
                   "number",
                   "null"
                 ]
+              }
+            }
+          }
+        }
+      },
+      "ReclutadorPerfil": {
+        "type": "object",
+        "description": "Ficha de contacto de un reclutador activo.",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "apellido": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "telefono": {
+            "type": "string",
+            "nullable": true
+          },
+          "ubicacion": {
+            "type": "string",
+            "nullable": true
+          },
+          "fotoPerfil": {
+            "type": "string",
+            "nullable": true
+          },
+          "empresa": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "razonSocial": {
+                "type": "string"
+              },
+              "logo": {
+                "type": "string",
+                "nullable": true
               }
             }
           }
@@ -3629,6 +3677,163 @@
           },
           "description": "multipart/form-data con el campo `logo` (imagen validada, máx. 2 MB)."
         }
+      }
+    },
+    "/api/empresas/ofertas/{id}/responsable": {
+      "patch": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasOfertaResponsable",
+        "summary": "Asignar o cambiar el reclutador responsable de una oferta",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "titulo": {
+                              "type": "string"
+                            },
+                            "creadaPorUsuarioId": {
+                              "type": "integer"
+                            },
+                            "creadaPor": {
+                              "$ref": "#/components/schemas/ResponsableOferta"
+                            },
+                            "responsableAnterior": {
+                              "$ref": "#/components/schemas/ResponsableOferta"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Acción de gobierno del admin_empresa: solo cambia el responsable (`creadaPorUsuarioId`). No edita el contenido de la oferta ni sus postulaciones. El responsable debe ser un reclutador activo de la misma empresa (400 si es el admin_empresa, está suspendido, es de otra empresa o ya es el responsable). Notifica al nuevo responsable y, si sigue activo, al anterior. Audita `asignar_responsable_oferta` / `reasignar_responsable_oferta`.\n\n**Roles:** empresa/admin_empresa",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "responsableId"
+                ],
+                "properties": {
+                  "responsableId": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Id de usuario de un reclutador activo de la empresa."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/empresas/reclutadores/{id}/perfil": {
+      "get": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasReclutadorPerfil",
+        "summary": "Ficha de contacto de un reclutador",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/ReclutadorPerfil"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Solo lectura. `id` es el id de usuario. Pueden verla: el propio reclutador, los miembros activos de su empresa, un alumno/egresado que pueda ver la conversación de chat con él, y el admin del sistema. Responde el mismo 404 si el usuario no existe, no es un reclutador activo (p. ej. es admin_empresa) o quien consulta no tiene relación: no permite enumerar reclutadores.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
       }
     },
     "/api/empresas/candidatos": {

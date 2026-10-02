@@ -25,6 +25,7 @@ const OTRAS_SECCIONES = [
   { match: empieza('/chat'), label: 'Mensajes del equipo' },
   { match: empieza('/notificaciones'), label: 'Notificaciones' },
   { match: empieza('/perfil'), label: 'Perfil de candidato' },
+  { match: empieza('/reclutador'), label: 'Perfil de reclutador' },
   { match: (p) => /^\/empresa\/\d+$/.test(p), label: 'Perfil público' },
 ];
 

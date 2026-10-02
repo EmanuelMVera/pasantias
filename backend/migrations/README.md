@@ -62,9 +62,9 @@ ejecute una vez: `CREATE EXTENSION pgcrypto; CREATE EXTENSION pg_trgm;`.
 
 ---
 
-## Las migraciones actuales (000 → 019)
+## Las migraciones actuales (000 → 020)
 
-20 archivos. `000` es el baseline; `001`–`019` son incrementales. Todas ya están
+21 archivos. `000` es el baseline; `001`–`020` son incrementales. Todas ya están
 aplicadas en las bases de desarrollo/CI y **son históricas** — no se tocan.
 
 | # | Archivo | Origen | Qué hace |
@@ -89,6 +89,7 @@ aplicadas en las bases de desarrollo/CI y **son históricas** — no se tocan.
 | 017 | `017-nivel-confianza-empresa.js` | RBAC-05 | `empresas.nivelConfianza` (STRING + CHECK, `estandar\|confiable`, default `'estandar'`) — política institucional que permite a una empresa de confianza operar con moderación posterior en vez de previa. |
 | 018 | `018-activity-log-confianza-empresa.js` | RBAC-05 | Agrega 4 valores al ENUM `activity_logs.accion`: `'marcar_empresa_confiable'`, `'revocar_confianza_empresa'`, `'auto_aprobar_solicitud_reclutador'`, `'oferta_auto_aprobada'`. |
 | 019 | `019-eliminar-empresa-usuarioid.js` | RBAC-06 | Elimina `empresas.usuarioId` (mecanismo legacy paralelo a `empresa_usuarios`). Backfillea cualquier empresa sin fila `admin_empresa`, valida que todas tengan una antes de seguir (aborta si no), reemplaza `unique_empresa_usuario_dueno` por el índice parcial `unique_admin_empresa_por_usuario ON empresa_usuarios("usuarioId") WHERE "rolInterno"='admin_empresa'`, y recién ahí dropea la columna. `EmpresaUsuario` queda como única fuente de verdad de "quién representa a una empresa". |
+| 020 | `020-activity-log-responsable-oferta.js` | Cierre admin_empresa | Agrega `'asignar_responsable_oferta'` y `'reasignar_responsable_oferta'` al ENUM `activity_logs.accion` (auditoría de `PATCH /api/empresas/ofertas/:id/responsable`). Aditiva, no reversible. No toca `ofertas` ni hace backfill de responsables. |
 
 `db:migrate:status` es la fuente de verdad de qué se aplicó en *esta* base.
 

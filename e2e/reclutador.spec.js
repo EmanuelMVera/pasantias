@@ -100,3 +100,56 @@ test('una nueva postulación le llega al reclutador responsable, no al administr
   expect(notifs.data.filter((n) => n.tipo === 'postulacion')).toEqual([]);
   await adminEmpresa.dispose();
 });
+
+test('reclutador: no puede asignar ni cambiar el responsable de una oferta', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 1000 }); // el menú ⋯ se cierra al hacer scroll
+  await login(page, fx.reclutador.email);
+  await page.goto('/empresa/ofertas');
+  const fila = page.locator('tbody tr').filter({ hasText: fx.ofertaActiva.titulo });
+  await fila.getByRole('button', { name: /más acciones/i }).click();
+  await expect(page.getByRole('menuitem', { name: 'Editar contenido' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: /responsable/i })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  // Y el backend lo rechaza aunque se intente por API.
+  const equipo = await (await page.request.get(`${API}/empresas/equipo`)).json();
+  const yo = equipo.data.find((m) => m.rolInterno === 'reclutador');
+  const ofertas = await (await page.request.get(`${API}/empresas/mis-ofertas`)).json();
+  const res = await page.request.patch(`${API}/empresas/ofertas/${ofertas.data[0].id}/responsable`, {
+    data: { responsableId: yo.usuario.id },
+  });
+  expect(res.status()).toBe(403);
+  expect((await res.json()).code).toBe('ROL_INSUFICIENTE');
+});
+
+test('chat del reclutador: "Ver empresa" para la cuenta administradora y "Ver perfil" para un candidato', async ({ page }) => {
+  await login(page, fx.reclutador.email);
+
+  // La cuenta administradora representa a la entidad → perfil de la empresa.
+  await page.goto('/chat');
+  await page.getByRole('button', { name: 'Iniciar nueva conversación' }).click();
+  let buscador = page.getByRole('dialog');
+  await buscador.getByRole('textbox').fill(fx.adminEmpresa.nombre);
+  await buscador.getByRole('button').filter({ hasText: fx.empresa.razonSocial }).click();
+  await expect(page.getByRole('button', { name: 'Ver perfil', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Ver empresa' }).click();
+  await expect(page).toHaveURL(/\/empresa\/\d+$/);
+  await expect(page.getByRole('heading', { name: fx.empresa.razonSocial })).toBeVisible();
+
+  // Candidato: el chat se habilita cuando su postulación avanza (regla existente).
+  const candidatos = await (await page.request.get(`${API}/empresas/candidatos`)).json();
+  const postulacion = candidatos.data.find((p) => p.usuario.apellido === fx.alumno2.apellido);
+  const avance = await page.request.patch(`${API}/postulaciones/${postulacion.id}/estado`, {
+    data: { estado: 'preseleccionado' },
+  });
+  expect(avance.ok()).toBe(true);
+
+  await page.goto('/chat');
+  await page.getByRole('button', { name: 'Iniciar nueva conversación' }).click();
+  buscador = page.getByRole('dialog');
+  await buscador.getByRole('textbox').fill(fx.alumno2.nombre);
+  await buscador.getByRole('button').filter({ hasText: fx.alumno2.apellido }).click();
+  await expect(page.getByRole('button', { name: 'Ver empresa' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Ver perfil', exact: true }).click();
+  await expect(page).toHaveURL(/\/perfil\/\d+$/);
+});

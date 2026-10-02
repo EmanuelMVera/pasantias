@@ -9,6 +9,10 @@
  * (o las iniciales de la razón social) y la razón social; la persona
  * responsable aparece como dato secundario en el menú de usuario.
  *
+ * La sidebar no muestra el nivel de confianza de la empresa: es un dato
+ * administrativo secundario que vive, con su explicación, en Mi empresa →
+ * Datos institucionales.
+ *
  * El reclutador NO usa este shell (sigue con el Navbar): su experiencia es
  * operativa, no de gobierno. Ver `Chrome` en App.jsx.
  */
@@ -25,7 +29,6 @@ export default function EmpresaShell({ children }) {
   const { empresa } = useEmpresa();
 
   const razonSocial = empresa?.razonSocial || 'Mi empresa';
-  const confiable = empresa?.nivelConfianza === 'confiable';
 
   const identidad = (
     <div className={styles.identidad} title={razonSocial}>
@@ -50,10 +53,6 @@ export default function EmpresaShell({ children }) {
       seccion={seccionEmpresa(pathname)}
       incluirChat
       sidebarHeader={identidad}
-      sidebarFooter={{
-        icon: confiable ? 'shield' : 'building',
-        text: confiable ? 'Empresa de confianza' : 'Empresa estándar',
-      }}
       userMenuLinks={EMPRESA_MENU_USUARIO}
     >
       {children}

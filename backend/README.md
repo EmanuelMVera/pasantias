@@ -219,7 +219,10 @@ reclutador de una empresa estándar, oferta pendiente de moderación, oferta pub
 automáticamente y reclutador agregado automáticamente (empresas de confianza).
 En el área de empresa, la **nueva postulación** se avisa al reclutador responsable de la oferta
 (a los `admin_empresa` solo si la oferta no tiene un responsable válido) y el **resultado de la
-moderación** de una oferta se avisa a los `admin_empresa` y al reclutador responsable.
+moderación** de una oferta se avisa a los `admin_empresa` y al reclutador responsable. Cuando el
+`admin_empresa` **asigna o cambia el responsable** de una oferta se avisa al nuevo responsable y, si
+sigue activo, al anterior (la acción queda además auditada: `asignar_responsable_oferta` /
+`reasignar_responsable_oferta`).
 
 - **Nivel de log**: env `LOG_LEVEL` (`debug|info|warn|error|fatal|silent`). Default: `debug` en
   desarrollo (incluye el SQL de Sequelize), `info` en producción, `silent` en tests.

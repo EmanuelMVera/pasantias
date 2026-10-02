@@ -30,6 +30,8 @@
  * Panel corporativo:
  * - GET  /dashboard              → Métricas del panel (todos los roles)
  * - GET  /mis-ofertas            → Lista de ofertas propias (todos los roles)
+ * - PATCH /ofertas/:id/responsable → Asignar/cambiar el reclutador responsable (solo admin_empresa)
+ * - GET  /reclutadores/:id/perfil → Ficha de un reclutador (cualquier usuario con relación)
  *
  * Perfil de empresa:
  * - GET  /mi-empresa             → Ver perfil (todos los miembros)
@@ -75,6 +77,16 @@ router.get('/dashboard', ...miembro, asyncHandler(ctrl.getDashboard));
 
 // GET /api/empresas/mis-ofertas — Lista de ofertas con postulaciones (todos los miembros)
 router.get('/mis-ofertas', ...miembro, asyncHandler(ctrl.getMisOfertas));
+
+// PATCH /api/empresas/ofertas/:id/responsable — Asigna o cambia el reclutador
+// responsable de una oferta (solo admin_empresa). Body: { responsableId }.
+// Acción de gobierno: no edita el contenido de la oferta ni sus postulaciones.
+router.patch('/ofertas/:id/responsable', ...soloAdmin, asyncHandler(ctrl.asignarResponsableOferta));
+
+// GET /api/empresas/reclutadores/:id/perfil — Ficha de contacto de un reclutador.
+// No exige ser miembro de una empresa: la autorización (misma empresa, o un
+// candidato con relación de chat) la resuelve el service.
+router.get('/reclutadores/:id/perfil', verifyToken, asyncHandler(ctrl.getPerfilReclutador));
 
 // ── Perfil de empresa ─────────────────────────────────────────────────────────
 

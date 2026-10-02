@@ -62,6 +62,7 @@ import AdminImportacionPage from './pages/admin/AdminImportacionPage';
 // Páginas de perfiles públicos (alumno/egresado y empresa)
 import PerfilPublicoPage  from './pages/alumno/PerfilPublicoPage';
 import EmpresaPublicaPage from './pages/empresa/EmpresaPublicaPage';
+import ReclutadorPerfilPage from './pages/empresa/ReclutadorPerfilPage';
 
 // Página de chat/mensajería (todos los roles autenticados)
 import ChatPage from './pages/ChatPage';
@@ -286,6 +287,12 @@ function AppRoutes() {
       <Route path="/perfil/:usuarioId" element={
         <ProtectedRoute roles={['alumno', 'egresado', 'empresa', 'admin']}>
           <PerfilPublicoPage />
+        </ProtectedRoute>
+      } />
+      {/* /reclutador/:usuarioId — ficha de un reclutador (el backend decide quién puede verla) */}
+      <Route path="/reclutador/:usuarioId" element={
+        <ProtectedRoute roles={['alumno', 'egresado', 'empresa', 'admin']}>
+          <ReclutadorPerfilPage />
         </ProtectedRoute>
       } />
       {/* /empresa/:empresaId — vista pública de una empresa (DESPUÉS de todas las rutas fijas /empresa/...) */}

@@ -1,0 +1,109 @@
+/* ReclutadorPerfilPage.module.css — ficha de un reclutador (card central). */
+
+.pagina > section { max-width: 720px; }
+
+.volver {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  margin-bottom: var(--space-4);
+}
+
+.ficha { padding: var(--space-6); }
+
+.cabecera {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.identidad {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* Dos clases: le gana a `.page-container h1/h2` (márgenes y borde de título de página). */
+.ficha .nombre {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.empresa {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+
+.empresa svg { flex-shrink: 0; }
+
+.ficha .subtitulo {
+  margin: var(--space-6) 0 var(--space-3);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-soft);
+  font-size: 1rem;
+  color: var(--text-strong);
+}
+
+.contacto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.dato dt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: 2px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.dato dd {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.dato a { color: var(--primary); text-decoration: none; }
+.dato a:hover { text-decoration: underline; }
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.acciones :global(.btn-primary) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  text-decoration: none;
+}
+
+@media (max-width: 560px) {
+  .ficha { padding: var(--space-4); }
+  .cabecera { flex-direction: column; align-items: flex-start; gap: var(--space-4); }
+  .ficha .nombre { font-size: 1.3rem; }
+  .acciones :global(.btn-primary) { width: 100%; justify-content: center; }
+}

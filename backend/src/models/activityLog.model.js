@@ -66,6 +66,8 @@ module.exports = (sequelize) => {
         'revocar_confianza_empresa',     // migración 018 — RBAC-05
         'auto_aprobar_solicitud_reclutador', // migración 018 — RBAC-05
         'oferta_auto_aprobada',          // migración 018 — RBAC-05
+        'asignar_responsable_oferta',    // migración 020
+        'reasignar_responsable_oferta',  // migración 020
         'sistema'
       ),
       allowNull: false,

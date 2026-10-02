@@ -73,6 +73,7 @@ es autoridad de permisos).
 | Ver mi perfil académico (`GET /api/users/perfil`) | — | ✅ | ✅ | ✅ | ✅ |
 | Editar mi perfil académico, subir CV / carta / foto | — | — | ✅ | — | — |
 | Ver perfil público de otro usuario / de una empresa | — | ✅ | ✅ | ✅ | ✅ |
+| Ver la ficha de un reclutador (`GET /api/empresas/reclutadores/:id/perfil`) | — | ✅ | ✅ con relación⁵ | ✅ misma empresa | ✅ misma empresa |
 
 ### Ofertas
 
@@ -84,6 +85,7 @@ es autoridad de permisos).
 | Editar el contenido de una oferta (`PUT /api/ofertas/:id`) | — | — | — | — | ✅¹ |
 | Pausar / reactivar una oferta (`PATCH /api/ofertas/:id/estado`) | — | — | — | ✅² | ✅¹ |
 | Cerrar una oferta (`PATCH /api/ofertas/:id/estado`) | — | — | — | ✅² | ✅¹ |
+| Asignar / cambiar el reclutador responsable de una oferta (`PATCH /api/empresas/ofertas/:id/responsable`) | — | — | — | ✅⁴ | — |
 | Moderar una oferta (aprobar / pausar / rechazar) | — | ✅ | — | — | — |
 
 ¹ El reclutador solo sobre su propia oferta (`creadaPorUsuarioId === req.usuario.id`)
@@ -95,6 +97,14 @@ su contenido — la cuenta empresa es una entidad institucional, no publica ofer
 operativas (feedback de la profesora, iteración RBAC-01). Toda transición de estado
 queda auditada con `pausar_oferta` / `reactivar_oferta` / `cerrar_oferta`, marcando
 `esOverrideInstitucional: true` en el detalle cuando el actor no es el responsable.
+
+⁴ Acción de gobierno: solo cambia el responsable (`creadaPorUsuarioId`), nunca el
+contenido de la oferta ni sus postulaciones. El responsable tiene que ser un
+**reclutador activo de la misma empresa** (membresía activa `reclutador` + cuenta
+activa y habilitada): no puede ser el `admin_empresa`, un reclutador suspendido ni
+alguien de otra empresa. Notifica al nuevo responsable y, si sigue activo, al
+anterior. Queda auditado como `asignar_responsable_oferta` /
+`reasignar_responsable_oferta` (oferta, responsable anterior y nuevo, quién lo hizo).
 
 ### Postulaciones
 
@@ -111,6 +121,12 @@ queda auditada con `pausar_oferta` / `reactivar_oferta` / `cerrar_oferta`, marca
 oferta no tiene un responsable válido (histórica sin responsable, responsable
 suspendido o que ya no es reclutador) se avisa a los `admin_empresa` activos. Nunca
 a ambos. Ver `obtenerDestinatariosPostulacion` en `backend/src/services/empresa.service.js`.
+
+⁵ Un alumno/egresado ve la ficha de un reclutador solo si puede ver la conversación
+de chat con él (misma regla de `chatPermission.service.js`: una postulación suya
+avanzó bajo la responsabilidad de ese reclutador). El endpoint responde el mismo 404
+si el usuario no existe, no es un reclutador activo o no hay relación — no permite
+enumerar reclutadores.
 
 ### Empresa — perfil y equipo
 
@@ -197,9 +213,17 @@ una de sus ofertas.
   pero no puede quitarse a sí mismo la condición de dueño.
 - Toda acción sensible (aprobaciones, cambios de rol, moderación, borrados) queda
   en `activity_logs` vía `registrarAuditoria` — ver [`../backend/README.md`](../backend/README.md) §Observabilidad.
-- **Reasignación de ofertas entre reclutadores (mejora futura, no implementada):**
-  hoy `oferta.creadaPorUsuarioId` es el único campo de responsable — alcanza para
-  "el creador edita, cualquiera puede tomar una histórica sin dueño". Si en el
-  futuro se necesita transferir una oferta activa de un reclutador a otro, hace
-  falta una columna nueva `asignadaAUsuarioId` (nullable, migración aparte) — no
-  se agregó ahora porque no hay un caso de uso concreto que la requiera.
+- **Responsable de una oferta:** `oferta.creadaPorUsuarioId` es el único campo de
+  responsable. Nace con el reclutador que crea la oferta y el `admin_empresa`
+  puede asignarlo o cambiarlo (ver nota ⁴). El nombre de la columna quedó
+  histórico: hoy significa "reclutador responsable", no necesariamente "quien la
+  creó". Las ofertas históricas sin responsable siguen en `NULL` hasta que un
+  `admin_empresa` las asigne a mano — no hay backfill automático. Cambiar el
+  responsable traslada todo lo que depende de ese campo: quién edita la oferta y
+  gestiona sus candidatos, quién recibe las postulaciones nuevas y con quién
+  pueden chatear los candidatos.
+- **Perfiles según identidad:** un `admin_empresa` representa a la entidad y se
+  lo muestra con el perfil de la empresa (`/empresa/:id`); un `reclutador` es una
+  persona de la empresa y tiene su ficha (`/reclutador/:usuarioId`, solo consulta).
+  El chat decide el destino del botón de perfil por `rolInterno`, nunca solo por
+  el rol global `empresa`.

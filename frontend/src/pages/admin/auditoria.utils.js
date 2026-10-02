@@ -40,6 +40,8 @@ export const ACCIONES = {
   pausar_oferta:                      { label: 'Pausar oferta',                    color: NARANJA },
   reactivar_oferta:                   { label: 'Reactivar oferta',                 color: VERDE },
   cerrar_oferta:                      { label: 'Cerrar oferta',                    color: GRIS },
+  asignar_responsable_oferta:         { label: 'Asignar responsable de oferta',    color: AZUL },
+  reasignar_responsable_oferta:       { label: 'Cambiar responsable de oferta',    color: AZUL },
   postular:                           { label: 'Postulación',                      color: TEAL },
   cambiar_estado_postulacion:         { label: 'Estado de postulación',            color: VIOLETA },
   importar_alumnos_csv:               { label: 'Importar alumnos (CSV)',           color: AZUL },

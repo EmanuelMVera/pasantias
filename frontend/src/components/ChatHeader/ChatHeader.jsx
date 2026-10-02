@@ -1,16 +1,19 @@
 import { useNavigate } from 'react-router-dom';
 import Avatar from '../Avatar/Avatar';
-import { displayNombre, displayAvatarProps } from '../../utils/chatDisplay';
+import { displayAvatarProps, displayEncabezado, perfilDestino } from '../../utils/chatDisplay';
 import styles from './ChatHeader.module.css';
 
-/** Encabezado de la conversación abierta: volver (móvil) + interlocutor + "Ver perfil". */
+/**
+ * Encabezado de la conversación abierta: volver (móvil) + interlocutor + acceso
+ * a su perfil. El destino depende de quién es el interlocutor (ver
+ * `perfilDestino`): alumno/egresado → su perfil; reclutador → su ficha;
+ * administrador de empresa → el perfil de la empresa ("Ver empresa").
+ */
 export default function ChatHeader({ partnerActivo, loadingMensajes, onVolver }) {
   const navigate = useNavigate();
 
-  // Ver perfil — link a perfil público del interlocutor
-  const perfilUrl = partnerActivo?.rol === 'empresa'
-    ? (partnerActivo?.empresaId ? `/empresa/${partnerActivo.empresaId}` : null)
-    : (partnerActivo?.id ? `/perfil/${partnerActivo.id}` : null);
+  const perfil = perfilDestino(partnerActivo);
+  const { titulo, subtitulo } = displayEncabezado(partnerActivo);
 
   return (
     <div className={styles.chatHeader}>
@@ -30,17 +33,17 @@ export default function ChatHeader({ partnerActivo, loadingMensajes, onVolver })
         <strong>
           {loadingMensajes && !partnerActivo
             ? 'Cargando...'
-            : displayNombre(partnerActivo)}
+            : titulo}
         </strong>
-        <span>{partnerActivo?.email}</span>
+        {subtitulo && <span>{subtitulo}</span>}
       </div>
-      {perfilUrl ? (
+      {perfil ? (
         <button
           className={styles.verPerfilBtn}
-          onClick={() => navigate(perfilUrl)}
-          title="Ver perfil"
+          onClick={() => navigate(perfil.url)}
+          title={perfil.label}
         >
-          Ver perfil
+          {perfil.label}
         </button>
       ) : (
         <button

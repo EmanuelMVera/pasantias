@@ -34,13 +34,29 @@ empresa tiene garantizada al menos una fila `admin_empresa` activa.
 
 | Rol | Qué puede hacer |
 |---|---|
-| `admin_empresa` | Gobierno y supervisión: editar perfil + logo, gestionar el equipo (solicitar/agregar reclutadores, suspender, quitar), ver todas las ofertas y candidatos de la empresa, y pausar / reactivar / cerrar cualquier oferta. **No** crea ni edita ofertas ni cambia el estado de las postulaciones. |
-| `reclutador` | Solo operativo: crear/editar/cerrar ofertas, ver candidatos, mover el embudo de selección, chat. **No** toca equipo ni perfil de empresa. |
+| `admin_empresa` | Gobierno y supervisión: editar perfil + logo, gestionar el equipo (solicitar/agregar reclutadores, suspender, quitar), ver todas las ofertas y candidatos de la empresa, pausar / reactivar / cerrar cualquier oferta y **asignar o cambiar el reclutador responsable** de una oferta. **No** crea ni edita ofertas ni cambia el estado de las postulaciones. |
+| `reclutador` | Solo operativo: crear/editar/cerrar ofertas, ver candidatos, mover el embudo de selección, chat. **No** toca equipo ni perfil de empresa, y **no** puede asignar ni cambiar responsables de ofertas. |
 
 **Notificaciones.** Una nueva postulación se le avisa al reclutador responsable de la
 oferta (`creadaPorUsuarioId`); a los `admin_empresa` solo si la oferta no tiene un
 responsable válido. El resultado de la moderación de una oferta se avisa a los
-`admin_empresa` y al reclutador responsable.
+`admin_empresa` y al reclutador responsable. Al asignar o cambiar el responsable de
+una oferta se avisa al nuevo responsable ("Se te asignó una oferta") y, si sigue
+siendo un reclutador activo, al anterior; nunca al `admin_empresa` que hizo la acción.
+
+**Responsable de una oferta.** `PATCH /api/empresas/ofertas/:id/responsable`
+(`{ responsableId }`, solo `admin_empresa`). El responsable debe ser un reclutador
+activo de la misma empresa. Solo cambia `creadaPorUsuarioId`: no toca el contenido ni
+las postulaciones. Si el responsable de una oferta fue suspendido, la oferta lo
+conserva (historial) hasta que el `admin_empresa` la reasigne. Las ofertas históricas
+sin responsable no se completan solas: no hay backfill. Auditoría:
+`asignar_responsable_oferta` / `reasignar_responsable_oferta` (migración 020).
+
+**Ficha de reclutador.** `GET /api/empresas/reclutadores/:id/perfil` devuelve datos de
+contacto básicos (nombre, email, teléfono, ubicación, foto y empresa) de un reclutador
+activo. La ven su propia empresa, un candidato con relación de chat y el admin del
+sistema; cualquier otro caso responde 404. El `admin_empresa` no tiene ficha: se lo
+representa con el perfil de la empresa.
 
 Ver la matriz por acción en [`docs/ROLES-Y-PERMISOS.md`](../docs/ROLES-Y-PERMISOS.md) §4.
 

@@ -7,6 +7,8 @@ const equipoService  = require('../services/empresaEquipo.service');
 const { parsePagination } = require('../utils/pagination');
 const { procesarSubidaImagen, establecerUrlExterna } = require('../services/archivoImagen.service');
 const { registrarAuditoria } = require('../utils/auditLog');
+const { crearNotificacion } = require('../utils/notificador');
+const logger = require('../utils/logger');
 
 // SEC-03: `logo` NO se edita por texto libre — se sube por
 // POST /api/empresas/mi-empresa/logo (multipart, validado).
@@ -52,6 +54,77 @@ exports.getMisOfertas = async (req, res) => {
     page, limit, offset,
   });
   return res.json({ success: true, data, pagination, total: pagination.total });
+};
+
+// ── Responsable de una oferta (gobierno: solo admin_empresa) ──────────────────
+// Asigna un reclutador a una oferta sin responsable, o lo cambia. No edita el
+// contenido de la oferta ni toca las postulaciones.
+
+exports.asignarResponsableOferta = async (req, res) => {
+  const empresa = await _resolverEmpresa(req);
+  if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
+
+  const { oferta, responsable, anterior, anteriorVigente } = await empresaService.asignarResponsableOferta(
+    empresa, req.params.id, req.body?.responsableId,
+  );
+  const esReasignacion = Boolean(anterior);
+
+  // Avisos: al nuevo responsable siempre; al anterior solo si sigue siendo un
+  // reclutador activo. Nunca al admin_empresa que acaba de hacer la acción
+  // (auditoría ≠ notificación). No bloquean la respuesta.
+  const avisos = [crearNotificacion({
+    usuarioId: responsable.id,
+    titulo: 'Se te asignó una oferta',
+    mensaje: `Ahora sos responsable de "${oferta.titulo}".`,
+    tipo: 'oferta',
+    enlace: `/empresa/postulantes/${oferta.id}`,
+    accionURL: `/empresa/postulantes/${oferta.id}`,
+  })];
+  if (anteriorVigente && anteriorVigente.id !== req.usuario.id) {
+    avisos.push(crearNotificacion({
+      usuarioId: anteriorVigente.id,
+      titulo: 'Dejaste de ser responsable de una oferta',
+      mensaje: `"${oferta.titulo}" ahora está a cargo de ${responsable.nombre} ${responsable.apellido}.`,
+      tipo: 'oferta',
+      enlace: '/empresa',
+      accionURL: '/empresa',
+    }));
+  }
+  Promise.all(avisos).catch((err) => (req.log || logger).error({ err }, 'notificacion_responsable_oferta_fallo'));
+
+  await registrarAuditoria({
+    req,
+    accion: esReasignacion ? 'reasignar_responsable_oferta' : 'asignar_responsable_oferta',
+    entidad: 'oferta',
+    entidadId: oferta.id,
+    detalle: {
+      empresaId: empresa.id,
+      responsableAnteriorId: anterior?.id ?? null,
+      responsableNuevoId: responsable.id,
+    },
+  });
+
+  return res.json({
+    success: true,
+    message: esReasignacion ? 'Responsable de la oferta actualizado.' : 'Responsable asignado a la oferta.',
+    data: {
+      id: oferta.id,
+      titulo: oferta.titulo,
+      creadaPorUsuarioId: oferta.creadaPorUsuarioId,
+      creadaPor: responsable,
+      responsableAnterior: anterior ? anterior.toJSON() : null,
+    },
+  });
+};
+
+// ── Ficha de un reclutador ────────────────────────────────────────────────────
+// 404 único para "no existe / no es reclutador activo / no tenés relación con
+// él": no permite enumerar reclutadores por id.
+
+exports.getPerfilReclutador = async (req, res) => {
+  const perfil = await empresaService.obtenerPerfilReclutador(req.usuario, req.params.id);
+  if (!perfil) return res.status(404).json({ success: false, message: 'Perfil no disponible.' });
+  return res.json({ success: true, data: perfil });
 };
 
 // ── Perfil de empresa ─────────────────────────────────────────────────────────

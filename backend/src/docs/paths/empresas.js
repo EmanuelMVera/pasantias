@@ -86,6 +86,46 @@ module.exports = {
     }),
   },
 
+  '/api/empresas/ofertas/{id}/responsable': {
+    patch: operation({
+      tag: T, id: 'empresasOfertaResponsable', summary: 'Asignar o cambiar el reclutador responsable de una oferta',
+      description: 'Acción de gobierno del admin_empresa: solo cambia el responsable (`creadaPorUsuarioId`). No edita el contenido de la oferta ni sus postulaciones. El responsable debe ser un reclutador activo de la misma empresa (400 si es el admin_empresa, está suspendido, es de otra empresa o ya es el responsable). Notifica al nuevo responsable y, si sigue activo, al anterior. Audita `asignar_responsable_oferta` / `reasignar_responsable_oferta`.',
+      roles: R_ADMIN, csrf: true, params: ['id'],
+      body: {
+        type: 'object',
+        required: ['responsableId'],
+        properties: {
+          responsableId: { type: 'integer', minimum: 1, description: 'Id de usuario de un reclutador activo de la empresa.' },
+        },
+      },
+      responses: {
+        200: message({
+          data: {
+            type: 'object',
+            properties: {
+              id: { type: 'integer' },
+              titulo: { type: 'string' },
+              creadaPorUsuarioId: { type: 'integer' },
+              creadaPor: REF.schema('ResponsableOferta'),
+              responsableAnterior: REF.schema('ResponsableOferta'),
+            },
+          },
+        }),
+      },
+      errors: ['400', '401', '403', '403csrf', '404', '404empresa'],
+    }),
+  },
+
+  '/api/empresas/reclutadores/{id}/perfil': {
+    get: operation({
+      tag: T, id: 'empresasReclutadorPerfil', summary: 'Ficha de contacto de un reclutador',
+      description: 'Solo lectura. `id` es el id de usuario. Pueden verla: el propio reclutador, los miembros activos de su empresa, un alumno/egresado que pueda ver la conversación de chat con él, y el admin del sistema. Responde el mismo 404 si el usuario no existe, no es un reclutador activo (p. ej. es admin_empresa) o quien consulta no tiene relación: no permite enumerar reclutadores.',
+      params: ['id'],
+      responses: { 200: ok('ReclutadorPerfil') },
+      errors: ['401', '404'],
+    }),
+  },
+
   '/api/empresas/candidatos': {
     get: operation({
       tag: T, id: 'empresasCandidatos', summary: 'Todas las postulaciones de mi empresa',

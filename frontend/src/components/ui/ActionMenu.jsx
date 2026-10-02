@@ -12,6 +12,8 @@
  * - Se dibuja en un portal con `position: fixed` calculada desde el botón al abrir:
  *   así no lo recorta el `overflow` del contenedor de la tabla.
  * - Se cierra si la página hace scroll o cambia de tamaño (la posición ya no sería válida).
+ * - Un ítem con `separatorBefore: true` dibuja una línea divisoria arriba suyo
+ *   (para separar grupos de acciones).
  * - Si `items` está vacío no renderiza nada.
  */
 
@@ -23,6 +25,7 @@ import styles from './ActionMenu.module.css';
 const ANCHO_MENU = 190;
 const ALTO_ITEM = 42;
 const MARGEN = 8;
+const ALTO_SEPARADOR = 9;
 
 export default function ActionMenu({ items, label = 'Más acciones', disabled = false }) {
   const [pos, setPos] = useState(null); // null = cerrado
@@ -39,7 +42,8 @@ export default function ActionMenu({ items, label = 'Más acciones', disabled = 
     e.stopPropagation();
     if (abierto) { cerrar(); return; }
     const r = botonRef.current.getBoundingClientRect();
-    const alto = items.length * ALTO_ITEM + 14;
+    const alto = items.length * ALTO_ITEM + 14
+      + items.filter((it) => it.separatorBefore).length * ALTO_SEPARADOR;
     const left = Math.min(Math.max(MARGEN, r.right - ANCHO_MENU), window.innerWidth - ANCHO_MENU - MARGEN);
     const entraAbajo = r.bottom + 4 + alto <= window.innerHeight - MARGEN;
     setPos({ left, top: entraAbajo ? r.bottom + 4 : Math.max(MARGEN, r.top - 4 - alto) });
@@ -116,7 +120,7 @@ export default function ActionMenu({ items, label = 'Más acciones', disabled = 
               key={it.key}
               type="button"
               role="menuitem"
-              className={`${styles.item} ${it.danger ? styles.itemDanger : ''}`}
+              className={`${styles.item} ${it.danger ? styles.itemDanger : ''} ${it.separatorBefore ? styles.itemSeparado : ''}`}
               onClick={() => { cerrar(true); it.onSelect(); }}
             >
               {it.label}

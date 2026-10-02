@@ -33,7 +33,7 @@ src/
 ├── pages/
 │   ├── auth/             LoginPage, ForgotPasswordPage, ResetPasswordPage, SolicitudEmpresaPage
 │   ├── alumno/           Dashboard, OfertasPage, OfertaDetallePage, MisPostulacionesPage, PerfilPage, PerfilPublicoPage
-│   ├── empresa/          EmpresaInicioPage (admin_empresa → EmpresaResumenPage, reclutador → EmpresaDashboardPage), EmpresaOfertasPage, CrearOfertaPage, PostulantesMiOfertaPage, EquipoPage, MiEmpresaPage, CandidatosEmpresaPage, SeguridadPage
+│   ├── empresa/          EmpresaInicioPage (admin_empresa → EmpresaResumenPage, reclutador → EmpresaDashboardPage), EmpresaOfertasPage, ReclutadorPerfilPage (/reclutador/:usuarioId), CrearOfertaPage, PostulantesMiOfertaPage, EquipoPage, MiEmpresaPage, CandidatosEmpresaPage, SeguridadPage
 │   ├── admin/            AdminDashboardPage, AdminUsuariosPage, AdminOfertasPage, AdminSolicitudesPage, AdminLogsPage
 │   ├── HomePage.jsx      Landing pública
 │   ├── ChatPage.jsx      Mensajería

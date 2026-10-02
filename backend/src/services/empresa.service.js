@@ -5,6 +5,8 @@ const {
 } = require('../models');
 const { Op } = require('sequelize');
 const { buildPagination, groupCount } = require('../utils/pagination');
+const HttpError = require('../utils/httpError');
+const { comparteMismaEmpresa, puedeVerConversacion } = require('./chatPermission.service');
 
 // Resolución canónica de empresa para un request autenticado.
 // Orden: (1) req.empresa inyectado por middleware → (2) membresía activa en
@@ -326,7 +328,130 @@ async function obtenerCandidatosConFoto(empresaId, {
   return { data, pagination: buildPagination(count, { page, limit }), conteoPorEstado };
 }
 
+const esIdValido = (valor) => (typeof valor === 'number' || (typeof valor === 'string' && /^\d+$/.test(valor)))
+  && Number.isInteger(Number(valor)) && Number(valor) > 0;
+
+/**
+ * Asigna (o cambia) el reclutador responsable de una oferta de la empresa
+ * (PATCH /api/empresas/ofertas/:id/responsable — solo admin_empresa).
+ *
+ * Es una acción de GOBIERNO: solo toca `creadaPorUsuarioId`. No modifica el
+ * contenido de la oferta, ni las postulaciones, ni sus estados.
+ *
+ * El responsable tiene que ser un RECLUTADOR ACTIVO de ESA empresa (membresía
+ * activa con rolInterno 'reclutador' y cuenta de usuario activa y habilitada):
+ * nunca el admin_empresa, un reclutador suspendido o alguien de otra empresa.
+ *
+ * @returns {{ oferta, responsable, anterior, anteriorVigente }}
+ *   anterior: usuario que figuraba como responsable (o null) — para auditoría.
+ *   anteriorVigente: ese mismo usuario solo si seguía siendo un reclutador
+ *   activo de la empresa (a quién tiene sentido avisarle).
+ */
+async function asignarResponsableOferta(empresa, ofertaId, responsableId) {
+  if (!esIdValido(ofertaId)) throw new HttpError(404, 'Oferta no encontrada.');
+  if (!esIdValido(responsableId)) {
+    throw new HttpError(400, 'Indicá el reclutador responsable (responsableId).');
+  }
+  const idResponsable = Number(responsableId);
+
+  const oferta = await Oferta.findOne({ where: { id: Number(ofertaId), empresaId: empresa.id } });
+  if (!oferta) throw new HttpError(404, 'Oferta no encontrada.');
+
+  const membresia = await EmpresaUsuario.findOne({
+    where: { empresaId: empresa.id, usuarioId: idResponsable, rolInterno: 'reclutador', activo: true },
+    include: [{ model: Usuario, as: 'usuario', attributes: [...ATRIBUTOS_RESPONSABLE, 'activo', 'habilitado'] }],
+  });
+  const candidato = membresia?.usuario;
+  if (!candidato || !candidato.activo || !candidato.habilitado) {
+    throw new HttpError(400, 'El responsable debe ser un reclutador activo de tu empresa.');
+  }
+
+  if (oferta.creadaPorUsuarioId === idResponsable) {
+    throw new HttpError(400, 'Ese reclutador ya es el responsable de la oferta.');
+  }
+
+  const [anterior, anteriorVigente] = await Promise.all([
+    oferta.creadaPorUsuarioId
+      ? Usuario.findByPk(oferta.creadaPorUsuarioId, { attributes: ATRIBUTOS_RESPONSABLE })
+      : null,
+    obtenerReclutadorResponsable(oferta),
+  ]);
+
+  await oferta.update({ creadaPorUsuarioId: idResponsable });
+
+  const responsable = { id: candidato.id, nombre: candidato.nombre, apellido: candidato.apellido };
+  return { oferta, responsable, anterior, anteriorVigente };
+}
+
+/**
+ * Ficha de un reclutador (GET /api/empresas/reclutadores/:id/perfil).
+ *
+ * Solo datos de contacto básicos de una persona que es RECLUTADOR ACTIVO de
+ * una empresa. Un admin_empresa no tiene ficha personal: se lo representa con
+ * el perfil de la empresa.
+ *
+ * Quién puede verla (no es un directorio abierto de reclutadores):
+ *   - el propio reclutador;
+ *   - cualquier miembro activo de su misma empresa;
+ *   - un alumno/egresado que pueda ver la conversación con él (misma regla
+ *     del chat: una postulación suya avanzó bajo su responsabilidad);
+ *   - el admin del sistema.
+ *
+ * Devuelve null tanto si el usuario no existe o no es un reclutador activo
+ * como si quien consulta no tiene relación: el controller responde el mismo
+ * 404 en los dos casos, para no permitir enumerar reclutadores por id.
+ */
+async function obtenerPerfilReclutador(solicitante, usuarioId) {
+  if (!esIdValido(usuarioId)) return null;
+  const id = Number(usuarioId);
+
+  const membresia = await EmpresaUsuario.findOne({
+    where: { usuarioId: id, rolInterno: 'reclutador', activo: true },
+    include: [
+      {
+        model: Usuario,
+        as: 'usuario',
+        attributes: ['id', 'nombre', 'apellido', 'email', 'telefono', 'ubicacion', 'fotoPerfil', 'rol', 'activo'],
+      },
+      { model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'logo'] },
+    ],
+  });
+  const usuario = membresia?.usuario;
+  if (!usuario || usuario.rol !== 'empresa' || !usuario.activo || !membresia.empresa) return null;
+
+  let autorizado = false;
+  if (solicitante.rol === 'admin' || solicitante.id === id) autorizado = true;
+  else if (solicitante.rol === 'empresa') autorizado = await comparteMismaEmpresa(solicitante.id, id);
+  else if (['alumno', 'egresado'].includes(solicitante.rol)) {
+    autorizado = (await puedeVerConversacion(solicitante.id, id)).ok;
+  }
+  if (!autorizado) return null;
+
+  let fotoPerfil = usuario.fotoPerfil;
+  if (!fotoPerfil) {
+    const perfil = await Perfil.findOne({ where: { usuarioId: id }, attributes: ['fotoPerfil'] });
+    fotoPerfil = perfil?.fotoPerfil ?? null;
+  }
+
+  return {
+    id: usuario.id,
+    nombre: usuario.nombre,
+    apellido: usuario.apellido,
+    email: usuario.email,
+    telefono: usuario.telefono ?? null,
+    ubicacion: usuario.ubicacion ?? null,
+    fotoPerfil,
+    empresa: {
+      id: membresia.empresa.id,
+      razonSocial: membresia.empresa.razonSocial,
+      logo: membresia.empresa.logo ?? null,
+    },
+  };
+}
+
 module.exports = {
+  asignarResponsableOferta,
+  obtenerPerfilReclutador,
   resolverEmpresaDelRequest,
   obtenerAdminsActivos,
   obtenerReclutadorResponsable,

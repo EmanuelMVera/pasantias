@@ -109,6 +109,28 @@ module.exports = {
     },
   },
 
+  ReclutadorPerfil: {
+    type: 'object',
+    description: 'Ficha de contacto de un reclutador activo.',
+    properties: {
+      id: { type: 'integer' },
+      nombre: { type: 'string' },
+      apellido: { type: 'string' },
+      email: { type: 'string', format: 'email' },
+      telefono: { type: 'string', nullable: true },
+      ubicacion: { type: 'string', nullable: true },
+      fotoPerfil: { type: 'string', nullable: true },
+      empresa: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer' },
+          razonSocial: { type: 'string' },
+          logo: { type: 'string', nullable: true },
+        },
+      },
+    },
+  },
+
   ResponsableOferta: {
     type: 'object',
     nullable: true,

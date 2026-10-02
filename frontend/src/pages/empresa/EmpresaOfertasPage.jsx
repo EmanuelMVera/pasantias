@@ -6,8 +6,9 @@
  * están y cuántas postulaciones tienen. No es la pantalla de creación.
  *
  * Permisos (la autoridad es el backend, esto solo los refleja):
- *   - admin_empresa: ver candidatos y pausar / reactivar / cerrar cualquier
- *     oferta. Nunca editar el contenido.
+ *   - admin_empresa: ver candidatos, pausar / reactivar / cerrar cualquier
+ *     oferta y asignar o cambiar su reclutador responsable. Nunca editar el
+ *     contenido.
  *   - reclutador: mismas acciones de estado solo sobre sus ofertas, y además
  *     "Editar contenido".
  *
@@ -36,6 +37,7 @@ import DataCard from '../../components/ui/DataCard';
 import EmptyState from '../../components/ui/EmptyState';
 import ActionMenu from '../../components/ui/ActionMenu';
 import ConfirmModal from '../../components/ui/ConfirmModal';
+import AsignarResponsableModal from '../../components/AsignarResponsableModal/AsignarResponsableModal';
 import Toast from '../../components/ui/Toast';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import {
@@ -59,7 +61,7 @@ function ModeracionBadge({ estado }) {
 export default function EmpresaOfertasPage() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
-  const { esAdminEmpresa, esReclutador } = useEmpresa();
+  const { empresa, esAdminEmpresa, esReclutador } = useEmpresa();
   const esTabla = useMediaQuery('(min-width: 1024px)');
   const { toast, showToast } = useToast(4000);
 
@@ -93,6 +95,7 @@ export default function EmpresaOfertasPage() {
   const [accionando, setAccionando] = useState(null); // id de la oferta en proceso
   const [confirmarCierre, setConfirmarCierre] = useState(null); // oferta a cerrar
   const [cerrando, setCerrando] = useState(false);
+  const [ofertaResponsable, setOfertaResponsable] = useState(null); // oferta a (re)asignar
 
   const secuencia = useRef(0); // descarta respuestas de consultas viejas
 
@@ -156,17 +159,49 @@ export default function EmpresaOfertasPage() {
     setConfirmarCierre(null);
   };
 
+  // El responsable de la oferta dejó de ser un reclutador activo (se muestra
+  // igual, por historial; el admin_empresa puede cambiarlo).
+  const responsableSuspendido = (o) => reclutadores.some((r) => r.id === o.creadaPorUsuarioId && !r.activo);
+
+  const responsableAsignado = async (mensaje) => {
+    setOfertaResponsable(null);
+    showToast(mensaje, 'success');
+    await cargar();
+  };
+
   const accionesDe = (o) => {
     const items = [];
     if (puedeEditar(o)) {
       items.push({ key: 'editar', label: 'Editar contenido', onSelect: () => navigate(`/empresa/ofertas/${o.id}/editar`) });
     }
+    // Gobierno de la empresa: solo el administrador de empresa asigna responsables.
+    if (esAdminEmpresa) {
+      items.push({
+        key: 'responsable',
+        label: o.creadaPorUsuarioId ? 'Cambiar responsable' : 'Asignar responsable',
+        onSelect: () => setOfertaResponsable(o),
+      });
+    }
     if (puedeGestionar(o)) {
-      if (o.estado === 'activa') items.push({ key: 'pausar', label: 'Pausar publicación', onSelect: () => cambiarEstado(o, 'pausada') });
-      if (o.estado === 'pausada') items.push({ key: 'reactivar', label: 'Reactivar publicación', onSelect: () => cambiarEstado(o, 'activa') });
-      if (o.estado !== 'cerrada') items.push({ key: 'cerrar', label: 'Cerrar publicación', danger: true, onSelect: () => setConfirmarCierre(o) });
+      const estados = [];
+      if (o.estado === 'activa') estados.push({ key: 'pausar', label: 'Pausar publicación', onSelect: () => cambiarEstado(o, 'pausada') });
+      if (o.estado === 'pausada') estados.push({ key: 'reactivar', label: 'Reactivar publicación', onSelect: () => cambiarEstado(o, 'activa') });
+      if (o.estado !== 'cerrada') estados.push({ key: 'cerrar', label: 'Cerrar publicación', danger: true, onSelect: () => setConfirmarCierre(o) });
+      if (estados.length > 0 && items.length > 0) estados[0].separatorBefore = true;
+      items.push(...estados);
     }
     return items;
+  };
+
+  const celdaResponsable = (o) => {
+    const nombre = nombreResponsable(o);
+    if (!nombre) return <span className={styles.sinDato}>Sin responsable asignado</span>;
+    return (
+      <>
+        {nombre}
+        {responsableSuspendido(o) && <small className={styles.sub}>Suspendido</small>}
+      </>
+    );
   };
 
   const renderAcciones = (oferta) => (
@@ -282,9 +317,7 @@ export default function EmpresaOfertasPage() {
                       <strong>{o.titulo}</strong>
                       <small className={styles.sub}>{[o.area, o.modalidad].filter(Boolean).join(' · ') || '—'}</small>
                     </td>
-                    <td className="cell-break">
-                      {nombreResponsable(o) ?? <span className={styles.sinDato}>Sin responsable asignado</span>}
-                    </td>
+                    <td className="cell-break">{celdaResponsable(o)}</td>
                     <td><EstadoBadge estado={o.estado} /></td>
                     <td><ModeracionBadge estado={o.estadoModeracion} /></td>
                     <td className={styles.numeros}>{o.cantidadVacantes ?? '—'} / <strong>{o.totalPostulaciones}</strong></td>
@@ -303,7 +336,12 @@ export default function EmpresaOfertasPage() {
                   subtitle={[o.area, o.modalidad].filter(Boolean).join(' · ') || undefined}
                   badge={<EstadoBadge estado={o.estado} />}
                   fields={[
-                    { label: 'Responsable', value: nombreResponsable(o) ?? 'Sin responsable asignado' },
+                    {
+                      label: 'Responsable',
+                      value: nombreResponsable(o)
+                        ? `${nombreResponsable(o)}${responsableSuspendido(o) ? ' (suspendido)' : ''}`
+                        : 'Sin responsable asignado',
+                    },
                     { label: 'Moderación', value: <ModeracionBadge estado={o.estadoModeracion} /> },
                     { label: 'Vacantes / Postulados', value: `${o.cantidadVacantes ?? '—'} / ${o.totalPostulaciones}` },
                     { label: 'Publicada', value: fechaCorta(o) },
@@ -317,6 +355,16 @@ export default function EmpresaOfertasPage() {
       )}
 
       {!primeraCarga && <Paginacion pagination={pagination} onPageChange={setPage} />}
+
+      {ofertaResponsable && (
+        <AsignarResponsableModal
+          oferta={ofertaResponsable}
+          reclutadores={reclutadores.filter((r) => r.activo)}
+          empresaNombre={empresa?.razonSocial}
+          onClose={() => setOfertaResponsable(null)}
+          onAsignado={responsableAsignado}
+        />
+      )}
 
       {confirmarCierre && (
         <ConfirmModal

@@ -6,6 +6,8 @@
  *
  * Campos editables: descripcion, rubro, sitioWeb, telefono, direccion, ciudad.
  * Protegidos (solo lectura): razonSocial, cuit, estado y nivel de confianza.
+ * El nivel de confianza se muestra UNA sola vez, en Datos institucionales, con
+ * una explicación de qué implica (no es un plan ni una jerarquía de cuenta).
  * El logo se sube aparte (POST /empresas/mi-empresa/logo): el backend valida
  * tipo real, extensión y tamaño; acá solo se anticipa el error al usuario.
  *
@@ -181,12 +183,6 @@ export default function MiEmpresaPage() {
   const confiable = empresa?.nivelConfianza === 'confiable';
   const nombreResponsable = responsable ? `${responsable.nombre} ${responsable.apellido}` : null;
 
-  const badgeConfianza = (
-    <span className={`badge badge-tone-${confiable ? 'teal' : 'gray'}`}>
-      {confiable && <Icon name="shield" size={14} strokeWidth={2} />}
-      {confiable ? 'Empresa de confianza' : 'Empresa estándar'}
-    </span>
-  );
 
   return (
     <div className={`page-container ${styles.pagina}`}>
@@ -228,7 +224,6 @@ export default function MiEmpresaPage() {
             {empresa?.rubro && <span className={styles.rubro}>{empresa.rubro}</span>}
             <div className={styles.badges}>
               <span className={`badge badge-tone-${estado.tone}`}>{estado.label}</span>
-              {badgeConfianza}
             </div>
             {nombreResponsable && (
               <span className={styles.responsable}>Responsable: <strong>{nombreResponsable}</strong></span>
@@ -281,7 +276,20 @@ export default function MiEmpresaPage() {
           <div><dt>Razón social</dt><dd>{empresa?.razonSocial ?? '—'}</dd></div>
           <div><dt>CUIT</dt><dd>{empresa?.cuit ?? '—'}</dd></div>
           <div><dt>Estado</dt><dd><span className={`badge badge-tone-${estado.tone}`}>{estado.label}</span></dd></div>
-          <div><dt>Nivel de confianza</dt><dd>{badgeConfianza}</dd></div>
+          <div className={styles.datoAncho}>
+            <dt>Nivel de confianza</dt>
+            <dd>
+              <span className={`badge badge-tone-${confiable ? 'teal' : 'gray'}`}>
+                {confiable && <Icon name="shield" size={14} strokeWidth={2} />}
+                {confiable ? 'De confianza' : 'Estándar'}
+              </span>
+              <p className={styles.ayudaDato}>
+                {confiable
+                  ? 'Tu empresa cuenta con habilitación institucional para determinadas aprobaciones automáticas.'
+                  : 'Las nuevas publicaciones y altas de reclutadores pueden requerir revisión institucional.'}
+              </p>
+            </dd>
+          </div>
         </dl>
         <p className={styles.nota}>
           Para modificar la razón social o el CUIT, contactate con el administrador del sistema.

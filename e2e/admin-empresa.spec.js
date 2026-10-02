@@ -51,7 +51,8 @@ test.describe('Administrador de empresa — shell e identidad', () => {
     const sidebar = page.locator('#nav-mobile');
     await expect(sidebar).toContainText(fx.empresa.razonSocial);
     await expect(sidebar).toContainText('Administrador de empresa');
-    await expect(sidebar).toContainText('Empresa estándar');
+    // El nivel de confianza no se muestra en la sidebar (vive en Mi empresa).
+    await expect(sidebar).not.toContainText(/empresa estándar|empresa de confianza/i);
 
     // Topbar: Chat y Notificaciones son acciones globales.
     await expect(page.getByRole('link', { name: 'Chat' })).toBeVisible();
@@ -352,7 +353,6 @@ test.describe('Administrador de empresa — supervisión', () => {
     });
     await page.goto('/empresa/equipo');
 
-    await expect(page.locator('#nav-mobile')).toContainText('Empresa de confianza');
     const boton = page.locator('#btn-nuevo-miembro');
     await expect(boton).toHaveText('Agregar reclutador');
     await boton.click();
@@ -399,5 +399,161 @@ test.describe('Administrador de empresa — supervisión', () => {
     // Solo ofertas visibles para alumnos: la pendiente de moderación no aparece.
     await expect(page.getByText(fx.ofertaActiva.titulo)).toBeVisible();
     await expect(page.getByText(fx.ofertaPendiente.titulo)).toHaveCount(0);
+  });
+});
+
+test.describe('Administrador de empresa — cierre: perfiles del chat y responsable de oferta', () => {
+  test.beforeEach(async ({ page }) => {
+    // Viewport alto: el menú ⋯ se cierra al hacer scroll (por diseño).
+    await page.setViewportSize({ width: 1366, height: 1000 });
+    await login(page, fx.adminEmpresa.email);
+  });
+
+  test('Chat: "Ver perfil" de un reclutador abre SU ficha (no la empresa) y desde ahí se llega a la empresa', async ({ page }) => {
+    await page.goto('/chat');
+    await page.getByRole('button', { name: 'Iniciar nueva conversación' }).click();
+    const buscador = page.getByRole('dialog');
+    await buscador.getByRole('textbox').fill(fx.reclutador.nombre);
+    await buscador.getByRole('button').filter({ hasText: RECLUTADORA }).click();
+
+    // Identidad: el reclutador es una persona de la empresa.
+    const cabecera = page.getByRole('button', { name: 'Ver perfil', exact: true }).locator('..');
+    await expect(cabecera).toContainText(RECLUTADORA);
+    await expect(cabecera).toContainText(`Reclutador · ${fx.empresa.razonSocial}`);
+    await expect(page.getByRole('button', { name: 'Ver empresa' })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Ver perfil', exact: true }).click();
+    await expect(page).toHaveURL(/\/reclutador\/\d+$/);
+    await expect(page.getByRole('heading', { level: 1, name: RECLUTADORA })).toBeVisible();
+    const ficha = page.getByRole('region', { name: RECLUTADORA });
+    await expect(ficha.getByText('Reclutador', { exact: true })).toBeVisible();
+    await expect(ficha).toContainText(fx.empresa.razonSocial);
+    await expect(ficha.getByRole('link', { name: fx.reclutador.email })).toBeVisible();
+    await sinScrollHorizontal(page);
+
+    // Desde la ficha se llega al perfil público de la empresa (la misma página de siempre).
+    await ficha.getByRole('link', { name: 'Ver empresa' }).click();
+    await expect(page).toHaveURL(/\/empresa\/\d+$/);
+    await expect(page.getByRole('heading', { name: fx.empresa.razonSocial })).toBeVisible();
+  });
+
+  test('Perfil de reclutador: responsive en móvil y perfil inexistente', async ({ page }) => {
+    // Un id que no es de un reclutador (o sin relación) responde "no disponible".
+    await page.goto('/reclutador/999999');
+    await expect(page.getByText('Este perfil no está disponible.')).toBeVisible();
+
+    const equipo = await (await page.request.get('http://localhost:5000/api/empresas/equipo')).json();
+    const reclutadora = equipo.data.find((m) => m.rolInterno === 'reclutador');
+    // La cuenta administradora no tiene ficha de reclutador.
+    const admin = equipo.data.find((m) => m.rolInterno === 'admin_empresa');
+    await page.goto(`/reclutador/${admin.usuario.id}`);
+    await expect(page.getByText('Este perfil no está disponible.')).toBeVisible();
+
+    for (const ancho of [320, 375, 768]) {
+      await page.setViewportSize({ width: ancho, height: 800 });
+      await page.goto(`/reclutador/${reclutadora.usuario.id}`);
+      await expect(page.getByRole('heading', { level: 1, name: RECLUTADORA })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Ver empresa' })).toBeVisible();
+      await sinScrollHorizontal(page);
+    }
+  });
+
+  test('Sidebar sin etiqueta de nivel de confianza; Mi empresa lo muestra una sola vez y lo explica', async ({ page }) => {
+    await expect(page.locator('#nav-mobile')).not.toContainText(/empresa estándar|empresa de confianza/i);
+
+    await page.goto('/empresa/mi-empresa');
+    const institucional = page.getByRole('region', { name: 'Datos institucionales' });
+    await expect(institucional).toContainText('Nivel de confianza');
+    await expect(institucional.getByText('Estándar', { exact: true })).toBeVisible();
+    await expect(institucional).toContainText('pueden requerir revisión institucional');
+    // No se repite en la cabecera ni en la sidebar.
+    await expect(page.getByText('Estándar', { exact: true })).toHaveCount(1);
+    await expect(page.getByText(/empresa estándar/i)).toHaveCount(0);
+    await expect(page.locator('#nav-mobile')).not.toContainText(/estándar/i);
+  });
+
+  test('Ofertas: asignar responsable a una oferta sin responsable', async ({ page }) => {
+    await page.goto('/empresa/ofertas');
+    const pendiente = page.locator('tbody tr').filter({ hasText: fx.ofertaPendiente.titulo });
+    await expect(pendiente).toContainText('Sin responsable asignado');
+
+    await pendiente.getByRole('button', { name: /más acciones/i }).click();
+    await expect(page.getByRole('menuitem', { name: 'Cambiar responsable' })).toHaveCount(0);
+    await page.getByRole('menuitem', { name: 'Asignar responsable' }).click();
+
+    const modal = page.getByRole('dialog');
+    await expect(modal.getByRole('heading', { name: 'Asignar responsable' })).toBeVisible();
+    await expect(modal).toContainText(fx.ofertaPendiente.titulo);
+    await expect(modal).toContainText('Sin responsable asignado');
+    await expect(modal).toContainText(`Solo se muestran reclutadores activos de ${fx.empresa.razonSocial}`);
+
+    // Solo reclutadores activos: la cuenta administradora no es una opción.
+    const select = modal.getByLabel('Responsable', { exact: true });
+    await expect(select.locator('option')).toHaveText(['Elegí un reclutador…', RECLUTADORA]);
+    const confirmar = modal.getByRole('button', { name: 'Asignar responsable' });
+    await expect(confirmar).toBeDisabled();
+    await select.selectOption({ label: RECLUTADORA });
+    await confirmar.click();
+
+    await expect(page.getByRole('status').filter({ hasText: /quedó como responsable/i })).toBeVisible();
+    await expect(pendiente).toContainText(RECLUTADORA);
+    await expect(pendiente).not.toContainText('Sin responsable asignado');
+
+    // Ya no quedan ofertas sin responsable: el filtro y el resumen lo reflejan.
+    await page.getByLabel('Responsable', { exact: true }).selectOption('sin');
+    await expect(page.getByText(/no hay ofertas con esos criterios/i)).toBeVisible();
+    await page.goto('/empresa');
+    const recientes = page.getByRole('region', { name: 'Ofertas recientes' });
+    await expect(recientes).toContainText(fx.ofertaPendiente.titulo);
+    await expect(recientes).not.toContainText('Sin responsable asignado');
+  });
+
+  test('Ofertas: cambiar responsable pide confirmación explícita con el traspaso', async ({ page }) => {
+    // El seed tiene un solo reclutador: se simula un segundo en el equipo y la
+    // respuesta del cambio (las reglas reales se cubren en los tests de backend).
+    await page.route('**/api/empresas/equipo', async (route) => {
+      const res = await route.fetch();
+      const json = await res.json();
+      json.data.push({
+        id: 999001, rolInterno: 'reclutador', activo: true,
+        usuario: { id: 999001, nombre: 'Lucía', apellido: 'Ferrari', email: 'lucia@e2e.test' },
+      });
+      return route.fulfill({ response: res, json });
+    });
+    let cuerpo = null;
+    await page.route('**/api/empresas/ofertas/*/responsable', async (route) => {
+      cuerpo = route.request().postDataJSON();
+      return route.fulfill({ json: { success: true, message: 'Responsable de la oferta actualizado.', data: {} } });
+    });
+
+    await page.goto('/empresa/ofertas');
+    const activa = page.locator('tbody tr').filter({ hasText: fx.ofertaActiva.titulo });
+    await expect(activa).toContainText(RECLUTADORA);
+    await activa.getByRole('button', { name: /más acciones/i }).click();
+    await expect(page.getByRole('menuitem', { name: 'Asignar responsable' })).toHaveCount(0);
+    await page.getByRole('menuitem', { name: 'Cambiar responsable' }).click();
+
+    const modal = page.getByRole('dialog');
+    await expect(modal.getByRole('heading', { name: 'Cambiar responsable' })).toBeVisible();
+    await expect(modal).toContainText('Responsable actual');
+    await expect(modal).toContainText(RECLUTADORA);
+    // El responsable actual no se ofrece como destino.
+    const select = modal.getByLabel('Nuevo responsable');
+    await expect(select.locator('option')).toHaveText(['Elegí un reclutador…', 'Lucía Ferrari']);
+    await select.selectOption({ label: 'Lucía Ferrari' });
+    await modal.getByRole('button', { name: 'Cambiar responsable' }).click();
+
+    await expect(modal).toContainText('¿Cambiar el responsable de esta oferta?');
+    await expect(modal).toContainText(`pasará de ${RECLUTADORA} a Lucía Ferrari`);
+    await expect(modal).toContainText('Los candidatos y el historial del proceso se conservarán');
+    expect(cuerpo).toBeNull(); // todavía no se envió nada
+
+    // "Volver" no cambia nada; confirmar envía el cambio.
+    await modal.getByRole('button', { name: 'Volver' }).click();
+    await expect(modal.getByLabel('Nuevo responsable')).toHaveValue('999001');
+    await modal.getByRole('button', { name: 'Cambiar responsable' }).click();
+    await modal.getByRole('button', { name: 'Sí, cambiar responsable' }).click();
+    await expect(page.getByRole('status').filter({ hasText: /nuevo responsable/i })).toBeVisible();
+    expect(cuerpo).toEqual({ responsableId: 999001 });
   });
 });

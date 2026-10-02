@@ -152,6 +152,16 @@
   overflow-wrap: anywhere;
 }
 
+/* Dato con explicación debajo: ocupa toda la fila de la grilla. */
+.datoAncho { grid-column: 1 / -1; }
+
+.ayudaDato {
+  margin: var(--space-2) 0 0;
+  font-size: 0.84rem;
+  font-weight: 400;
+  color: var(--text-soft);
+}
+
 .nota {
   margin: var(--space-4) 0 0;
   padding-top: var(--space-3);

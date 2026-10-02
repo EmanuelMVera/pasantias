@@ -61,6 +61,21 @@
   outline: none;
 }
 
+/* Divisor entre grupos de acciones (ítem con `separatorBefore`). */
+.itemSeparado {
+  position: relative;
+  margin-top: 9px;
+}
+
+.itemSeparado::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--border-soft);
+}
+
 .itemDanger { color: var(--danger-text); }
 .itemDanger:hover,
 .itemDanger:focus-visible { background: var(--danger-soft); }
