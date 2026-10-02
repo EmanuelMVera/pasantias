@@ -3,7 +3,7 @@
  *
  * `usuarios` es paranoid (soft delete, EST-08): hay que forzar el borrado
  * real o el próximo run choca contra el UNIQUE de email/cuit con filas
- * "borradas" que en realidad siguen ahí (mismo bug ya visto en seedDemo.js).
+ * "borradas" que en realidad siguen ahí.
  *
  * Las cascadas ya definidas en models/index.js (Usuario → Perfil /
  * EmpresaUsuario / Postulacion / Notificacion / Mensaje; Empresa → Oferta /

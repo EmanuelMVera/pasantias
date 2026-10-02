@@ -18,6 +18,7 @@ const app = require('../src/app');
 const {
   Usuario, Empresa, EmpresaUsuario, Oferta, Postulacion,
   PostulacionHistorialEstado, Mensaje, Notificacion, ActivityLog, Archivo,
+  SolicitudReclutador,
 } = require('../src/models');
 const {
   escenarioInstitucionalExiste,
@@ -79,7 +80,106 @@ describe('seedInstitucional — dataset institucional amplio (Fase 1.5)', () => 
     }
   });
 
-  test('RBAC-01: ninguna oferta institucional fue creada por un admin_empresa', async () => {
+  test('nivel de confianza determinístico: 15 estándar + 5 de confianza, siempre las mismas empresas', async () => {
+    await ejecutarSeedInstitucional({ verbose: false });
+    const leer = async () => (await Empresa.findAll({
+      where: { cuit: { [Op.like]: '307000000%' } }, attributes: ['cuit', 'nivelConfianza'], order: [['cuit', 'ASC']],
+    })).map((e) => `${e.cuit}:${e.nivelConfianza}`);
+
+    const primera = await leer();
+    expect(primera.filter((x) => x.endsWith(':confiable'))).toHaveLength(5);
+    expect(primera.filter((x) => x.endsWith(':estandar'))).toHaveLength(15);
+
+    await ejecutarSeedInstitucional({ verbose: false });
+    expect(await leer()).toEqual(primera); // reseedear no cambia quién es confiable
+  });
+
+  test('moderación coherente: las empresas de confianza publican en automático; las estándar pasan por moderación', async () => {
+    const r = await ejecutarSeedInstitucional({ verbose: false });
+    const empresas = await Empresa.findAll({ where: { cuit: { [Op.like]: '307000000%' } }, attributes: ['id', 'nivelConfianza'] });
+    const confiables = new Set(empresas.filter((e) => e.nivelConfianza === 'confiable').map((e) => e.id));
+    const ofertas = await Oferta.findAll({
+      where: { empresaId: { [Op.in]: empresas.map((e) => e.id) } }, attributes: ['empresaId', 'estadoModeracion'],
+    });
+
+    const auto = ofertas.filter((o) => o.estadoModeracion === 'auto_aprobada');
+    expect(auto.length).toBeGreaterThan(0);
+    expect(r.ofertasAutoAprobadas).toBe(auto.length);
+    for (const o of ofertas) {
+      // auto_aprobada ⇔ empresa de confianza
+      expect(o.estadoModeracion === 'auto_aprobada').toBe(confiables.has(o.empresaId));
+    }
+    const deEstandar = new Set(ofertas.filter((o) => !confiables.has(o.empresaId)).map((o) => o.estadoModeracion));
+    expect(deEstandar).toEqual(new Set(['aprobada', 'pendiente', 'rechazada']));
+
+    // El filtro "Publicación automática" del admin encuentra resultados reales.
+    const { crearAdmin, loginYObtenerToken } = require('./helpers/factories');
+    const { limpiarUsuarios } = require('./helpers/cleanup');
+    const { usuario: admin, passwordPlana } = await crearAdmin();
+    try {
+      const token = await loginYObtenerToken(admin.email, passwordPlana);
+      const res = await request(app)
+        .get('/api/admin/ofertas?estadoModeracion=auto_aprobada&limit=100')
+        .set('Authorization', `Bearer ${token}`);
+      expect(res.status).toBe(200);
+      expect(res.body.data.length).toBeGreaterThanOrEqual(auto.length);
+      expect(res.body.data.every((o) => o.estadoModeracion === 'auto_aprobada')).toBe(true);
+    } finally {
+      await limpiarUsuarios(admin.id);
+    }
+  });
+
+  test('casos especiales acotados: 2 reclutadores suspendidos, 3 solicitudes pendientes, algunos usuarios sin último acceso', async () => {
+    await ejecutarSeedInstitucional({ verbose: false });
+    const empresas = await Empresa.findAll({ where: { cuit: { [Op.like]: '307000000%' } }, attributes: ['id', 'nivelConfianza'] });
+    const empresaIds = empresas.map((e) => e.id);
+
+    const membresias = await EmpresaUsuario.findAll({ where: { empresaId: { [Op.in]: empresaIds } }, attributes: ['empresaId', 'usuarioId', 'rolInterno', 'activo'] });
+    const suspendidos = membresias.filter((m) => !m.activo);
+    expect(suspendidos).toHaveLength(2);
+    expect(suspendidos.every((m) => m.rolInterno === 'reclutador')).toBe(true);
+    // Ninguna empresa se queda sin reclutador activo.
+    for (const id of empresaIds) {
+      expect(membresias.some((m) => m.empresaId === id && m.rolInterno === 'reclutador' && m.activo)).toBe(true);
+    }
+
+    const pendientes = await SolicitudReclutador.findAll({ where: { empresaId: { [Op.in]: empresaIds }, estado: 'pendiente' } });
+    expect(pendientes).toHaveLength(3);
+    const nivel = new Map(empresas.map((e) => [e.id, e.nivelConfianza]));
+    expect(pendientes.every((s) => nivel.get(s.empresaId) === 'estandar')).toBe(true);
+
+    const sinAcceso = await Usuario.findAll({
+      where: { email: { [Op.iLike]: `%@${DOMINIO}` }, ultimoAcceso: null }, attributes: ['id'],
+    });
+    expect(sinAcceso.length).toBeGreaterThan(0);
+    expect(sinAcceso.length).toBeLessThan(15);
+    // Quien nunca ingresó no tiene postulaciones.
+    expect(await Postulacion.count({ where: { usuarioId: { [Op.in]: sinAcceso.map((u) => u.id) } } })).toBe(0);
+  });
+
+  test('consistencia histórica: solo hay postulaciones a ofertas visibles y el historial termina en el estado actual', async () => {
+    await ejecutarSeedInstitucional({ verbose: false });
+    const usuarios = await Usuario.findAll({ where: { email: { [Op.iLike]: `%@${DOMINIO}` } }, attributes: ['id'] });
+    const postulaciones = await Postulacion.findAll({
+      where: { usuarioId: { [Op.in]: usuarios.map((u) => u.id) } },
+      attributes: ['id', 'estado'],
+      include: [{ model: Oferta, as: 'oferta', attributes: ['estadoModeracion'] }],
+    });
+    expect(postulaciones.length).toBeGreaterThan(100);
+    for (const p of postulaciones) {
+      expect(['aprobada', 'auto_aprobada']).toContain(p.oferta.estadoModeracion);
+    }
+
+    const historial = await PostulacionHistorialEstado.findAll({
+      where: { postulacionId: { [Op.in]: postulaciones.map((p) => p.id) } },
+      attributes: ['postulacionId', 'estadoNuevo'], order: [['id', 'ASC']],
+    });
+    const ultimo = new Map();
+    for (const h of historial) ultimo.set(h.postulacionId, h.estadoNuevo);
+    for (const p of postulaciones) expect(ultimo.get(p.id)).toBe(p.estado);
+  });
+
+  test('ninguna oferta institucional tiene como responsable a un admin_empresa', async () => {
     await ejecutarSeedInstitucional({ verbose: false });
     const empresas = await Empresa.findAll({ where: { cuit: { [Op.like]: '307000000%' } }, attributes: ['id'] });
     const empresaIds = empresas.map((e) => e.id);
@@ -176,6 +276,10 @@ describe('seedInstitucional — dataset institucional amplio (Fase 1.5)', () => 
   });
 
   test('namespace aislado: ningún usuario institucional aparece en GET /api/demo/status, ninguno tiene rol admin', async () => {
+    // Autocontenido: /api/demo/status solo lista cuentas si el escenario de
+    // presentación está cargado (no depende de qué test corrió antes).
+    const { ejecutarSeedPresentacion } = require('../src/utils/seedPresentacion');
+    await ejecutarSeedPresentacion({ verbose: false });
     await ejecutarSeedInstitucional({ verbose: false });
 
     const admins = await Usuario.count({ where: { email: { [Op.iLike]: `%@${DOMINIO}` }, rol: 'admin' } });

@@ -107,8 +107,9 @@ npm run db:seed:admin    # crea admin@pasantias.com / Admin1234!  (si no existe)
 cd ..
 ```
 
-Opcional — datos de demo (empresas, ofertas, alumnos, postulaciones):
-`cd backend && npm run db:seed:demo`.
+Opcional — datos de demo (el escenario de Delta Innovación IT + un dataset de volumen):
+`cd backend && npm run db:seed:showcase`. Para reconstruirlos de cero,
+`npm run db:showcase:reset`; para verificarlos, `npm run db:seed:showcase:status`.
 
 ---
 
@@ -173,7 +174,11 @@ La **matriz de permisos completa** (qué puede hacer cada rol) está en
 | `npm run db:migrate:down` | Revierte la última migración |
 | `npm run db:migrate:create <nombre>` | Crea `migrations/NNN-<nombre>.js` desde plantilla |
 | `npm run db:seed:admin` | Crea el usuario admin inicial |
-| `npm run db:seed:demo` | Carga datos de demostración |
+| `npm run db:seed:presentacion` | Escenario dirigido de demo (Delta Innovación IT, las 3 cuentas de LoginPage) |
+| `npm run db:seed:institucional` | Dataset de volumen (estadísticas, filtros, paginación, exportaciones) |
+| `npm run db:seed:showcase` | Los dos anteriores juntos |
+| `npm run db:showcase:reset` | Limpia todos los datos ficticios conocidos, vuelve a sembrar y valida |
+| `npm run db:seed:showcase:status` | Verifica el showcase (solo lectura) |
 | `npm run db:backup` | `pg_dump -Fc` a `backend/backups/` + verificación |
 | `npm run db:schema:dump` | Regenera `schema.sql` (raíz) desde la base actual |
 | `npm run db:reset:dev` | **Solo dev**: dropea, recrea y migra la base local |

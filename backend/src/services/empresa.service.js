@@ -241,8 +241,8 @@ async function obtenerOfertasConConteo(empresaId, {
     where,
     attributes: ['id', 'titulo', 'modalidad', 'ciudad', 'estado', 'estadoModeracion',
                  'cantidadVacantes', 'fechaLimite', 'area', 'createdAt', 'creadaPorUsuarioId'],
-    // Responsable de la oferta (RBAC-01): null en ofertas históricas anteriores
-    // a la migración 013 — el frontend debe mostrar "Responsable no registrado".
+    // Responsable actual de la oferta: null en ofertas históricas sin
+    // responsable — el frontend muestra "Sin responsable asignado".
     include: [{ model: Usuario, as: 'creadaPor', attributes: ['id', 'nombre', 'apellido', 'fotoPerfil'] }],
     order: [['createdAt', 'DESC'], ['id', 'DESC']],
     limit,

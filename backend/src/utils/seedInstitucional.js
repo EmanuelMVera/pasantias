@@ -11,16 +11,23 @@
  *
  * Crea (namespace `@institucional.invalid`, nunca resuelve — RFC 2606):
  *   - 20 empresas, cada una con razón social + logo (URL https externa,
- *     nunca un objeto R2/Archivo) y CUIT determinístico único.
+ *     nunca un objeto R2/Archivo) y CUIT determinístico único. Nivel de
+ *     confianza DETERMINÍSTICO: 15 estándar y 5 de confianza (1 de cada 4,
+ *     ver esConfiable) — siempre las mismas al reseedear.
  *   - 1 admin_empresa + entre 1 y 3 reclutadores por empresa (39 reclutadores
  *     en total). El admin_empresa es la identidad INSTITUCIONAL de la cuenta
  *     (razón social + logo) — el nombre/apellido de la persona queda como
- *     dato secundario "Responsable de cuenta", igual criterio que
- *     Navbar.jsx/EquipoPage.jsx ya aplican (Fase 1C de esta misma iteración).
+ *     dato secundario "Responsable de cuenta".
  *   - 80 alumnos/egresados con Perfil básico.
- *   - 1 oferta por reclutador (39 en total) — creadaPorUsuarioId siempre un
- *     reclutador, nunca un admin_empresa (RBAC-01, misma regla que rige el
- *     resto de la plataforma).
+ *   - 1 oferta por reclutador (39 en total). `creadaPorUsuarioId` (nombre
+ *     histórico: hoy es el RECLUTADOR RESPONSABLE de la oferta) es siempre un
+ *     reclutador de esa empresa, nunca un admin_empresa.
+ *   - Moderación coherente con el nivel de confianza: las ofertas de empresas
+ *     de confianza nacen `auto_aprobada` (publicación automática); las de
+ *     empresas estándar mezclan aprobada / pendiente / rechazada.
+ *   - Unos pocos casos especiales, sin exagerar: 2 reclutadores suspendidos,
+ *     algunos usuarios que nunca ingresaron (sin último acceso) y 3
+ *     solicitudes de reclutador pendientes.
  *   - ~200 postulaciones (cada alumno aplica a 1-4 ofertas, siempre pares
  *     usuarioId+ofertaId distintos) con su cadena de PostulacionHistorialEstado.
  *   - Mensajes SOLO entre usuarios con una relación real: admin_empresa↔su
@@ -51,13 +58,13 @@
  *
  * Uso:
  *   npm run db:seed:institucional
- *   npm run db:seed:institucional:status   (solo lectura, ver seedInstitucionalStatus.js)
  *   npm run db:seed:institucional:clean    (limpia sin volver a sembrar)
+ *   npm run db:seed:showcase:status        (diagnóstico de solo lectura, ver showcaseStatus.js)
  *
  * Exporta: escenarioInstitucionalExiste(), ejecutarSeedInstitucional({ verbose }),
- *          limpiarInstitucional(transaction) [reusado por el flag --clean],
- *          DOMINIO (única fuente de verdad del namespace, la reusa
- *          seedInstitucionalStatus.js sin duplicar el criterio).
+ *          limpiarSoloInstitucional() [flag --clean y showcaseReset.js],
+ *          DOMINIO y CUIT_PREFIJO (única fuente de verdad del namespace, los
+ *          reusa showcaseStatus.js sin duplicar el criterio).
  */
 
 'use strict';
@@ -72,6 +79,7 @@ const { bloquearSiProd } = require('./seedGuards');
 const {
   sequelize, Usuario, Perfil, Empresa, EmpresaUsuario, Oferta, Postulacion,
   PostulacionHistorialEstado, Notificacion, Mensaje, ActivityLog, Archivo,
+  SolicitudReclutador,
 } = require('../models');
 const { areas, habilidadesPorArea, carreras, rubroACarreras } = require('../data/catalogos.json');
 
@@ -81,6 +89,22 @@ const DOMINIO = 'institucional.invalid'; // RFC 2606, nunca resuelve
 const EMPRESAS_COUNT = 20;
 const ALUMNOS_COUNT = 80;
 const reclutadoresPorEmpresa = (i) => (i % 3) + 1; // 1..3, determinístico
+
+// Prefijo de CUIT del namespace: identifica a las empresas institucionales.
+const CUIT_PREFIJO = '307000000';
+
+// Nivel de confianza determinístico: 1 de cada 4 empresas es de confianza
+// (i = 3, 7, 11, 15, 19 → 5 confiables y 15 estándar). Nunca aleatorio.
+const esConfiable = (i) => i % 4 === 3;
+
+// Casos especiales (pocos, a propósito): [empresa, reclutador] suspendidos —
+// siempre en empresas con más de un reclutador, así ninguna queda sin equipo.
+const RECLUTADORES_SUSPENDIDOS = new Set(['4-1', '14-2']);
+// Empresas con una solicitud de reclutador PENDIENTE (todas estándar: en una
+// de confianza el alta es automática y no quedaría pendiente).
+const EMPRESAS_CON_SOLICITUD_PENDIENTE = [2, 9, 16];
+// Usuarios que nunca ingresaron (sin último acceso): 1 de cada 13 alumnos.
+const nuncaIngreso = (n) => n % 13 === 5;
 
 // ── Pools de datos (determinísticos, sin overlap con seedPresentacion.js) ──
 
@@ -141,7 +165,7 @@ async function limpiarInstitucional(transaction) {
   const userIds = usuarios.map((u) => u.id);
 
   const empresas = await Empresa.findAll({
-    where: { cuit: { [Op.like]: '307000000%' } },
+    where: { cuit: { [Op.like]: `${CUIT_PREFIJO}%` } },
     attributes: ['id'],
     paranoid: false,
     transaction,
@@ -152,6 +176,10 @@ async function limpiarInstitucional(transaction) {
     ? await Oferta.findAll({ where: { empresaId: { [Op.in]: empresaIds } }, attributes: ['id'], paranoid: false, transaction })
     : [];
   const ofertaIds = ofertas.map((o) => o.id);
+
+  if (empresaIds.length) {
+    await SolicitudReclutador.destroy({ where: { empresaId: { [Op.in]: empresaIds } }, transaction });
+  }
 
   const orPost = [];
   if (userIds.length) orPost.push({ usuarioId: { [Op.in]: userIds } });
@@ -190,7 +218,12 @@ async function limpiarInstitucional(transaction) {
 
 // ── Siembra ───────────────────────────────────────────────────────────────────
 
-const ESTADOS_POSTULACION = ['en_revision', 'preseleccionado', 'entrevista', 'contratado', 'rechazado'];
+// Distribución con forma de embudo (determinística, por índice): muchas en
+// revisión, menos avanzan, pocas terminan en contratación.
+const ESTADOS_POSTULACION = [
+  'en_revision', 'preseleccionado', 'rechazado', 'en_revision', 'entrevista',
+  'en_revision', 'preseleccionado', 'rechazado', 'entrevista', 'contratado',
+];
 const CADENA_POR_ESTADO = {
   en_revision: ['en_revision'],
   preseleccionado: ['en_revision', 'preseleccionado'],
@@ -199,6 +232,7 @@ const CADENA_POR_ESTADO = {
   rechazado: ['en_revision', 'rechazado'],
 };
 
+// Empresas ESTÁNDAR: sus ofertas pasan por la moderación del instituto.
 const ESTADO_OFERTA_PATTERN = [
   { estado: 'activa', estadoModeracion: 'aprobada' },
   { estado: 'activa', estadoModeracion: 'aprobada' },
@@ -207,6 +241,10 @@ const ESTADO_OFERTA_PATTERN = [
   { estado: 'cerrada', estadoModeracion: 'aprobada' },
   { estado: 'activa', estadoModeracion: 'rechazada' },
 ];
+// Empresas DE CONFIANZA: sus ofertas se publican sin revisión manual
+// (`auto_aprobada`, el mismo valor que escribe oferta.controller.js al crear
+// una oferta de una empresa confiable). El ciclo de vida sí varía.
+const ESTADO_OFERTA_CONFIABLE = ['activa', 'activa', 'pausada', 'activa', 'cerrada'];
 
 async function sembrar(transaction) {
   // ── Password: aleatoria por corrida, hasheada UNA sola vez, jamás impresa.
@@ -246,6 +284,7 @@ async function sembrar(transaction) {
       ultimoAcceso: tick(0, 2),
     }, { transaction });
 
+    const confiable = esConfiable(i);
     const rubro = RUBROS[i % RUBROS.length];
     const empresa = await Empresa.create({
       razonSocial: nombreEmpresa,
@@ -259,6 +298,7 @@ async function sembrar(transaction) {
       // Logo por URL https externa — nunca un objeto R2 ni fila Archivo.
       logo: logoUrl(nombreEmpresa, i),
       estadoAprobacion: 'aprobada',
+      nivelConfianza: confiable ? 'confiable' : 'estandar', // explícito, nunca el default
       aprobadaPorUsuarioId: null, // independiente del admin real, igual criterio que seedPresentacion
       aprobadaEn: tick(0, 1),
       createdAt: tEmpresa,
@@ -284,29 +324,44 @@ async function sembrar(transaction) {
         createdAt: tReclutador,
         ultimoAcceso: tick(0, 3),
       }, { transaction });
+      const suspendido = RECLUTADORES_SUSPENDIDOS.has(`${i}-${r}`);
       await EmpresaUsuario.create({
         empresaId: empresa.id, usuarioId: reclutador.id,
-        rolInterno: 'reclutador', activo: true, createdAt: tReclutador,
+        rolInterno: 'reclutador', activo: !suspendido, createdAt: tReclutador,
       }, { transaction });
+      reclutador.suspendido = suspendido; // solo en memoria, para el resto del script
       reclutadores.push(reclutador);
     }
 
-    empresas.push({ empresa, admin, reclutadores, rubro });
+    if (EMPRESAS_CON_SOLICITUD_PENDIENTE.includes(i)) {
+      await SolicitudReclutador.create({
+        empresaId: empresa.id,
+        nombre: NOMBRES[(i + 17) % NOMBRES.length],
+        apellido: APELLIDOS[(i * 5 + 9) % APELLIDOS.length],
+        email: `empresa${String(i + 1).padStart(2, '0')}.solicitud@${DOMINIO}`,
+        estado: 'pendiente',
+        createdAt: tick(0, 2),
+      }, { transaction });
+    }
+
+    empresas.push({ empresa, admin, reclutadores, rubro, confiable });
   }
 
-  // ── 2. OFERTAS (una por reclutador — RBAC-01: siempre atribuida a un
-  //     reclutador, nunca a un admin_empresa) ───────────────────────────────
+  // ── 2. OFERTAS (una por reclutador: el RESPONSABLE de la oferta es siempre
+  //     un reclutador de esa empresa, nunca un admin_empresa) ───────────────
   const ofertas = []; // { oferta, empresa, reclutador, empresaIdx }
   const TIPO_PUESTO = ['pasante', 'trainee', 'junior'];
   const NIVEL_POR_TIPO = { pasante: 'sin_experiencia', trainee: 'sin_experiencia', junior: 'junior' };
   let ofertaGlobalIdx = 0;
   for (let i = 0; i < empresas.length; i++) {
-    const { empresa, reclutadores, rubro } = empresas[i];
+    const { empresa, reclutadores, rubro, confiable } = empresas[i];
     const carrerasDestinatarias = rubroACarreras[rubro] || [carreras[i % carreras.length]];
     for (const reclutador of reclutadores) {
       const area = areas[ofertaGlobalIdx % areas.length];
       const tipoPuesto = TIPO_PUESTO[ofertaGlobalIdx % TIPO_PUESTO.length];
-      const { estado, estadoModeracion } = ESTADO_OFERTA_PATTERN[ofertaGlobalIdx % ESTADO_OFERTA_PATTERN.length];
+      const { estado, estadoModeracion } = confiable
+        ? { estado: ESTADO_OFERTA_CONFIABLE[ofertaGlobalIdx % ESTADO_OFERTA_CONFIABLE.length], estadoModeracion: 'auto_aprobada' }
+        : ESTADO_OFERTA_PATTERN[ofertaGlobalIdx % ESTADO_OFERTA_PATTERN.length];
       const tOferta = tick(1, 4);
       const oferta = await Oferta.create({
         empresaId: empresa.id,
@@ -352,7 +407,7 @@ async function sembrar(transaction) {
       ubicacion: `${CIUDADES[n % CIUDADES.length]}, Buenos Aires`,
       fotoPerfil: `https://i.pravatar.cc/150?img=${(n % 70) + 1}`,
       createdAt: tAlumno,
-      ultimoAcceso: tick(0, 4),
+      ultimoAcceso: nuncaIngreso(n) ? null : tick(0, 4),
     }, { transaction });
     await Perfil.create({
       usuarioId: alumno.id,
@@ -376,11 +431,18 @@ async function sembrar(transaction) {
   const postulaciones = []; // { postulacion, oferta, reclutador, alumno, estado }
   for (let a = 0; a < alumnos.length; a++) {
     const alumno = alumnos[a];
-    const numPost = 1 + (a % 4);
+    // Un usuario que nunca ingresó no pudo haberse postulado.
+    const numPost = nuncaIngreso(a) ? 0 : 1 + (a % 4);
     for (let k = 0; k < numPost; k++) {
       const ofertaIdx = (a + k * 7) % totalOfertas;
       const { oferta, reclutador } = ofertas[ofertaIdx];
-      const estado = ESTADOS_POSTULACION[(a * 3 + k) % ESTADOS_POSTULACION.length];
+      // Solo se puede postular a ofertas que fueron visibles para los alumnos
+      // (moderación resuelta): nunca a una pendiente o rechazada.
+      if (!['aprobada', 'auto_aprobada'].includes(oferta.estadoModeracion)) continue;
+      // Un reclutador suspendido no llegó a avanzar candidatos: quedan en revisión.
+      const estado = reclutador.suspendido
+        ? 'en_revision'
+        : ESTADOS_POSTULACION[(a * 3 + k) % ESTADOS_POSTULACION.length];
       const cadena = CADENA_POR_ESTADO[estado];
 
       // Se calculan ANTES de crear la fila los timestamps de toda la cadena
@@ -514,6 +576,8 @@ async function sembrar(transaction) {
 
   return {
     empresas: empresas.length,
+    confiables: empresas.filter((e) => e.confiable).length,
+    ofertasAutoAprobadas: ofertas.filter((o) => o.oferta.estadoModeracion === 'auto_aprobada').length,
     reclutadores: empresas.reduce((acc, e) => acc + e.reclutadores.length, 0),
     alumnos: alumnos.length,
     ofertas: ofertas.length,
@@ -543,6 +607,8 @@ async function ejecutarSeedInstitucional({ verbose = false } = {}) {
     if (verbose) console.log('✅ Dataset institucional sembrado.');
     return {
       empresas: r.empresas,
+      confiables: r.confiables,
+      ofertasAutoAprobadas: r.ofertasAutoAprobadas,
       reclutadores: r.reclutadores,
       alumnos: r.alumnos,
       ofertas: r.ofertas,
@@ -571,6 +637,7 @@ module.exports = {
   ejecutarSeedInstitucional,
   limpiarSoloInstitucional,
   DOMINIO,
+  CUIT_PREFIJO,
   EMPRESAS_COUNT,
   ALUMNOS_COUNT,
 };
@@ -597,10 +664,10 @@ if (require.main === module) {
       console.log('⚠️  Este seed crea datos FICTICIOS a escala (dataset institucional). No borra usuarios reales.');
       const r = await ejecutarSeedInstitucional({ verbose: false });
       console.log('\n✨ Dataset institucional creado ✨\n');
-      console.log(`  Empresas:       ${r.empresas}`);
+      console.log(`  Empresas:       ${r.empresas} (${r.empresas - r.confiables} estándar + ${r.confiables} de confianza)`);
       console.log(`  Reclutadores:   ${r.reclutadores} (+ ${r.empresas} admin_empresa, 1 por empresa)`);
       console.log(`  Alumnos:        ${r.alumnos}`);
-      console.log(`  Ofertas:        ${r.ofertas} (una por reclutador)`);
+      console.log(`  Ofertas:        ${r.ofertas} (una por reclutador; ${r.ofertasAutoAprobadas} de publicación automática)`);
       console.log(`  Postulaciones:  ${r.postulaciones}`);
       console.log('  Password: aleatoria por corrida, NO se imprime — estas cuentas no están');
       console.log('  pensadas para login interactivo. Las 3 cuentas de LoginPage siguen siendo');

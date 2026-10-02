@@ -58,7 +58,8 @@ src/
 │   └── *.model.js      Un archivo por tabla
 ├── validators/         Validación de body por endpoint
 ├── utils/              logger (pino), auditLog (registrarAuditoria), cookies, asyncHandler,
-│                       archivoNombre (magic bytes), seeds + seedGuards (bloquean prod), mantenimiento
+│                       archivoNombre (magic bytes), seeds (seedAdmin, seedPresentacion, seedInstitucional,
+│                       seedShowcase, showcaseReset, showcaseStatus) + seedGuards (bloquean prod), mantenimiento
 └── data/               Catálogos estáticos (carreras, rubros) en JSON
 ```
 

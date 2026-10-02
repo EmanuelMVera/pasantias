@@ -13,7 +13,7 @@
  * Uso: npm run db:reset:dev
  * Después de correr esto, sembrar datos con:
  *   npm run db:seed:admin
- *   npm run db:seed:demo
+ *   npm run db:seed:showcase
  */
 
 'use strict';
@@ -62,7 +62,7 @@ async function main() {
     });
   });
 
-  console.log('✅ Listo. Ahora podés correr: npm run db:seed:admin && npm run db:seed:demo');
+  console.log('✅ Listo. Ahora podés correr: npm run db:seed:admin && npm run db:seed:showcase');
 }
 
 main().catch((err) => {

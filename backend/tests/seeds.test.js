@@ -34,13 +34,13 @@ describe('seedGuards.bloquearSiProd', () => {
 
   test('fuera de producción no hace nada', () => {
     const { bloquearSiProd } = cargar(false);
-    expect(() => bloquearSiProd('db:seed:demo')).not.toThrow();
+    expect(() => bloquearSiProd('db:showcase:reset')).not.toThrow();
     expect(exitSpy).not.toHaveBeenCalled();
   });
 
   test('en producción sin override → aborta con exit(1)', () => {
     const { bloquearSiProd } = cargar(true);
-    expect(() => bloquearSiProd('db:seed:demo')).toThrow('EXIT');
+    expect(() => bloquearSiProd('db:showcase:reset')).toThrow('EXIT');
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
@@ -75,10 +75,30 @@ describe('seeds — abortan en producción (subproceso real)', () => {
     }
   };
 
-  test('db:seed:demo → bloqueado en producción sin excepción', () => {
-    const r = correr('src/utils/seedDemo.js', { NODE_ENV: 'production' });
+  test('db:showcase:reset → exige ALLOW_PRODUCTION_DEMO_SEED en producción (mismo guard que los seeds de demo)', () => {
+    const r = correr('src/utils/showcaseReset.js', { NODE_ENV: 'production', ALLOW_PRODUCTION_DEMO_SEED: '' });
     expect(r.ok).toBe(false);
-    expect(r.stderr + r.stdout).toMatch(/producción|production/i);
+    expect(r.stderr + r.stdout).toMatch(/ALLOW_PRODUCTION_DEMO_SEED/);
+  });
+
+  test('db:seed:showcase → exige ALLOW_PRODUCTION_DEMO_SEED en producción', () => {
+    const r = correr('src/utils/seedShowcase.js', { NODE_ENV: 'production', ALLOW_PRODUCTION_DEMO_SEED: '' });
+    expect(r.ok).toBe(false);
+    expect(r.stderr + r.stdout).toMatch(/ALLOW_PRODUCTION_DEMO_SEED/);
+  });
+
+  test('el seed legacy db:seed:demo ya no existe (ni el script ni sus datos)', () => {
+    const fs = require('fs');
+    const pkg = require('../package.json');
+    expect(pkg.scripts['db:seed:demo']).toBeUndefined();
+    for (const archivo of ['src/utils/seedDemo.js', 'src/data/empresas.json', 'src/data/alumnos.json']) {
+      expect(fs.existsSync(path.join(BACKEND_DIR, archivo))).toBe(false);
+    }
+    // Todo script de package.json apunta a un archivo que existe.
+    for (const comando of Object.values(pkg.scripts)) {
+      const m = comando.match(/^node (\S+\.js)/);
+      if (m) expect(fs.existsSync(path.join(BACKEND_DIR, m[1]))).toBe(true);
+    }
   });
 
   test('db:seed:presentacion → exige ALLOW_PRODUCTION_DEMO_SEED en producción', () => {

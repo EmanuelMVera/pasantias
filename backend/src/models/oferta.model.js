@@ -168,10 +168,16 @@ module.exports = (sequelize) => {
 
     // ── Auditoría ─────────────────────────────────────────────────────────
 
-    // Quién (qué miembro del equipo) creó la oferta — solo atribución/auditoría,
-    // no restringe visibilidad: cualquier miembro de la empresa sigue viendo
-    // todas sus ofertas. Nullable: ofertas históricas anteriores a este campo
-    // (migración 013) quedan en NULL. ON DELETE SET NULL (ver migración).
+    // RECLUTADOR RESPONSABLE ACTUAL de la oferta. El nombre de la columna es
+    // histórico ("quién la creó"): nace con el reclutador que la crea, pero el
+    // admin_empresa puede asignarlo o cambiarlo después
+    // (PATCH /api/empresas/ofertas/:id/responsable). De este campo depende
+    // quién edita la oferta y gestiona sus candidatos, quién recibe las
+    // postulaciones nuevas y con quién se habilita el chat. No restringe la
+    // visibilidad: cualquier miembro de la empresa ve todas sus ofertas.
+    // Nullable: las ofertas históricas (anteriores a la migración 013) quedan
+    // en NULL hasta que un admin_empresa les asigne responsable — no hay
+    // backfill. ON DELETE SET NULL (ver migración).
     creadaPorUsuarioId: {
       type: DataTypes.INTEGER,
       allowNull: true,

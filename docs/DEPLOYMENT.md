@@ -197,206 +197,212 @@ cuenta — nunca se comparte contraseña entre personas):
    claro — **nunca** eleva privilegios automáticamente. Para eso hace falta una acción
    explícita de otro admin desde el panel (`Admin → Usuarios`).
 
-### B. Cargar el escenario demo (solo staging/demo — opcional, una sola vez)
+### B. Datos de demostración (solo staging/demo — opcional)
+
+Todos los datos ficticios salen de **dos seeds** y se administran con cinco comandos:
+
+| Comando | Para qué |
+|---|---|
+| `npm run db:seed:presentacion` | Escenario **dirigido**: la historia navegable de Delta Innovación IT (las 3 cuentas de `LoginPage`). |
+| `npm run db:seed:institucional` | **Volumen**: 20 empresas, 80 alumnos, ofertas y postulaciones para estadísticas, filtros, paginación, auditoría y exportaciones. |
+| `npm run db:seed:showcase` | Los dos anteriores juntos. |
+| `npm run db:showcase:reset` | **Reconstruye**: limpia todos los datos ficticios conocidos (incluidos residuos viejos), vuelve a sembrar y valida. |
+| `npm run db:seed:showcase:status` | **Verifica** (solo lectura): conteos + chequeos de coherencia. Sale con código 1 si algo no cumple. |
+
+> El antiguo `db:seed:demo` (`seedDemo.js`) **ya no existe**: fue reemplazado por estos
+> seeds. No hay que usarlo ni buscarlo; `db:showcase:reset` limpia los datos que haya
+> dejado en una base donde corrió alguna vez.
+
+Los administradores del sistema **no** forman parte de ningún seed de demo: se crean
+únicamente con `db:seed:admin` (paso A).
+
+#### B.1 Cargar o reconstruir el showcase
 
 **Nunca en la producción real** salvo una necesidad puntual y consciente:
 
-1. Desplegar el código y las migraciones normalmente (`npm run db:migrate`).
-2. Confirmar que el admin real ya existe (paso A) — el escenario demo es
-   independiente de él, pero es buena práctica tenerlo creado antes.
-3. Agregar temporalmente `ALLOW_PRODUCTION_DEMO_SEED=true` en las variables de
-   entorno del servicio.
-4. Ejecutar `npm run db:seed:presentacion`.
-5. Comprobar el resumen impreso: **exactamente 3 cuentas de login** (`empresa@demo.com`,
-   `reclutador@demo.com`, `alumno@demo.com`, password `Demo1234!`), **ninguna admin**,
-   más **10 candidatos sintéticos** `candidatoNN@demo.invalid` (ver más abajo).
-6. **Eliminar `ALLOW_PRODUCTION_DEMO_SEED` inmediatamente** — no debe quedar seteada
-   de forma permanente.
+1. Desplegar el código y correr las migraciones: `npm run db:migrate`. Los seeds **no
+   migran**: si falta la migración 020 abortan con un mensaje claro, antes de tocar datos.
+2. Confirmar que el admin real ya existe (paso A).
+3. Agregar temporalmente `ALLOW_PRODUCTION_DEMO_SEED=true` en las variables de entorno.
+4. Ejecutar `npm run db:showcase:reset` (o `db:seed:showcase` si la base nunca tuvo
+   datos de demo).
+5. Leer el informe final: tiene que terminar en `SHOWCASE COHERENTE`.
+6. **Eliminar `ALLOW_PRODUCTION_DEMO_SEED` inmediatamente** — no debe quedar seteada.
 7. Confirmar que `SEED_PRESENTACION_ON_BOOT` sigue en `false` (default en `render.yaml`).
-8. Verificar `GET /api/demo/status` → `{ enabled: true, accounts: [...3 cuentas...] }`.
-9. Probar el login con las 3 cuentas desde `LoginPage` (los botones de autocompletado
-   solo aparecen si el paso 8 dio `enabled:true`).
+8. Verificar `GET /api/demo/status` → `{ enabled: true, accounts: [...3 cuentas...] }` y
+   probar el login con las 3 cuentas desde `LoginPage`.
 
-El seed es idempotente (limpia y recrea solo su propio namespace) y no borra usuarios
-reales ni toca al admin real (ni lo crea, ni lo modifica, ni lo elimina). También limpia
-de forma segura una eventual cuenta legacy `sistema@demo.com` de una versión anterior del
-seed, sin tocar ningún otro admin.
+Sin Shell en Render: cambiar temporalmente el *Build Command* a
+```
+npm ci && npm run db:migrate && npm run db:showcase:reset
+```
+(con `ALLOW_PRODUCTION_DEMO_SEED=true` seteada), leer el resultado en el log del deploy y
+después restaurar el Build Command normal y quitar la variable. Para solo verificar, usar
+`npm run db:seed:showcase:status` en su lugar (no necesita la variable: no escribe nada).
 
-#### B.1 Por qué Neon va a tener MÁS de 3 usuarios tras este seed
+#### B.2 Qué limpia el reset — y qué no
 
-La tabla `usuarios` va a mostrar **13 filas nuevas**, no 3: las 3 cuentas de login
-(`empresa@demo.com`, `reclutador@demo.com`, `alumno@demo.com`) **más 10 candidatos
-sintéticos** con email `candidatoNN@demo.invalid` (`candidato01@demo.invalid` …
-`candidato10@demo.invalid`). Son necesarios para que el pipeline de postulaciones del
-reclutador tenga contenido real: solo el alumno demo no alcanza para llenar el embudo
-de selección de 7 ofertas sin violar `UNIQUE(usuarioId, ofertaId)`.
+`db:showcase:reset` borra **solo** namespaces ficticios explícitos. No usa `DROP`,
+`TRUNCATE` ni `DELETE` sin `where`:
 
-- **No tienen login utilizable en la práctica**: no aparecen en `LoginPage` ni en
-  `GET /api/demo/status` (esa lista es fija — 3 emails, no una consulta a `usuarios`).
-- El dominio `.invalid` está reservado por la RFC 2606 específicamente para que nunca
-  resuelva ni pertenezca a nadie — mismo criterio que las IPs de auditoría de este seed
-  (rango `203.0.113.0/24`, TEST-NET-3 de la RFC 5737).
-- Comparten la password `Demo1234!` con las 3 cuentas de login — no es un secreto
-  nuevo, ya está documentada acá mismo; no se crearon para tener un login individual.
-- Quedan namespaced (`@demo.invalid`) justamente para que sean fáciles de identificar
-  y de excluir de cualquier reporte/exportación que solo deba mostrar cuentas reales.
+| Origen | Cómo se identifica |
+|---|---|
+| Presentación | `empresa@demo.com`, `reclutador@demo.com`, `alumno@demo.com`, `lucia.ferrari@demo.invalid`, `candidatoNN@demo.invalid`, la empresa "Delta Innovación IT" y la solicitud de empresa demo. También la cuenta legacy `sistema@demo.com` (rol admin) de una versión vieja del seed. |
+| Institucional | Usuarios `@institucional.invalid` y empresas con CUIT `307000000NN`. |
+| Antiguo `seedDemo` | Lista **exacta y cerrada** (`backend/src/utils/seedLegacy.js`): 50 emails `nombre.apellido@<empresa>.demo`, 20 alumnos `3700000N@itbeltran.com.ar` (tienen que coincidir email **y** nombre **y** apellido) y 20 razones sociales (solo si todos sus miembros son de esa lista). |
 
-**Conteos exactos verificados** (migración desde vacío + `db:seed:presentacion` únicamente,
-en Postgres local aislado — ver también `npm run db:seed:presentacion:status`):
+De cada uno borra además lo que cuelga: ofertas, postulaciones, historial, mensajes,
+notificaciones, auditoría, perfiles y membresías.
+
+**Nunca borra**: administradores del sistema reales, alumnos importados (aunque su email
+sea `@itbeltran.com.ar`), empresas reales (aunque compartan razón social con la lista
+legacy, si tienen miembros reales) ni ningún usuario fuera de esos namespaces. Cada
+limpieza y cada siembra es transaccional por dataset e idempotente: correrlo dos veces
+deja los mismos conteos.
+
+#### B.3 Escenario de presentación — Delta Innovación IT
+
+| | |
+|---|---|
+| Cuentas públicas (`LoginPage`, password `Demo1234!`) | `empresa@demo.com` (Carolina Méndez, admin_empresa) · `reclutador@demo.com` (Diego Herrera, reclutador) · `alumno@demo.com` (Martín Gómez, alumno) |
+| Resto del elenco (sin login público) | `lucia.ferrari@demo.invalid` (Lucía Ferrari, **segunda reclutadora activa**) · 10 candidatos `candidatoNN@demo.invalid` |
+| Equipo | 1 cuenta administradora + 2 reclutadores activos + 1 solicitud de reclutador pendiente (Mateo Silva) |
+| Empresa | Aprobada, **nivel de confianza estándar** (explícito) |
+
+Las 7 ofertas cubren todo el ciclo de vida y la moderación:
+
+| Oferta | Responsable | Estado | Moderación |
+|---|---|---|---|
+| Pasante en Desarrollo Frontend (React) | Diego | activa | aprobada |
+| Pasante en Desarrollo Backend (Node.js) | Diego | activa | aprobada |
+| Trainee en QA y Automatización de Pruebas | Lucía | activa | aprobada |
+| Pasante en Análisis de Datos | Diego | activa | pendiente |
+| Pasante en Soporte y Administración de Redes | Lucía | pausada | aprobada |
+| Pasante en Diseño UX/UI | Diego | cerrada | aprobada |
+| Pasante en Ciberseguridad | **sin responsable** (histórica, a propósito) | activa | rechazada |
+
+El responsable de una oferta (`creadaPorUsuarioId`) es siempre un reclutador activo,
+nunca el admin_empresa. La de Ciberseguridad queda sin responsable **a propósito**, para
+mostrar "Sin responsable asignado" y la acción de asignar responsable.
+
+16 postulaciones (4 del alumno demo + 12 de candidatos sintéticos): 5 en revisión, 3
+preseleccionados, 3 en entrevista, 2 contratados y 3 no seleccionados. El alumno demo
+tiene Frontend → entrevista, Backend → en revisión, QA → contratado y UX/UI → no
+seleccionado.
+
+Chats y notificaciones respetan las reglas reales: hay conversación interna Carolina ↔
+Diego y conversaciones reclutador ↔ candidato (Diego ↔ Martín, Lucía ↔ Martín, y cada
+uno con un candidato sintético); **no** hay ninguna admin_empresa ↔ candidato. "Nueva
+postulación recibida" les llega a los reclutadores; la administradora recibe avisos de
+moderación de ofertas, altas del equipo y mensajes internos.
+
+**Conteos exactos** (migración desde vacío + `db:seed:presentacion` únicamente):
 
 | Tabla | Conteo |
 |---|---|
-| usuarios (login demo) | 3 |
-| usuarios (candidatos sintéticos) | 10 |
+| usuarios | 14 (3 login + Lucía + 10 candidatos sintéticos) |
 | empresas | 1 |
-| empresa_usuarios | 2 |
-| ofertas | 7 |
-| postulaciones | 14 |
-| postulacion_historial_estados | 29 |
-| mensajes | 17 |
-| notificaciones | 18 |
-| activity_logs | 14 |
-| solicitudes_empresa | 1 |
-| solicitudes_reclutador (total) | 2 (1 pendiente + 1 aprobado) |
+| empresa_usuarios | 3 (1 admin_empresa + 2 reclutadores) |
+| ofertas | 7 (6 con responsable + 1 sin responsable) |
+| postulaciones | 16 |
+| postulacion_historial_estados | 34 |
+| mensajes | 19 (5 conversaciones) |
+| notificaciones | 26 |
+| activity_logs | 17 |
+| solicitudes_empresa | 1 (pendiente) |
+| solicitudes_reclutador | 3 (2 aprobadas + 1 pendiente) |
 | archivos | 0 |
 
-Las 14 postulaciones son **siempre** las mismas: 4 del alumno demo (con historial
-completo) + 10 del pool sintético (una por candidato, sin reusar ningún par
-`usuarioId`+`ofertaId`) — determinístico, no depende de que haya corrido ningún otro
-seed antes (a diferencia de una versión anterior de este script, que tomaba el pool de
-cuentas `@itbeltran.com.ar` creadas por `seedDemo.js`; si ese script no había corrido,
-las postulaciones caían de 14 a 4 **en silencio**, sin error — ver el fix en el
-changelog de `seedPresentacion.js`).
+Los usuarios `@demo.invalid` no aparecen en `LoginPage` ni en `GET /api/demo/status` (esa
+lista es fija: 3 emails). El dominio `.invalid` está reservado por la RFC 2606 para que
+nunca resuelva; las IPs de auditoría usan el rango de documentación `203.0.113.0/24`
+(RFC 5737). No se crean filas `Archivo` ni se sube nada a R2: el logo es una URL externa.
 
-#### B.2 Verificar sin Shell — `db:seed:presentacion:status`
+#### B.4 Dataset institucional
 
-Comando de solo lectura, cuenta filas sin secretos:
-
-```bash
-npm run db:seed:presentacion:status
-```
-
-Sin Shell en Render, igual que el seed de admin: cambiar temporalmente el
-*Build Command* a
-```
-npm ci && npm run db:migrate && npm run db:seed:presentacion:status
-```
-y leer el resultado en el log del deploy — después restaurar el Build Command normal
-(este comando no escribe nada, pero no hace falta dejarlo corriendo en cada deploy).
-
-**Consultas SQL equivalentes**, para correr directo en el SQL Editor de Neon (reemplazan
-al comando de arriba si se prefiere no tocar el Build Command en absoluto):
-
-```sql
--- Usuarios del escenario demo (3 login + 10 candidatos sintéticos)
-SELECT
-  count(*) FILTER (WHERE email IN ('empresa@demo.com','reclutador@demo.com','alumno@demo.com')) AS login_demo,
-  count(*) FILTER (WHERE email LIKE '%@demo.invalid') AS candidatos_sinteticos
-FROM usuarios;
-
--- Empresa + equipo
-SELECT count(*) FROM empresas WHERE "razonSocial" = 'Delta Innovación IT';
-SELECT count(*) FROM empresa_usuarios eu
-  JOIN empresas e ON e.id = eu."empresaId" WHERE e."razonSocial" = 'Delta Innovación IT';
-
--- Ofertas y postulaciones
-SELECT count(*) FROM ofertas o
-  JOIN empresas e ON e.id = o."empresaId" WHERE e."razonSocial" = 'Delta Innovación IT';
-SELECT count(*) FROM postulaciones p
-  JOIN ofertas o ON o.id = p."ofertaId" JOIN empresas e ON e.id = o."empresaId"
-  WHERE e."razonSocial" = 'Delta Innovación IT';
-
--- Integridad: NINGUNA de estas dos debe devolver más de 0 filas
-SELECT "usuarioId", "ofertaId", count(*) FROM postulaciones
-  GROUP BY 1, 2 HAVING count(*) > 1;                              -- duplicados UNIQUE
-SELECT count(*) FROM postulaciones p
-  LEFT JOIN ofertas o ON o.id = p."ofertaId" WHERE o.id IS NULL;  -- huérfanas
-```
-
-### B.3 Dataset institucional a escala (solo staging/demo — opcional)
-
-Distinto del escenario dirigido de la sección B: `db:seed:institucional` genera un
-dataset VOLUMÉTRICO (20 empresas, 39 reclutadores, 80 alumnos/egresados, 39 ofertas,
-200 postulaciones — ver conteos completos más abajo) para ejercitar paginación,
-filtros, estadísticas y exportación a una escala realista. No reemplaza ni depende
-del escenario dirigido — cada uno vive en su propio namespace de email y se limpia/
-siembra independientemente.
-
-```bash
-ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:institucional          # sembrar
-npm run db:seed:institucional:status                                   # solo lectura
-npm run db:seed:institucional:clean                                    # limpiar sin resembrar
-ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:showcase                # los dos seeds juntos
-```
-
-Namespace `@institucional.invalid` (RFC 2606, nunca resuelve). Ninguna de estas
-~139 cuentas tiene login público: comparten una password **aleatoria por corrida**
-que el script nunca imprime ni loguea — no están pensadas para iniciar sesión, son
-datos para poblar paneles/reportes. Ninguna aparece en `LoginPage` ni en
-`GET /api/demo/status` (esos dos solo conocen las 3 cuentas de
-`db:seed:presentacion`, nunca consultan la tabla `usuarios` por patrón).
-
-**Conteos exactos verificados** (migración desde vacío + `db:seed:institucional`
-únicamente, Postgres local aislado):
+Namespace `@institucional.invalid`. Ninguna de sus 139 cuentas tiene login público:
+comparten una password **aleatoria por corrida** que el script nunca imprime.
 
 | Tabla | Conteo |
 |---|---|
-| usuarios (institucional) | 139 (20 admin_empresa + 39 reclutadores + 80 alumnos/egresados) |
+| usuarios | 139 (20 admin_empresa + 39 reclutadores + 80 alumnos/egresados) |
 | usuarios rol admin | 0 |
-| empresas | 20 |
-| empresa_usuarios | 59 (20 admin_empresa + 39 reclutador) |
-| ofertas | 39 (una por reclutador — nunca por un admin_empresa, RBAC-01) |
-| postulaciones | 200 (pares usuarioId+ofertaId únicos, cero duplicados) |
-| postulacion_historial_estados | 480 |
-| mensajes | 200 (solo entre equipo de la misma empresa, o reclutador responsable ↔ postulante real) |
-| notificaciones | 400 |
-| activity_logs | 399 |
+| empresas | 20 (**15 estándar + 5 de confianza**) |
+| empresa_usuarios | 59 (2 reclutadores suspendidos) |
+| solicitudes_reclutador pendientes | 3 (todas en empresas estándar) |
+| ofertas | 39 (una por reclutador; **9 de publicación automática**) |
+| postulaciones | 137 |
+| postulacion_historial_estados | 305 |
+| mensajes | 138 |
+| notificaciones | 274 |
+| activity_logs | 279 |
 | archivos | 0 |
 
-Reglas de diseño (ver cabecera de `backend/src/utils/seedInstitucional.js` para el
-detalle): 1-3 reclutadores por empresa, todo determinístico por índice (no
-`Math.random()` — la misma corrida da siempre el mismo dataset), cronología
-garantizada por un "reloj lógico" que solo avanza (nunca una postulación fechada
-antes que su oferta), transaccional (todo o nada), idempotente (limpia su propio
-namespace antes de resembrar), cero archivos/CV/logo subidos a disco o R2.
+Reglas de diseño (detalle en la cabecera de `backend/src/utils/seedInstitucional.js`):
 
-**SQL de verificación** (Neon SQL Editor, alternativa a `db:seed:institucional:status`):
+- Todo determinístico por índice (nunca `Math.random()`): la misma corrida da siempre el
+  mismo dataset. 1 de cada 4 empresas es de confianza, siempre las mismas.
+- Las ofertas de empresas de confianza nacen `auto_aprobada` (el filtro "Publicación
+  automática" de Admin → Ofertas devuelve resultados reales); las de empresas estándar
+  mezclan `aprobada` / `pendiente` / `rechazada`.
+- El responsable de cada oferta es un reclutador de esa empresa, nunca el admin_empresa.
+- Solo hay postulaciones a ofertas visibles (moderación resuelta); el embudo tiene forma
+  realista (34 en revisión, 27 preseleccionados, 33 en entrevista, 16 contratados, 27 no
+  seleccionados).
+- Cronología garantizada por un "reloj lógico" que solo avanza: nunca una postulación
+  anterior a su oferta.
+- Unos pocos casos especiales: 2 reclutadores suspendidos, 6 usuarios que nunca
+  ingresaron y 3 solicitudes de reclutador pendientes.
 
-```sql
-SELECT count(*) FROM usuarios WHERE email LIKE '%@institucional.invalid';           -- 139
-SELECT count(*) FROM usuarios WHERE email LIKE '%@institucional.invalid' AND rol='admin'; -- 0, siempre
-SELECT count(*) FROM empresas WHERE cuit LIKE '307000000%';                          -- 20
+`npm run db:seed:institucional:clean` limpia este dataset sin volver a sembrarlo.
 
--- Ninguna oferta institucional creada por un admin_empresa (debe dar 0 filas)
-SELECT count(*) FROM ofertas o
-  JOIN empresa_usuarios eu ON eu."usuarioId" = o."creadaPorUsuarioId"
-  JOIN empresas e ON e.id = o."empresaId"
-  WHERE e.cuit LIKE '307000000%' AND eu."rolInterno" = 'admin_empresa';
+#### B.5 Verificar — `db:seed:showcase:status`
 
--- Duplicados en postulaciones (debe dar 0 filas)
-SELECT p."usuarioId", p."ofertaId", count(*) FROM postulaciones p
-  JOIN usuarios u ON u.id = p."usuarioId" WHERE u.email LIKE '%@institucional.invalid'
-  GROUP BY 1, 2 HAVING count(*) > 1;
+Solo lectura, sin secretos. Cuenta y además valida la coherencia con las reglas reales:
+
 ```
+SHOWCASE SISPASANTÍAS
+
+PRESENTACIÓN
+
+✓ Admin empresa demo: 1
+✓ Reclutadores activos: 2
+✓ Solicitud reclutador pendiente: 1
+✓ Candidatos sintéticos: 10
+✓ Ofertas: 7 (activas: 5, pausadas: 1, cerradas: 1)
+✓ Ofertas con responsable: 6
+✓ Ofertas sin responsable intencional: 1
+✓ Postulaciones: 16
+✓ Chat admin_empresa ↔ alumno/candidatos: 0
+✓ Notificación "nueva postulación" al admin_empresa: 0
+…
+INSTITUCIONAL
+
+✓ Empresas: 20
+✓ Estándar: 15
+✓ Confiables: 5
+✓ Ofertas publicación automática: 9
+…
+RESULTADO:
+SHOWCASE COHERENTE
+```
+
+Un chequeo que no cumple se muestra con `✗` (error) o `⚠` (advertencia) y el resultado
+pasa a `SHOWCASE INCOHERENTE`. Chequea, entre otras cosas: que ninguna oferta tenga al
+admin_empresa como responsable, que no haya chats admin_empresa ↔ alumno, que el
+admin_empresa no reciba "nueva postulación", que ninguna postulación sea anterior a su
+oferta, que el historial de estados termine en el estado actual, que no haya ningún rol
+`admin` en los namespaces ficticios y que existan empresas de confianza con ofertas de
+publicación automática.
 
 ### C. Qué NO ejecutar contra Neon de producción
 
-- `npm run db:seed:demo` — bloqueado sin excepción en producción (no tiene override).
 - `npm run db:reset:dev` — bloqueado salvo `NODE_ENV=development` + `DB_HOST` local.
 - `npm run e2e:seed` (o `npm run e2e`) — bloqueado salvo `DB_HOST` local
   (localhost/127.0.0.1/::1); además siempre opera sobre una base cuyo nombre
   termina en `_e2e`, nunca sobre el nombre tal cual se le pase.
-
-### D. Limpiar solo el escenario demo
-
-No existe (ni hace falta) un comando separado de "solo limpiar": volver a correr
-`npm run db:seed:presentacion` ya limpia y recrea el escenario en una única
-transacción (todo o nada), y es la operación soportada y testeada. Si en algún
-momento se necesitara limpiar sin recrear, debería ser un comando nuevo que (a)
-exija confirmación explícita en producción, (b) borre únicamente el namespace de
-`OUR_EMAILS`/`RAZON_SOCIAL` de `seedPresentacion.js`, (c) nunca toque al admin real,
-(d) corra en una transacción, y (e) no tenga nada que limpiar en R2 (el escenario
-demo no crea objetos ahí). No se agregó en este ciclo por no ser necesario todavía.
+- Los seeds de demo (`db:seed:presentacion`, `db:seed:institucional`, `db:seed:showcase`,
+  `db:showcase:reset`) están bloqueados en producción salvo `ALLOW_PRODUCTION_DEMO_SEED=true`.
 
 ---
 
@@ -445,7 +451,7 @@ Leyenda: **S** = secreta · **R** = requerida en producción · **O** = opcional
 | `SEED_SECOND_ADMIN_PASSWORD` | Render | R si `SEED_SECOND_ADMIN_EMAIL` está seteada | *(fuerte, ≥8 chars)* | Si falta con el email seteado, el seed aborta sin crear nada. | S |
 | `SEED_SECOND_ADMIN_NAME` / `SEED_SECOND_ADMIN_LASTNAME` | Render | O | `Compa` / `Equipo` | Nombre/apellido del segundo admin. Default "Admin" / "Equipo". | |
 | `SEED_PRESENTACION_ON_BOOT` | Render | R | `false` | Nunca `true` en producción. | |
-| `ALLOW_PRODUCTION_DEMO_SEED` | Render | O | *(sin setear)* | `true` habilita `db:seed:presentacion` en prod (datos ficticios). | |
+| `ALLOW_PRODUCTION_DEMO_SEED` | Render | O | *(sin setear)* | `true` habilita los seeds de demo en prod (`db:seed:presentacion`, `db:seed:institucional`, `db:seed:showcase`, `db:showcase:reset`). Quitarla apenas terminen. | |
 | `ENABLE_API_DOCS` | Render | O | `false` | `true` expone Swagger UI en `/api/docs`. | |
 | `LOG_LEVEL` | Render | O | `info` | `debug` también logea el SQL. | |
 | `NODE_VERSION` | Render | O | `22` | Versión de Node en Render. | |
@@ -474,11 +480,12 @@ npm run db:admin:status -- --email=admin@tudominio.edu --email=compañero@tudomi
                                # Nunca muestra el hash. No modifica nada.
 
 # Solo staging/demo — nunca en la producción real:
-ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:presentacion     # 3 cuentas dirigidas (LoginPage)
-ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:institucional    # dataset amplio (sin login público)
+ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:presentacion     # escenario dirigido (Delta Innovación IT, 3 cuentas de LoginPage)
+ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:institucional    # volumen (sin login público)
 ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:showcase         # los dos anteriores juntos
-npm run db:seed:institucional:status                              # solo lectura, sin secretos
-npm run db:seed:institucional:clean                                # limpia el dataset amplio sin resembrar
+ALLOW_PRODUCTION_DEMO_SEED=true npm run db:showcase:reset        # limpia TODO lo ficticio, resiembra y valida
+npm run db:seed:showcase:status                                   # solo lectura: conteos + coherencia, sin secretos
+npm run db:seed:institucional:clean                               # limpia el dataset de volumen sin resembrar
 ```
 
 Contra Neon desde tu máquina: exportar `DATABASE_URL` (pooled) y `DB_SSL=true` antes del
@@ -492,14 +499,14 @@ Detalle del runner y reglas de migraciones nuevas: `backend/migrations/README.md
 
 - **No** correr `npm run db:reset:dev` contra Neon (dropea y recrea la base — tiene doble
   guard: `NODE_ENV=development` + `DB_HOST` localhost).
-- **No** usar `npm run db:seed:demo` en producción — **está bloqueado** (borra usuarios
-  con email `@itbeltran.com.ar` y hace `destroy({ force: true })`).
+- `npm run db:seed:demo` **ya no existe** (se eliminó `seedDemo.js`). Para datos de demo usar
+  `db:seed:showcase` / `db:showcase:reset` (ver §3.B).
 - **No** poner `SEED_PRESENTACION_ON_BOOT=true` en producción. Aunque se ponga, el seed
   de demo no corre sin `ALLOW_PRODUCTION_DEMO_SEED=true`.
 - El **admin real nunca forma parte** del seed de presentación — se crea exclusivamente
   con `db:seed:admin`, nunca usa la contraseña `Demo1234!`, y no aparece en `LoginPage` ni
   en `GET /api/demo/status` (que solo refleja las 3 cuentas demo, nunca un admin).
-- Después de correr `db:seed:presentacion` en un entorno con `ALLOW_PRODUCTION_DEMO_SEED=true`,
+- Después de correr un seed de demo en un entorno con `ALLOW_PRODUCTION_DEMO_SEED=true`,
   **eliminá esa variable** de inmediato — no debe quedar seteada de forma permanente.
 - **No** guardar uploads en el filesystem de Render (efímero) → usar `STORAGE_BACKEND=s3`.
 - **No** poner secretos en variables `VITE_*` (van al bundle público).

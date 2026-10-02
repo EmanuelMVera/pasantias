@@ -3,8 +3,8 @@
 /**
  * seedGuards.js — DEPLOY-01.
  *
- * Guard común para que los seeds no corran (o no destruyan datos) en producción
- * por accidente.
+ * Guards comunes de los seeds: que no corran (o no destruyan datos) en
+ * producción por accidente, y que no siembren sobre un esquema desactualizado.
  */
 
 const { config } = require('../config/env');
@@ -30,4 +30,23 @@ function bloquearSiProd(nombre, { overrideEnv } = {}) {
   process.exit(1);
 }
 
-module.exports = { bloquearSiProd };
+/**
+ * Los seeds de demo presuponen el esquema al día y NUNCA corren migraciones
+ * por su cuenta. Verifica la más reciente que necesitan (020: acciones de
+ * auditoría de responsable de oferta) y falla con un mensaje claro si falta,
+ * antes de tocar ningún dato.
+ *
+ * @param {import('sequelize').Sequelize} sequelize
+ */
+async function exigirMigracionesAlDia(sequelize) {
+  const [filas] = await sequelize.query(
+    `SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+     WHERE t.typname = 'enum_activity_logs_accion' AND e.enumlabel = 'reasignar_responsable_oferta'
+     LIMIT 1`
+  );
+  if (filas.length === 0) {
+    throw new Error('La base no tiene las migraciones al día (falta la 020). Corré `npm run db:migrate` antes de sembrar.');
+  }
+}
+
+module.exports = { bloquearSiProd, exigirMigracionesAlDia };
