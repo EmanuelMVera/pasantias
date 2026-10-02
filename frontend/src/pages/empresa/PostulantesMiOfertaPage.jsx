@@ -4,10 +4,15 @@
  * Ruta: /empresa/postulantes/:ofertaId
  *
  * Muestra la lista completa de postulantes con:
+ * - Encabezado con el título de la oferta, su responsable y los totales por etapa
  * - Filtro por estado
  * - Selector de estado inline (dropdown) para avanzar candidatos
  * - CV descargable y carta de presentación
- * - Stats rápidas (total, en proceso, contratados)
+ *
+ * Dos lecturas de la misma pantalla (la autoridad es el backend):
+ * - Reclutador responsable de la oferta: opera (cambia estados, contacta).
+ * - Administrador de empresa (y reclutadores no responsables): vista de
+ *   SUPERVISIÓN, sin acciones sobre los candidatos.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -18,6 +23,7 @@ import Avatar from '../../components/Avatar/Avatar';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import { useEmpresa } from '../../hooks/useEmpresa';
 import { useAuth } from '../../hooks/useAuth';
+import Icon from '../../components/ui/Icon';
 import { LISTA_ESTADOS_POSTULACION, ESTADOS_HABILITAN_CHAT, getEstadoInfo, normalizarEstado } from '../../constants/postulacionEstados';
 import styles from './PostulantesMiOfertaPage.module.css';
 
@@ -46,7 +52,7 @@ function CompatBar({ valor }) {
 export default function PostulantesMiOfertaPage() {
   const { ofertaId } = useParams();
   const navigate = useNavigate();
-  const { esReclutador } = useEmpresa();
+  const { esReclutador, esAdminEmpresa } = useEmpresa();
   const { usuario } = useAuth();
 
   const [postulaciones, setPostulaciones] = useState([]);
@@ -102,9 +108,21 @@ export default function PostulantesMiOfertaPage() {
 
   const filtradas = postulaciones; // el filtro por estado ahora es server-side
 
-  const total       = Object.values(conteoPorEstado).reduce((a, b) => a + b, 0);
-  const activos     = total - (conteoPorEstado.rechazado ?? 0);
-  const contratados = conteoPorEstado.contratado ?? 0;
+  const total = Object.values(conteoPorEstado).reduce((a, b) => a + b, 0);
+  const resumen = [
+    { key: 'total', label: 'Total', valor: total },
+    { key: 'en_revision', label: 'En revisión', valor: conteoPorEstado.en_revision ?? 0 },
+    { key: 'preseleccionado', label: 'Preseleccionados', valor: conteoPorEstado.preseleccionado ?? 0 },
+    { key: 'entrevista', label: 'Entrevistas', valor: conteoPorEstado.entrevista ?? 0 },
+    { key: 'contratado', label: 'Contratados', valor: conteoPorEstado.contratado ?? 0 },
+  ];
+  const responsable = ofertaInfo?.creadaPor
+    ? `${ofertaInfo.creadaPor.nombre} ${ofertaInfo.creadaPor.apellido}`
+    : null;
+  // El admin de empresa llega desde Candidatos (supervisión); el reclutador, desde su panel.
+  const volver = esAdminEmpresa
+    ? { to: '/empresa/candidatos', label: 'Volver a candidatos' }
+    : { to: '/empresa', label: 'Volver al panel' };
 
   return (
     <div className="page-container">
@@ -112,29 +130,38 @@ export default function PostulantesMiOfertaPage() {
       {/* ── Cabecera ──────────────────────────────────────────────────────── */}
       <div className={styles.pageHeader}>
         <div className={styles.pageHeaderLeft}>
-          <Link to="/empresa" className="btn-back">← Volver al panel</Link>
-          <h1>Candidatos</h1>
+          <Link to={volver.to} className={styles.volver}>
+            <Icon name="arrowLeft" size={16} /> {volver.label}
+          </Link>
+          <h1>{ofertaInfo?.titulo ?? 'Candidatos'}</h1>
           <p className={styles.pageSubtitle}>
-            Revisá y gestioná los postulantes a esta oferta.
+            {ofertaInfo && (
+              <span className={styles.responsable}>
+                <Icon name="user" size={15} />
+                Responsable: <strong>{responsable ?? 'sin responsable asignado'}</strong>
+              </span>
+            )}
           </p>
         </div>
-
-        {/* Stats rápidas */}
-        <div className={styles.headerStats}>
-          <div className={styles.statPill}>
-            <span className={styles.statNum}>{total}</span>
-            <span>Total</span>
-          </div>
-          <div className={styles.statPill}>
-            <span className={styles.statNum} style={{ color: '#2563eb' }}>{activos}</span>
-            <span>En proceso</span>
-          </div>
-          <div className={styles.statPill}>
-            <span className={styles.statNum} style={{ color: '#16a34a' }}>{contratados}</span>
-            <span>Contratados</span>
-          </div>
-        </div>
       </div>
+
+      {/* Totales por etapa del proceso */}
+      <dl className={styles.resumenEtapas} aria-label="Candidatos por etapa">
+        {resumen.map((r) => (
+          <div key={r.key} className={styles.etapa}>
+            <dt>{r.label}</dt>
+            <dd>{r.valor}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {/* Vista de supervisión: sin acciones sobre candidatos */}
+      {ofertaInfo && !puedeGestionar && (
+        <p className={styles.notaSupervision}>
+          <Icon name="eye" size={16} />
+          Vista de supervisión — la gestión de candidatos corresponde al reclutador responsable.
+        </p>
+      )}
 
       {/* ── Error ─────────────────────────────────────────────────────────── */}
       {error && <p className={styles.errorMsg}>{error}</p>}

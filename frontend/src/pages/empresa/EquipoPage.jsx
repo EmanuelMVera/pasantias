@@ -1,304 +1,365 @@
 /**
- * EquipoPage.jsx — Gestión del equipo reclutador de la empresa.
+ * EquipoPage.jsx — Equipo de la empresa.
  *
- * Ruta: /empresa/equipo
- * Acceso: solo admin_empresa puede enviar solicitudes y gestionar miembros.
- *         otros roles pueden ver (solo lectura).
+ * Ruta: /empresa/equipo  (`?tab=solicitudes` abre la segunda pestaña)
+ * Acceso: el administrador de empresa gestiona; el reclutador solo ve.
  *
- * Flujo de alta de reclutadores:
- *   1. Propietario llena formulario (nombre + email) → POST /equipo/solicitar
- *   2. Admin aprueba → usuario creado automáticamente → email con credenciales
- *   3. Reclutador inicia sesión y cambia su contraseña desde /empresa/seguridad
+ * Estructura:
+ *   - Resumen: reclutadores activos · suspendidos · solicitudes pendientes.
+ *   - Pestaña Miembros: "Cuenta administradora" (la EMPRESA, con su
+ *     responsable como dato secundario) separada de "Reclutadores" (personas).
+ *   - Pestaña Solicitudes: historial de altas pedidas (pendiente / aprobada /
+ *     rechazada). El badge de la pestaña avisa si hay pendientes.
+ *
+ * Alta de reclutadores (la lógica de confianza es del backend, acá solo cambia
+ * el texto):
+ *   - Empresa estándar  → "Solicitar reclutador": la revisa el instituto.
+ *   - Empresa confiable → "Agregar reclutador": la cuenta se crea al instante.
+ *
+ * Suspender / reactivar / quitar / enviar recuperación piden confirmación.
  */
 
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { empresaService } from '../../services/empresa.service';
 import { useEmpresa } from '../../hooks/useEmpresa';
-import MiembroEquipoCard from '../../components/MiembroEquipoCard/MiembroEquipoCard';
+import { useToast } from '../../hooks/useToast';
+import Avatar from '../../components/Avatar/Avatar';
+import PageHeader from '../../components/ui/PageHeader';
+import Card from '../../components/ui/Card';
+import Tabs, { TabPanel } from '../../components/ui/Tabs';
+import StatCard from '../../components/ui/StatCard';
+import ActionMenu from '../../components/ui/ActionMenu';
+import ConfirmModal from '../../components/ui/ConfirmModal';
+import EmptyState from '../../components/ui/EmptyState';
+import TableResponsive from '../../components/ui/TableResponsive';
+import DataCard from '../../components/ui/DataCard';
+import Toast from '../../components/ui/Toast';
+import Icon from '../../components/ui/Icon';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import SolicitarReclutadorModal from '../../components/SolicitarReclutadorModal/SolicitarReclutadorModal';
-import SolicitudesReclutadoresTabla from '../../components/SolicitudesReclutadoresTabla/SolicitudesReclutadoresTabla';
-import ConfirmModal from '../../components/ConfirmModal/ConfirmModal';
 import styles from './EquipoPage.module.css';
 
-/* ── Componente principal ───────────────────────────────────────────────────── */
+const ESTADO_SOLICITUD = {
+  pendiente: { label: 'Pendiente', tone: 'orange', icon: 'clock' },
+  aprobado:  { label: 'Aprobada',  tone: 'green',  icon: 'checkCircle' },
+  rechazado: { label: 'Rechazada', tone: 'red',    icon: 'xCircle' },
+};
+
+const formatFecha = (iso) => (iso
+  ? new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })
+  : 'Nunca');
+
+const nombreDe = (m) => {
+  const u = m.usuario ?? {};
+  return `${u.nombre ?? ''} ${u.apellido ?? ''}`.trim() || u.email || 'Miembro';
+};
+
+function SolicitudBadge({ estado }) {
+  const info = ESTADO_SOLICITUD[estado] ?? { label: estado, tone: 'gray', icon: 'info' };
+  return (
+    <span className={`badge badge-tone-${info.tone}`}>
+      <Icon name={info.icon} size={14} strokeWidth={2} />
+      {info.label}
+    </span>
+  );
+}
+
+// Textos de cada confirmación (qué pasa y qué se conserva).
+const CONFIRMACIONES = {
+  suspender: {
+    title: 'Suspender cuenta', confirmLabel: 'Suspender cuenta', tone: 'danger',
+    texto: 'no va a poder iniciar sesión hasta que reactives su cuenta. Sus datos y lo que ya gestionó se conservan.',
+  },
+  reactivar: {
+    title: 'Reactivar cuenta', confirmLabel: 'Reactivar cuenta', tone: 'ok',
+    texto: 'va a recuperar el acceso al sistema como reclutador.',
+  },
+  quitar: {
+    title: 'Quitar del equipo', confirmLabel: 'Quitar del equipo', tone: 'danger',
+    texto: 'va a dejar de tener acceso. A diferencia de suspender, para que vuelva vas a tener que pedir su alta de nuevo. Sus datos y las postulaciones que gestionó se conservan.',
+  },
+  recuperacion: {
+    title: 'Enviar recuperación de acceso', confirmLabel: 'Enviar recuperación', tone: 'primary',
+    texto: 'va a recibir un email con un link para establecer su propia contraseña. Vos no la vas a ver ni a elegir.',
+  },
+};
+
 export default function EquipoPage() {
   const { esAdminEmpresa, empresa } = useEmpresa();
+  const esTabla = useMediaQuery('(min-width: 768px)');
+  const { toast, showToast } = useToast(4500);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') === 'solicitudes' && esAdminEmpresa ? 'solicitudes' : 'miembros';
+  const setTab = (t) => setSearchParams(t === 'miembros' ? {} : { tab: t }, { replace: true });
+
   const [equipo,      setEquipo]      = useState([]);
   const [solicitudes, setSolicitudes] = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState('');
-  const [toast,       setToast]       = useState('');
+  const [modalAlta,   setModalAlta]   = useState(false);
+  const [confirmar,   setConfirmar]   = useState(null); // { accion, miembro }
+  const [guardando,   setGuardando]   = useState(false);
 
-  const [modalSolicitar,  setModalSolicitar]  = useState(false);
-  const [modalSuspender,  setModalSuspender]  = useState(null); // miembro a suspender/reactivar
-  const [modalEliminar,   setModalEliminar]   = useState(null); // miembro a quitar del equipo
-  const [modalRecuperacion, setModalRecuperacion] = useState(null); // miembro a enviarle recuperación de acceso
+  const esConfiable = empresa?.nivelConfianza === 'confiable';
+  const textoAlta = esConfiable ? 'Agregar reclutador' : 'Solicitar reclutador';
 
-  const esPropietario = esAdminEmpresa;
-  const activos    = equipo.filter(m => m.activo !== false);
-  const suspendidos = equipo.filter(m => m.activo === false);
-
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
-
-  useEffect(() => {
-    async function cargar() {
-      try {
-        const equipoRes = await empresaService.getEquipo();
-        // Decisión local e inmediata (no depende del context, que puede no
-        // haber resuelto todavía) — solo se usa acá adentro, una sola vez.
-        const rolRecibido = equipoRes.data.rolEnEquipo ?? null;
-        setEquipo(equipoRes.data.data ?? []);
-
-        if (rolRecibido === 'admin_empresa') {
-          try {
-            const solRes = await empresaService.getMisSolicitudesReclutador();
-            setSolicitudes(solRes.data.data ?? []);
-          } catch {
-            // las solicitudes son UI secundaria; no bloquear si fallan
-          }
-        }
-      } catch {
-        setError('No se pudo cargar el equipo. Intentá de nuevo.');
-      } finally {
-        setLoading(false);
+  const cargar = useCallback(async () => {
+    try {
+      const equipoRes = await empresaService.getEquipo();
+      setEquipo(equipoRes.data.data ?? []);
+      // Las solicitudes son solo del admin_empresa (el backend responde 403 al resto).
+      if (equipoRes.data.rolEnEquipo === 'admin_empresa') {
+        try {
+          const solRes = await empresaService.getMisSolicitudesReclutador();
+          setSolicitudes(solRes.data.data ?? []);
+        } catch { /* secundario: no bloquea la pantalla */ }
       }
+      setError('');
+    } catch {
+      setError('No se pudo cargar el equipo. Intentá de nuevo.');
+    } finally {
+      setLoading(false);
     }
-    cargar();
   }, []);
 
-  const handleEnviada = (nueva) => {
-    setSolicitudes(prev => [nueva, ...prev]);
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const cuentaAdmin   = equipo.find((m) => m.rolInterno === 'admin_empresa');
+  const reclutadores  = equipo.filter((m) => m.rolInterno !== 'admin_empresa');
+  const activos       = reclutadores.filter((m) => m.activo !== false);
+  const suspendidos   = reclutadores.filter((m) => m.activo === false);
+  const pendientes    = solicitudes.filter((s) => s.estado === 'pendiente');
+
+  const handleAltaEnviada = (nueva) => {
     showToast(
       nueva.estado === 'aprobado'
-        ? `✅ ${nueva.nombre} ya puede acceder al sistema — le enviamos las credenciales por email.`
-        : '✅ Solicitud enviada. El administrador la revisará pronto.'
+        ? `${nueva.nombre} ya puede acceder al sistema: le enviamos las credenciales por email.`
+        : 'Solicitud enviada. El administrador del instituto la revisará pronto.',
+      'success',
     );
+    cargar(); // empresa confiable: aparece el nuevo miembro; estándar: la solicitud pendiente
+    if (nueva.estado !== 'aprobado') setTab('solicitudes');
   };
 
-  const handleRecuperacion = (miembro) => {
-    setModalRecuperacion(miembro);
-  };
-
-  const confirmarRecuperacion = async () => {
-    const miembro = modalRecuperacion;
-    if (!miembro) return;
-    setModalRecuperacion(null);
+  const ejecutarConfirmacion = async () => {
+    const { accion, miembro } = confirmar;
+    const nombre = nombreDe(miembro);
+    setGuardando(true);
     try {
-      const { data } = await empresaService.enviarRecuperacionMiembro(miembro.id);
-      showToast(data.message ?? '✓ Email de recuperación enviado.');
+      if (accion === 'suspender' || accion === 'reactivar') {
+        await empresaService.editarMiembro(miembro.id, { activo: accion === 'reactivar' });
+        showToast(`Cuenta de ${nombre} ${accion === 'reactivar' ? 'reactivada' : 'suspendida'}.`, 'success');
+      } else if (accion === 'quitar') {
+        await empresaService.eliminarMiembro(miembro.id);
+        showToast(`${nombre} fue quitado del equipo.`, 'success');
+      } else {
+        const { data } = await empresaService.enviarRecuperacionMiembro(miembro.id);
+        showToast(data.message ?? 'Email de recuperación enviado.', 'success');
+      }
+      setConfirmar(null);
+      await cargar();
     } catch (err) {
-      showToast(err.response?.data?.message ?? '✗ Error al enviar la recuperación de acceso.');
+      setConfirmar(null);
+      showToast(err.response?.data?.message ?? 'No se pudo completar la acción.', 'error');
+    } finally {
+      setGuardando(false);
     }
   };
 
-  const handleToggleActivo = async (miembro) => {
-    // Abre el modal visual en lugar de window.confirm
-    setModalSuspender(miembro);
-  };
+  const accionesDe = (m) => [
+    { key: 'recuperacion', label: 'Enviar recuperación de acceso', onSelect: () => setConfirmar({ accion: 'recuperacion', miembro: m }) },
+    m.activo
+      ? { key: 'suspender', label: 'Suspender cuenta', onSelect: () => setConfirmar({ accion: 'suspender', miembro: m }) }
+      : { key: 'reactivar', label: 'Reactivar cuenta', onSelect: () => setConfirmar({ accion: 'reactivar', miembro: m }) },
+    { key: 'quitar', label: 'Quitar del equipo', danger: true, onSelect: () => setConfirmar({ accion: 'quitar', miembro: m }) },
+  ];
 
-  const confirmarToggle = async () => {
-    const miembro = modalSuspender;
-    if (!miembro) return;
-    const nuevoEstado = !miembro.activo;
-    setModalSuspender(null);
-    try {
-      await empresaService.editarMiembro(miembro.id, { activo: nuevoEstado });
-      setEquipo(prev => prev.map(m => m.id === miembro.id ? { ...m, activo: nuevoEstado } : m));
-      showToast(`✓ Cuenta ${nuevoEstado ? 'reactivada' : 'suspendida'}.`);
-    } catch {
-      showToast('✗ Error al cambiar el estado.');
-    }
-  };
+  const filaReclutador = (m) => (
+    <li key={m.id} className={`${styles.miembro} ${m.activo ? '' : styles.miembroSuspendido}`}>
+      <Avatar src={m.usuario?.fotoPerfil} nombre={m.usuario?.nombre} apellido={m.usuario?.apellido} size={42} />
+      <div className={styles.miembroInfo}>
+        <span className={styles.miembroNombre}>{nombreDe(m)}</span>
+        <span className={styles.miembroDato}>{m.usuario?.email}</span>
+        <span className={styles.miembroDato}>Último acceso: {formatFecha(m.usuario?.ultimoAcceso)}</span>
+      </div>
+      <div className={styles.miembroEstado}>
+        <span className="badge badge-tone-blue">Reclutador</span>
+        <span className={`badge badge-tone-${m.activo ? 'green' : 'red'}`}>{m.activo ? 'Activo' : 'Suspendido'}</span>
+      </div>
+      {esAdminEmpresa && (
+        <ActionMenu label={`Acciones para ${nombreDe(m)}`} items={accionesDe(m)} />
+      )}
+    </li>
+  );
 
-  const handleEliminar = (miembro) => {
-    // Abre el modal de confirmación en lugar de window.confirm
-    setModalEliminar(miembro);
-  };
+  const panelMiembros = (
+    <>
+      {cuentaAdmin && (
+        <Card as="section" titleId="sec-cuenta" title="Cuenta administradora" headingLevel={2} className={styles.bloque}>
+          <div className={styles.cuenta}>
+            <Avatar src={empresa?.logo || null} nombre={empresa?.razonSocial || cuentaAdmin.usuario?.nombre} apellido="" size={56} />
+            <div className={styles.miembroInfo}>
+              <span className={styles.cuentaNombre}>{empresa?.razonSocial ?? 'Mi empresa'}</span>
+              <span className="badge badge-tone-violet">Administrador de empresa</span>
+              <span className={styles.miembroDato}>
+                Responsable: <strong>{nombreDe(cuentaAdmin)}</strong>
+              </span>
+              <span className={styles.miembroDato}>{cuentaAdmin.usuario?.email}</span>
+              <span className={styles.miembroDato}>Último acceso: {formatFecha(cuentaAdmin.usuario?.ultimoAcceso)}</span>
+            </div>
+          </div>
+        </Card>
+      )}
 
-  const confirmarEliminar = async () => {
-    const miembro = modalEliminar;
-    if (!miembro) return;
-    const nombre = miembro.usuario?.nombre ?? miembro.nombre;
-    setModalEliminar(null);
-    try {
-      await empresaService.eliminarMiembro(miembro.id);
-      setEquipo(prev => prev.filter(m => m.id !== miembro.id));
-      showToast(`✓ ${nombre} fue quitado del equipo.`);
-    } catch (err) {
-      showToast(err.response?.data?.message ?? '✗ Error al quitar al miembro.');
-    }
-  };
+      <Card
+        as="section" titleId="sec-reclutadores" title="Reclutadores" headingLevel={2}
+        subtitle="Personas que publican ofertas y gestionan candidatos."
+        className={styles.bloque}
+      >
+        {reclutadores.length === 0 ? (
+          <EmptyState iconName="userPlus" title="Todavía no hay reclutadores en el equipo.">
+            {esAdminEmpresa && (
+              <button type="button" className="btn-primary" onClick={() => setModalAlta(true)}>{textoAlta}</button>
+            )}
+          </EmptyState>
+        ) : (
+          <ul className={styles.lista}>
+            {[...activos, ...suspendidos].map(filaReclutador)}
+          </ul>
+        )}
+      </Card>
+    </>
+  );
 
-  const solicitudesPendientes = solicitudes.filter(s => s.estado === 'pendiente');
+  const panelSolicitudes = solicitudes.length === 0 ? (
+    <EmptyState
+      iconName="inbox"
+      title="No hay solicitudes de reclutadores."
+      hint={esConfiable
+        ? 'Tu empresa tiene habilitación institucional: los reclutadores que agregues se dan de alta al instante.'
+        : 'Cuando pidas el alta de un reclutador, vas a ver acá su estado.'}
+    />
+  ) : esTabla ? (
+    <TableResponsive minWidth={560}>
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Email</th>
+          <th>Estado</th>
+          <th>Fecha</th>
+        </tr>
+      </thead>
+      <tbody>
+        {solicitudes.map((s) => (
+          <tr key={s.id}>
+            <td className="cell-break"><strong>{[s.nombre, s.apellido].filter(Boolean).join(' ')}</strong></td>
+            <td className="cell-break">{s.email}</td>
+            <td>
+              <SolicitudBadge estado={s.estado} />
+              {s.estado === 'rechazado' && s.motivoRechazo && <small className={styles.motivo}>{s.motivoRechazo}</small>}
+            </td>
+            <td className={styles.fecha}>{formatFecha(s.createdAt)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </TableResponsive>
+  ) : (
+    <div className={styles.cards}>
+      {solicitudes.map((s) => (
+        <DataCard
+          key={s.id}
+          title={[s.nombre, s.apellido].filter(Boolean).join(' ')}
+          subtitle={s.email}
+          badge={<SolicitudBadge estado={s.estado} />}
+          fields={[
+            { label: 'Fecha', value: formatFecha(s.createdAt) },
+            { label: 'Motivo', value: s.estado === 'rechazado' ? s.motivoRechazo : null },
+          ]}
+        />
+      ))}
+    </div>
+  );
+
+  const conf = confirmar ? CONFIRMACIONES[confirmar.accion] : null;
 
   return (
     <div className="page-container">
+      <Toast toast={toast} />
 
-      {/* ── Cabecera ── */}
-      <div className="dashboard-header">
-        <div>
-          <Link to="/empresa" className="btn-back">← Volver al panel</Link>
-          <h1>Gestión del equipo</h1>
-          <p className={styles.subtitulo}>
-            Administrá los accesos y roles de tu equipo de reclutadores.
-          </p>
-        </div>
-        {esPropietario && (
-          <button className={styles.btnPrimary} onClick={() => setModalSolicitar(true)} id="btn-nuevo-miembro">
-            + Solicitar reclutador
+      <PageHeader
+        title="Equipo"
+        subtitle={esAdminEmpresa
+          ? 'Gestioná las personas con acceso al espacio de tu empresa.'
+          : 'Personas con acceso al espacio de la empresa.'}
+        actions={esAdminEmpresa && (
+          <button type="button" className="btn-primary" onClick={() => setModalAlta(true)} id="btn-nuevo-miembro">
+            <Icon name="userPlus" size={18} />
+            {textoAlta}
           </button>
         )}
-      </div>
+      />
 
-      {/* Toast y error */}
-      {toast && <div className={styles.toast}>{toast}</div>}
-      {error && <p className={styles.errorMsg}>{error}</p>}
+      {error && <p className={`error-msg ${styles.error}`} role="alert">{error}</p>}
 
-      {/* Skeleton */}
-      {loading && (
-        <div className={styles.skeletonList}>
-          {[1, 2, 3].map(i => <div key={i} className={styles.skeletonRow} />)}
+      {loading ? (
+        <div className={styles.skeletonList} aria-hidden="true">
+          {[1, 2, 3].map((i) => <div key={i} className={styles.skeletonRow} />)}
         </div>
-      )}
-
-      {/* ── Solicitudes pendientes — aviso destacado ── */}
-      {!loading && solicitudesPendientes.length > 0 && (
-        <div className={styles.alertPendiente}>
-          <span>⏳</span>
-          <span>
-            Tenés <strong>{solicitudesPendientes.length}</strong> solicitud{solicitudesPendientes.length > 1 ? 'es' : ''} de reclutador pendiente{solicitudesPendientes.length > 1 ? 's' : ''} de aprobación por el administrador.
-          </span>
-        </div>
-      )}
-
-      {/* ── Stats ── */}
-      {!loading && equipo.length > 0 && (
-        <div className={styles.statsRow}>
-          <div className={styles.statChip}>
-            <span className={styles.statNum}>{equipo.length}</span><span>Total</span>
+      ) : !error && (
+        <>
+          <div className={styles.resumen}>
+            <StatCard compact iconName="users" tone="green" label="Reclutadores activos" value={activos.length} />
+            <StatCard compact iconName="pause" tone="neutral" label="Suspendidos" value={suspendidos.length} />
+            {esAdminEmpresa && (
+              <StatCard compact iconName="clock" tone="orange" label="Solicitudes pendientes" value={pendientes.length} />
+            )}
           </div>
-          <div className={styles.statChip}>
-            <span className={styles.statNum} style={{ color: '#16a34a' }}>{activos.length}</span><span>Activos</span>
-          </div>
-          {suspendidos.length > 0 && (
-            <div className={styles.statChip}>
-              <span className={styles.statNum} style={{ color: '#dc2626' }}>{suspendidos.length}</span><span>Suspendidos</span>
-            </div>
-          )}
-          {solicitudesPendientes.length > 0 && (
-            <div className={styles.statChip}>
-              <span className={styles.statNum} style={{ color: '#ca8a04' }}>{solicitudesPendientes.length}</span><span>Solicitudes</span>
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* ── Lista activos ── */}
-      {!loading && activos.length > 0 && (
-        <section className={styles.seccion}>
-          <h2 className={styles.seccionTitulo}>Miembros activos</h2>
-          <div className={styles.listaCards}>
-            {activos.map(m => (
-              <MiembroEquipoCard key={m.id} miembro={m} empresa={empresa} esPropietario={esPropietario}
-                onToggleActivo={handleToggleActivo} onEliminar={handleEliminar}
-                onRecuperacion={handleRecuperacion}
+          {esAdminEmpresa ? (
+            <>
+              <Tabs
+                idPrefix="equipo"
+                ariaLabel="Secciones del equipo"
+                stretch
+                value={tab}
+                onChange={setTab}
+                tabs={[
+                  { key: 'miembros', label: 'Miembros', icon: 'users' },
+                  { key: 'solicitudes', label: 'Solicitudes', icon: 'inbox', count: pendientes.length || undefined, alerta: true },
+                ]}
               />
-            ))}
-          </div>
-        </section>
+              <TabPanel idPrefix="equipo" tabKey={tab}>
+                {tab === 'miembros' ? panelMiembros : panelSolicitudes}
+              </TabPanel>
+            </>
+          ) : panelMiembros}
+        </>
       )}
 
-      {/* ── Lista suspendidos ── */}
-      {!loading && suspendidos.length > 0 && (
-        <section className={styles.seccion}>
-          <h2 className={styles.seccionTitulo} style={{ color: 'var(--text-muted)' }}>Cuentas suspendidas</h2>
-          <div className={styles.listaCards}>
-            {suspendidos.map(m => (
-              <MiembroEquipoCard key={m.id} miembro={m} empresa={empresa} esPropietario={esPropietario}
-                onToggleActivo={handleToggleActivo} onEliminar={handleEliminar}
-                onRecuperacion={handleRecuperacion}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── Historial de solicitudes de reclutadores ── */}
-      {!loading && solicitudes.length > 0 && (
-        <SolicitudesReclutadoresTabla solicitudes={solicitudes} />
-      )}
-
-      {/* ── Estado vacío ── */}
-      {!loading && equipo.length === 0 && solicitudes.length === 0 && (
-        <div className={styles.emptyState}>
-          <span>👥</span>
-          <p>El equipo está vacío.</p>
-          {esPropietario && (
-            <button className={styles.btnPrimary} onClick={() => setModalSolicitar(true)}>
-              + Solicitar primer reclutador
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ── Modales ── */}
-      {modalSolicitar && (
+      {modalAlta && (
         <SolicitarReclutadorModal
-          onClose={() => setModalSolicitar(false)}
-          onEnviada={handleEnviada}
-          esConfiable={empresa?.nivelConfianza === 'confiable'}
+          onClose={() => setModalAlta(false)}
+          onEnviada={handleAltaEnviada}
+          esConfiable={esConfiable}
         />
       )}
 
-      {/* Modal confirmar suspender / reactivar */}
-      {modalSuspender && (
+      {confirmar && (
         <ConfirmModal
-          title={modalSuspender.activo ? '🔒 Suspender cuenta' : '🔓 Reactivar cuenta'}
-          icon={modalSuspender.activo ? '🔒' : '🔓'}
-          iconBg={modalSuspender.activo ? '#fee2e2' : '#dcfce7'}
-          miembro={modalSuspender}
-          notaTone={modalSuspender.activo ? 'warn' : 'success'}
-          nota={modalSuspender.activo
-            ? '⚠️ Al suspender, el usuario no podrá iniciar sesión hasta que se reactive. Sus datos y acciones previas se conservan.'
-            : '✅ Al reactivar, el usuario recuperará el acceso al sistema con su rol actual.'}
-          confirmTone={modalSuspender.activo ? 'danger' : 'success'}
-          confirmLabel={modalSuspender.activo ? '🔒 Sí, suspender' : '🔓 Sí, reactivar'}
-          onConfirm={confirmarToggle}
-          onClose={() => setModalSuspender(null)}
-        />
-      )}
-
-      {/* Modal confirmar quitar del equipo (desvincular) */}
-      {modalEliminar && (
-        <ConfirmModal
-          title="🗑️ Quitar del equipo"
-          icon="🗑️"
-          iconBg="#fee2e2"
-          miembro={modalEliminar}
-          notaTone="warn"
-          nota='⚠️ A diferencia de suspender, para que vuelva a tener acceso vas a tener que solicitar su alta de nuevo desde "Solicitar reclutador". Sus datos y postulaciones gestionadas se conservan.'
-          confirmTone="danger"
-          confirmLabel="🗑️ Sí, quitar del equipo"
-          onConfirm={confirmarEliminar}
-          onClose={() => setModalEliminar(null)}
-        />
-      )}
-
-      {/* Modal confirmar envío de recuperación de acceso (EST-10) */}
-      {modalRecuperacion && (
-        <ConfirmModal
-          title="🔑 Enviar recuperación de acceso"
-          icon="📧"
-          iconBg="#eff6ff"
-          miembro={modalRecuperacion}
-          notaTone="info"
-          nota="ℹ️ Le vamos a enviar un email con un link para que establezca su propia contraseña. Vos no la vas a ver ni a elegir en ningún momento."
-          confirmTone="info"
-          confirmLabel="📧 Sí, enviar recuperación"
-          onConfirm={confirmarRecuperacion}
-          onClose={() => setModalRecuperacion(null)}
-        />
+          title={conf.title}
+          confirmLabel={conf.confirmLabel}
+          tone={conf.tone}
+          busy={guardando}
+          onConfirm={ejecutarConfirmacion}
+          onClose={() => setConfirmar(null)}
+          confirmId="btn-confirmar-equipo"
+        >
+          <p>
+            <strong>{nombreDe(confirmar.miembro)}</strong> ({confirmar.miembro.usuario?.email}) {conf.texto}
+          </p>
+        </ConfirmModal>
       )}
     </div>
   );

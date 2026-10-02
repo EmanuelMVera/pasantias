@@ -440,9 +440,9 @@ Leyenda: **S** = secreta · **R** = requerida en producción · **O** = opcional
 | `EMAIL_FROM` | Render | O | `"SisPasantías" <noreply@tudominio.edu>` | Remitente. Default: `"SisPasantías" <EMAIL_USER>`. | |
 | `EMAIL_REQUIRED` | Render | O | `false` | `true` = la API aborta si falta el SMTP. | |
 | `SEED_ADMIN_EMAIL` | Render | R (solo primer deploy) | `admin@tudominio.edu` | Email del admin primario. | |
-| `SEED_ADMIN_PASSWORD` | Render | R (solo primer deploy) | *(fuerte, ≥6 chars)* | Contraseña del admin primario. Cambiarla tras el primer login. | S |
+| `SEED_ADMIN_PASSWORD` | Render | R (solo primer deploy) | *(fuerte, ≥8 chars)* | Contraseña del admin primario. Cambiarla tras el primer login. | S |
 | `SEED_SECOND_ADMIN_EMAIL` | Render | O | `compañero@tudominio.edu` | Email del segundo admin (opcional). Vacío = no se crea ninguno. | |
-| `SEED_SECOND_ADMIN_PASSWORD` | Render | R si `SEED_SECOND_ADMIN_EMAIL` está seteada | *(fuerte, ≥6 chars)* | Si falta con el email seteado, el seed aborta sin crear nada. | S |
+| `SEED_SECOND_ADMIN_PASSWORD` | Render | R si `SEED_SECOND_ADMIN_EMAIL` está seteada | *(fuerte, ≥8 chars)* | Si falta con el email seteado, el seed aborta sin crear nada. | S |
 | `SEED_SECOND_ADMIN_NAME` / `SEED_SECOND_ADMIN_LASTNAME` | Render | O | `Compa` / `Equipo` | Nombre/apellido del segundo admin. Default "Admin" / "Equipo". | |
 | `SEED_PRESENTACION_ON_BOOT` | Render | R | `false` | Nunca `true` en producción. | |
 | `ALLOW_PRODUCTION_DEMO_SEED` | Render | O | *(sin setear)* | `true` habilita `db:seed:presentacion` en prod (datos ficticios). | |

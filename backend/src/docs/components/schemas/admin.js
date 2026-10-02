@@ -109,6 +109,17 @@ module.exports = {
     },
   },
 
+  ResponsableOferta: {
+    type: 'object',
+    nullable: true,
+    description: 'Reclutador responsable de la oferta. null en ofertas históricas sin responsable.',
+    properties: {
+      id: { type: 'integer' },
+      nombre: { type: 'string' },
+      apellido: { type: 'string' },
+    },
+  },
+
   DashboardEmpresa: {
     type: 'object',
     properties: {
@@ -116,8 +127,48 @@ module.exports = {
       rolEnEquipo: { type: 'string', enum: ['admin_empresa', 'reclutador'] },
       ofertas: { type: 'object', additionalProperties: { type: 'integer' } },
       postulaciones: { type: 'object', additionalProperties: { type: 'integer' } },
-      equipo: { type: 'object', properties: { totalMiembros: { type: 'integer' } } },
-      ofertasRecientes: { type: 'array', items: { $ref: '#/components/schemas/OfertaResumen' } },
+      equipo: {
+        type: 'object',
+        properties: {
+          totalMiembros: { type: 'integer', description: 'Membresías activas (incluye al admin_empresa).' },
+          reclutadoresActivos: { type: 'integer', description: 'Solo reclutadores con membresía activa.' },
+          solicitudesPendientes: { type: 'integer', description: 'Solicitudes de reclutador pendientes de aprobación.' },
+        },
+      },
+      ofertasRecientes: {
+        type: 'array',
+        description: 'Las 5 ofertas más recientes de la empresa.',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' },
+            titulo: { type: 'string' },
+            area: { type: 'string', nullable: true },
+            estado: { type: 'string', enum: ['activa', 'pausada', 'cerrada'] },
+            estadoModeracion: { type: 'string', enum: ['pendiente', 'aprobada', 'rechazada', 'auto_aprobada'] },
+            vistas: { type: 'integer' },
+            cantidadVacantes: { type: 'integer' },
+            createdAt: { type: 'string', format: 'date-time' },
+            creadaPorUsuarioId: { type: 'integer', nullable: true },
+            creadaPor: { $ref: '#/components/schemas/ResponsableOferta' },
+            totalPostulaciones: { type: 'integer' },
+          },
+        },
+      },
+      topOfertasPostulaciones: {
+        type: 'array',
+        description: 'Hasta 5 ofertas con al menos una postulación, ordenadas por cantidad (top global de la empresa).',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' },
+            titulo: { type: 'string' },
+            estado: { type: 'string', enum: ['activa', 'pausada', 'cerrada'] },
+            totalPostulaciones: { type: 'integer' },
+            creadaPor: { $ref: '#/components/schemas/ResponsableOferta' },
+          },
+        },
+      },
     },
   },
 

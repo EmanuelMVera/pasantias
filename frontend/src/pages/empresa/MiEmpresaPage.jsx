@@ -1,27 +1,40 @@
 /**
- * MiEmpresaPage.jsx — Visualización y edición del perfil de empresa.
+ * MiEmpresaPage.jsx — Perfil de la empresa ("Mi empresa").
  *
- * admin_empresa: puede ver y editar campos permitidos.
- * reclutador:    solo lectura; campos deshabilitados y sin botón Guardar.
+ * admin_empresa: ve y edita los campos permitidos y cambia el logo.
+ * reclutador:    solo lectura (campos deshabilitados, sin Guardar ni logo).
  *
  * Campos editables: descripcion, rubro, sitioWeb, telefono, direccion, ciudad.
- * Campos protegidos (solo lectura): razonSocial, cuit, estadoAprobacion.
+ * Protegidos (solo lectura): razonSocial, cuit, estado y nivel de confianza.
+ * El logo se sube aparte (POST /empresas/mi-empresa/logo): el backend valida
+ * tipo real, extensión y tamaño; acá solo se anticipa el error al usuario.
+ *
+ * "Ver perfil público" abre la misma página que ven alumnos y egresados
+ * (/empresa/:id, EmpresaPublicaPage) — no hay una segunda vista duplicada.
  *
  * Ruta: /empresa/mi-empresa
  */
 
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { empresaService } from '../../services/empresa.service';
 import { useEmpresa } from '../../hooks/useEmpresa';
-import PageContainer from '../../components/ui/PageContainer';
+import { useToast } from '../../hooks/useToast';
+import Avatar from '../../components/Avatar/Avatar';
+import PageHeader from '../../components/ui/PageHeader';
+import Card from '../../components/ui/Card';
+import Icon from '../../components/ui/Icon';
+import Toast from '../../components/ui/Toast';
 import styles from './MiEmpresaPage.module.css';
 
-const ESTADO_LABEL = {
-  aprobada:  '✅ Aprobada',
-  pendiente: '⏳ Pendiente de aprobación',
-  rechazada: '❌ Rechazada',
+const ESTADO = {
+  aprobada:  { label: 'Aprobada', tone: 'green' },
+  pendiente: { label: 'Pendiente de aprobación', tone: 'orange' },
+  rechazada: { label: 'Rechazada', tone: 'red' },
 };
+
+const LOGO_TIPOS = ['image/png', 'image/jpeg', 'image/webp'];
+const LOGO_MAX_BYTES = 2 * 1024 * 1024;
 
 // ── Normalización de URL ──────────────────────────────────────────────────────
 // Agrega "https://" si el valor tiene aspecto de URL pero sin protocolo.
@@ -30,45 +43,30 @@ function normalizeUrl(raw) {
   if (!raw || !raw.trim()) return '';
   const trimmed = raw.trim();
   if (/^https?:\/\//i.test(trimmed)) {
-    // Ya tiene protocolo; validar que sea parseable
     try { new URL(trimmed); return trimmed; } catch { return null; }
   }
-  // Sin protocolo: verificar que se parece a un dominio (tiene al menos un punto)
   if (/^[\w-]+(\.[\w-]+)+/i.test(trimmed)) {
     const withProtocol = 'https://' + trimmed;
     try { new URL(withProtocol); return withProtocol; } catch { return null; }
   }
-  // No parece una URL
   return null;
 }
 
-// ── Toast de éxito ────────────────────────────────────────────────────────────
-function ToastExito({ mensaje, onClose }) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 3500);
-    return () => clearTimeout(t);
-  }, [onClose]);
-
-  return (
-    <div role="status" className={styles.toast}>
-      ✓ {mensaje}
-      <button onClick={onClose} className={styles.toastClose} aria-label="Cerrar">✕</button>
-    </div>
-  );
-}
-
 export default function MiEmpresaPage() {
-  const navigate = useNavigate();
-  const { esAdminEmpresa, loading: loadingRol } = useEmpresa();
+  const { esAdminEmpresa, loading: loadingRol, refrescar } = useEmpresa();
+  const { toast, showToast } = useToast(3500);
 
   const [empresa,    setEmpresa]    = useState(null);
+  const [responsable, setResponsable] = useState(null); // usuario admin_empresa
   const [form,       setForm]       = useState({});
   const [loading,    setLoading]    = useState(true);
   const [guardando,  setGuardando]  = useState(false);
   const [error,      setError]      = useState('');
-  const [showToast,  setShowToast]  = useState(false);
   const [logoFile,     setLogoFile]     = useState(null);
+  const [logoPreview,  setLogoPreview]  = useState(null);
+  const [logoError,    setLogoError]    = useState('');
   const [subiendoLogo, setSubiendoLogo] = useState(false);
+  const inputLogoRef = useRef(null);
 
   // admin_empresa: puede editar. reclutador: solo lectura.
   const esAdmin = esAdminEmpresa;
@@ -89,33 +87,42 @@ export default function MiEmpresaPage() {
       })
       .catch(() => setError('No se pudo cargar el perfil de empresa.'))
       .finally(() => setLoading(false));
+
+    // Persona responsable de la cuenta (dato secundario de la identidad).
+    empresaService.getEquipo()
+      .then((res) => {
+        const admin = (res.data?.data ?? []).find((m) => m.rolInterno === 'admin_empresa');
+        setResponsable(admin?.usuario ?? null);
+      })
+      .catch(() => {});
   }, []);
+
+  // Liberar la URL temporal de la vista previa.
+  useEffect(() => () => { if (logoPreview) URL.revokeObjectURL(logoPreview); }, [logoPreview]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    // Normalizar sitioWeb antes de enviar
     const urlNorm = normalizeUrl(form.sitioWeb);
     if (form.sitioWeb.trim() && urlNorm === null) {
       setError('El sitio web no parece una URL válida. Ej: www.empresa.com o https://empresa.com');
       return;
     }
 
-    const payload = { ...form, sitioWeb: urlNorm || '' };
-
     setGuardando(true);
     try {
-      const { data } = await empresaService.updateMiEmpresa(payload);
+      const { data } = await empresaService.updateMiEmpresa({ ...form, sitioWeb: urlNorm || '' });
       const updated = data.data ?? data;
       setEmpresa(updated);
-      setForm(prev => ({ ...prev, sitioWeb: updated.sitioWeb ?? '' }));
-      setShowToast(true);
+      setForm((prev) => ({ ...prev, sitioWeb: updated.sitioWeb ?? '' }));
+      showToast('Datos de empresa actualizados correctamente.', 'success');
+      refrescar();
     } catch (err) {
       setError(err.response?.data?.message ?? 'Error al guardar los cambios.');
     } finally {
@@ -123,200 +130,232 @@ export default function MiEmpresaPage() {
     }
   };
 
-  // SEC-03: el logo se sube como imagen validada (JPG/PNG/WEBP, ≤ 2 MB).
+  // ── Logo (SEC-03: el backend valida tipo real y tamaño) ───────────────────
+  const descartarLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    setLogoError('');
+    if (inputLogoRef.current) inputLogoRef.current.value = '';
+  };
+
   const handleLogoChange = (e) => {
     const file = e.target.files?.[0] || null;
-    if (file && file.size > 2 * 1024 * 1024) {
-      setError('La imagen del logo no puede superar los 2 MB.');
-      e.target.value = '';
+    setLogoError('');
+    if (!file) { descartarLogo(); return; }
+    if (!LOGO_TIPOS.includes(file.type)) {
+      descartarLogo();
+      setLogoError('Solo se aceptan imágenes PNG, JPG o WEBP.');
       return;
     }
-    setError('');
+    if (file.size > LOGO_MAX_BYTES) {
+      descartarLogo();
+      setLogoError('La imagen del logo no puede superar los 2 MB.');
+      return;
+    }
     setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
   };
 
   const handleSubirLogo = async () => {
     if (!logoFile) return;
     setSubiendoLogo(true);
-    setError('');
-    const formData = new FormData();
-    formData.append('logo', logoFile);
+    setLogoError('');
     try {
-      const { data } = await empresaService.subirLogo(formData);
+      const fd = new FormData();
+      fd.append('logo', logoFile);
+      const { data } = await empresaService.subirLogo(fd);
       setEmpresa((prev) => ({ ...prev, logo: data.logo }));
-      setLogoFile(null);
-      setShowToast(true);
+      descartarLogo();
+      showToast('Logo actualizado.', 'success');
+      refrescar(); // sidebar, topbar y menú de usuario muestran el logo nuevo
     } catch (err) {
-      setError(err.response?.data?.message ?? 'Error al subir el logo.');
+      setLogoError(err.response?.data?.message ?? 'No se pudo subir el logo.');
     } finally {
       setSubiendoLogo(false);
     }
   };
 
-  if (loading || loadingRol) return <p className="msg">Cargando...</p>;
+  if (loading || loadingRol) return <p className="msg">Cargando perfil de empresa...</p>;
+
+  const estado = ESTADO[empresa?.estadoAprobacion] ?? { label: empresa?.estadoAprobacion ?? '—', tone: 'gray' };
+  const confiable = empresa?.nivelConfianza === 'confiable';
+  const nombreResponsable = responsable ? `${responsable.nombre} ${responsable.apellido}` : null;
+
+  const badgeConfianza = (
+    <span className={`badge badge-tone-${confiable ? 'teal' : 'gray'}`}>
+      {confiable && <Icon name="shield" size={14} strokeWidth={2} />}
+      {confiable ? 'Empresa de confianza' : 'Empresa estándar'}
+    </span>
+  );
 
   return (
-    <PageContainer size="form">
+    <div className={`page-container ${styles.pagina}`}>
+      <Toast toast={toast} />
 
-      {/* Toast de éxito */}
-      {showToast && (
-        <ToastExito
-          mensaje="Datos de empresa actualizados correctamente."
-          onClose={() => setShowToast(false)}
-        />
-      )}
+      <PageHeader
+        title="Mi empresa"
+        subtitle={esAdmin
+          ? 'Datos institucionales y perfil público de tu empresa.'
+          : 'Perfil de la empresa (solo lectura).'}
+      />
 
-      <div className={`dashboard-header ${styles.header}`}>
-        <div>
-          <Link to="/empresa" className="btn-back">← Volver al panel</Link>
-          <h1>Perfil de empresa</h1>
-        </div>
-      </div>
-
-      {error && <p className="error-msg">{error}</p>}
-
-      {/* Aviso de solo lectura para reclutadores */}
       {!esAdmin && (
-        <div className={styles.avisoLectura}>
-          🔒 Solo el <strong>administrador de empresa</strong> puede modificar estos datos.
-          Estás viendo el perfil en modo lectura.
-        </div>
+        <p className={styles.lecturaInfo}>
+          <Icon name="lock" size={16} />
+          Solo el administrador de empresa puede modificar estos datos. Estás viendo el perfil en modo lectura.
+        </p>
       )}
 
-      {/* Datos de solo lectura */}
-      <section className={styles.readonlyBox}>
-        <h3 className={styles.readonlyTitle}>Datos institucionales (solo lectura)</h3>
-        <dl className={styles.dl}>
-          <dt>Razón Social</dt>
-          <dd>{empresa?.razonSocial ?? '—'}</dd>
-          <dt>CUIT</dt>
-          <dd>{empresa?.cuit ?? '—'}</dd>
-          <dt>Estado</dt>
-          <dd>{ESTADO_LABEL[empresa?.estadoAprobacion] ?? empresa?.estadoAprobacion ?? '—'}</dd>
-          {empresa?.nivelConfianza === 'confiable' && (
-            <>
-              <dt>Nivel de confianza</dt>
-              <dd>🤝 Empresa de confianza institucional</dd>
-            </>
+      {error && <p className={`error-msg ${styles.error}`} role="alert">{error}</p>}
+
+      {/* ── Resumen: identidad de la empresa ───────────────────────────────── */}
+      <Card as="section" className={styles.bloque} aria-label="Resumen de la empresa">
+        <div className={styles.resumen}>
+          <div className={styles.logoCol}>
+            <Avatar
+              key={logoPreview || empresa?.logo || 'sin-logo'}
+              src={logoPreview || empresa?.logo || null}
+              nombre={empresa?.razonSocial}
+              apellido=""
+              size={96}
+              className={styles.logo}
+            />
+            {logoPreview && <span className={styles.previewTag}>Vista previa</span>}
+          </div>
+
+          <div className={styles.resumenInfo}>
+            <span className={styles.razonSocial}>{empresa?.razonSocial ?? '—'}</span>
+            {empresa?.rubro && <span className={styles.rubro}>{empresa.rubro}</span>}
+            <div className={styles.badges}>
+              <span className={`badge badge-tone-${estado.tone}`}>{estado.label}</span>
+              {badgeConfianza}
+            </div>
+            {nombreResponsable && (
+              <span className={styles.responsable}>Responsable: <strong>{nombreResponsable}</strong></span>
+            )}
+
+            {esAdmin && (
+              <div className={styles.logoControl}>
+                <input
+                  ref={inputLogoRef}
+                  id="logo-empresa"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className={styles.inputOculto}
+                  onChange={handleLogoChange}
+                  disabled={subiendoLogo}
+                />
+                {logoFile ? (
+                  <>
+                    <button type="button" className="btn-primary" onClick={handleSubirLogo} disabled={subiendoLogo}>
+                      <Icon name="check" size={18} strokeWidth={2.2} />
+                      {subiendoLogo ? 'Subiendo...' : 'Guardar logo'}
+                    </button>
+                    <button type="button" className="btn-secondary" onClick={descartarLogo} disabled={subiendoLogo}>
+                      Descartar
+                    </button>
+                  </>
+                ) : (
+                  <label htmlFor="logo-empresa" className={`btn-secondary ${styles.labelLogo}`}>
+                    <Icon name="image" size={18} />
+                    Cambiar logo
+                  </label>
+                )}
+                <span className={styles.logoHint}>PNG, JPG o WEBP · Máximo 2 MB</span>
+              </div>
+            )}
+            {logoError && <p className={styles.logoError} role="alert">{logoError}</p>}
+          </div>
+
+          {empresa?.id && (
+            <Link to={`/empresa/${empresa.id}`} className={styles.verPublico}>
+              Ver perfil público <Icon name="arrowRight" size={16} />
+            </Link>
           )}
+        </div>
+      </Card>
+
+      {/* ── Datos institucionales (solo lectura) ───────────────────────────── */}
+      <Card as="section" titleId="sec-institucional" title="Datos institucionales" className={styles.bloque}>
+        <dl className={styles.datos}>
+          <div><dt>Razón social</dt><dd>{empresa?.razonSocial ?? '—'}</dd></div>
+          <div><dt>CUIT</dt><dd>{empresa?.cuit ?? '—'}</dd></div>
+          <div><dt>Estado</dt><dd><span className={`badge badge-tone-${estado.tone}`}>{estado.label}</span></dd></div>
+          <div><dt>Nivel de confianza</dt><dd>{badgeConfianza}</dd></div>
         </dl>
-        <p className={styles.readonlyHint}>
+        <p className={styles.nota}>
           Para modificar la razón social o el CUIT, contactate con el administrador del sistema.
         </p>
-      </section>
+      </Card>
 
-      {/* Logo — solo admin_empresa (SEC-03: subida de imagen validada) */}
-      {esAdmin && (
-        <section className={styles.logoSection}>
-          <h3 className={styles.logoTitle}>Logo de la empresa</h3>
-          <div className={styles.logoRow}>
-            {empresa?.logo && (
-              <img
-                key={empresa.logo}
-                src={empresa.logo}
-                alt="Logo actual"
-                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                className={styles.logoImg}
+      <form onSubmit={handleSubmit} className={styles.form}>
+        {/* ── Perfil público ──────────────────────────────────────────────── */}
+        <Card
+          as="section" titleId="sec-publico" title="Perfil público"
+          subtitle="Lo que ven alumnos y egresados en la página de tu empresa."
+          className={styles.bloque}
+        >
+          <div className={styles.campos}>
+            <div className="form-group">
+              <label htmlFor="rubro">Rubro / Industria</label>
+              <input
+                id="rubro" name="rubro" type="text" value={form.rubro} onChange={handleChange}
+                placeholder="Ej: Software y Tecnología" disabled={!esAdmin}
               />
-            )}
-            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoChange} />
-            <button type="button" className="btn-secondary" onClick={handleSubirLogo} disabled={!logoFile || subiendoLogo}>
-              {subiendoLogo ? 'Subiendo...' : 'Subir logo'}
-            </button>
+            </div>
+            <div className="form-group">
+              <label htmlFor="sitioWeb">Sitio web</label>
+              <input
+                id="sitioWeb" name="sitioWeb" type="text" value={form.sitioWeb} onChange={handleChange}
+                placeholder="www.empresa.com" disabled={!esAdmin}
+              />
+            </div>
+            <div className={`form-group ${styles.campoAncho}`}>
+              <label htmlFor="descripcion">Descripción</label>
+              <textarea
+                id="descripcion" name="descripcion" value={form.descripcion} onChange={handleChange}
+                rows={5} placeholder="Contanos brevemente a qué se dedica tu empresa..." disabled={!esAdmin}
+              />
+            </div>
           </div>
-          <span className={styles.logoHint}>JPG, PNG o WEBP. Máximo 2 MB.</span>
-        </section>
-      )}
+        </Card>
 
-      {/* Formulario */}
-      <form onSubmit={esAdmin ? handleSubmit : (e) => e.preventDefault()}>
-
-        <div className="form-group">
-          <label htmlFor="rubro">Rubro / Industria</label>
-          <input
-            id="rubro" name="rubro" type="text"
-            value={form.rubro} onChange={handleChange}
-            placeholder="Ej: Software y Tecnología"
-            disabled={!esAdmin}
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="descripcion">Descripción de la empresa</label>
-          <textarea
-            id="descripcion" name="descripcion" rows={5}
-            value={form.descripcion} onChange={handleChange}
-            placeholder="Contanos brevemente a qué se dedica tu empresa..."
-            disabled={!esAdmin}
-          />
-        </div>
-
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="sitioWeb">
-              Sitio web
-              {esAdmin && <span className={styles.labelHint}>(ej: www.empresa.com)</span>}
-            </label>
-            <input
-              id="sitioWeb" name="sitioWeb"
-              type="text"
-              value={form.sitioWeb} onChange={handleChange}
-              placeholder="www.empresa.com"
-              disabled={!esAdmin}
-            />
+        {/* ── Contacto y ubicación ────────────────────────────────────────── */}
+        <Card as="section" titleId="sec-contacto" title="Contacto y ubicación" className={styles.bloque}>
+          <div className={styles.campos}>
+            <div className="form-group">
+              <label htmlFor="telefono">Teléfono institucional</label>
+              <input
+                id="telefono" name="telefono" type="tel" value={form.telefono} onChange={handleChange}
+                placeholder="Ej: 11-4300-1234" disabled={!esAdmin}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="ciudad">Ciudad</label>
+              <input
+                id="ciudad" name="ciudad" type="text" value={form.ciudad} onChange={handleChange}
+                placeholder="Ej: Avellaneda" disabled={!esAdmin}
+              />
+            </div>
+            <div className={`form-group ${styles.campoAncho}`}>
+              <label htmlFor="direccion">Dirección</label>
+              <input
+                id="direccion" name="direccion" type="text" value={form.direccion} onChange={handleChange}
+                placeholder="Ej: Av. Mitre 1234" disabled={!esAdmin}
+              />
+            </div>
           </div>
-          <div className="form-group">
-            <label htmlFor="telefono">Teléfono institucional</label>
-            <input
-              id="telefono" name="telefono" type="tel"
-              value={form.telefono} onChange={handleChange}
-              placeholder="Ej: 11-4300-1234"
-              disabled={!esAdmin}
-            />
-          </div>
-        </div>
+        </Card>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="ciudad">Ciudad</label>
-            <input
-              id="ciudad" name="ciudad" type="text"
-              value={form.ciudad} onChange={handleChange}
-              placeholder="Ej: Avellaneda"
-              disabled={!esAdmin}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="direccion">Dirección</label>
-            <input
-              id="direccion" name="direccion" type="text"
-              value={form.direccion} onChange={handleChange}
-              placeholder="Ej: Av. Mitre 1234"
-              disabled={!esAdmin}
-            />
-          </div>
-        </div>
-
-        {/* Botones solo para admin_empresa */}
         {esAdmin && (
           <div className={styles.acciones}>
             <button type="submit" className="btn-primary" disabled={guardando}>
-              {guardando ? 'Guardando...' : '✓ Guardar cambios'}
-            </button>
-            <button type="button" className="btn-secondary" onClick={() => navigate('/empresa')}>
-              Cancelar
-            </button>
-          </div>
-        )}
-
-        {!esAdmin && (
-          <div className={styles.acciones}>
-            <button type="button" className="btn-secondary" onClick={() => navigate('/empresa')}>
-              ← Volver al panel
+              <Icon name="check" size={18} strokeWidth={2.2} />
+              {guardando ? 'Guardando...' : 'Guardar cambios'}
             </button>
           </div>
         )}
       </form>
-    </PageContainer>
+    </div>
   );
 }

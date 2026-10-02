@@ -5,15 +5,20 @@
  * SeguridadPage por longitud + mayúscula/número (4 niveles) — la misma
  * contraseña podía verse "Aceptable" en una pantalla y "Media" en la otra.
  *
- * Política real de backend (auth.validator.js::validateCambiarPassword,
- * auth.controller.js::resetPassword, empresaEquipo.service.js): el único
- * requisito duro es longitud >= 6. No hay regla de mayúscula/número/carácter
+ * Política real de backend (backend/src/utils/password.js, usada por
+ * cambiar contraseña, restablecer y alta/edición desde el admin): el único
+ * requisito duro es longitud >= 8. No hay regla de mayúscula/número/carácter
  * especial en el servidor — este módulo NO inventa un requisito de submit
  * que el backend no exige; el score de abajo es puramente indicativo/UX
  * para ayudar a elegir una mejor contraseña, no un gate adicional.
  */
 
-const LONGITUD_MINIMA = 6; // igual que el backend — no cambiar sin justificar ahí también
+// Igual que el backend (PASSWORD_MIN_LENGTH en backend/src/utils/password.js).
+// Es la única regla dura; cambiarla acá sin cambiarla allá no sirve.
+export const PASSWORD_MIN_LENGTH = 8;
+export const MENSAJE_PASSWORD_CORTA = `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`;
+
+const LONGITUD_MINIMA = PASSWORD_MIN_LENGTH;
 const LONGITUD_RECOMENDADA = 10;
 
 const NIVELES = {

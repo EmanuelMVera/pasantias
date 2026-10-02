@@ -18,14 +18,15 @@
   display: flex;
   gap: 0.6rem;
   align-items: flex-start;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: var(--radius);
+  background: var(--info-soft);
+  border-radius: var(--radius-md);
   padding: 0.75rem 1rem;
-  font-size: 0.82rem;
-  color: #1e40af;
+  font-size: 0.86rem;
+  color: var(--info-text);
   line-height: 1.5;
 }
+
+.infoBox svg { flex-shrink: 0; margin-top: 2px; }
 
 /* ── Campos del formulario ──────────────────────────────────────────────────── */
 .fieldGroup {

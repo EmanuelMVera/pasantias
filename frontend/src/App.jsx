@@ -40,7 +40,8 @@ import MisPostulacionesPage from './pages/alumno/MisPostulacionesPage';
 import PerfilPage from './pages/alumno/PerfilPage';
 
 // Páginas de la empresa (requieren rol empresa)
-import EmpresaDashboardPage from './pages/empresa/EmpresaDashboardPage';
+import EmpresaInicioPage from './pages/empresa/EmpresaInicioPage';
+import EmpresaOfertasPage from './pages/empresa/EmpresaOfertasPage';
 import CrearOfertaPage from './pages/empresa/CrearOfertaPage';
 import EditarOfertaPage from './pages/empresa/EditarOfertaPage';
 import PostulantesMiOfertaPage from './pages/empresa/PostulantesMiOfertaPage';
@@ -71,6 +72,8 @@ import NotificacionesPage from './pages/NotificacionesPage';
 // Componentes de layout global que se muestran en todas las páginas
 import Navbar from './components/Navbar/Navbar';
 import AdminShell from './components/AdminShell/AdminShell';
+import EmpresaShell from './components/EmpresaShell/EmpresaShell';
+import { useEmpresa } from './hooks/useEmpresa';
 
 /**
  * ProtectedRoute — Componente de guardia de rutas.
@@ -174,9 +177,16 @@ function AppRoutes() {
       } />
 
       {/* ── Rutas de la empresa ── */}
+      {/* /empresa: Resumen (administrador de empresa) o panel operativo (reclutador) */}
       <Route path="/empresa" element={
         <ProtectedRoute roles={['empresa']}>
-          <EmpresaDashboardPage />
+          <EmpresaInicioPage />
+        </ProtectedRoute>
+      } />
+      {/* Ofertas de la empresa (supervisión). Va antes de /empresa/:empresaId. */}
+      <Route path="/empresa/ofertas" element={
+        <ProtectedRoute roles={['empresa']}>
+          <EmpresaOfertasPage />
         </ProtectedRoute>
       } />
       <Route path="/empresa/nueva-oferta" element={
@@ -294,12 +304,19 @@ function AppRoutes() {
 /**
  * Chrome — Estructura visual común.
  *
- * - Rol admin: shell propio (sidebar + topbar, components/AdminShell).
- * - Resto (alumno/egresado/empresa y páginas públicas): navbar horizontal; la
- *   marca vive dentro del navbar, así que el alto del chrome es solo el suyo.
+ * Tres experiencias autenticadas distintas:
+ * - Rol admin (Administrador del Sistema): AdminShell (sidebar + topbar).
+ * - Rol empresa con rolInterno admin_empresa (Administrador de Empresa):
+ *   EmpresaShell — mismo lenguaje visual, secciones de gobierno de la empresa.
+ * - Reclutador, alumno/egresado y páginas públicas: navbar horizontal.
+ *
+ * El rol interno de un usuario empresa llega asíncrono (EmpresaContext): hasta
+ * que se resuelve no se dibuja ningún chrome, para no mostrarle por un instante
+ * el navbar a un administrador de empresa (ni el shell a un reclutador).
  */
 function Chrome() {
   const { usuario } = useAuth();
+  const { esAdminEmpresa, loading: cargandoEmpresa } = useEmpresa();
 
   if (usuario?.rol === 'admin') {
     return (
@@ -310,6 +327,23 @@ function Chrome() {
             <AppRoutes />
           </main>
         </AdminShell>
+      </>
+    );
+  }
+
+  if (usuario?.rol === 'empresa' && cargandoEmpresa) {
+    return <div className="app-loading" role="status">Cargando...</div>;
+  }
+
+  if (esAdminEmpresa) {
+    return (
+      <>
+        <a href="#contenido" className="skip-link">Saltar al contenido</a>
+        <EmpresaShell>
+          <main id="contenido">
+            <AppRoutes />
+          </main>
+        </EmpresaShell>
       </>
     );
   }

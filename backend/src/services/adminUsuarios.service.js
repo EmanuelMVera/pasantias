@@ -13,6 +13,7 @@ const { Op } = require('sequelize');
 const { hashPassword } = require('./auth.service');
 const { Usuario, Perfil, Empresa, EmpresaUsuario } = require('../models');
 const HttpError = require('../utils/httpError');
+const { esPasswordValida, MENSAJE_PASSWORD_CORTA } = require('../utils/password');
 const { buildPagination } = require('../utils/pagination');
 const { registrarAuditoria } = require('../utils/auditLog');
 const { obtenerRegexLegajo, normalizarLegajo } = require('../utils/legajo');
@@ -89,6 +90,7 @@ async function crearUsuario({ nombre, apellido, email, password, rol, telefono, 
   if (!nombre || !apellido || !email || !password || !rol) {
     throw new HttpError(400, 'Faltan campos obligatorios (nombre, apellido, email, password, rol).');
   }
+  if (!esPasswordValida(password)) throw new HttpError(400, MENSAJE_PASSWORD_CORTA);
 
   let legajoNormalizado = null;
   if (['alumno', 'egresado'].includes(rol)) {
@@ -151,7 +153,10 @@ async function actualizarUsuario(id, body, { actorUsuarioId, ip, requestId }) {
   if (activo    !== undefined) updateData.activo    = activo;
   if (telefono  !== undefined) updateData.telefono  = telefono;
   if (ubicacion !== undefined) updateData.ubicacion = ubicacion;
-  if (password) updateData.password = await hashPassword(password);
+  if (password) {
+    if (!esPasswordValida(password)) throw new HttpError(400, MENSAJE_PASSWORD_CORTA);
+    updateData.password = await hashPassword(password);
+  }
 
   const antes = { rol: usuario.rol, activo: usuario.activo };
   await usuario.update(updateData);

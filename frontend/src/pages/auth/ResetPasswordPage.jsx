@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { authService } from '../../services/auth.service';
-import { calcularFortalezaPassword } from '../../utils/passwordStrength';
+import { calcularFortalezaPassword, PASSWORD_MIN_LENGTH, MENSAJE_PASSWORD_CORTA } from '../../utils/passwordStrength';
 import styles from './LoginPage.module.css';
 
 export default function ResetPasswordPage() {
@@ -19,7 +19,7 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setError('');
 
-    if (password.length < 6) return setError('La contraseña debe tener al menos 6 caracteres.');
+    if (password.length < PASSWORD_MIN_LENGTH) return setError(MENSAJE_PASSWORD_CORTA);
     if (password !== confirm) return setError('Las contraseñas no coinciden.');
 
     setLoading(true);
@@ -85,7 +85,7 @@ export default function ResetPasswordPage() {
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder={`Mínimo ${PASSWORD_MIN_LENGTH} caracteres`}
                     required
                   />
                   <button

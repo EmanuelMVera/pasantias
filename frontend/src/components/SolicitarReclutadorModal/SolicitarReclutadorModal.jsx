@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { empresaService } from '../../services/empresa.service';
 import Modal from '../Modal/Modal';
+import Icon from '../ui/Icon';
 import styles from './SolicitarReclutadorModal.module.css';
 
-/* ── Modal: Solicitar reclutador ────────────────────────────────────────────── */
+/* ── Modal: alta de reclutador ───────────────────────────────────────────────
+   El texto cambia según el nivel de confianza de la empresa (la decisión real
+   la toma el backend):
+   - estándar  → "Solicitar reclutador": la solicitud la revisa el instituto.
+   - confiable → "Agregar reclutador": la cuenta se crea de inmediato. */
 export default function SolicitarReclutadorModal({ onClose, onEnviada, esConfiable }) {
   const [form, setForm] = useState({ nombre: '', apellido: '', email: '' });
   const [loading, setLoading] = useState(false);
@@ -38,21 +43,22 @@ export default function SolicitarReclutadorModal({ onClose, onEnviada, esConfiab
   };
 
   return (
-    <Modal title="📋 Solicitar nuevo reclutador" onClose={onClose}>
+    <Modal title={esConfiable ? 'Agregar reclutador' : 'Solicitar reclutador'} onClose={onClose}>
       <form onSubmit={handleSubmit} className={styles.modalForm}>
 
         <div className={styles.infoBox}>
-          <span>ℹ️</span>
+          <Icon name={esConfiable ? 'shield' : 'info'} size={18} />
           <span>
             {esConfiable
-              ? 'Tu empresa es de confianza institucional: la cuenta se crea de inmediato, sin esperar aprobación del administrador. Las credenciales se envían por email.'
-              : 'La solicitud será revisada por el administrador del instituto. Al aprobarla, se creará la cuenta y se enviarán las credenciales por email.'}
+              ? 'Tu empresa tiene habilitación institucional. La cuenta se creará inmediatamente y las credenciales se enviarán por email.'
+              : 'La solicitud será revisada por el administrador del instituto. Al aprobarla se creará la cuenta y se enviarán las credenciales por email.'}
           </span>
         </div>
 
         <div className={styles.fieldGroup}>
-          <label>Nombre *</label>
+          <label htmlFor="rec-nombre">Nombre *</label>
           <input
+            id="rec-nombre"
             type="text"
             value={form.nombre}
             onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
@@ -63,8 +69,9 @@ export default function SolicitarReclutadorModal({ onClose, onEnviada, esConfiab
         </div>
 
         <div className={styles.fieldGroup}>
-          <label>Apellido *</label>
+          <label htmlFor="rec-apellido">Apellido *</label>
           <input
+            id="rec-apellido"
             type="text"
             value={form.apellido}
             onChange={e => setForm(f => ({ ...f, apellido: e.target.value }))}
@@ -74,8 +81,9 @@ export default function SolicitarReclutadorModal({ onClose, onEnviada, esConfiab
         </div>
 
         <div className={styles.fieldGroup}>
-          <label>Email *</label>
+          <label htmlFor="rec-email">Email *</label>
           <input
+            id="rec-email"
             type="email"
             value={form.email}
             onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
@@ -84,12 +92,12 @@ export default function SolicitarReclutadorModal({ onClose, onEnviada, esConfiab
           />
         </div>
 
-        {error && <p className={styles.errorMsg}>⚠️ {error}</p>}
+        {error && <p className={styles.errorMsg} role="alert">{error}</p>}
 
         <div className={styles.modalActions}>
           <button type="button" className={styles.btnSecondary} onClick={onClose}>Cancelar</button>
           <button type="submit" className={styles.btnPrimary} disabled={loading}>
-            {loading ? 'Enviando...' : '📤 Enviar solicitud'}
+            {loading ? 'Enviando...' : (esConfiable ? 'Agregar reclutador' : 'Enviar solicitud')}
           </button>
         </div>
       </form>

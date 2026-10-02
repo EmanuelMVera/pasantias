@@ -26,6 +26,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useEmpresa } from '../hooks/useEmpresa';
 import { useConversacion } from '../hooks/useConversacion';
 import { mensajeService } from '../services/chat.service';
 import ListaConversaciones from '../components/ListaConversaciones/ListaConversaciones';
@@ -48,6 +49,9 @@ function formatFecha(dateStr) {
 export default function ChatPage() {
   const { usuarioId: usuarioIdParam } = useParams();
   const { usuario }                   = useAuth();
+  // El administrador de empresa solo chatea con su equipo (regla del backend):
+  // la pantalla lo dice en el título y en la búsqueda.
+  const { esAdminEmpresa }            = useEmpresa();
   const navigate                      = useNavigate();
 
   const [conversaciones,  setConversaciones]  = useState([]);
@@ -137,6 +141,7 @@ export default function ChatPage() {
         <NuevoChatModal
           onClose={() => setModalAbierto(false)}
           onSeleccionar={handleSeleccionarUsuario}
+          soloEquipo={esAdminEmpresa}
         />
       )}
 
@@ -149,6 +154,7 @@ export default function ChatPage() {
           error={errorConvs}
           onNuevoChat={() => setModalAbierto(true)}
           onSeleccionar={handleSeleccionarConversacion}
+          titulo={esAdminEmpresa ? 'Mensajes del equipo' : undefined}
         />
 
         {/* ── Panel derecho: vista de mensajes ──────────────────────────── */}

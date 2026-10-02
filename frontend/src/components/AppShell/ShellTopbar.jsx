@@ -1,34 +1,39 @@
 /**
- * AdminTopbar.jsx — barra superior clara del shell admin.
+ * ShellTopbar.jsx — barra superior clara del shell.
  *
- * Izquierda: hamburguesa (solo <1024px) + nombre de la sección actual.
+ * Izquierda: hamburguesa (solo <1024px) + breadcrumb de la sección actual.
  * No hay buscador global: no existe una API de búsqueda transversal y no se
  * muestra un control que no haga nada.
- * Derecha: campana (navega a /notificaciones, contador real, rojo si hay alta
- * prioridad) + menú de usuario.
+ * Derecha: Chat (opcional, con mensajes sin leer) + campana (navega a
+ * /notificaciones, contador real, rojo si hay alta prioridad) + menú de usuario.
  */
 
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotifCounters } from '../../hooks/useNotifCounters';
 import Brand from '../Brand/Brand';
 import Icon from '../ui/Icon';
 import UserMenu from '../Navbar/UserMenu';
-import { seccionActual } from './adminNav';
-import styles from './AdminShell.module.css';
+import styles from './AppShell.module.css';
 
-export default function AdminTopbar({ toggleRef, drawerOpen, onToggleDrawer, onCloseDrawer }) {
+export default function ShellTopbar({
+  toggleRef, crumbRoot, seccion, incluirChat = false, userMenuLinks,
+  drawerOpen, onToggleDrawer, onCloseDrawer,
+}) {
   const { usuario } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { noLeidas, prioridadAlta } = useNotifCounters(usuario, { incluirChat: false });
+  const { noLeidas, prioridadAlta, mensajesNL } = useNotifCounters(usuario, { incluirChat });
 
   const enNotificaciones = location.pathname === '/notificaciones';
-  const seccion = seccionActual(location.pathname);
+  const enChat = location.pathname === '/chat' || location.pathname.startsWith('/chat/');
 
   const bellTitle = noLeidas > 0
     ? `${noLeidas} notificación${noLeidas !== 1 ? 'es' : ''} sin leer`
     : 'Notificaciones';
+  const chatTitle = mensajesNL > 0
+    ? `${mensajesNL} mensaje${mensajesNL !== 1 ? 's' : ''} sin leer`
+    : 'Chat';
 
   return (
     <header className={styles.topbar}>
@@ -51,7 +56,7 @@ export default function AdminTopbar({ toggleRef, drawerOpen, onToggleDrawer, onC
 
         {seccion && (
           <p className={styles.crumbs}>
-            <span className={styles.crumbRoot}>Administración</span>
+            <span className={styles.crumbRoot}>{crumbRoot}</span>
             <Icon name="chevronRight" size={14} className={styles.crumbSep} />
             <span className={styles.crumbCurrent}>{seccion}</span>
           </p>
@@ -59,6 +64,22 @@ export default function AdminTopbar({ toggleRef, drawerOpen, onToggleDrawer, onC
       </div>
 
       <div className={styles.topbarRight}>
+        {incluirChat && (
+          <Link
+            to="/chat"
+            className={`${styles.bell} ${enChat ? styles.bellActive : ''}`}
+            title={chatTitle}
+            aria-label="Chat"
+            aria-current={enChat ? 'page' : undefined}
+            onClick={onCloseDrawer}
+          >
+            <Icon name="message" size={22} />
+            {mensajesNL > 0 && (
+              <span className={styles.bellCount}>{mensajesNL > 9 ? '9+' : mensajesNL}</span>
+            )}
+          </Link>
+        )}
+
         <button
           type="button"
           className={`${styles.bell} ${enNotificaciones ? styles.bellActive : ''}`}
@@ -83,6 +104,7 @@ export default function AdminTopbar({ toggleRef, drawerOpen, onToggleDrawer, onC
           noLeidas={noLeidas}
           prioridadAlta={prioridadAlta}
           onOpen={onCloseDrawer}
+          links={userMenuLinks}
         />
       </div>
     </header>

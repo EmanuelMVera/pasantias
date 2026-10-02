@@ -1,139 +1,189 @@
-/* MiEmpresaPage.module.css — perfil de empresa (ver / editar). */
+/* MiEmpresaPage.module.css — "Mi empresa". */
 
-.toast {
-  position: fixed;
-  top: 1.25rem;
-  right: 1.25rem;
-  z-index: 1200;
-  background: #16a34a;
-  color: #fff;
-  padding: 0.75rem 1.25rem;
-  border-radius: 10px;
-  font-weight: 600;
-  font-size: 0.92rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+/* Formulario: no se estira a todo el ancho del shell. */
+.pagina > section,
+.pagina > form,
+.pagina > .lecturaInfo { max-width: 980px; }
+
+.error { margin-bottom: var(--space-4); }
+.bloque { margin-bottom: var(--space-5); }
+
+.lecturaInfo {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  animation: toastIn 0.25s ease;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--neutral-soft);
+  color: var(--neutral-text);
+  font-size: 0.88rem;
 }
 
-@keyframes toastIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+.lecturaInfo svg { flex-shrink: 0; }
 
-.toastClose {
-  background: none;
-  border: none;
-  color: #fff;
-  cursor: pointer;
-  font-weight: 700;
-  margin-left: 4px;
-}
-
-.header > div {
+/* ── Card resumen ── */
+.resumen {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-5);
   min-width: 0;
 }
 
-.avisoLectura {
-  margin-bottom: 1.25rem;
-  padding: 0.75rem 1rem;
-  background: #fef9c3;
-  border: 1px solid #fbbf24;
-  border-radius: 8px;
-  font-size: 0.88rem;
-  color: #92400e;
-}
-
-.readonlyBox {
-  margin-bottom: 2rem;
-  padding: 1rem 1.25rem;
-  background: var(--bg-card);
-  border-radius: 10px;
-  border: 1px solid var(--border);
-}
-
-.readonlyTitle {
-  margin-top: 0;
-  font-size: 0.95rem;
-  color: var(--text-muted);
-}
-
-.dl {
-  display: grid;
-  grid-template-columns: 140px 1fr;
-  gap: 0.4rem 1rem;
-  margin: 0;
-  font-size: 0.9rem;
-}
-
-.dl dt { font-weight: 600; }
-.dl dd { margin: 0; }
-
-.readonlyHint {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  margin: 0.75rem 0 0;
-}
-
-.logoSection {
-  margin-bottom: 2rem;
-}
-
-.logoTitle {
-  font-size: 0.95rem;
-  margin-bottom: 0.75rem;
-}
-
-.logoRow {
+.logoCol {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.logo {
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-xs);
+}
+
+.previewTag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--warning-text);
+  background: var(--warning-soft);
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+}
+
+.resumenInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.razonSocial {
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.rubro { font-size: 0.95rem; color: var(--text-soft); }
+
+.badges {
+  display: flex;
   flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
-.logoImg {
-  width: 80px;
-  height: 80px;
-  object-fit: contain;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 4px;
+.responsable { font-size: 0.9rem; color: var(--text-soft); }
+.responsable strong { color: var(--text-strong); }
+
+/* ── Control de logo ── */
+.logoControl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-2);
 }
 
-.logoHint {
-  display: block;
-  margin-top: 0.4rem;
-  font-size: 0.78rem;
-  color: var(--text-muted);
+/* El input real queda en el DOM (operable con teclado) pero sin el control nativo. */
+.inputOculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
 }
 
-.labelHint {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  font-weight: 400;
-  margin-left: 0.4rem;
+.labelLogo { cursor: pointer; }
+
+.logoControl:has(.inputOculto:focus-visible) .labelLogo {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
+
+.logoHint { font-size: 0.8rem; color: var(--text-soft); }
+
+.logoError {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--danger-text);
+}
+
+.verPublico {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 40px;
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+/* ── Datos institucionales ── */
+.datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.datos dt {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  margin-bottom: 2px;
+}
+
+.datos dd {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.nota {
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-soft);
+  font-size: 0.84rem;
+  color: var(--text-soft);
+}
+
+/* ── Formulario ── */
+.campos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.campoAncho { grid-column: 1 / -1; }
 
 .acciones {
   display: flex;
-  gap: 1rem;
-  margin-top: 1.5rem;
-  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
 }
 
-@media (max-width: 600px) {
-  .dl {
-    grid-template-columns: 1fr;
-    gap: 0.15rem;
-  }
+.acciones button { min-height: 44px; }
 
-  .dl dt { margin-top: 0.5rem; }
+@media (max-width: 767.98px) {
+  .resumen { flex-direction: column; align-items: stretch; gap: var(--space-4); }
+  .logoCol { align-items: flex-start; }
+  .campos { grid-template-columns: minmax(0, 1fr); }
+  .acciones button { width: 100%; }
+}
 
-  .toast {
-    left: 1rem;
-    right: 1rem;
-    top: 1rem;
-  }
+@media (pointer: coarse) {
+  .labelLogo, .logoControl button { min-height: 44px; }
 }

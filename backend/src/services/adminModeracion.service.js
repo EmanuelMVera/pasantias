@@ -22,7 +22,7 @@ const { buildPagination } = require('../utils/pagination');
 const { registrarAuditoria } = require('../utils/auditLog');
 const logger = require('../utils/logger');
 const { TRANSICIONES_ESTADO } = require('./oferta.service');
-const { obtenerAdminsActivos } = require('./empresa.service');
+const { obtenerAdminsActivos, obtenerReclutadorResponsable } = require('./empresa.service');
 
 // ── Empresas (aprobación directa) ──────────────────────────────────────────────
 
@@ -238,18 +238,32 @@ const NOTIF_POR_ACCION = {
   cerrar:   { titulo: '🔒 Tu oferta fue cerrada',   mensaje: (titulo) => `La oferta "${titulo}" fue cerrada por el administrador.`,           tipoVisual: 'info'    },
 };
 
+/**
+ * Avisa a la empresa una decisión del instituto sobre una oferta. Es un evento
+ * de gobierno Y operativo: lo reciben los admin_empresa (supervisión) y el
+ * reclutador responsable de la oferta (es su publicación). Sin duplicar si
+ * fueran la misma persona.
+ */
 async function notificarEmpresa(oferta, accion) {
   try {
-    const admins = await obtenerAdminsActivos(oferta.empresaId);
+    const [admins, responsable] = await Promise.all([
+      obtenerAdminsActivos(oferta.empresaId),
+      obtenerReclutadorResponsable(oferta),
+    ]);
     const notif = NOTIF_POR_ACCION[accion];
-    await Promise.all(admins.map((admin) => crearNotificacion({
-      usuarioId: admin.id,
+    const idsAdmin = new Set(admins.map((a) => a.id));
+    const destinatarios = admins.map((a) => ({ id: a.id, url: '/empresa/ofertas' }));
+    if (responsable && !idsAdmin.has(responsable.id)) {
+      destinatarios.push({ id: responsable.id, url: '/empresa' });
+    }
+    await Promise.all(destinatarios.map((dest) => crearNotificacion({
+      usuarioId: dest.id,
       titulo: notif.titulo,
       mensaje: notif.mensaje(oferta.titulo),
       tipo: 'oferta',
       tipoVisual: notif.tipoVisual,
-      enlace: '/empresa',
-      accionURL: '/empresa',
+      enlace: dest.url,
+      accionURL: dest.url,
     })));
   } catch (e) { logger.error({ err: e }, 'notif_moderacion_oferta_fallo'); }
 }

@@ -17,6 +17,7 @@ const { Usuario } = require('../models');
 const authService = require('../services/auth.service');
 const HttpError = require('../utils/httpError');
 const { cookieOptionsToken, cookieClearOptions } = require('../utils/cookies');
+const { esPasswordValida, MENSAJE_PASSWORD_CORTA } = require('../utils/password');
 const { config } = require('../config/env');
 const { registrarAuditoria } = require('../utils/auditLog');
 const logger = require('../utils/logger');
@@ -151,8 +152,8 @@ exports.resetPassword = async (req, res) => {
   const { token } = req.params;
   const { password } = req.body;
 
-  if (!password || password.length < 6) {
-    throw new HttpError(400, 'La contraseña debe tener al menos 6 caracteres.');
+  if (!esPasswordValida(password)) {
+    throw new HttpError(400, MENSAJE_PASSWORD_CORTA);
   }
 
   const tokenHash = authService.hashTokenReset(token);

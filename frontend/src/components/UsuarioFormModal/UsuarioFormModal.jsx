@@ -1,4 +1,5 @@
 import Modal from '../Modal/Modal';
+import { PASSWORD_MIN_LENGTH } from '../../utils/passwordStrength';
 import styles from './UsuarioFormModal.module.css';
 
 /**
@@ -46,7 +47,13 @@ export default function UsuarioFormModal({
 
           <div className="form-group">
             <label htmlFor="u-password">{modo === 'crear' ? 'Contraseña *' : 'Nueva contraseña (dejar vacío para no cambiar)'}</label>
-            <input id="u-password" name="password" type="password" value={form.password} onChange={onChange} required={modo === 'crear'} placeholder={modo === 'editar' ? '••••••••' : ''} />
+            <input
+              id="u-password" name="password" type="password" value={form.password} onChange={onChange}
+              required={modo === 'crear'} minLength={PASSWORD_MIN_LENGTH}
+              placeholder={modo === 'editar' ? '••••••••' : `Mínimo ${PASSWORD_MIN_LENGTH} caracteres`}
+              aria-describedby="u-password-ayuda"
+            />
+            <small id="u-password-ayuda" className={styles.ayuda}>Mínimo {PASSWORD_MIN_LENGTH} caracteres.</small>
           </div>
 
           <div className={styles.formRow}>

@@ -1,5 +1,7 @@
 'use strict';
 
+const { PASSWORD_MIN_LENGTH, esPasswordValida } = require('../utils/password');
+
 /**
  * Valida el body de PUT /api/auth/cambiar-password.
  * @returns {string|null}
@@ -9,8 +11,8 @@ function validateCambiarPassword(body) {
   if (!passwordActual || !nuevaPassword) {
     return 'Debés proporcionar la contraseña actual y la nueva contraseña.';
   }
-  if (nuevaPassword.length < 6) {
-    return 'La nueva contraseña debe tener al menos 6 caracteres.';
+  if (!esPasswordValida(nuevaPassword)) {
+    return `La nueva contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`;
   }
   if (passwordActual === nuevaPassword) {
     return 'La nueva contraseña debe ser diferente a la actual.';

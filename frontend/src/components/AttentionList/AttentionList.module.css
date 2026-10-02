@@ -7,6 +7,22 @@
   gap: var(--space-3);
 }
 
+/* Estado positivo: no hay nada que atender (hideZero). */
+.alDia {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--success-soft);
+  color: var(--success-text);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.alDiaIcon { display: inline-flex; flex-shrink: 0; }
+
 .item {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto;

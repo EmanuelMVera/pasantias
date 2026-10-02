@@ -1,0 +1,114 @@
+/* EmpresaOfertasPage.module.css — también lo usa CandidatosEmpresaPage (misma toolbar). */
+
+.error { margin-bottom: var(--space-4); }
+
+/* ── Barra de búsqueda + filtros (card liviana) ─────────────────────────── */
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+}
+
+.fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.busqueda {
+  display: flex;
+  flex: 1 1 320px;
+  min-width: min(100%, 240px);
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 260px;
+  min-width: min(100%, 200px);
+}
+
+.campo select {
+  min-height: 44px;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 0.9rem;
+}
+
+/* Label real para lectores de pantalla; la primera opción describe el control. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.grupos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+}
+
+.resultados {
+  margin: 0 0 var(--space-3);
+  font-size: 0.86rem;
+  color: var(--text-soft);
+}
+
+.recargando { opacity: 0.55; transition: opacity 0.15s; }
+
+/* ── Celdas ──────────────────────────────────────────────────────────────── */
+.sub {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+
+.sinDato { color: var(--text-soft); font-size: 0.88rem; }
+.fecha { font-size: 0.86rem; color: var(--text-soft); white-space: nowrap; }
+.numeros { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.userCell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.acciones {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.acciones :global(.btn-small) { white-space: nowrap; }
+
+/* ── Cards (tablet / móvil) ──────────────────────────────────────────────── */
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .toolbar { padding: var(--space-3); }
+  .campo { flex: 1 1 100%; }
+}

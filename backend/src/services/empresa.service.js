@@ -1,6 +1,8 @@
 'use strict';
 
-const { Oferta, Postulacion, Perfil, Usuario, Empresa, EmpresaUsuario, sequelize } = require('../models');
+const {
+  Oferta, Postulacion, Perfil, Usuario, Empresa, EmpresaUsuario, SolicitudReclutador, sequelize,
+} = require('../models');
 const { Op } = require('sequelize');
 const { buildPagination, groupCount } = require('../utils/pagination');
 
@@ -33,10 +35,78 @@ async function obtenerAdminsActivos(empresaId) {
   return membresias.map((m) => m.usuario).filter(Boolean);
 }
 
+/**
+ * Reclutador responsable de una oferta, solo si sigue siendo un reclutador
+ * ACTIVO de la empresa dueña de la oferta. Devuelve null para ofertas sin
+ * responsable (históricas), o cuyo creador fue suspendido/quitado o no es
+ * reclutador.
+ * @returns {Promise<Usuario|null>}
+ */
+async function obtenerReclutadorResponsable(oferta) {
+  if (!oferta.creadaPorUsuarioId) return null;
+  const membresia = await EmpresaUsuario.findOne({
+    where: {
+      empresaId: oferta.empresaId,
+      usuarioId: oferta.creadaPorUsuarioId,
+      rolInterno: 'reclutador',
+      activo: true,
+    },
+    include: [{ model: Usuario, as: 'usuario' }],
+  });
+  return membresia?.usuario?.activo ? membresia.usuario : null;
+}
+
+/**
+ * Destinatarios de la notificación "nueva postulación" de una oferta.
+ *
+ * Regla (gobierno vs. operación): la postulación es trabajo OPERATIVO, así que
+ * se avisa al RECLUTADOR RESPONSABLE de la oferta (`creadaPorUsuarioId`),
+ * siempre que siga siendo un reclutador activo de esa empresa. El
+ * admin_empresa NO recibe cada postulación (era ruido).
+ *
+ * Fallback para no perder el evento: si la oferta no tiene un responsable
+ * válido (oferta histórica sin `creadaPorUsuarioId`, responsable suspendido o
+ * quitado del equipo, o una oferta cuyo creador no es reclutador) se avisa a
+ * los admin_empresa activos. Nunca a ambos a la vez.
+ *
+ * @param {{ empresaId: number, creadaPorUsuarioId: number|null }} oferta
+ * @returns {Promise<Usuario[]>}
+ */
+async function obtenerDestinatariosPostulacion(oferta) {
+  const responsable = await obtenerReclutadorResponsable(oferta);
+  return responsable ? [responsable] : obtenerAdminsActivos(oferta.empresaId);
+}
+
+const ATRIBUTOS_RESPONSABLE = ['id', 'nombre', 'apellido'];
+
+/** { ofertaId: totalPostulaciones } para un conjunto de ofertas (un solo GROUP BY). */
+async function contarPostulacionesPorOferta(ofertaIds) {
+  if (ofertaIds.length === 0) return {};
+  const filas = await Postulacion.findAll({
+    where: { ofertaId: { [Op.in]: ofertaIds } },
+    attributes: ['ofertaId', [sequelize.fn('COUNT', sequelize.col('id')), 'total']],
+    group: ['ofertaId'],
+    raw: true,
+  });
+  return filas.reduce((acc, f) => { acc[f.ofertaId] = parseInt(f.total, 10); return acc; }, {});
+}
+
+/**
+ * Métricas del dashboard de la empresa (GET /api/empresas/dashboard).
+ *
+ * Todo es de alcance EMPRESA (no del usuario que consulta). Consultas fijas,
+ * sin N+1: una lista liviana de ofertas, los conteos de postulaciones por
+ * estado, un GROUP BY de postulaciones por oferta (alimenta el top y las
+ * recientes) y los conteos de equipo.
+ *
+ * `equipo.totalMiembros` conserva su significado (membresías activas, incluye
+ * al admin_empresa). `equipo.reclutadoresActivos` cuenta solo reclutadores.
+ */
 async function obtenerMetricasDashboard(empresaId) {
   const ofertas = await Oferta.findAll({
     where: { empresaId },
-    attributes: ['id', 'estado', 'estadoModeracion'],
+    attributes: ['id', 'titulo', 'estado', 'estadoModeracion', 'creadaPorUsuarioId'],
+    include: [{ model: Usuario, as: 'creadaPor', attributes: ATRIBUTOS_RESPONSABLE }],
   });
   const ofertaIds = ofertas.map((o) => o.id);
 
@@ -54,6 +124,9 @@ async function obtenerMetricasDashboard(empresaId) {
     entrevistasPendientes,
     contrataciones,
     miembrosEquipo,
+    reclutadoresActivos,
+    solicitudesPendientes,
+    conteoPorOferta,
   ] = await Promise.all([
     Postulacion.count({ where: wherePost }),
     Postulacion.count({ where: { ...wherePost, estado: 'en_revision' } }),
@@ -61,14 +134,33 @@ async function obtenerMetricasDashboard(empresaId) {
     Postulacion.count({ where: { ...wherePost, estado: 'entrevista' } }),
     Postulacion.count({ where: { ...wherePost, estado: 'contratado' } }),
     EmpresaUsuario.count({ where: { empresaId, activo: true } }),
+    EmpresaUsuario.count({ where: { empresaId, activo: true, rolInterno: 'reclutador' } }),
+    SolicitudReclutador.count({ where: { empresaId, estado: 'pendiente' } }),
+    contarPostulacionesPorOferta(ofertaIds),
   ]);
 
   const ofertasRecientes = await Oferta.findAll({
     where: { empresaId },
-    attributes: ['id', 'titulo', 'estado', 'estadoModeracion', 'vistas', 'createdAt', 'cantidadVacantes'],
-    order: [['createdAt', 'DESC']],
+    attributes: ['id', 'titulo', 'area', 'estado', 'estadoModeracion', 'vistas', 'createdAt',
+                 'cantidadVacantes', 'creadaPorUsuarioId'],
+    include: [{ model: Usuario, as: 'creadaPor', attributes: ATRIBUTOS_RESPONSABLE }],
+    order: [['createdAt', 'DESC'], ['id', 'DESC']],
     limit: 5,
   });
+
+  // Top global (no depende de ninguna paginación): ofertas con al menos una
+  // postulación, ordenadas por cantidad (desempate: la más nueva primero).
+  const topOfertasPostulaciones = ofertas
+    .filter((o) => (conteoPorOferta[o.id] || 0) > 0)
+    .sort((a, b) => (conteoPorOferta[b.id] - conteoPorOferta[a.id]) || (b.id - a.id))
+    .slice(0, 5)
+    .map((o) => ({
+      id: o.id,
+      titulo: o.titulo,
+      estado: o.estado,
+      totalPostulaciones: conteoPorOferta[o.id],
+      creadaPor: o.creadaPor ? o.creadaPor.toJSON() : null,
+    }));
 
   return {
     ofertas: {
@@ -85,16 +177,63 @@ async function obtenerMetricasDashboard(empresaId) {
       entrevistas: entrevistasPendientes,
       contrataciones,
     },
-    equipo: { totalMiembros: miembrosEquipo },
-    ofertasRecientes,
+    equipo: {
+      totalMiembros: miembrosEquipo,
+      reclutadoresActivos,
+      solicitudesPendientes,
+    },
+    ofertasRecientes: ofertasRecientes.map((o) => ({
+      ...o.toJSON(),
+      totalPostulaciones: conteoPorOferta[o.id] || 0,
+    })),
+    topOfertasPostulaciones,
   };
 }
 
-// Reemplaza el N+1 de getMisOfertas con una sola query GROUP BY.
-// Paginado (SCALE-03): recibe { estado, page, limit, offset } ya saneados.
-async function obtenerOfertasConConteo(empresaId, { estado, page = 1, limit = 20, offset = 0 } = {}) {
+const ESTADOS_OFERTA = ['activa', 'pausada', 'cerrada'];
+const ESTADOS_MODERACION = ['pendiente', 'aprobada', 'rechazada', 'auto_aprobada'];
+const escaparLike = (texto) => texto.replace(/[\\%_]/g, '\\$&');
+
+/**
+ * Filtro por responsable de la oferta: id de usuario, o 'sin' para las ofertas
+ * históricas sin responsable registrado. Devuelve null si no hay filtro válido.
+ */
+function whereResponsable(responsable) {
+  if (responsable == null || responsable === '') return null;
+  if (responsable === 'sin') return { creadaPorUsuarioId: null };
+  const id = Number(responsable);
+  return Number.isInteger(id) && id > 0 ? { creadaPorUsuarioId: id } : null;
+}
+
+/**
+ * Ofertas de la empresa con su total de postulaciones (GET /api/empresas/mis-ofertas).
+ *
+ * Todos los filtros se aplican en el servidor ANTES de paginar, así el total
+ * y las páginas corresponden al resultado filtrado:
+ *   - estado: activa | pausada | cerrada
+ *   - estadoModeracion: pendiente | aprobada | rechazada | auto_aprobada
+ *   - responsable: id del usuario creador, o 'sin'
+ *   - q: texto en título, área o nombre/apellido del responsable
+ * Valores inválidos se ignoran (no filtran).
+ */
+async function obtenerOfertasConConteo(empresaId, {
+  estado, estadoModeracion, responsable, q, page = 1, limit = 20, offset = 0,
+} = {}) {
   const where = { empresaId };
-  if (estado) where.estado = estado;
+  if (ESTADOS_OFERTA.includes(estado)) where.estado = estado;
+  if (ESTADOS_MODERACION.includes(estadoModeracion)) where.estadoModeracion = estadoModeracion;
+  Object.assign(where, whereResponsable(responsable) || {});
+
+  const texto = typeof q === 'string' ? q.trim().slice(0, 100) : '';
+  if (texto) {
+    const patron = `%${escaparLike(texto)}%`;
+    where[Op.or] = [
+      { titulo: { [Op.iLike]: patron } },
+      { area: { [Op.iLike]: patron } },
+      { '$creadaPor.nombre$': { [Op.iLike]: patron } },
+      { '$creadaPor.apellido$': { [Op.iLike]: patron } },
+    ];
+  }
 
   const { count, rows: ofertas } = await Oferta.findAndCountAll({
     where,
@@ -106,33 +245,35 @@ async function obtenerOfertasConConteo(empresaId, { estado, page = 1, limit = 20
     order: [['createdAt', 'DESC'], ['id', 'DESC']],
     limit,
     offset,
+    subQuery: false, // el filtro `q` referencia columnas del include (belongsTo)
   });
 
   const pagination = buildPagination(count, { page, limit });
   if (ofertas.length === 0) return { data: [], pagination };
 
-  const ofertaIds = ofertas.map((o) => o.id);
-
-  const conteos = await Postulacion.findAll({
-    where: { ofertaId: { [Op.in]: ofertaIds } },
-    attributes: [
-      'ofertaId',
-      [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
-    ],
-    group: ['ofertaId'],
-    raw: true,
-  });
-
-  const conteoMap = {};
-  conteos.forEach((c) => { conteoMap[c.ofertaId] = parseInt(c.total, 10); });
-
+  const conteoMap = await contarPostulacionesPorOferta(ofertas.map((o) => o.id));
   const data = ofertas.map((o) => ({ ...o.toJSON(), totalPostulaciones: conteoMap[o.id] || 0 }));
   return { data, pagination };
 }
 
-// Paginado (SCALE-03): recibe { estado, page, limit, offset } ya saneados.
-async function obtenerCandidatosConFoto(empresaId, { estado, page = 1, limit = 20, offset = 0 } = {}) {
-  const ofertas = await Oferta.findAll({ where: { empresaId }, attributes: ['id'] });
+/**
+ * Candidatos (postulaciones) de todas las ofertas de la empresa
+ * (GET /api/empresas/candidatos). Vista de supervisión: cada fila incluye la
+ * oferta y su reclutador responsable.
+ *
+ * Filtros server-side, antes de paginar: `estado`, `responsable` (id | 'sin')
+ * y `ofertaId`. `conteoPorEstado` se calcula sobre el alcance filtrado por
+ * responsable/oferta (sin el filtro de estado), así los contadores de las
+ * pestañas de estado corresponden a lo que se está mirando.
+ */
+async function obtenerCandidatosConFoto(empresaId, {
+  estado, responsable, ofertaId, page = 1, limit = 20, offset = 0,
+} = {}) {
+  const whereOfertas = { empresaId, ...(whereResponsable(responsable) || {}) };
+  const idOferta = Number(ofertaId);
+  if (Number.isInteger(idOferta) && idOferta > 0) whereOfertas.id = idOferta;
+
+  const ofertas = await Oferta.findAll({ where: whereOfertas, attributes: ['id'] });
   const ofertaIds = ofertas.map((o) => o.id);
 
   const vacio = { data: [], pagination: buildPagination(0, { page, limit }), conteoPorEstado: {} };
@@ -146,11 +287,17 @@ async function obtenerCandidatosConFoto(empresaId, { estado, page = 1, limit = 2
       where,
       include: [
         { model: Usuario, as: 'usuario', attributes: ['id', 'nombre', 'apellido', 'email', 'fotoPerfil'] },
-        { model: Oferta,  as: 'oferta',  attributes: ['id', 'titulo', 'area'] },
+        {
+          model: Oferta,
+          as: 'oferta',
+          attributes: ['id', 'titulo', 'area', 'creadaPorUsuarioId'],
+          include: [{ model: Usuario, as: 'creadaPor', attributes: ATRIBUTOS_RESPONSABLE }],
+        },
       ],
       order: [['updatedAt', 'DESC'], ['id', 'DESC']],
       limit,
       offset,
+      distinct: true,
     }),
     groupCount(Postulacion, 'estado', scope),
   ]);
@@ -182,6 +329,8 @@ async function obtenerCandidatosConFoto(empresaId, { estado, page = 1, limit = 2
 module.exports = {
   resolverEmpresaDelRequest,
   obtenerAdminsActivos,
+  obtenerReclutadorResponsable,
+  obtenerDestinatariosPostulacion,
   obtenerMetricasDashboard,
   obtenerOfertasConConteo,
   obtenerCandidatosConFoto,

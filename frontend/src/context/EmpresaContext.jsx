@@ -16,10 +16,14 @@
  * que ya incluía la fila de Empresa y ahora también expone `rolEnEquipo`
  * (mismo campo que ya devolvían getDashboard/getEquipo).
  *
- * Uso: const { empresa, rolInterno, esAdminEmpresa, esReclutador } = useEmpresa()
+ * `refrescar()` vuelve a pedir la empresa (p. ej. después de editar el perfil
+ * o cambiar el logo) para que sidebar, topbar y menú de usuario muestren el
+ * dato nuevo sin recargar la página.
+ *
+ * Uso: const { empresa, rolInterno, esAdminEmpresa, esReclutador, refrescar } = useEmpresa()
  */
 
-import { createContext, useState, useEffect } from 'react';
+import { createContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { empresaService } from '../services/empresa.service';
 
@@ -36,6 +40,9 @@ export const EmpresaProvider = ({ children }) => {
   // ya refleja "cargando" sin necesidad de un setState síncrono en el effect.
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
+  const [version, setVersion]       = useState(0);
+
+  const refrescar = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
     // Si el usuario no es de tipo empresa no hay nada que resolver; el estado
@@ -60,7 +67,7 @@ export const EmpresaProvider = ({ children }) => {
       });
 
     return () => { cancelado = true; };
-  }, [usuario?.id, esEmpresa]);
+  }, [usuario?.id, esEmpresa, version]);
 
   // Estado derivado: si el usuario no es empresa, el contexto expone valores
   // vacíos aunque queden restos de una sesión anterior en el state.
@@ -71,6 +78,7 @@ export const EmpresaProvider = ({ children }) => {
     esReclutador:   esEmpresa && rolInterno === 'reclutador',
     loading:        esEmpresa && loading,
     error:          esEmpresa ? error : null,
+    refrescar,
   };
 
   return <EmpresaContext.Provider value={value}>{children}</EmpresaContext.Provider>;

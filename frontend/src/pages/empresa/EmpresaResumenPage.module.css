@@ -1,0 +1,203 @@
+/* EmpresaResumenPage.module.css — Resumen del administrador de empresa. */
+
+.error { margin-bottom: var(--space-5); }
+
+.seccion { margin-bottom: var(--space-6); }
+
+.seccionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-5);
+  margin-bottom: var(--space-4);
+}
+
+/* (.seccion h2) le gana a `.page-container h2`. */
+.seccion .seccionTitulo {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.seccionNota {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--text-soft);
+}
+
+/* 5 KPIs: 2 columnas en teléfono, 3 en tablet, 5 en desktop. */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+@media (min-width: 640px) {
+  .kpiGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+}
+
+@media (min-width: 1280px) {
+  .kpiGrid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+.dosColumnas {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+  margin-bottom: var(--space-5);
+}
+
+.columna {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/* El espaciado lo da la grilla, no el margen de Card. */
+.bloque { margin-bottom: 0; }
+
+.vacio {
+  margin: 0;
+  padding: var(--space-5) 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+}
+
+.sub {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+
+/* ── Ranking: ofertas con más postulaciones ── */
+.ranking,
+.recientes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rankingItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.rankingItem:last-child { border-bottom: none; }
+
+.rankingPos {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--info-soft);
+  color: var(--info-text);
+  font-family: var(--font-numeric);
+  font-size: 0.8rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rankingTexto { flex: 1; min-width: 0; }
+
+.rankingTitulo {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.rankingValor {
+  font-family: var(--font-numeric);
+  font-weight: 800;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+
+.rankingUnidad {
+  font-family: var(--font-primary);
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+/* ── Ofertas recientes ── */
+.reciente {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.reciente:last-child { border-bottom: none; padding-bottom: 0; }
+.reciente:first-child { padding-top: 0; }
+
+.recienteInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.recienteTitulo {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.recienteBadges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: 2px;
+}
+
+.recientePostulados {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.reciente :global(.btn-small) { flex-shrink: 0; min-height: 36px; padding-inline: 0.9rem; }
+
+.verMas {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+@media (max-width: 1199.98px) {
+  .dosColumnas { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 767.98px) {
+  .seccion { margin-bottom: var(--space-5); }
+}
+
+@media (pointer: coarse) {
+  .reciente :global(.btn-small) { min-height: 44px; }
+}

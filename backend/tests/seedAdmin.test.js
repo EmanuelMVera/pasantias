@@ -142,7 +142,7 @@ describe('seedAdmin — segundo administrador', () => {
     expect(primario).toBeNull();
   });
 
-  test('password débil (< 6 caracteres) aborta sin crear nada', async () => {
+  test('password débil (< 8 caracteres) aborta sin crear nada', async () => {
     const suf = sufijo();
     const emailPrimario = `admin-${suf}-1@test.local`;
 

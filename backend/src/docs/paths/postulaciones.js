@@ -44,6 +44,9 @@ module.exports = {
                 id: { type: 'integer' },
                 titulo: { type: 'string' },
                 habilidadesRequeridas: { type: 'array', items: { type: 'string' } },
+                estado: { type: 'string', enum: ['activa', 'pausada', 'cerrada'] },
+                creadaPorUsuarioId: { type: 'integer', nullable: true },
+                creadaPor: REF.schema('ResponsableOferta'),
               },
             },
           },
@@ -56,7 +59,8 @@ module.exports = {
   '/api/postulaciones/{id}/estado': {
     patch: operation({
       tag: T, id: 'postulacionesUpdateEstado', summary: 'Cambiar el estado de una postulación',
-      roles: ['empresa/admin_empresa', 'empresa/reclutador'],
+      description: 'Solo el reclutador responsable de la oferta (o cualquier reclutador activo si la oferta no tiene responsable). El admin_empresa supervisa pero no gestiona candidatos (403 ROL_INSUFICIENTE).',
+      roles: ['empresa/reclutador'],
       csrf: true, params: ['id'], body: 'PostulacionEstadoUpdate',
       responses: { 200: message({ data: REF.schema('Postulacion') }) },
       errors: ['400', '401', '403', '403csrf', '404'],

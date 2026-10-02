@@ -103,13 +103,21 @@ queda auditada con `pausar_oferta` / `reactivar_oferta` / `cerrar_oferta`, marca
 | Postularme a una oferta | — | — | ✅ | — | — |
 | Ver "Mis Postulaciones" | — | — | ✅ | — | — |
 | Ver candidatos de una oferta / de mi empresa | — | — | — | ✅ | ✅ |
-| Cambiar el estado de una postulación (embudo de selección) | — | — | — | ✅ | ✅ |
+| Cambiar el estado de una postulación (embudo de selección) | — | — | — | — (supervisa) | ✅ (responsable de la oferta) |
+| Recibir el aviso de "nueva postulación" | — | — | — | solo como respaldo³ | ✅ (responsable de la oferta) |
+
+³ El aviso de una nueva postulación va al **reclutador responsable** de la oferta
+(`creadaPorUsuarioId` con membresía activa `reclutador` en esa empresa). Solo si la
+oferta no tiene un responsable válido (histórica sin responsable, responsable
+suspendido o que ya no es reclutador) se avisa a los `admin_empresa` activos. Nunca
+a ambos. Ver `obtenerDestinatariosPostulacion` en `backend/src/services/empresa.service.js`.
 
 ### Empresa — perfil y equipo
 
 | Acción | público | admin | alumno / egresado | admin_empresa | reclutador |
 |---|:--:|:--:|:--:|:--:|:--:|
 | Ver dashboard / mis-ofertas / mi-empresa / equipo | — | — | — | ✅ | ✅ |
+| Filtrar ofertas y candidatos de la empresa por estado, moderación, responsable u oferta | — | — | — | ✅ | ✅ |
 | Editar el perfil de la empresa, subir logo | — | — | — | ✅ | — |
 | Solicitar el alta de un reclutador (al admin) | — | — | — | ✅ | — |
 | Ver las solicitudes de reclutador de mi empresa | — | — | — | ✅ | — |
@@ -167,6 +175,23 @@ una de sus ofertas.
   migración 019.
 - **`reclutador` no puede tocar el equipo ni el perfil de la empresa**, solo lo
   operativo: ofertas, candidatos, embudo de selección, chat.
+- **`admin_empresa` gobierna y supervisa, no opera**: edita el perfil y el logo,
+  gestiona el equipo y puede pausar / reactivar / cerrar cualquier oferta de su
+  empresa, pero no crea ni edita ofertas ni mueve candidatos en el embudo. En el
+  frontend tiene un shell propio (sidebar + topbar, `EmpresaShell`) con Resumen,
+  Ofertas, Candidatos, Equipo y Mi empresa; el reclutador conserva el navbar y su
+  panel operativo. Esa separación es solo de presentación: la autoridad sigue
+  siendo `authorizeEmpresaRoles` en el backend.
+- **Notificaciones de empresa:** la nueva postulación va al reclutador responsable
+  (ver nota ³); el resultado de la moderación de una oferta va a los
+  `admin_empresa` **y** al reclutador responsable, sin duplicar.
+- **Perfil público de empresa** (`GET /api/empresas/:id`): solo lista ofertas
+  visibles (activas y con moderación `aprobada` / `auto_aprobada`), el mismo
+  criterio que el listado público de ofertas.
+- **Contraseñas:** mínimo 8 caracteres en todos los flujos que fijan una
+  contraseña (cambio, recuperación, alta/edición desde el admin, seed de admins).
+  El login no valida largo: las cuentas con claves anteriores más cortas siguen
+  pudiendo ingresar.
 - El rol interno **no** se puede elevar a `admin_empresa` desde el panel de empresa;
   el `admin_empresa` puede cambiar el rol de un miembro entre los valores válidos
   pero no puede quitarse a sí mismo la condición de dueño.

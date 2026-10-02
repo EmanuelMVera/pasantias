@@ -2113,6 +2113,22 @@
           }
         }
       },
+      "ResponsableOferta": {
+        "type": "object",
+        "nullable": true,
+        "description": "Reclutador responsable de la oferta. null en ofertas históricas sin responsable.",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "apellido": {
+            "type": "string"
+          }
+        }
+      },
       "DashboardEmpresa": {
         "type": "object",
         "properties": {
@@ -2142,14 +2158,102 @@
             "type": "object",
             "properties": {
               "totalMiembros": {
-                "type": "integer"
+                "type": "integer",
+                "description": "Membresías activas (incluye al admin_empresa)."
+              },
+              "reclutadoresActivos": {
+                "type": "integer",
+                "description": "Solo reclutadores con membresía activa."
+              },
+              "solicitudesPendientes": {
+                "type": "integer",
+                "description": "Solicitudes de reclutador pendientes de aprobación."
               }
             }
           },
           "ofertasRecientes": {
             "type": "array",
+            "description": "Las 5 ofertas más recientes de la empresa.",
             "items": {
-              "$ref": "#/components/schemas/OfertaResumen"
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "titulo": {
+                  "type": "string"
+                },
+                "area": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "estado": {
+                  "type": "string",
+                  "enum": [
+                    "activa",
+                    "pausada",
+                    "cerrada"
+                  ]
+                },
+                "estadoModeracion": {
+                  "type": "string",
+                  "enum": [
+                    "pendiente",
+                    "aprobada",
+                    "rechazada",
+                    "auto_aprobada"
+                  ]
+                },
+                "vistas": {
+                  "type": "integer"
+                },
+                "cantidadVacantes": {
+                  "type": "integer"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "creadaPorUsuarioId": {
+                  "type": "integer",
+                  "nullable": true
+                },
+                "creadaPor": {
+                  "$ref": "#/components/schemas/ResponsableOferta"
+                },
+                "totalPostulaciones": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "topOfertasPostulaciones": {
+            "type": "array",
+            "description": "Hasta 5 ofertas con al menos una postulación, ordenadas por cantidad (top global de la empresa).",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "titulo": {
+                  "type": "string"
+                },
+                "estado": {
+                  "type": "string",
+                  "enum": [
+                    "activa",
+                    "pausada",
+                    "cerrada"
+                  ]
+                },
+                "totalPostulaciones": {
+                  "type": "integer"
+                },
+                "creadaPor": {
+                  "$ref": "#/components/schemas/ResponsableOferta"
+                }
+              }
             }
           }
         }
@@ -2636,7 +2740,7 @@
                 "properties": {
                   "password": {
                     "type": "string",
-                    "minLength": 6
+                    "minLength": 8
                   }
                 }
               }
@@ -2718,7 +2822,7 @@
                   },
                   "nuevaPassword": {
                     "type": "string",
-                    "minLength": 6,
+                    "minLength": 8,
                     "description": "Debe diferir de la actual."
                   }
                 }
@@ -3244,7 +3348,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "**Roles:** empresa/admin_empresa · empresa/reclutador"
+        "description": "Alcance: toda la empresa (no el usuario que consulta). Incluye reclutadores activos, solicitudes de reclutador pendientes, las 5 ofertas con más postulaciones (top global) y las 5 ofertas más recientes con su responsable.\n\n**Roles:** empresa/admin_empresa · empresa/reclutador"
       }
     },
     "/api/empresas/mis-ofertas": {
@@ -3253,7 +3357,7 @@
           "empresas"
         ],
         "operationId": "empresasMisOfertas",
-        "summary": "Mis ofertas (con conteo de postulaciones)",
+        "summary": "Ofertas de mi empresa (con responsable y conteo de postulaciones)",
         "responses": {
           "200": {
             "description": "Lista paginada",
@@ -3304,7 +3408,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "description": "Los filtros se aplican en el servidor antes de paginar. Valores inválidos se ignoran.\n\n**Roles:** empresa/admin_empresa · empresa/reclutador",
         "parameters": [
           {
             "$ref": "#/components/parameters/pageParam"
@@ -3314,6 +3418,26 @@
           },
           {
             "$ref": "#/components/parameters/estadoQuery"
+          },
+          {
+            "$ref": "#/components/parameters/estadoModeracionQuery"
+          },
+          {
+            "name": "responsable",
+            "in": "query",
+            "description": "Id del usuario responsable de la oferta, o `sin` para las ofertas sin responsable.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Texto en título, área o nombre/apellido del responsable.",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
           }
         ]
       }
@@ -3570,7 +3694,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "description": "Cada postulación incluye la oferta y su responsable (`oferta.creadaPor`). `conteoPorEstado` se calcula sobre el alcance filtrado por responsable/oferta (sin el filtro de estado).\n\n**Roles:** empresa/admin_empresa · empresa/reclutador",
         "parameters": [
           {
             "$ref": "#/components/parameters/pageParam"
@@ -3580,6 +3704,23 @@
           },
           {
             "$ref": "#/components/parameters/estadoQuery"
+          },
+          {
+            "name": "responsable",
+            "in": "query",
+            "description": "Id del usuario responsable de la oferta, o `sin` para las ofertas sin responsable.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ofertaId",
+            "in": "query",
+            "description": "Solo las postulaciones de esa oferta de la empresa.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
           }
         ]
       }
@@ -4642,6 +4783,21 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "estado": {
+                              "type": "string",
+                              "enum": [
+                                "activa",
+                                "pausada",
+                                "cerrada"
+                              ]
+                            },
+                            "creadaPorUsuarioId": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "creadaPor": {
+                              "$ref": "#/components/schemas/ResponsableOferta"
                             }
                           }
                         }
@@ -4746,7 +4902,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "description": "Solo el reclutador responsable de la oferta (o cualquier reclutador activo si la oferta no tiene responsable). El admin_empresa supervisa pero no gestiona candidatos (403 ROL_INSUFICIENTE).\n\n**Roles:** empresa/reclutador",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"

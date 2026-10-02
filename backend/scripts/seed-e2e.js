@@ -104,6 +104,10 @@ async function sembrar() {
     area: 'Programación', modalidad: 'hibrido', ciudad: 'Avellaneda',
     tipoPuesto: 'pasante', cantidadVacantes: 2,
     estado: 'activa', estadoModeracion: 'aprobada',
+    // Responsable: el reclutador (así las postulaciones nuevas le llegan a él
+    // y el admin_empresa la ve en modo supervisión). La oferta pendiente de
+    // abajo queda sin responsable a propósito (caso "histórica").
+    creadaPorUsuarioId: uReclutador.id,
   });
   await Oferta.create({
     empresaId: empresa.id,

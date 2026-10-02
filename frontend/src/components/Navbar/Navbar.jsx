@@ -1,8 +1,9 @@
 /**
- * Navbar.jsx — Barra de navegación de alumno/egresado y empresa.
+ * Navbar.jsx — Barra de navegación de alumno/egresado y RECLUTADOR.
  *
- * El admin del sistema NO usa este navbar: tiene su propio shell con sidebar
- * + topbar (components/AdminShell). Ver `Chrome` en App.jsx.
+ * No lo usan el admin del sistema (components/AdminShell) ni el administrador
+ * de empresa (components/EmpresaShell): ambos tienen su propio shell con
+ * sidebar + topbar. Ver `Chrome` en App.jsx.
  *
  * - Badge de notificaciones con prioridad (alta → rojo) y de mensajes de chat.
  * - La campana navega a /notificaciones (y se marca activa ahí).
@@ -58,18 +59,17 @@ export default function Navbar() {
     { to: '/perfil', label: 'Mi Perfil' },
   ];
 
-  // admin_empresa gestiona la cuenta institucional (no publica ofertas —
-  // RBAC-01, backend/src/routes/oferta.routes.js); reclutador sí publica.
+  // Usuario empresa en este navbar = reclutador (operativo): publica ofertas y
+  // gestiona candidatos. Si el rol interno no se pudo resolver, queda solo el
+  // panel (el backend igual decide qué puede hacer).
   const linksEmpresa = esReclutador
     ? [
         { to: '/empresa', label: 'Panel' },
         { to: '/empresa/nueva-oferta', label: '+ Nueva Oferta' },
+        { to: '/empresa/candidatos', label: 'Candidatos' },
         { to: '/empresa/equipo', label: 'Equipo' },
       ]
-    : [
-        { to: '/empresa', label: 'Panel' },
-        { to: '/empresa/equipo', label: 'Equipo' },
-      ];
+    : [{ to: '/empresa', label: 'Panel' }];
 
   const links = usuario.rol === 'empresa' ? linksEmpresa : linksAlumnoEgresado;
 

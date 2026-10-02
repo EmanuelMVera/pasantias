@@ -11,10 +11,13 @@
  *
  * Identidad: admin_empresa se muestra como la EMPRESA (logo + razón social);
  * el reclutador como PERSONA. Es solo visual: el backend decide permisos.
+ *
+ * `links`: accesos de cuenta dentro del menú ([{ to, label, icon }]), p. ej.
+ * "Seguridad de mi cuenta" en el shell del administrador de empresa.
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useEmpresa } from '../../hooks/useEmpresa';
 import Avatar from '../Avatar/Avatar';
@@ -29,7 +32,7 @@ const ROL_LEGIBLE = {
   empresa: 'Empresa',
 };
 
-export default function UserMenu({ tone = 'dark', noLeidas = 0, prioridadAlta = false, onOpen, mostrarRol = false }) {
+export default function UserMenu({ tone = 'dark', noLeidas = 0, prioridadAlta = false, onOpen, mostrarRol = false, links = [] }) {
   const { usuario, logout } = useAuth();
   const { empresa, esAdminEmpresa, esReclutador } = useEmpresa();
   const navigate = useNavigate();
@@ -144,6 +147,13 @@ export default function UserMenu({ tone = 'dark', noLeidas = 0, prioridadAlta = 
           )}
 
           <div className={styles.dropdownDivider} />
+
+          {links.map((l) => (
+            <Link key={l.to} to={l.to} className={styles.dropdownLink} onClick={() => setOpen(false)}>
+              <Icon name={l.icon} size={16} />
+              {l.label}
+            </Link>
+          ))}
 
           {noLeidas > 0 && (
             <button

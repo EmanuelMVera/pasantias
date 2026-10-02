@@ -33,6 +33,7 @@ module.exports = {
   '/api/empresas/dashboard': {
     get: operation({
       tag: T, id: 'empresasDashboard', summary: 'Métricas del panel corporativo',
+      description: 'Alcance: toda la empresa (no el usuario que consulta). Incluye reclutadores activos, solicitudes de reclutador pendientes, las 5 ofertas con más postulaciones (top global) y las 5 ofertas más recientes con su responsable.',
       roles: R_MIEMBRO,
       responses: { 200: ok('DashboardEmpresa') },
       errors: ['401', '404empresa'],
@@ -41,9 +42,14 @@ module.exports = {
 
   '/api/empresas/mis-ofertas': {
     get: operation({
-      tag: T, id: 'empresasMisOfertas', summary: 'Mis ofertas (con conteo de postulaciones)',
+      tag: T, id: 'empresasMisOfertas', summary: 'Ofertas de mi empresa (con responsable y conteo de postulaciones)',
+      description: 'Los filtros se aplican en el servidor antes de paginar. Valores inválidos se ignoran.',
       roles: R_MIEMBRO,
-      query: ['pageParam', 'limitParam', REF.param('estadoQuery')],
+      query: [
+        'pageParam', 'limitParam', REF.param('estadoQuery'), REF.param('estadoModeracionQuery'),
+        { name: 'responsable', in: 'query', description: 'Id del usuario responsable de la oferta, o `sin` para las ofertas sin responsable.', schema: { type: 'string' } },
+        { name: 'q', in: 'query', description: 'Texto en título, área o nombre/apellido del responsable.', schema: { type: 'string', maxLength: 100 } },
+      ],
       responses: { 200: paginated('Oferta') },
       errors: ['401', '404empresa'],
     }),
@@ -83,8 +89,13 @@ module.exports = {
   '/api/empresas/candidatos': {
     get: operation({
       tag: T, id: 'empresasCandidatos', summary: 'Todas las postulaciones de mi empresa',
+      description: 'Cada postulación incluye la oferta y su responsable (`oferta.creadaPor`). `conteoPorEstado` se calcula sobre el alcance filtrado por responsable/oferta (sin el filtro de estado).',
       roles: R_MIEMBRO,
-      query: ['pageParam', 'limitParam', REF.param('estadoQuery')],
+      query: [
+        'pageParam', 'limitParam', REF.param('estadoQuery'),
+        { name: 'responsable', in: 'query', description: 'Id del usuario responsable de la oferta, o `sin` para las ofertas sin responsable.', schema: { type: 'string' } },
+        { name: 'ofertaId', in: 'query', description: 'Solo las postulaciones de esa oferta de la empresa.', schema: { type: 'integer', minimum: 1 } },
+      ],
       responses: {
         200: paginated('Postulacion', {
           extraProps: { conteoPorEstado: { type: 'object', additionalProperties: { type: 'integer' } } },

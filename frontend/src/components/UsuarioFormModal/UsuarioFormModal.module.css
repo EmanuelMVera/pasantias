@@ -19,6 +19,8 @@
 }
 .checkboxLabel input { width: 16px; height: 16px; accent-color: var(--primary); }
 
+.ayuda { font-size: 0.8rem; color: var(--text-soft); }
+
 .checkboxDisabled { cursor: not-allowed; color: var(--text-soft); }
 
 .notaPropia {

@@ -35,7 +35,9 @@
 .bar0 { background: #1b5e96; }
 .bar1 { background: #2f80c2; }
 .bar2 { background: #5aa2dc; }
-.bar3 { background: #2fa36b; }
+.bar3 { background: #86bde8; }
+/* Última etapa (resultado), sea cual sea la cantidad de etapas. */
+.barFinal { background: #2fa36b; }
 
 .legend {
   list-style: none;

@@ -64,7 +64,7 @@ module.exports = {
       description: 'CSRF exento. Invalida las sesiones previas (bump de `tokenVersion`).',
       security: [],
       params: [{ name: 'token', in: 'path', required: true, schema: { type: 'string' } }],
-      body: { type: 'object', required: ['password'], properties: { password: { type: 'string', minLength: 6 } } },
+      body: { type: 'object', required: ['password'], properties: { password: { type: 'string', minLength: 8 } } },
       responses: { 200: message() },
       errors: ['400', '429'],
     }),
@@ -78,7 +78,7 @@ module.exports = {
         type: 'object', required: ['passwordActual', 'nuevaPassword'],
         properties: {
           passwordActual: { type: 'string' },
-          nuevaPassword: { type: 'string', minLength: 6, description: 'Debe diferir de la actual.' },
+          nuevaPassword: { type: 'string', minLength: 8, description: 'Debe diferir de la actual.' },
         },
       },
       responses: { 200: message() },

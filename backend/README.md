@@ -217,6 +217,9 @@ exportaciones, navegación, ediciones ni por acciones que el propio destinatario
 Hoy los admins del sistema reciben avisos solo por: nueva solicitud de empresa, nueva solicitud de
 reclutador de una empresa estándar, oferta pendiente de moderación, oferta publicada
 automáticamente y reclutador agregado automáticamente (empresas de confianza).
+En el área de empresa, la **nueva postulación** se avisa al reclutador responsable de la oferta
+(a los `admin_empresa` solo si la oferta no tiene un responsable válido) y el **resultado de la
+moderación** de una oferta se avisa a los `admin_empresa` y al reclutador responsable.
 
 - **Nivel de log**: env `LOG_LEVEL` (`debug|info|warn|error|fatal|silent`). Default: `debug` en
   desarrollo (incluye el SQL de Sequelize), `info` en producción, `silent` en tests.

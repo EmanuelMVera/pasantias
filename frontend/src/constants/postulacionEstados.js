@@ -19,6 +19,8 @@ export const ESTADOS_POSTULACION = {
   en_revision: {
     estado: 'en_revision',
     label: 'En revisión',
+    tone: 'gray',
+    icon: 'inbox',
     emoji: '📥',
     color: '#64748b',
     bg: '#f1f5f9',
@@ -27,6 +29,8 @@ export const ESTADOS_POSTULACION = {
   preseleccionado: {
     estado: 'preseleccionado',
     label: 'Preseleccionado',
+    tone: 'blue',
+    icon: 'check',
     emoji: '⭐',
     color: '#2563eb',
     bg: '#eff6ff',
@@ -35,6 +39,8 @@ export const ESTADOS_POSTULACION = {
   entrevista: {
     estado: 'entrevista',
     label: 'Entrevista',
+    tone: 'violet',
+    icon: 'calendar',
     emoji: '🎙️',
     color: '#7c3aed',
     bg: '#f5f3ff',
@@ -43,6 +49,8 @@ export const ESTADOS_POSTULACION = {
   contratado: {
     estado: 'contratado',
     label: 'Contratado',
+    tone: 'green',
+    icon: 'checkCircle',
     emoji: '🎉',
     color: '#16a34a',
     bg: '#f0fdf4',
@@ -51,6 +59,8 @@ export const ESTADOS_POSTULACION = {
   rechazado: {
     estado: 'rechazado',
     label: 'No seleccionado',
+    tone: 'red',
+    icon: 'xCircle',
     emoji: '✕',
     color: '#dc2626',
     bg: '#fef2f2',
@@ -83,6 +93,8 @@ export function getEstadoInfo(estado) {
   return ESTADOS_POSTULACION[normalizarEstado(estado)] ?? {
     estado,
     label: estado ?? 'Desconocido',
+    tone: 'gray',
+    icon: 'info',
     emoji: '❓',
     color: '#6b7280',
     bg: '#f9fafb',

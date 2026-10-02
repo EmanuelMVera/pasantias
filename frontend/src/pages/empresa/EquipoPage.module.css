@@ -1,156 +1,125 @@
-/* ── EquipoPage.module.css ────────────────────────────────────────────────── */
+/* EquipoPage.module.css — Equipo de la empresa. */
 
-/* ── Stats rápidas ──────────────────────────────────────────────────────────── */
-.statsRow {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin-bottom: 1.75rem;
+.error { margin-bottom: var(--space-4); }
+
+/* Resumen: reclutadores activos · suspendidos · solicitudes pendientes */
+.resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
 }
 
-.statChip {
+.bloque { margin-bottom: var(--space-5); }
+
+/* ── Cuenta administradora (la empresa) ── */
+.cuenta {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.cuentaNombre {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+/* ── Reclutadores ── */
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.miembro {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0.35rem 1rem;
-  font-size: 0.88rem;
-  color: var(--text-muted);
-  box-shadow: var(--shadow-card);
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-soft);
+  min-width: 0;
 }
 
-.statNum {
-  font-weight: 800;
-  font-size: 1.05rem;
-  color: var(--text);
+.miembro:first-child { padding-top: 0; }
+.miembro:last-child { border-bottom: none; padding-bottom: 0; }
+
+.miembroSuspendido .miembroNombre { color: var(--text-soft); }
+
+.miembroInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
 }
 
-/* ── Secciones ──────────────────────────────────────────────────────────────── */
-.seccion {
-  margin-bottom: 2rem;
-}
-
-.seccionTitulo {
-  font-size: 0.8rem;
+.miembroNombre {
+  font-size: 0.98rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  margin-bottom: 0.75rem;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
 }
 
-/* ── Lista de tarjetas ──────────────────────────────────────────────────────── */
-.listaCards {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+.miembroDato {
+  font-size: 0.84rem;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
 }
 
-/* ── Skeleton ───────────────────────────────────────────────────────────────── */
-.skeletonList {
+.miembroDato strong { color: var(--text-strong); }
+
+.miembroEstado {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* ── Solicitudes ── */
+.fecha { font-size: 0.86rem; color: var(--text-soft); white-space: nowrap; }
+
+.motivo {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+
+.cards {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
+  gap: var(--space-3);
 }
+
+/* ── Skeleton ── */
+.skeletonList { display: flex; flex-direction: column; gap: var(--space-3); }
 
 .skeletonRow {
-  height: 76px;
-  border-radius: var(--radius);
-  background: linear-gradient(90deg, #e8edf2 25%, #f4f6f8 50%, #e8edf2 75%);
+  height: 72px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, var(--surface-muted) 25%, var(--border-soft) 50%, var(--surface-muted) 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.4s infinite;
+  animation: shimmer 1.4s ease infinite;
 }
 
 @keyframes shimmer {
-  0%   { background-position: 200% 0; }
+  0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
 
-/* ── Estado vacío ───────────────────────────────────────────────────────────── */
-.emptyState {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 3.5rem 1rem;
-  background: var(--bg-card);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-  text-align: center;
-  color: var(--text-muted);
-  margin-top: 1rem;
+@media (max-width: 560px) {
+  .miembro { flex-wrap: wrap; }
+  .miembroEstado { order: 3; flex-basis: 100%; justify-content: flex-start; padding-left: 54px; }
+  .cuenta { gap: var(--space-3); }
 }
 
-.emptyState span { font-size: 2.8rem; }
-
-.subtitulo {
-  color: var(--text-muted);
-  margin-top: 0.25rem;
-  font-size: 0.9rem;
-}
-
-/* ── Botones ────────────────────────────────────────────────────────────────── */
-.btnPrimary {
-  background: var(--primary);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius);
-  padding: 0.6rem 1.25rem;
-  font-size: 0.88rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: opacity 0.15s, transform 0.1s;
-}
-.btnPrimary:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
-.btnPrimary:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* ── Toast ──────────────────────────────────────────────────────────────────── */
-.toast {
-  position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
-  background: #1e293b;
-  color: #fff;
-  border-radius: var(--radius);
-  padding: 0.8rem 1.25rem;
-  font-size: 0.88rem;
-  font-weight: 600;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-  z-index: 9999;
-  animation: slideUp 0.2s ease, fadeOut 0.4s ease 3.1s forwards;
-}
-
-/* ── Mensajes de error ──────────────────────────────────────────────────────── */
-.errorMsg {
-  color: #dc2626;
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-/* ── Animaciones ────────────────────────────────────────────────────────────── */
-@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
-
-/* ── Responsive ─────────────────────────────────────────────────────────────── */
-@media (max-width: 640px) {
-  .statsRow { gap: 0.5rem; }
-}
-
-/* ── Alerta de solicitudes pendientes ────────────────────────────────────────── */
-.alertPendiente {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  background: #fef9c3;
-  border: 1px solid #fde047;
-  border-left: 4px solid #ca8a04;
-  border-radius: var(--radius);
-  padding: 0.875rem 1rem;
-  margin-bottom: 1.5rem;
-  font-size: 0.88rem;
-  color: #713f12;
+@media (prefers-reduced-motion: reduce) {
+  .skeletonRow { animation: none; }
 }

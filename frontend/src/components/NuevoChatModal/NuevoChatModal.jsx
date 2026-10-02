@@ -16,7 +16,10 @@ const ROL_LABEL = {
 /**
  * Modal para iniciar un nuevo chat buscando un usuario.
  */
-export default function NuevoChatModal({ onClose, onSeleccionar }) {
+// `soloEquipo`: el administrador de empresa solo puede escribirle a su equipo
+// (la restricción real es del backend, GET /chat/usuarios); acá se ajustan los
+// textos para que la búsqueda no parezca global.
+export default function NuevoChatModal({ onClose, onSeleccionar, soloEquipo = false }) {
   const [query,       setQuery]       = useState('');
   const [resultados,  setResultados]  = useState([]);
   const [buscando,    setBuscando]    = useState(false);
@@ -55,7 +58,7 @@ export default function NuevoChatModal({ onClose, onSeleccionar }) {
 
   return (
     <Modal
-      title="✏️ Nuevo mensaje"
+      title={soloEquipo ? 'Nuevo mensaje al equipo' : '✏️ Nuevo mensaje'}
       onClose={onClose}
       style={{ display: 'flex', flexDirection: 'column', maxHeight: '80vh', overflow: 'hidden' }}
     >
@@ -64,7 +67,7 @@ export default function NuevoChatModal({ onClose, onSeleccionar }) {
           <input
             ref={inputRef}
             type="text"
-            placeholder="Buscar por nombre, apellido o email..."
+            placeholder={soloEquipo ? 'Buscar a alguien de tu equipo…' : 'Buscar por nombre, apellido o email...'}
             value={query}
             onChange={(e) => buscar(e.target.value)}
             className={styles.modalInput}
@@ -75,7 +78,11 @@ export default function NuevoChatModal({ onClose, onSeleccionar }) {
           {buscando ? (
             <p className={styles.modalEstado}>Buscando...</p>
           ) : sinResultados ? (
-            <p className={styles.modalEstado}>No se encontraron usuarios con "{query}".</p>
+            <p className={styles.modalEstado}>
+              {soloEquipo
+                ? `No hay miembros de tu equipo que coincidan con "${query}". Solo podés escribirle a tu equipo.`
+                : `No se encontraron usuarios con "${query}".`}
+            </p>
           ) : resultados.length === 0 && query.length >= 2 ? (
             <p className={styles.modalEstado}>Ingresá un nombre, apellido o email.</p>
           ) : query.length < 2 ? (

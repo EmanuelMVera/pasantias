@@ -25,8 +25,8 @@
  *   admin desde el panel.
  * - Todas las altas de una misma corrida son una única transacción: o se
  *   crean todos los administradores que faltaban, o no se crea ninguno.
- * - bcrypt costo 12. Password mínima: 6 caracteres (misma regla que el
- *   flujo de reset de contraseña, ver auth.controller.js).
+ * - bcrypt costo 12. Password mínima: 8 caracteres (regla única del sistema,
+ *   ver utils/password.js).
  *
  * ⚠️ Cambiar la contraseña por default en producción después del primer acceso.
  */
@@ -37,7 +37,7 @@ const { sequelize, Usuario } = require('../models');
 
 const DEFAULT_EMAIL = 'admin@pasantias.com';
 const DEFAULT_PASSWORD = 'Admin1234!';
-const PASSWORD_MIN_LENGTH = 6; // misma regla que auth.controller.js (resetPassword)
+const { PASSWORD_MIN_LENGTH } = require('./password'); // regla única del sistema (8)
 const BCRYPT_COST = 12;
 
 /**

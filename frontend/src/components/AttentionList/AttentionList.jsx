@@ -12,11 +12,25 @@ import styles from './AttentionList.module.css';
  *
  * `count` null/undefined = todavía no se pudo obtener → se muestra "—".
  * El botón aparece solo si hay pendientes (count > 0).
+ *
+ * `hideZero`: no muestra las filas con count 0 (solo lo accionable). Si no
+ * queda ninguna, muestra un estado positivo con `emptyText`.
  */
-export default function AttentionList({ items }) {
+export default function AttentionList({ items, hideZero = false, emptyText = 'Todo al día: no hay nada pendiente.' }) {
+  const visibles = hideZero ? items.filter((it) => it.count == null || it.count > 0) : items;
+
+  if (hideZero && visibles.length === 0) {
+    return (
+      <p className={styles.alDia}>
+        <span className={styles.alDiaIcon}><Icon name="checkCircle" size={22} /></span>
+        {emptyText}
+      </p>
+    );
+  }
+
   return (
     <ul className={styles.list}>
-      {items.map(({ key, title, icon, tone = 'blue', count, singular, plural, to, cta }) => {
+      {visibles.map(({ key, title, icon, tone = 'blue', count, singular, plural, to, cta }) => {
         const conocido = count != null;
         const hay = conocido && count > 0;
         return (

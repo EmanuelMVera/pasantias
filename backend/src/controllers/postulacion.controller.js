@@ -37,9 +37,13 @@ exports.postular = async (req, res) => {
     cambiadoPorUsuarioId: usuarioId,
   });
 
-  const adminsEmpresa = await empresaService.obtenerAdminsActivos(oferta.empresaId);
-  await Promise.all(adminsEmpresa.map((admin) => crearNotificacion({
-    usuarioId: admin.id,
+  // Operación ≠ gobierno: la nueva postulación se avisa al RECLUTADOR
+  // RESPONSABLE de la oferta, no al admin_empresa. Solo si la oferta no tiene
+  // un responsable válido (histórica, suspendido…) cae en el admin_empresa
+  // para no perder el evento. Ver empresa.service::obtenerDestinatariosPostulacion.
+  const destinatarios = await empresaService.obtenerDestinatariosPostulacion(oferta);
+  await Promise.all(destinatarios.map((dest) => crearNotificacion({
+    usuarioId: dest.id,
     titulo: 'Nueva postulación recibida',
     mensaje: `${req.usuario.nombre} ${req.usuario.apellido} se postuló a "${oferta.titulo}".`,
     tipo: 'postulacion',
@@ -99,7 +103,11 @@ exports.getPostulacionesByOferta = async (req, res) => {
   const empresa = await _resolverEmpresa(req);
   if (!empresa) return res.status(403).json({ success: false, message: 'No tenés un perfil de empresa activo.' });
 
-  const oferta = await Oferta.findOne({ where: { id: req.params.ofertaId, empresaId: empresa.id } });
+  const oferta = await Oferta.findOne({
+    where: { id: req.params.ofertaId, empresaId: empresa.id },
+    // Responsable de la oferta: lo muestra la vista de supervisión del proceso.
+    include: [{ model: Usuario, as: 'creadaPor', attributes: ['id', 'nombre', 'apellido'] }],
+  });
   if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
 
   const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
@@ -156,7 +164,9 @@ exports.getPostulacionesByOferta = async (req, res) => {
       id: oferta.id,
       titulo: oferta.titulo,
       habilidadesRequeridas: oferta.habilidadesRequeridas,
+      estado: oferta.estado,
       creadaPorUsuarioId: oferta.creadaPorUsuarioId,
+      creadaPor: oferta.creadaPor ? oferta.creadaPor.toJSON() : null,
     },
   });
 };

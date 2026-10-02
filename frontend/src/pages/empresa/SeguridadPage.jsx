@@ -2,16 +2,20 @@
  * SeguridadPage.jsx — Página de seguridad de cuenta para usuarios empresa/reclutador.
  *
  * Permite cambiar la contraseña actual verificando que conoce la contraseña vigente.
- * Disponible para todos los roles autenticados.
+ * La nueva debe tener al menos 8 caracteres (regla única del sistema, la misma
+ * que valida el backend).
  *
- * Ruta: /empresa/seguridad
+ * Ruta: /empresa/seguridad — se abre desde el menú de usuario ("Seguridad de mi
+ * cuenta") para el administrador de empresa, y desde el panel para el reclutador.
  */
 
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/auth.service';
 import { useAuth } from '../../hooks/useAuth';
-import { calcularFortalezaPassword } from '../../utils/passwordStrength';
+import { calcularFortalezaPassword, PASSWORD_MIN_LENGTH } from '../../utils/passwordStrength';
+import PageHeader from '../../components/ui/PageHeader';
+import Icon from '../../components/ui/Icon';
 import styles from './SeguridadPage.module.css';
 
 export default function SeguridadPage() {
@@ -49,7 +53,7 @@ export default function SeguridadPage() {
   function validar() {
     if (!form.passwordActual) return 'Ingresá tu contraseña actual.';
     if (!form.nuevaPassword)  return 'Ingresá la nueva contraseña.';
-    if (form.nuevaPassword.length < 6) return 'La nueva contraseña debe tener al menos 6 caracteres.';
+    if (form.nuevaPassword.length < PASSWORD_MIN_LENGTH) return `La nueva contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`;
     if (form.nuevaPassword !== form.confirmarPassword) return 'Las contraseñas nuevas no coinciden.';
     if (form.passwordActual === form.nuevaPassword) return 'La nueva contraseña debe ser diferente a la actual.';
     return null;
@@ -74,7 +78,7 @@ export default function SeguridadPage() {
       // Hay que cerrar sesión en el cliente y mandar al login, si no la SPA
       // queda "logueada" en falso hasta el próximo 401.
       setEstado('ok');
-      setMensaje('✅ Contraseña actualizada. Volvé a iniciar sesión con la nueva contraseña.');
+      setMensaje('Contraseña actualizada. Volvé a iniciar sesión con la nueva contraseña.');
       setForm({ passwordActual: '', nuevaPassword: '', confirmarPassword: '' });
       setTimeout(async () => {
         await logout();
@@ -89,19 +93,14 @@ export default function SeguridadPage() {
   const fuerza = calcularFortalezaPassword(form.nuevaPassword);
 
   return (
-    <div className="page-container" style={{ maxWidth: 560 }}>
+    <div className="page-container">
 
-      {/* ── Cabecera ── */}
-      <div className="dashboard-header" style={{ marginBottom: '2rem' }}>
-        <div>
-          <Link to="/empresa" className="btn-back">← Volver al panel</Link>
-          <h1 style={{ marginTop: '0.5rem' }}>🔐 Seguridad de la cuenta</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', marginTop: '0.25rem' }}>
-            Actualizá tu contraseña de acceso al sistema.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Seguridad de mi cuenta"
+        subtitle="Actualizá tu contraseña de acceso al sistema."
+      />
 
+      <div className={styles.contenido}>
       {/* ── Card del formulario ── */}
       <div className={styles.card}>
         <form onSubmit={handleSubmit} noValidate>
@@ -129,7 +128,7 @@ export default function SeguridadPage() {
                 aria-label={mostrar.actual ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 title={mostrar.actual ? 'Ocultar' : 'Ver'}
               >
-                {mostrar.actual ? '🙈' : '👁️'}
+                <Icon name={mostrar.actual ? 'eyeOff' : 'eye'} size={18} />
               </button>
             </div>
           </div>
@@ -148,7 +147,9 @@ export default function SeguridadPage() {
                 type={mostrar.nueva ? 'text' : 'password'}
                 value={form.nuevaPassword}
                 onChange={handleChange}
-                placeholder="Mínimo 6 caracteres"
+                placeholder={`Mínimo ${PASSWORD_MIN_LENGTH} caracteres`}
+                minLength={PASSWORD_MIN_LENGTH}
+                aria-describedby="ayuda-password"
                 className={styles.input}
                 autoComplete="new-password"
               />
@@ -159,7 +160,7 @@ export default function SeguridadPage() {
                 aria-label={mostrar.nueva ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 title={mostrar.nueva ? 'Ocultar' : 'Ver'}
               >
-                {mostrar.nueva ? '🙈' : '👁️'}
+                <Icon name={mostrar.nueva ? 'eyeOff' : 'eye'} size={18} />
               </button>
             </div>
 
@@ -209,7 +210,7 @@ export default function SeguridadPage() {
                 aria-label={mostrar.confirmar ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 title={mostrar.confirmar ? 'Ocultar' : 'Ver'}
               >
-                {mostrar.confirmar ? '🙈' : '👁️'}
+                <Icon name={mostrar.confirmar ? 'eyeOff' : 'eye'} size={18} />
               </button>
             </div>
             {form.confirmarPassword && form.confirmarPassword !== form.nuevaPassword && (
@@ -219,10 +220,10 @@ export default function SeguridadPage() {
 
           {/* Feedback */}
           {estado === 'ok' && (
-            <div className={styles.alertOk}>{mensaje}</div>
+            <div className={styles.alertOk} role="status">{mensaje}</div>
           )}
           {estado === 'error' && (
-            <div className={styles.alertError}>⚠️ {mensaje}</div>
+            <div className={styles.alertError} role="alert">{mensaje}</div>
           )}
 
           {/* Botón */}
@@ -232,18 +233,20 @@ export default function SeguridadPage() {
             className={`btn-primary ${styles.btnSubmit}`}
             disabled={estado === 'loading'}
           >
-            {estado === 'loading' ? '⏳ Cambiando...' : '🔐 Cambiar contraseña'}
+            <Icon name="lock" size={18} />
+            {estado === 'loading' ? 'Cambiando...' : 'Cambiar contraseña'}
           </button>
         </form>
       </div>
 
       {/* Tip de seguridad */}
-      <div className={styles.tip}>
-        <span>💡</span>
+      <div className={styles.tip} id="ayuda-password">
+        <Icon name="info" size={18} />
         <span>
-          Usá una contraseña de al menos 8 caracteres combinando letras, números y símbolos.
-          No uses la misma contraseña que en otras plataformas.
+          La contraseña debe tener al menos {PASSWORD_MIN_LENGTH} caracteres. Para que sea más segura,
+          combiná letras, números y símbolos, y no reutilices la de otras plataformas.
         </span>
+      </div>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 
 const { Empresa, Oferta } = require('../models');
 const empresaService = require('../services/empresa.service');
+const { whereOfertaVisible } = require('../services/oferta.service');
 const equipoService  = require('../services/empresaEquipo.service');
 const { parsePagination } = require('../utils/pagination');
 const { procesarSubidaImagen, establecerUrlExterna } = require('../services/archivoImagen.service');
@@ -42,8 +43,13 @@ exports.getMisOfertas = async (req, res) => {
   if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
 
   const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
+  // Filtros server-side (antes de paginar): estado, moderación, responsable y texto.
   const { data, pagination } = await empresaService.obtenerOfertasConConteo(empresa.id, {
-    estado: req.query.estado, page, limit, offset,
+    estado: req.query.estado,
+    estadoModeracion: req.query.estadoModeracion,
+    responsable: req.query.responsable,
+    q: req.query.q,
+    page, limit, offset,
   });
   return res.json({ success: true, data, pagination, total: pagination.total });
 };
@@ -103,7 +109,10 @@ exports.getAllCandidatos = async (req, res) => {
 
   const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
   const { data, pagination, conteoPorEstado } = await empresaService.obtenerCandidatosConFoto(empresa.id, {
-    estado: req.query.estado, page, limit, offset,
+    estado: req.query.estado,
+    responsable: req.query.responsable,
+    ofertaId: req.query.ofertaId,
+    page, limit, offset,
   });
   return res.json({ success: true, data, pagination, conteoPorEstado, total: pagination.total });
 };
@@ -194,8 +203,11 @@ exports.getEmpresaPublica = async (req, res) => {
     return res.status(404).json({ success: false, message: 'Empresa no encontrada o no disponible.' });
   }
 
+  // Mismo criterio de visibilidad que el listado de ofertas para alumnos:
+  // activa Y con moderación resuelta (aprobada / publicación automática).
+  // Antes solo miraba `estado`, y colaba ofertas pendientes o rechazadas.
   const ofertas = await Oferta.findAll({
-    where: { empresaId: empresa.id, estado: 'activa' },
+    where: { empresaId: empresa.id, ...whereOfertaVisible() },
     attributes: ['id', 'titulo', 'area', 'modalidad', 'ciudad', 'fechaLimite', 'tipoPuesto'],
     order: [['createdAt', 'DESC']],
     limit: 10,

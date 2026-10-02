@@ -4,6 +4,8 @@ import styles from './ListaConversaciones.module.css';
 /**
  * Panel izquierdo del chat: cabecera con "nuevo mensaje" + lista de
  * conversaciones (con estados loading / error / vacío).
+ * `titulo` permite un encabezado contextual (p. ej. "Mensajes del equipo" para
+ * el administrador de empresa, que solo chatea con su equipo).
  */
 export default function ListaConversaciones({
   conversaciones,
@@ -12,11 +14,12 @@ export default function ListaConversaciones({
   error,
   onNuevoChat,
   onSeleccionar,
+  titulo = '💬 Mensajes',
 }) {
   return (
     <aside className={`${styles.sidebar} ${convActivaId ? styles.sidebarHiddenMobile : ''}`}>
       <div className={styles.sidebarHeader}>
-        <h2>💬 Mensajes</h2>
+        <h2>{titulo}</h2>
         <button
           className={styles.nuevoChatBtn}
           onClick={onNuevoChat}

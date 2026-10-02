@@ -34,8 +34,13 @@ empresa tiene garantizada al menos una fila `admin_empresa` activa.
 
 | Rol | Qué puede hacer |
 |---|---|
-| `admin_empresa` | Todo lo de la empresa: editar perfil + logo, gestionar el equipo (solicitar reclutadores, cambiar roles, suspender), además de todo lo operativo. |
+| `admin_empresa` | Gobierno y supervisión: editar perfil + logo, gestionar el equipo (solicitar/agregar reclutadores, suspender, quitar), ver todas las ofertas y candidatos de la empresa, y pausar / reactivar / cerrar cualquier oferta. **No** crea ni edita ofertas ni cambia el estado de las postulaciones. |
 | `reclutador` | Solo operativo: crear/editar/cerrar ofertas, ver candidatos, mover el embudo de selección, chat. **No** toca equipo ni perfil de empresa. |
+
+**Notificaciones.** Una nueva postulación se le avisa al reclutador responsable de la
+oferta (`creadaPorUsuarioId`); a los `admin_empresa` solo si la oferta no tiene un
+responsable válido. El resultado de la moderación de una oferta se avisa a los
+`admin_empresa` y al reclutador responsable.
 
 Ver la matriz por acción en [`docs/ROLES-Y-PERMISOS.md`](../docs/ROLES-Y-PERMISOS.md) §4.
 
@@ -76,7 +81,7 @@ Todos requieren `verifyToken` + `authorizeRoles('empresa')` + `verifyEmpresaMemb
 | GET | `/mi-empresa` | cualquiera | Datos de la empresa + `rolEnEquipo` del usuario |
 | PUT | `/mi-empresa` | `admin_empresa` | Edita el perfil de la empresa |
 | POST | `/mi-empresa/logo` | `admin_empresa` | Sube el logo (imagen validada, SEC-03) |
-| GET | `/dashboard`, `/mis-ofertas`, `/candidatos` | cualquiera | Paneles de solo lectura |
+| GET | `/dashboard`, `/mis-ofertas`, `/candidatos` | cualquiera | Paneles de solo lectura. `/dashboard` incluye `equipo.reclutadoresActivos`, `equipo.solicitudesPendientes`, `topOfertasPostulaciones` y `ofertasRecientes` con responsable. `/mis-ofertas` filtra por `estado`, `estadoModeracion`, `responsable` (id o `sin`) y `q`; `/candidatos` por `estado`, `responsable` y `ofertaId` (siempre antes de paginar). |
 
 `EmpresaContext` (frontend) resuelve `rolInterno` una vez por sesión vía
 `GET /api/empresas/mi-empresa` y lo usa **solo para decidir qué botones mostrar** —

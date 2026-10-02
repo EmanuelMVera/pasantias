@@ -51,14 +51,15 @@ const VIEWPORTS = [
 const PAGINAS = {
   publicas:   ['/', '/login', '/registro-empresa', '/forgot-password', '/reset-password/test'],
   alumno:     ['/dashboard', '/ofertas', '/mis-postulaciones', '/perfil', '/chat', '/notificaciones'],
-  adminEmpresa: ['/empresa', '/empresa/equipo', '/empresa/mi-empresa', '/empresa/candidatos', '/chat', '/notificaciones'],
+  adminEmpresa: ['/empresa', '/empresa/ofertas', '/empresa/candidatos', '/empresa/equipo', '/empresa/equipo?tab=solicitudes', '/empresa/mi-empresa', '/empresa/seguridad', '/chat', '/notificaciones'],
   reclutador: ['/empresa', '/empresa/nueva-oferta', '/empresa/candidatos', '/chat', '/empresa/mi-empresa'],
   admin:      ['/admin', '/admin/usuarios', '/admin/importaciones', '/admin/solicitudes', '/admin/empresas', '/admin/ofertas', '/admin/logs', '/notificaciones'],
 };
 
 /** Nombre de archivo seguro a partir de una ruta ("/empresa/mi-empresa" → "empresa_mi-empresa"). */
 function slug(rutaPagina) {
-  return rutaPagina.replace(/^\//, '').replace(/\//g, '_') || 'home';
+  // `?`, `=` y `&` no son válidos en nombres de archivo de Windows (rutas con query).
+  return rutaPagina.replace(/^\//, '').replace(/[/?=&]/g, '_') || 'home';
 }
 
 /**
