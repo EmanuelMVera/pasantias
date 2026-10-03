@@ -5,7 +5,7 @@
  * página — no se estandarizan acá, cada pantalla sabe qué filtra). `chips`
  * es la lista de filtros actualmente aplicados, con su propio botón de
  * quitar — reusa las clases globales `.filter-chips`/`.filter-chip` que ya
- * usa EmpresaDashboardPage, ahora también disponibles para Admin.
+ * usaba el antiguo panel de empresa, ahora también disponibles para Admin.
  *
  *   <FilterBar
  *     chips={[{ key: 'estado', label: `Estado: ${estado}`, onRemove: () => setEstado('') }]}

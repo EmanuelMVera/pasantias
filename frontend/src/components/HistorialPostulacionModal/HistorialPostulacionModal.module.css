@@ -1,0 +1,112 @@
+/* HistorialPostulacionModal.module.css — línea de tiempo de estados. */
+
+.cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.contexto {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--text-soft);
+}
+
+.contexto strong { color: var(--text-strong); }
+
+.vacio {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+}
+
+.linea {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.paso {
+  position: relative;
+  display: flex;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+}
+
+/* Línea vertical que une los puntos. */
+.paso::before {
+  content: '';
+  position: absolute;
+  top: 30px;
+  bottom: 0;
+  left: 14px;
+  width: 2px;
+  background: var(--border-soft);
+}
+
+.paso:last-child { padding-bottom: 0; }
+.paso:last-child::before { display: none; }
+
+.punto {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--neutral-soft);
+  color: var(--neutral-text);
+}
+
+.tono_blue { background: var(--info-soft); color: var(--info-text); }
+.tono_violet { background: var(--violet-soft); color: var(--violet-text); }
+.tono_green { background: var(--success-soft); color: var(--success-text); }
+.tono_red { background: var(--danger-soft); color: var(--danger-text); }
+
+.pasoInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 4px;
+}
+
+.pasoTitulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.93rem;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.actual {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--info-soft);
+  color: var(--info-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.pasoDato {
+  font-size: 0.83rem;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+
+.acciones {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 480px) {
+  .cuerpo { padding: var(--space-3) var(--space-4) var(--space-4); }
+  .acciones button { width: 100%; }
+}

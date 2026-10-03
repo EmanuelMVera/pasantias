@@ -1,14 +1,18 @@
 /**
- * CandidatosEmpresaPage.jsx — Candidatos de la empresa (vista de SUPERVISIÓN).
+ * CandidatosEmpresaPage.jsx — Candidatos (/empresa/candidatos).
  *
- * Muestra las postulaciones de todas las ofertas de la empresa con la oferta y
- * su reclutador responsable. No gestiona candidatos: "Ver proceso" lleva al
- * detalle de la oferta (/empresa/postulantes/:ofertaId), donde el reclutador
- * responsable opera y el administrador de empresa solo observa.
+ * El alcance lo impone el backend (GET /api/empresas/candidatos):
+ *   - Administrador de empresa: SUPERVISIÓN de las postulaciones de todas las
+ *     ofertas de la empresa, con su reclutador responsable (columna y filtro).
+ *   - Reclutador: solo los candidatos de las ofertas a su cargo. Sin columna ni
+ *     filtro de responsable (siempre es él) y con buscador por nombre o email.
+ *
+ * No gestiona candidatos desde la lista: "Ver proceso" lleva al proceso de la
+ * oferta (/empresa/postulantes/:ofertaId).
  *
  * Filtros (todos server-side, antes de paginar, y reflejados en la URL para
  * poder recargar o compartir la vista):
- *   /empresa/candidatos?estado=entrevista&responsable=522&oferta=14
+ *   /empresa/candidatos?estado=entrevista&responsable=522&oferta=14&q=martin
  * Los contadores por estado corresponden al alcance filtrado por
  * responsable/oferta.
  */
@@ -19,6 +23,8 @@ import { empresaService } from '../../services/empresa.service';
 import { useEmpresa } from '../../hooks/useEmpresa';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { usePaginacion } from '../../hooks/usePaginacion';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import SearchField from '../../components/ui/SearchField';
 import Avatar from '../../components/Avatar/Avatar';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import PageHeader from '../../components/ui/PageHeader';
@@ -62,12 +68,19 @@ function EstadoBadge({ estado }) {
 
 export default function CandidatosEmpresaPage() {
   const { esAdminEmpresa } = useEmpresa();
+  // Reclutador: vista personal (el backend ya limita el alcance a sus ofertas).
+  const personal = !esAdminEmpresa;
   const esTabla = useMediaQuery('(min-width: 1024px)');
 
   const [params, setParams] = useSearchParams();
   const estado = params.get('estado') ?? '';
   const responsable = params.get('responsable') ?? '';
   const ofertaId = params.get('oferta') ?? '';
+  const qUrl = params.get('q') ?? '';
+
+  // Buscador (solo en la vista del reclutador): texto local + debounce → URL.
+  const [texto, setTexto] = useState(qUrl);
+  const q = useDebouncedValue(texto.trim(), 350);
 
   const setFiltro = (clave, valor) => {
     setParams((prev) => {
@@ -77,7 +90,16 @@ export default function CandidatosEmpresaPage() {
     }, { replace: true });
   };
 
-  const { page, setPage } = usePaginacion([estado, responsable, ofertaId]);
+  useEffect(() => {
+    if (q === qUrl) return;
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (q) next.set('q', q); else next.delete('q');
+      return next;
+    }, { replace: true });
+  }, [q, qUrl, setParams]);
+
+  const { page, setPage } = usePaginacion([estado, responsable, ofertaId, qUrl]);
 
   const [candidatos, setCandidatos] = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -96,8 +118,9 @@ export default function CandidatosEmpresaPage() {
     try {
       const consulta = { page, limit: 20 };
       if (estado) consulta.estado = estado;
-      if (responsable) consulta.responsable = responsable;
+      if (responsable && !personal) consulta.responsable = responsable;
       if (ofertaId) consulta.ofertaId = ofertaId;
+      if (qUrl) consulta.q = qUrl;
       const { data } = await empresaService.getCandidatos(consulta);
       if (mia !== secuencia.current) return;
       setCandidatos(data.data ?? []);
@@ -109,22 +132,25 @@ export default function CandidatosEmpresaPage() {
     } finally {
       if (mia === secuencia.current) setLoading(false);
     }
-  }, [page, estado, responsable, ofertaId]);
+  }, [page, estado, responsable, ofertaId, qUrl, personal]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  // Opciones de los filtros Responsable y Oferta (datos reales de la empresa).
+  // Opciones de los filtros Responsable (solo supervisión) y Oferta. Para un
+  // reclutador, /mis-ofertas ya devuelve únicamente las suyas.
   useEffect(() => {
-    empresaService.getEquipo()
-      .then((res) => {
-        const lista = (res.data?.data ?? []).filter((m) => m.rolInterno === 'reclutador' && m.usuario);
-        setReclutadores(lista.map((m) => ({ id: m.usuario.id, nombre: nombreCompleto(m.usuario), activo: m.activo })));
-      })
-      .catch(() => {});
+    if (!personal) {
+      empresaService.getEquipo()
+        .then((res) => {
+          const lista = (res.data?.data ?? []).filter((m) => m.rolInterno === 'reclutador' && m.usuario);
+          setReclutadores(lista.map((m) => ({ id: m.usuario.id, nombre: nombreCompleto(m.usuario), activo: m.activo })));
+        })
+        .catch(() => {});
+    }
     empresaService.getMisOfertas({ limit: 100 })
       .then((res) => setOfertas((res.data?.data ?? []).map((o) => ({ id: o.id, titulo: o.titulo }))))
       .catch(() => {});
-  }, []);
+  }, [personal]);
 
   const totalTodos = Object.values(conteoPorEstado).reduce((a, b) => a + b, 0);
   const opcionesEstado = ESTADOS_FILTRO.map((op) => ({
@@ -132,7 +158,8 @@ export default function CandidatosEmpresaPage() {
     label: `${op.label} (${op.value === '' ? totalTodos : (conteoPorEstado[op.value] ?? 0)})`,
   }));
 
-  const hayFiltros = Boolean(estado || responsable || ofertaId);
+  const hayFiltros = Boolean(estado || responsable || ofertaId || qUrl);
+  const limpiarFiltros = () => { setTexto(''); setParams({}, { replace: true }); };
   const total = pagination?.total ?? candidatos.length;
   const primeraCarga = loading && candidatos.length === 0 && !error;
 
@@ -152,27 +179,39 @@ export default function CandidatosEmpresaPage() {
         title="Candidatos"
         subtitle={esAdminEmpresa
           ? 'Supervisá los procesos de selección de todas las ofertas de la empresa.'
-          : 'Postulantes de las ofertas de la empresa.'}
+          : 'Personas postuladas a tus ofertas.'}
       />
 
       {error && <p className={`error-msg ${toolbar.error}`} role="alert">{error}</p>}
 
       <div className={toolbar.toolbar}>
         <div className={toolbar.fila}>
-          <div className={toolbar.campo}>
-            <label htmlFor="filtro-responsable" className={toolbar.srOnly}>Responsable</label>
-            <select id="filtro-responsable" value={responsable} onChange={(e) => setFiltro('responsable', e.target.value)}>
-              <option value="">Todos los responsables</option>
-              {reclutadores.map((r) => (
-                <option key={r.id} value={r.id}>{r.nombre}{r.activo ? '' : ' (suspendido)'}</option>
-              ))}
-              <option value="sin">Sin responsable asignado</option>
-            </select>
-          </div>
+          {personal ? (
+            <div className={toolbar.busqueda}>
+              <SearchField
+                id="busqueda-candidato"
+                label="Buscar candidato"
+                placeholder="Buscar candidato por nombre o email…"
+                value={texto}
+                onChange={setTexto}
+              />
+            </div>
+          ) : (
+            <div className={toolbar.campo}>
+              <label htmlFor="filtro-responsable" className={toolbar.srOnly}>Responsable</label>
+              <select id="filtro-responsable" value={responsable} onChange={(e) => setFiltro('responsable', e.target.value)}>
+                <option value="">Todos los responsables</option>
+                {reclutadores.map((r) => (
+                  <option key={r.id} value={r.id}>{r.nombre}{r.activo ? '' : ' (suspendido)'}</option>
+                ))}
+                <option value="sin">Sin responsable asignado</option>
+              </select>
+            </div>
+          )}
           <div className={`${toolbar.campo} ${styles.campoOferta}`}>
             <label htmlFor="filtro-oferta" className={toolbar.srOnly}>Oferta</label>
             <select id="filtro-oferta" value={ofertaId} onChange={(e) => setFiltro('oferta', e.target.value)}>
-              <option value="">Todas las ofertas</option>
+              <option value="">{personal ? 'Todas mis ofertas' : 'Todas las ofertas'}</option>
               {ofertas.map((o) => <option key={o.id} value={o.id}>{o.titulo}</option>)}
             </select>
           </div>
@@ -196,7 +235,7 @@ export default function CandidatosEmpresaPage() {
           hint={hayFiltros ? 'Probá quitando algún filtro.' : undefined}
         >
           {hayFiltros && (
-            <button type="button" className="btn-secondary" onClick={() => setParams({}, { replace: true })}>
+            <button type="button" className="btn-secondary" onClick={limpiarFiltros}>
               Limpiar filtros
             </button>
           )}
@@ -209,7 +248,7 @@ export default function CandidatosEmpresaPage() {
                 <tr>
                   <th>Candidato</th>
                   <th>Oferta</th>
-                  <th>Responsable</th>
+                  {!personal && <th>Responsable</th>}
                   <th>Estado</th>
                   <th>Actualizado</th>
                   <th>Acción</th>
@@ -240,9 +279,11 @@ export default function CandidatosEmpresaPage() {
                       {p.oferta?.titulo ?? '—'}
                       {p.oferta?.area && <small className={toolbar.sub}>{p.oferta.area}</small>}
                     </td>
-                    <td className="cell-break">
-                      {nombreResponsable(p.oferta) ?? <span className={toolbar.sinDato}>Sin responsable asignado</span>}
-                    </td>
+                    {!personal && (
+                      <td className="cell-break">
+                        {nombreResponsable(p.oferta) ?? <span className={toolbar.sinDato}>Sin responsable asignado</span>}
+                      </td>
+                    )}
                     <td><EstadoBadge estado={p.estado} /></td>
                     <td className={toolbar.fecha}>{formatFecha(p.updatedAt)}</td>
                     <td>{enlaceProceso(p)}</td>
@@ -259,7 +300,7 @@ export default function CandidatosEmpresaPage() {
                   subtitle={p.oferta?.titulo}
                   badge={<EstadoBadge estado={p.estado} />}
                   fields={[
-                    { label: 'Responsable', value: nombreResponsable(p.oferta) ?? 'Sin responsable asignado' },
+                    ...(personal ? [] : [{ label: 'Responsable', value: nombreResponsable(p.oferta) ?? 'Sin responsable asignado' }]),
                     { label: 'Actualizado', value: formatFecha(p.updatedAt) },
                   ]}
                   actions={(

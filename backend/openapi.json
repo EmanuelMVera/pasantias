@@ -1290,7 +1290,7 @@
       },
       "PostulacionEstadoUpdate": {
         "type": "object",
-        "description": "Ambos campos son opcionales; sin ninguno, la operación es un no-op y responde 200.",
+        "description": "Al menos uno de los dos campos (400 si no viene ninguno). Con solo `notasEmpresa` se guarda la nota interna sin cambiar el estado ni notificar al candidato.",
         "properties": {
           "estado": {
             "type": "string",
@@ -1300,10 +1300,14 @@
               "entrevista",
               "contratado",
               "rechazado"
-            ]
+            ],
+            "description": "Tiene que ser una transición permitida desde el estado actual (flujo guiado)."
           },
           "notasEmpresa": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "maxLength": 2000,
+            "description": "Nota interna de la empresa. Nunca se le muestra al candidato. Vacío o null la borra."
           }
         }
       },
@@ -2174,6 +2178,163 @@
           },
           "apellido": {
             "type": "string"
+          }
+        }
+      },
+      "DashboardReclutador": {
+        "type": "object",
+        "description": "Panel personal del reclutador (`alcance: \"reclutador\"` en GET /api/empresas/dashboard): solo ofertas a su cargo.",
+        "properties": {
+          "alcance": {
+            "type": "string",
+            "enum": [
+              "reclutador"
+            ]
+          },
+          "ofertas": {
+            "type": "object",
+            "properties": {
+              "activas": {
+                "type": "integer"
+              },
+              "pausadas": {
+                "type": "integer"
+              },
+              "cerradas": {
+                "type": "integer"
+              },
+              "pendienteModeracion": {
+                "type": "integer"
+              },
+              "rechazadas": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            }
+          },
+          "postulaciones": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "enRevision": {
+                "type": "integer"
+              },
+              "preseleccionados": {
+                "type": "integer"
+              },
+              "entrevistas": {
+                "type": "integer"
+              },
+              "contrataciones": {
+                "type": "integer"
+              }
+            }
+          },
+          "procesosActivos": {
+            "type": "array",
+            "description": "Hasta 5 ofertas no cerradas, primero las que tienen candidatos esperando revisión.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "oferta": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "titulo": {
+                      "type": "string"
+                    },
+                    "estado": {
+                      "type": "string",
+                      "enum": [
+                        "activa",
+                        "pausada",
+                        "cerrada"
+                      ]
+                    },
+                    "estadoModeracion": {
+                      "type": "string",
+                      "enum": [
+                        "pendiente",
+                        "aprobada",
+                        "rechazada",
+                        "auto_aprobada"
+                      ]
+                    },
+                    "fechaLimite": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  }
+                },
+                "totalCandidatos": {
+                  "type": "integer"
+                },
+                "porEstado": {
+                  "type": "object",
+                  "properties": {
+                    "enRevision": {
+                      "type": "integer"
+                    },
+                    "preseleccionados": {
+                      "type": "integer"
+                    },
+                    "entrevistas": {
+                      "type": "integer"
+                    },
+                    "contratados": {
+                      "type": "integer"
+                    },
+                    "rechazados": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "paraAtender": {
+            "type": "array",
+            "description": "Pendientes derivados del estado actual (no hay tabla de tareas). Sin ítems en cero.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tipo": {
+                  "type": "string",
+                  "enum": [
+                    "oferta_rechazada",
+                    "candidatos_en_revision",
+                    "candidatos_en_entrevista",
+                    "cierre_proximo",
+                    "oferta_pendiente_moderacion"
+                  ]
+                },
+                "ofertaId": {
+                  "type": "integer"
+                },
+                "titulo": {
+                  "type": "string"
+                },
+                "cantidad": {
+                  "type": "integer",
+                  "description": "Solo en los tipos de candidatos."
+                },
+                "dias": {
+                  "type": "integer",
+                  "description": "Solo en `cierre_proximo`: días hasta la fecha límite (0–7)."
+                },
+                "fechaLimite": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
           }
         }
       },
@@ -3396,7 +3557,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Alcance: toda la empresa (no el usuario que consulta). Incluye reclutadores activos, solicitudes de reclutador pendientes, las 5 ofertas con más postulaciones (top global) y las 5 ofertas más recientes con su responsable.\n\n**Roles:** empresa/admin_empresa · empresa/reclutador"
+        "description": "La respuesta depende de quién consulta (`alcance`). **admin_empresa** → `alcance: \"empresa\"`: métricas de toda la empresa (reclutadores activos, solicitudes pendientes, top de ofertas y ofertas recientes con su responsable). **reclutador** → `alcance: \"reclutador\"`: panel PERSONAL, solo de las ofertas a su cargo (`ofertas`, `postulaciones`, `procesosActivos` — máx. 5 — y `paraAtender`: pendientes derivados del estado actual); no incluye `equipo`, `topOfertasPostulaciones` ni `ofertasRecientes`.\n\n**Roles:** empresa/admin_empresa · empresa/reclutador"
       }
     },
     "/api/empresas/mis-ofertas": {
@@ -3456,7 +3617,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Los filtros se aplican en el servidor antes de paginar. Valores inválidos se ignoran.\n\n**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "description": "Alcance obligatorio según el actor: el admin_empresa recibe todas las ofertas de la empresa; el **reclutador solo las que tiene a su cargo** (el filtro `responsable` se ignora para él: no sirve para ampliar el alcance). Los filtros se aplican en el servidor, dentro de ese alcance y antes de paginar. Valores inválidos se ignoran.\n\n**Roles:** empresa/admin_empresa · empresa/reclutador",
         "parameters": [
           {
             "$ref": "#/components/parameters/pageParam"
@@ -3679,6 +3840,60 @@
         }
       }
     },
+    "/api/empresas/ofertas/{id}": {
+      "get": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasOfertaDetalle",
+        "summary": "Detalle completo de una oferta de mi empresa",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Oferta"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Devuelve la oferta en cualquier estado (el detalle público `GET /api/ofertas/{id}` solo devuelve las visibles para alumnos). El reclutador solo la obtiene si es el responsable (404 si no, incluidas las ofertas sin responsable); el admin_empresa, cualquiera de su empresa.\n\n**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ]
+      }
+    },
     "/api/empresas/ofertas/{id}/responsable": {
       "patch": {
         "tags": [
@@ -3899,7 +4114,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Cada postulación incluye la oferta y su responsable (`oferta.creadaPor`). `conteoPorEstado` se calcula sobre el alcance filtrado por responsable/oferta (sin el filtro de estado).\n\n**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "description": "Alcance obligatorio según el actor: el admin_empresa recibe las postulaciones de toda la empresa; el **reclutador solo las de las ofertas a su cargo** (`responsable` se ignora para él). Cada postulación incluye la oferta y su responsable (`oferta.creadaPor`). `conteoPorEstado` se calcula sobre el alcance filtrado por responsable/oferta/q (sin el filtro de estado).\n\n**Roles:** empresa/admin_empresa · empresa/reclutador",
         "parameters": [
           {
             "$ref": "#/components/parameters/pageParam"
@@ -3925,6 +4140,15 @@
             "schema": {
               "type": "integer",
               "minimum": 1
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Texto en nombre, apellido o email del candidato (dentro del alcance del actor).",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
             }
           }
         ]
@@ -4674,7 +4898,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Solo el reclutador responsable (`creadaPorUsuarioId`) — o cualquier reclutador si la oferta es histórica sin responsable registrado. No acepta `estado`; usar `PATCH /{id}/estado`.\n\n**Roles:** empresa/reclutador",
+        "description": "Solo el reclutador responsable (`creadaPorUsuarioId`); una oferta sin responsable no la edita nadie hasta que el admin_empresa le asigne uno. No acepta `estado` (usar `PATCH /{id}/estado`) ni permite cambiar la moderación o el responsable. Editar una oferta **rechazada** la reenvía a revisión: vuelve a `pendiente` y se avisa al instituto, también en empresas de confianza.\n\n**Roles:** empresa/reclutador",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -4997,6 +5221,20 @@
                                 "cerrada"
                               ]
                             },
+                            "estadoModeracion": {
+                              "type": "string",
+                              "enum": [
+                                "pendiente",
+                                "aprobada",
+                                "rechazada",
+                                "auto_aprobada"
+                              ]
+                            },
+                            "fechaLimite": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
                             "creadaPorUsuarioId": {
                               "type": "integer",
                               "nullable": true
@@ -5005,6 +5243,10 @@
                               "$ref": "#/components/schemas/ResponsableOferta"
                             }
                           }
+                        },
+                        "puedeGestionar": {
+                          "type": "boolean",
+                          "description": "true solo para el reclutador responsable."
                         }
                       }
                     }
@@ -5029,7 +5271,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "description": "Proceso de selección de una oferta. El **reclutador solo accede si es el responsable** (403 `NO_ES_RESPONSABLE` si la oferta es de otro reclutador o no tiene responsable asignado); el admin_empresa supervisa cualquiera de su empresa (`puedeGestionar: false`). Cada postulación trae `transicionesPermitidas` (vacío para quien solo supervisa) y la nota interna `notasEmpresa`.\n\n**Roles:** empresa/admin_empresa · empresa/reclutador",
         "parameters": [
           {
             "name": "ofertaId",
@@ -5048,6 +5290,96 @@
           },
           {
             "$ref": "#/components/parameters/estadoQuery"
+          }
+        ]
+      }
+    },
+    "/api/postulaciones/{id}/historial": {
+      "get": {
+        "tags": [
+          "postulaciones"
+        ],
+        "operationId": "postulacionesHistorial",
+        "summary": "Historial de estados de una postulación",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "estadoActual": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "estadoAnterior": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "estadoNuevo": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "cambiadoPor": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "nombre": {
+                                "type": "string"
+                              },
+                              "apellido": {
+                                "type": "string"
+                              },
+                              "rol": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Línea de tiempo del proceso (quién y cuándo cambió cada estado). Para el reclutador responsable de la oferta y el admin_empresa de esa empresa. No incluye notas internas.\n\n**Roles:** empresa/admin_empresa · empresa/reclutador",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
           }
         ]
       }
@@ -5107,7 +5439,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Solo el reclutador responsable de la oferta (o cualquier reclutador activo si la oferta no tiene responsable). El admin_empresa supervisa pero no gestiona candidatos (403 ROL_INSUFICIENTE).\n\n**Roles:** empresa/reclutador",
+        "description": "Solo el reclutador responsable de la oferta (403 `NO_ES_RESPONSABLE` en cualquier otro caso, incluidas las ofertas sin responsable). El admin_empresa supervisa pero no gestiona candidatos (403 `ROL_INSUFICIENTE`). Flujo guiado: en_revision → preseleccionado | rechazado; preseleccionado → entrevista | rechazado | en_revision; entrevista → contratado | rechazado | preseleccionado; rechazado → en_revision; contratado es final. Una transición no permitida responde 400 `TRANSICION_NO_PERMITIDA` con `transicionesPermitidas`. También guarda la nota interna.\n\n**Roles:** empresa/reclutador",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"

@@ -5,6 +5,8 @@ import api from './api';
 export const empresaService = {
   getDashboard:          () => api.get('/empresas/dashboard'),
   getMisOfertas:         (params) => api.get('/empresas/mis-ofertas', { params }),
+  // Oferta completa de la empresa en cualquier estado (el reclutador, solo si es responsable).
+  getOferta:             (ofertaId) => api.get(`/empresas/ofertas/${ofertaId}`),
   // Gobierno (solo admin_empresa): asigna o cambia el reclutador responsable de una oferta.
   asignarResponsableOferta: (ofertaId, responsableId) => api.patch(`/empresas/ofertas/${ofertaId}/responsable`, { responsableId }),
   // Ficha de contacto de un reclutador (el backend decide quién puede verla).

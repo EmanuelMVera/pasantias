@@ -55,6 +55,14 @@ router.get(
 
 // Cambiar estado de una postulación — solo reclutador (y solo el responsable
 // de la oferta, chequeado en el controller — RBAC-02).
+// GET /api/postulaciones/:id/historial — línea de tiempo de estados de una
+// postulación (reclutador responsable o admin_empresa de esa empresa).
+router.get(
+  '/:id/historial',
+  ...baseMiembroEmpresa,
+  asyncHandler(ctrl.getHistorial)
+);
+
 router.patch(
   '/:id/estado',
   ...baseMiembroEmpresa,

@@ -296,7 +296,7 @@ describe('CHAT', () => {
     expect(historial.status).toBe(403);
   });
 
-  test('oferta huérfana (sin creadaPorUsuarioId): cualquier reclutador activo de la empresa accede al candidato', async () => {
+  test('oferta sin responsable: no habilita el chat con ningún reclutador hasta que se le asigne uno', async () => {
     const { usuario: alumno, passwordPlana } = await crearAlumno();
     idsUsuarios.push(alumno.id);
     const { empresa } = await crearEmpresaConAdmin();
@@ -312,7 +312,15 @@ describe('CHAT', () => {
       .post('/api/chat')
       .set('Authorization', `Bearer ${token}`)
       .send({ receptorId: usuarioReclutador.id, mensaje: 'Hola' });
-    expect(envio.status).toBe(201);
+    expect(envio.status).toBe(403);
+
+    // Al asignarle responsable, el chat queda habilitado con ESE reclutador.
+    await ofertaHuerfana.update({ creadaPorUsuarioId: usuarioReclutador.id });
+    const envio2 = await request(app)
+      .post('/api/chat')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ receptorId: usuarioReclutador.id, mensaje: 'Hola' });
+    expect(envio2.status).toBe(201);
   });
 
   test('miembros de una misma empresa pueden chatear entre sí', async () => {

@@ -33,15 +33,16 @@ src/
 ├── pages/
 │   ├── auth/             LoginPage, ForgotPasswordPage, ResetPasswordPage, SolicitudEmpresaPage
 │   ├── alumno/           Dashboard, OfertasPage, OfertaDetallePage, MisPostulacionesPage, PerfilPage, PerfilPublicoPage
-│   ├── empresa/          EmpresaInicioPage (admin_empresa → EmpresaResumenPage, reclutador → EmpresaDashboardPage), EmpresaOfertasPage, ReclutadorPerfilPage (/reclutador/:usuarioId), CrearOfertaPage, PostulantesMiOfertaPage, EquipoPage, MiEmpresaPage, CandidatosEmpresaPage, SeguridadPage
+│   ├── empresa/          EmpresaInicioPage (admin_empresa → EmpresaResumenPage, reclutador → ReclutadorInicioPage), OfertasEmpresaPage (admin_empresa → EmpresaOfertasPage, reclutador → MisOfertasPage), ReclutadorPerfilPage (/reclutador/:usuarioId), CrearOfertaPage, PostulantesMiOfertaPage, EquipoPage, MiEmpresaPage, CandidatosEmpresaPage, SeguridadPage
 │   ├── admin/            AdminDashboardPage, AdminUsuariosPage, AdminOfertasPage, AdminSolicitudesPage, AdminLogsPage
 │   ├── HomePage.jsx      Landing pública
 │   ├── ChatPage.jsx      Mensajería
 │   └── NotificacionesPage.jsx
 ├── components/           Navbar, NavbarPublic, Avatar, Modal, Paginacion, TopBanner
+│                         ReclutadorNav (barra horizontal del reclutador, sin sidebar)
 │                         AppShell (sidebar + topbar genérico) con sus dos configuraciones:
-│                         AdminShell (rol admin) y EmpresaShell (admin_empresa). El reclutador,
-│                         el alumno y el egresado usan Navbar.
+│                         AdminShell (rol admin) y EmpresaShell (admin_empresa). El alumno y
+│                         el egresado usan Navbar.
 ├── context/
 │   ├── AuthContext.jsx     <AuthProvider> — usuario logueado, login/logout, helpers de rol
 │   └── EmpresaContext.jsx  <EmpresaProvider> — empresa y rol interno del usuario

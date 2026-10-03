@@ -41,10 +41,9 @@ async function resolverMembresiasActivas(usuarioId) {
 /**
  * Postulaciones del alumno bajo la responsabilidad de `reclutadorId` dentro
  * de las empresas donde ese usuario es reclutador activo. "Responsable" =
- * oferta.creadaPorUsuarioId === reclutadorId, o NULL (ofertas huérfanas
- * previas a la migración 013 — mismo criterio que oferta.controller.js
- * usa para permitir editar/cambiar estado: cualquier reclutador activo de
- * la empresa asume la responsabilidad, sin abrir nada fuera de la empresa).
+ * oferta.creadaPorUsuarioId === reclutadorId. Una oferta SIN responsable no
+ * habilita el chat con ningún reclutador hasta que el admin_empresa le asigne
+ * uno (mismo criterio que oferta.controller.js y postulacion.controller.js).
  */
 async function evaluarPostulacionesConReclutador(alumnoId, reclutadorId, empresaIds) {
   if (!empresaIds.length) return [];
@@ -58,7 +57,7 @@ async function evaluarPostulacionesConReclutador(alumnoId, reclutadorId, empresa
       required: true,
       where: {
         empresaId: { [Op.in]: empresaIds },
-        [Op.or]: [{ creadaPorUsuarioId: reclutadorId }, { creadaPorUsuarioId: null }],
+        creadaPorUsuarioId: reclutadorId,
       },
     }],
   });

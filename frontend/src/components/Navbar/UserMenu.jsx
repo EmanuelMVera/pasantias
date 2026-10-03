@@ -12,6 +12,9 @@
  * Identidad: admin_empresa se muestra como la EMPRESA (logo + razón social);
  * el reclutador como PERSONA. Es solo visual: el backend decide permisos.
  *
+ * `nombreCompleto`: muestra nombre y apellido en el disparador sobre fondo
+ * oscuro (el reclutador se identifica como persona: "Diego Herrera").
+ *
  * `links`: accesos de cuenta dentro del menú ([{ to, label, icon }]), p. ej.
  * "Seguridad de mi cuenta" en el shell del administrador de empresa.
  */
@@ -32,7 +35,9 @@ const ROL_LEGIBLE = {
   empresa: 'Empresa',
 };
 
-export default function UserMenu({ tone = 'dark', noLeidas = 0, prioridadAlta = false, onOpen, mostrarRol = false, links = [] }) {
+export default function UserMenu({
+  tone = 'dark', noLeidas = 0, prioridadAlta = false, onOpen, mostrarRol = false, links = [], nombreCompleto: mostrarNombreCompleto = false,
+}) {
   const { usuario, logout } = useAuth();
   const { empresa, esAdminEmpresa, esReclutador } = useEmpresa();
   const navigate = useNavigate();
@@ -102,7 +107,9 @@ export default function UserMenu({ tone = 'dark', noLeidas = 0, prioridadAlta = 
           />
         )}
         <span className={styles.identity}>
-          <span className={styles.name}>{claro ? (esVistaEmpresaAdmin ? nombrePrincipal : nombreCompleto) : nombrePrincipal}</span>
+          <span className={styles.name}>
+            {esVistaEmpresaAdmin ? nombrePrincipal : (claro || mostrarNombreCompleto ? nombreCompleto : nombrePrincipal)}
+          </span>
           {mostrarRol && <span className={styles.role}>{rolLegible}</span>}
         </span>
         <span className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`} aria-hidden="true">

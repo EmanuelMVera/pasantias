@@ -1,28 +1,25 @@
 /**
- * EmpresaOfertasPage.jsx — Ofertas de la empresa (vista de supervisión).
+ * MisOfertasPage.jsx — "Mis ofertas" del RECLUTADOR.
  *
- * Ruta: /empresa/ofertas, solo para el ADMINISTRADOR DE EMPRESA (el reclutador
- * ve MisOfertasPage en esa misma ruta — ver OfertasEmpresaPage). Es donde supervisa TODAS
- * las publicaciones de su empresa: quién es el responsable, en qué estado
- * están y cuántas postulaciones tienen. No es la pantalla de creación.
+ * Ruta: /empresa/ofertas (cuando el rol interno es reclutador; el administrador
+ * de empresa ve EmpresaOfertasPage, la vista corporativa — ver OfertasEmpresaPage).
  *
- * Permisos (la autoridad es el backend, esto solo los refleja):
- *   - admin_empresa: ver candidatos, pausar / reactivar / cerrar cualquier
- *     oferta y asignar o cambiar su reclutador responsable. Nunca editar el
- *     contenido.
+ * Consume GET /api/empresas/mis-ofertas: para un reclutador el backend devuelve
+ * SOLO las ofertas a su cargo, así que acá no hay filtro ni columna de
+ * responsable, ni filas de otros reclutadores.
  *
- * Búsqueda y filtros (estado, moderación, responsable) se resuelven en el
- * servidor antes de paginar y viven en la URL, así la vista se puede recargar
- * o compartir: /empresa/ofertas?estado=pausada&responsable=12
+ * Búsqueda y filtros (estado, moderación) se resuelven en el servidor y viven
+ * en la URL: /empresa/ofertas?estado=activa&moderacion=pendiente
  *
- * Cerrar es irreversible → pide confirmación. Pausar y reactivar son directos.
+ * Acciones por oferta: "Gestionar candidatos" + menú ⋯ (editar, pausar /
+ * reactivar, cerrar). Solo se muestran las que aplican al estado actual; cerrar
+ * es irreversible y pide confirmación.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { empresaService } from '../../services/empresa.service';
 import { ofertaService } from '../../services/oferta.service';
-import { useEmpresa } from '../../hooks/useEmpresa';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { usePaginacion } from '../../hooks/usePaginacion';
@@ -35,18 +32,28 @@ import DataCard from '../../components/ui/DataCard';
 import EmptyState from '../../components/ui/EmptyState';
 import ActionMenu from '../../components/ui/ActionMenu';
 import ConfirmModal from '../../components/ui/ConfirmModal';
-import AsignarResponsableModal from '../../components/AsignarResponsableModal/AsignarResponsableModal';
 import Toast from '../../components/ui/Toast';
+import Icon from '../../components/ui/Icon';
 import Paginacion from '../../components/Paginacion/Paginacion';
-import {
-  ESTADO_LABEL, ESTADO_TONO, MODERACION_LABEL, MODERACION_TONO,
-  OPCIONES_ESTADO, OPCIONES_MODERACION,
-} from '../../utils/ofertaEstados';
+import { ESTADO_LABEL, ESTADO_TONO, MODERACION_LABEL, MODERACION_TONO } from '../../utils/ofertaEstados';
 import styles from './EmpresaOfertasPage.module.css';
 
+const OPCIONES_ESTADO = [
+  { value: '', label: 'Todas' },
+  { value: 'activa', label: 'Activas' },
+  { value: 'pausada', label: 'Pausadas' },
+  { value: 'cerrada', label: 'Cerradas' },
+];
+const OPCIONES_MODERACION = [
+  { value: '', label: 'Todas' },
+  { value: 'pendiente', label: 'Pendientes' },
+  { value: 'aprobada', label: 'Aprobadas' },
+  { value: 'rechazada', label: 'Rechazadas' },
+  { value: 'auto_aprobada', label: 'Publicación automática' },
+];
+
 const RESULTADO = { activa: 'reactivada', pausada: 'pausada', cerrada: 'cerrada' };
-const fechaCorta = (o) => (o.createdAt ? new Date(o.createdAt).toLocaleDateString('es-AR') : '—');
-const nombreResponsable = (o) => (o.creadaPor ? `${o.creadaPor.nombre} ${o.creadaPor.apellido}` : null);
+const fechaCorta = (iso) => (iso ? new Date(iso).toLocaleDateString('es-AR') : '—');
 
 function EstadoBadge({ estado }) {
   return <span className={`badge badge-tone-${ESTADO_TONO[estado] ?? 'gray'}`}>{ESTADO_LABEL[estado] ?? estado}</span>;
@@ -56,16 +63,14 @@ function ModeracionBadge({ estado }) {
   return <span className={`badge badge-tone-${MODERACION_TONO[estado] ?? 'gray'}`}>{MODERACION_LABEL[estado] ?? estado}</span>;
 }
 
-export default function EmpresaOfertasPage() {
-  const { empresa, esAdminEmpresa } = useEmpresa();
+export default function MisOfertasPage() {
+  const navigate = useNavigate();
   const esTabla = useMediaQuery('(min-width: 1024px)');
   const { toast, showToast } = useToast(4000);
 
-  // Filtros en la URL (fuente de verdad); el texto se edita local y se aplica con debounce.
   const [params, setParams] = useSearchParams();
   const estado = params.get('estado') ?? '';
   const moderacion = params.get('moderacion') ?? '';
-  const responsable = params.get('responsable') ?? '';
   const qUrl = params.get('q') ?? '';
 
   const [texto, setTexto] = useState(qUrl);
@@ -81,17 +86,15 @@ export default function EmpresaOfertasPage() {
 
   useEffect(() => { if (q !== qUrl) setFiltro('q', q); }, [q, qUrl, setFiltro]);
 
-  const { page, setPage } = usePaginacion([estado, moderacion, responsable, q]);
+  const { page, setPage } = usePaginacion([estado, moderacion, q]);
 
   const [ofertas, setOfertas] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [reclutadores, setReclutadores] = useState([]);
-  const [accionando, setAccionando] = useState(null); // id de la oferta en proceso
-  const [confirmarCierre, setConfirmarCierre] = useState(null); // oferta a cerrar
+  const [accionando, setAccionando] = useState(null);
+  const [confirmarCierre, setConfirmarCierre] = useState(null);
   const [cerrando, setCerrando] = useState(false);
-  const [ofertaResponsable, setOfertaResponsable] = useState(null); // oferta a (re)asignar
 
   const secuencia = useRef(0); // descarta respuestas de consultas viejas
 
@@ -103,7 +106,6 @@ export default function EmpresaOfertasPage() {
       const consulta = { page, limit: 20 };
       if (estado) consulta.estado = estado;
       if (moderacion) consulta.estadoModeracion = moderacion;
-      if (responsable) consulta.responsable = responsable;
       if (q) consulta.q = q;
       const res = await empresaService.getMisOfertas(consulta);
       if (mia !== secuencia.current) return;
@@ -111,24 +113,13 @@ export default function EmpresaOfertasPage() {
       setPagination(res.data?.pagination ?? null);
     } catch {
       if (mia !== secuencia.current) return;
-      setError('No se pudieron cargar las ofertas.');
+      setError('No se pudieron cargar tus ofertas.');
     } finally {
       if (mia === secuencia.current) setLoading(false);
     }
-  }, [page, estado, moderacion, responsable, q]);
+  }, [page, estado, moderacion, q]);
 
   useEffect(() => { cargar(); }, [cargar]);
-
-  // Reclutadores de la empresa para el filtro "Responsable".
-  useEffect(() => {
-    empresaService.getEquipo()
-      .then((res) => {
-        const lista = (res.data?.data ?? []).filter((m) => m.rolInterno === 'reclutador' && m.usuario);
-        setReclutadores(lista.map((m) => ({ id: m.usuario.id, nombre: `${m.usuario.nombre} ${m.usuario.apellido}`, activo: m.activo })));
-      })
-      .catch(() => { /* el filtro queda sin opciones; el listado sigue funcionando */ });
-  }, []);
-
 
   const cambiarEstado = async (oferta, nuevoEstado) => {
     setAccionando(oferta.id);
@@ -137,10 +128,8 @@ export default function EmpresaOfertasPage() {
       await ofertaService.cambiarEstado(oferta.id, nuevoEstado);
       showToast(`Oferta ${RESULTADO[nuevoEstado]} correctamente.`, 'success');
       await cargar();
-      return true;
     } catch (err) {
       setError(err.response?.data?.message ?? 'No se pudo cambiar el estado de la oferta.');
-      return false;
     } finally {
       setAccionando(null);
     }
@@ -153,68 +142,26 @@ export default function EmpresaOfertasPage() {
     setConfirmarCierre(null);
   };
 
-  // El responsable de la oferta dejó de ser un reclutador activo (se muestra
-  // igual, por historial; el admin_empresa puede cambiarlo).
-  const responsableSuspendido = (o) => reclutadores.some((r) => r.id === o.creadaPorUsuarioId && !r.activo);
-
-  const responsableAsignado = async (mensaje) => {
-    setOfertaResponsable(null);
-    showToast(mensaje, 'success');
-    await cargar();
-  };
-
+  // Solo las acciones posibles en el estado actual (una oferta cerrada no se reabre).
   const accionesDe = (o) => {
-    const items = [];
-    // Gobierno de la empresa: solo el administrador de empresa asigna responsables.
-    if (esAdminEmpresa) {
-      items.push({
-        key: 'responsable',
-        label: o.creadaPorUsuarioId ? 'Cambiar responsable' : 'Asignar responsable',
-        onSelect: () => setOfertaResponsable(o),
-      });
-    }
-    if (esAdminEmpresa) {
-      const estados = [];
-      if (o.estado === 'activa') estados.push({ key: 'pausar', label: 'Pausar publicación', onSelect: () => cambiarEstado(o, 'pausada') });
-      if (o.estado === 'pausada') estados.push({ key: 'reactivar', label: 'Reactivar publicación', onSelect: () => cambiarEstado(o, 'activa') });
-      if (o.estado !== 'cerrada') estados.push({ key: 'cerrar', label: 'Cerrar publicación', danger: true, onSelect: () => setConfirmarCierre(o) });
-      if (estados.length > 0 && items.length > 0) estados[0].separatorBefore = true;
-      items.push(...estados);
-    }
+    const items = [{ key: 'editar', label: 'Editar oferta', onSelect: () => navigate(`/empresa/ofertas/${o.id}/editar`) }];
+    if (o.estado === 'activa') items.push({ key: 'pausar', label: 'Pausar oferta', separatorBefore: true, onSelect: () => cambiarEstado(o, 'pausada') });
+    if (o.estado === 'pausada') items.push({ key: 'reactivar', label: 'Reactivar oferta', separatorBefore: true, onSelect: () => cambiarEstado(o, 'activa') });
+    if (o.estado !== 'cerrada') items.push({ key: 'cerrar', label: 'Cerrar oferta', danger: true, onSelect: () => setConfirmarCierre(o) });
     return items;
   };
 
-  const celdaResponsable = (o) => {
-    const nombre = nombreResponsable(o);
-    if (!nombre) return <span className={styles.sinDato}>Sin responsable asignado</span>;
-    return (
-      <>
-        {nombre}
-        {responsableSuspendido(o) && <small className={styles.sub}>Suspendido</small>}
-      </>
-    );
-  };
-
-  const renderAcciones = (oferta) => (
+  const renderAcciones = (o) => (
     <div className={styles.acciones}>
-      <Link
-        to={`/empresa/postulantes/${oferta.id}`}
-        className="btn-small"
-        aria-label={`Ver candidatos de ${oferta.titulo}`}
-      >
-        Ver candidatos
+      <Link to={`/empresa/postulantes/${o.id}`} className="btn-small" aria-label={`Gestionar candidatos de ${o.titulo}`}>
+        Gestionar candidatos
       </Link>
-      <ActionMenu
-        label={`Más acciones para la oferta ${oferta.titulo}`}
-        items={accionesDe(oferta)}
-        disabled={accionando === oferta.id}
-      />
+      <ActionMenu label={`Más acciones para la oferta ${o.titulo}`} items={accionesDe(o)} disabled={accionando === o.id} />
     </div>
   );
 
-  const hayFiltros = Boolean(estado || moderacion || responsable || q);
+  const hayFiltros = Boolean(estado || moderacion || q);
   const limpiarFiltros = () => { setTexto(''); setParams({}, { replace: true }); };
-
   const total = pagination?.total ?? ofertas.length;
   const primeraCarga = loading && ofertas.length === 0 && !error;
 
@@ -223,8 +170,14 @@ export default function EmpresaOfertasPage() {
       <Toast toast={toast} />
 
       <PageHeader
-        title="Ofertas"
-        subtitle="Supervisá las publicaciones de tu empresa y su estado."
+        title="Mis ofertas"
+        subtitle="Gestioná las publicaciones que tenés asignadas."
+        actions={(
+          <Link to="/empresa/nueva-oferta" className="btn-primary">
+            <Icon name="plus" size={18} strokeWidth={2.2} />
+            Nueva oferta
+          </Link>
+        )}
       />
 
       {error && <p className={`error-msg ${styles.error}`} role="alert">{error}</p>}
@@ -233,26 +186,12 @@ export default function EmpresaOfertasPage() {
         <div className={styles.fila}>
           <div className={styles.busqueda}>
             <SearchField
-              id="busqueda-oferta"
-              label="Buscar ofertas"
-              placeholder="Buscar por título, área o responsable…"
+              id="busqueda-mis-ofertas"
+              label="Buscar en mis ofertas"
+              placeholder="Buscar por título o área…"
               value={texto}
               onChange={setTexto}
             />
-          </div>
-          <div className={styles.campo}>
-            <label htmlFor="filtro-responsable" className={styles.srOnly}>Responsable</label>
-            <select
-              id="filtro-responsable"
-              value={responsable}
-              onChange={(e) => setFiltro('responsable', e.target.value)}
-            >
-              <option value="">Todos los responsables</option>
-              {reclutadores.map((r) => (
-                <option key={r.id} value={r.id}>{r.nombre}{r.activo ? '' : ' (suspendido)'}</option>
-              ))}
-              <option value="sin">Sin responsable asignado</option>
-            </select>
           </div>
         </div>
         <div className={styles.grupos}>
@@ -268,7 +207,7 @@ export default function EmpresaOfertasPage() {
       </div>
 
       <p className={styles.resultados} role="status" aria-live="polite">
-        {loading ? 'Buscando…' : `${total} oferta${total !== 1 ? 's' : ''} encontrada${total !== 1 ? 's' : ''}`}
+        {loading ? 'Buscando…' : `${total} oferta${total !== 1 ? 's' : ''}`}
       </p>
 
       {primeraCarga ? (
@@ -276,25 +215,25 @@ export default function EmpresaOfertasPage() {
       ) : ofertas.length === 0 && !error ? (
         <EmptyState
           iconName="briefcase"
-          title={hayFiltros ? 'No hay ofertas con esos criterios.' : 'La empresa todavía no tiene ofertas publicadas.'}
-          hint={hayFiltros
-            ? 'Probá con otro texto o quitá algún filtro.'
-            : (esAdminEmpresa ? 'Las ofertas las publican los reclutadores del equipo.' : undefined)}
+          title={hayFiltros ? 'No tenés ofertas con esos criterios.' : 'Todavía no tenés ofertas asignadas.'}
+          hint={hayFiltros ? 'Probá con otro texto o quitá algún filtro.' : 'Publicá tu primera oferta para empezar a recibir postulaciones.'}
         >
-          {hayFiltros && <button type="button" className="btn-secondary" onClick={limpiarFiltros}>Limpiar filtros</button>}
+          {hayFiltros
+            ? <button type="button" className="btn-secondary" onClick={limpiarFiltros}>Limpiar filtros</button>
+            : <Link to="/empresa/nueva-oferta" className="btn-primary">Nueva oferta</Link>}
         </EmptyState>
       ) : ofertas.length > 0 && (
         <div className={loading ? styles.recargando : undefined} aria-busy={loading}>
           {esTabla ? (
-            <TableResponsive minWidth={880}>
+            <TableResponsive minWidth={860}>
               <thead>
                 <tr>
                   <th>Oferta</th>
-                  <th>Responsable</th>
                   <th>Estado</th>
                   <th>Moderación</th>
-                  <th>Vacantes / Postulados</th>
-                  <th>Publicada</th>
+                  <th>Candidatos</th>
+                  <th>Vacantes</th>
+                  <th>Cierre</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -305,11 +244,11 @@ export default function EmpresaOfertasPage() {
                       <strong>{o.titulo}</strong>
                       <small className={styles.sub}>{[o.area, o.modalidad].filter(Boolean).join(' · ') || '—'}</small>
                     </td>
-                    <td className="cell-break">{celdaResponsable(o)}</td>
                     <td><EstadoBadge estado={o.estado} /></td>
                     <td><ModeracionBadge estado={o.estadoModeracion} /></td>
-                    <td className={styles.numeros}>{o.cantidadVacantes ?? '—'} / <strong>{o.totalPostulaciones}</strong></td>
-                    <td className={styles.fecha}>{fechaCorta(o)}</td>
+                    <td className={styles.numeros}><strong>{o.totalPostulaciones}</strong></td>
+                    <td className={styles.numeros}>{o.cantidadVacantes ?? '—'}</td>
+                    <td className={styles.fecha}>{fechaCorta(o.fechaLimite)}</td>
                     <td>{renderAcciones(o)}</td>
                   </tr>
                 ))}
@@ -324,15 +263,10 @@ export default function EmpresaOfertasPage() {
                   subtitle={[o.area, o.modalidad].filter(Boolean).join(' · ') || undefined}
                   badge={<EstadoBadge estado={o.estado} />}
                   fields={[
-                    {
-                      label: 'Responsable',
-                      value: nombreResponsable(o)
-                        ? `${nombreResponsable(o)}${responsableSuspendido(o) ? ' (suspendido)' : ''}`
-                        : 'Sin responsable asignado',
-                    },
                     { label: 'Moderación', value: <ModeracionBadge estado={o.estadoModeracion} /> },
-                    { label: 'Vacantes / Postulados', value: `${o.cantidadVacantes ?? '—'} / ${o.totalPostulaciones}` },
-                    { label: 'Publicada', value: fechaCorta(o) },
+                    { label: 'Candidatos', value: String(o.totalPostulaciones) },
+                    { label: 'Vacantes', value: o.cantidadVacantes != null ? String(o.cantidadVacantes) : null },
+                    { label: 'Cierre', value: o.fechaLimite ? fechaCorta(o.fechaLimite) : null },
                   ]}
                   actions={renderAcciones(o)}
                 />
@@ -343,16 +277,6 @@ export default function EmpresaOfertasPage() {
       )}
 
       {!primeraCarga && <Paginacion pagination={pagination} onPageChange={setPage} />}
-
-      {ofertaResponsable && (
-        <AsignarResponsableModal
-          oferta={ofertaResponsable}
-          reclutadores={reclutadores.filter((r) => r.activo)}
-          empresaNombre={empresa?.razonSocial}
-          onClose={() => setOfertaResponsable(null)}
-          onAsignado={responsableAsignado}
-        />
-      )}
 
       {confirmarCierre && (
         <ConfirmModal

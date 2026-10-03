@@ -6,6 +6,10 @@
  * el permiso de quién puede llegar a este formulario lo resuelve cada
  * página (reclutador para crear; reclutador responsable para editar).
  *
+ * Cuatro secciones (Card): Información del puesto · Condiciones · Perfil
+ * buscado · Publicación. No hay selector de responsable: una oferta nueva queda
+ * a cargo de quien la crea, y reasignarla es tarea del administrador de empresa.
+ *
  * Campos de empresa/puesto:
  *   titulo, descripcion, requisitos, area, modalidad, modalidadExtendida,
  *   ciudad, cantidadVacantes, remuneracion, salario, beneficios,
@@ -19,6 +23,9 @@
  */
 
 import { useState } from 'react';
+import PageHeader from '../../components/ui/PageHeader';
+import Card from '../../components/ui/Card';
+import Icon from '../../components/ui/Icon';
 import styles from './CrearOfertaPage.module.css';
 
 // Carreras del instituto (lista canónica de catalogos.json)
@@ -39,19 +46,16 @@ const CARRERAS_INSTITUTO = [
 const TIPO_PUESTO_CONFIG = {
   pasante: {
     label:    'Pasante',
-    emoji:    '🎓',
     desc:     'Rol educativo. Sin requerimiento de experiencia laboral previa.',
     forzarSinExp: true,
   },
   trainee: {
     label:    'Trainee',
-    emoji:    '🌱',
     desc:     'Incorporación con acompañamiento. Puede valorarse experiencia en proyectos académicos.',
     forzarSinExp: false,
   },
   junior: {
     label:    'Junior',
-    emoji:    '💼',
     desc:     'Requiere habilidades comprobables o experiencia inicial.',
     forzarSinExp: false,
   },
@@ -79,6 +83,8 @@ const FORM_OFERTA_INICIAL = {
 
 export default function OfertaForm({
   titulo,
+  subtitulo,
+  aviso,
   submitLabel,
   submitLabelLoading,
   initialForm = FORM_OFERTA_INICIAL,
@@ -140,210 +146,221 @@ export default function OfertaForm({
   const tipoCfg = TIPO_PUESTO_CONFIG[form.tipoPuesto] ?? {};
 
   return (
-    <div className="page-container">
-      <h1>{titulo}</h1>
+    <div className={`page-container ${styles.pagina}`}>
+      <PageHeader title={titulo} subtitle={subtitulo} />
 
-      <form onSubmit={handleSubmit} className="oferta-form">
+      {aviso}
 
-        {/* ── Información principal ─────────────────────────────────────── */}
-        <div className="form-group">
-          <label htmlFor="titulo">Título del puesto *</label>
-          <input
-            id="titulo" name="titulo" value={form.titulo} onChange={handleChange} required
-            placeholder="Ej: Pasantía en Desarrollo Web"
-          />
-        </div>
+      <form onSubmit={handleSubmit} className={styles.form}>
 
-        <div className="form-group">
-          <label htmlFor="descripcion">Descripción *</label>
-          <textarea
-            id="descripcion" name="descripcion" value={form.descripcion} onChange={handleChange} required
-            rows={5} placeholder="Describí las responsabilidades y el contexto del puesto..."
-          />
-        </div>
+        {/* ── 1. Información del puesto ─────────────────────────────────── */}
+        <Card as="section" titleId="sec-puesto" title="Información del puesto" className={styles.seccion}>
+          <div className={styles.campos}>
+            <div className="form-group">
+              <label htmlFor="titulo">Título del puesto *</label>
+              <input
+                id="titulo" name="titulo" value={form.titulo} onChange={handleChange} required
+                placeholder="Ej: Pasantía en Desarrollo Web"
+              />
+            </div>
 
-        <div className="form-group">
-          <label htmlFor="requisitos">Requisitos</label>
-          <textarea
-            id="requisitos" name="requisitos" value={form.requisitos} onChange={handleChange}
-            rows={3} placeholder="Ej: Conocimientos básicos en React y Node.js..."
-          />
-        </div>
+            <div className="form-group">
+              <label htmlFor="descripcion">Descripción *</label>
+              <textarea
+                id="descripcion" name="descripcion" value={form.descripcion} onChange={handleChange} required
+                rows={5} placeholder="Describí las responsabilidades y el contexto del puesto..."
+              />
+            </div>
 
-        {/* ── Tipo de puesto ────────────────────────────────────────────── */}
-        <div className="form-group">
-          <span className="form-group-label">Tipo de puesto *</span>
-          <div className={styles.tipoGrid}>
-            {Object.entries(TIPO_PUESTO_CONFIG).map(([value, cfg]) => (
-              <label
-                key={value}
-                className={`${styles.tipoCard} ${form.tipoPuesto === value ? styles.tipoCardActiva : ''}`}
-              >
+            <div className="form-group">
+              <label htmlFor="requisitos">Requisitos</label>
+              <textarea
+                id="requisitos" name="requisitos" value={form.requisitos} onChange={handleChange}
+                rows={3} placeholder="Ej: Conocimientos básicos en React y Node.js..."
+              />
+            </div>
+
+            <div className="form-group">
+              <span className="form-group-label" id="tipo-puesto-label">Tipo de puesto *</span>
+              <div className={styles.tipoGrid} role="radiogroup" aria-labelledby="tipo-puesto-label">
+                {Object.entries(TIPO_PUESTO_CONFIG).map(([value, cfg]) => (
+                  <label
+                    key={value}
+                    className={`${styles.tipoCard} ${form.tipoPuesto === value ? styles.tipoCardActiva : ''}`}
+                  >
+                    <input
+                      type="radio" name="tipoPuesto" value={value}
+                      checked={form.tipoPuesto === value}
+                      onChange={() => handleTipoPuesto(value)}
+                    />
+                    <div>
+                      <strong className={styles.tipoNombre}>{cfg.label}</strong>
+                      <p className={styles.tipoDesc}>{cfg.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* ── 2. Condiciones ────────────────────────────────────────────── */}
+        <Card as="section" titleId="sec-condiciones" title="Condiciones" className={styles.seccion}>
+          <div className={styles.campos}>
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="modalidad">Modalidad de trabajo</label>
+                <select id="modalidad" name="modalidad" value={form.modalidad} onChange={handleChange}>
+                  <option value="presencial">Presencial</option>
+                  <option value="remoto">Remoto</option>
+                  <option value="hibrido">Híbrido</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label htmlFor="modalidadExtendida">Tipo de jornada</label>
+                <select id="modalidadExtendida" name="modalidadExtendida" value={form.modalidadExtendida} onChange={handleChange}>
+                  <option value="tiempo_completo">Tiempo completo</option>
+                  <option value="medio_tiempo">Medio tiempo</option>
+                  <option value="pasantia">Pasantía</option>
+                  <option value="freelance">Freelance / Por proyecto</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="ciudad">Ciudad</label>
                 <input
-                  type="radio" name="tipoPuesto" value={value}
-                  checked={form.tipoPuesto === value}
-                  onChange={() => handleTipoPuesto(value)}
+                  id="ciudad" name="ciudad" value={form.ciudad} onChange={handleChange}
+                  placeholder="Ej: Avellaneda"
                 />
-                <div>
-                  <strong className={styles.tipoNombre}>
-                    {cfg.emoji} {cfg.label}
-                  </strong>
-                  <p className={styles.tipoDesc}>{cfg.desc}</p>
-                </div>
+              </div>
+              <div className="form-group">
+                <label htmlFor="cantidadVacantes">Cantidad de vacantes</label>
+                <input
+                  id="cantidadVacantes" type="number" name="cantidadVacantes" value={form.cantidadVacantes}
+                  onChange={handleChange} min={1} max={999}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="remuneracion">Remuneración (visible para los alumnos)</label>
+                <input
+                  id="remuneracion" name="remuneracion" value={form.remuneracion} onChange={handleChange}
+                  placeholder="Ej: A convenir / $200.000"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="salario">Salario estimado (interno, no se publica)</label>
+                <input
+                  id="salario" name="salario" value={form.salario} onChange={handleChange}
+                  placeholder="Ej: 150000"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="beneficios">Beneficios</label>
+              <input
+                id="beneficios" name="beneficios" value={form.beneficios} onChange={handleChange}
+                placeholder="Ej: Capacitaciones, comedor, certificado"
+              />
+            </div>
+          </div>
+        </Card>
+
+        {/* ── 3. Perfil buscado ─────────────────────────────────────────── */}
+        <Card as="section" titleId="sec-perfil" title="Perfil buscado" className={styles.seccion}>
+          <div className={styles.campos}>
+            <div className="form-group">
+              <label htmlFor="area">Área</label>
+              <input
+                id="area" name="area" value={form.area} onChange={handleChange}
+                placeholder="Ej: Programación, Marketing..."
+              />
+            </div>
+
+            <div className="form-group">
+              <label className={`${styles.checkLabel} ${tipoCfg.forzarSinExp ? styles.checkLabelDisabled : ''}`}>
+                <input
+                  type="checkbox"
+                  name="requiereExperiencia"
+                  checked={form.requiereExperiencia}
+                  onChange={handleChange}
+                  disabled={tipoCfg.forzarSinExp}
+                />
+                Requiere experiencia previa
+                {tipoCfg.forzarSinExp && (
+                  <span className={styles.hint}>(no aplica para pasantes)</span>
+                )}
               </label>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        {/* ── Experiencia ────────────────────────────────────────────────── */}
-        <div className="form-group">
-          <label className={`${styles.checkLabel} ${tipoCfg.forzarSinExp ? styles.checkLabelDisabled : ''}`}>
-            <input
-              type="checkbox"
-              name="requiereExperiencia"
-              checked={form.requiereExperiencia}
-              onChange={handleChange}
-              disabled={tipoCfg.forzarSinExp}
-            />
-            Requiere experiencia previa
-            {tipoCfg.forzarSinExp && (
-              <span className={styles.hint}>(no aplica para pasantes)</span>
+            {form.requiereExperiencia && (
+              <div className="form-group">
+                <label htmlFor="experienciaDetalle">Detalle de experiencia requerida</label>
+                <textarea
+                  id="experienciaDetalle" name="experienciaDetalle" value={form.experienciaDetalle} onChange={handleChange}
+                  rows={2} placeholder="Ej: Proyectos académicos comprobables o 6 meses de experiencia en área similar"
+                />
+              </div>
             )}
-          </label>
-        </div>
 
-        {form.requiereExperiencia && (
-          <div className="form-group">
-            <label htmlFor="experienciaDetalle">Detalle de experiencia requerida</label>
-            <textarea
-              id="experienciaDetalle" name="experienciaDetalle" value={form.experienciaDetalle} onChange={handleChange}
-              rows={2} placeholder="Ej: Proyectos académicos comprobables o 6 meses de experiencia en área similar"
-            />
+            <div className="form-group">
+              <span className="form-group-label">
+                Carreras destinatarias
+                <span className={styles.labelHint}>
+                  (opcional — a qué carreras está orientada la oferta)
+                </span>
+              </span>
+              <div className={styles.chips}>
+                {CARRERAS_INSTITUTO.map(carrera => {
+                  const activa = carrerasDestinatarias.includes(carrera);
+                  return (
+                    <label
+                      key={carrera}
+                      className={`${styles.chip} ${activa ? styles.chipActiva : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={activa}
+                        onChange={() => handleCarreraToggle(carrera)}
+                      />
+                      {activa && <Icon name="check" size={14} strokeWidth={2.4} />}
+                      {carrera}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        )}
+        </Card>
 
-        {/* ── Área + Modalidad ──────────────────────────────────────────── */}
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="area">Área</label>
-            <input
-              id="area" name="area" value={form.area} onChange={handleChange}
-              placeholder="Ej: Programación, Marketing..."
-            />
+        {/* ── 4. Publicación ────────────────────────────────────────────── */}
+        <Card as="section" titleId="sec-publicacion" title="Publicación" className={styles.seccion}>
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="fechaPublicacion">Fecha de publicación</label>
+              <input id="fechaPublicacion" type="date" name="fechaPublicacion" value={form.fechaPublicacion} onChange={handleChange} />
+            </div>
+            <div className="form-group">
+              <label htmlFor="fechaLimite">Fecha límite de postulación</label>
+              <input id="fechaLimite" type="date" name="fechaLimite" value={form.fechaLimite} onChange={handleChange} />
+            </div>
           </div>
-          <div className="form-group">
-            <label htmlFor="modalidad">Modalidad de trabajo</label>
-            <select id="modalidad" name="modalidad" value={form.modalidad} onChange={handleChange}>
-              <option value="presencial">Presencial</option>
-              <option value="remoto">Remoto</option>
-              <option value="hibrido">Híbrido</option>
-            </select>
-          </div>
-        </div>
+        </Card>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="modalidadExtendida">Tipo de jornada</label>
-            <select id="modalidadExtendida" name="modalidadExtendida" value={form.modalidadExtendida} onChange={handleChange}>
-              <option value="tiempo_completo">Tiempo completo</option>
-              <option value="medio_tiempo">Medio tiempo</option>
-              <option value="pasantia">Pasantía</option>
-              <option value="freelance">Freelance / Por proyecto</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label htmlFor="ciudad">Ciudad</label>
-            <input
-              id="ciudad" name="ciudad" value={form.ciudad} onChange={handleChange}
-              placeholder="Ej: Avellaneda"
-            />
-          </div>
-        </div>
+        {error && <p className="error-msg" role="alert">{error}</p>}
 
-        {/* ── Vacantes + Remuneración ───────────────────────────────────── */}
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="cantidadVacantes">Cantidad de vacantes</label>
-            <input
-              id="cantidadVacantes" type="number" name="cantidadVacantes" value={form.cantidadVacantes}
-              onChange={handleChange} min={1} max={999}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="remuneracion">Remuneración (visible)</label>
-            <input
-              id="remuneracion" name="remuneracion" value={form.remuneracion} onChange={handleChange}
-              placeholder="Ej: A convenir / $200.000"
-            />
-          </div>
-        </div>
-
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="salario">Salario estimado (interno)</label>
-            <input
-              id="salario" name="salario" value={form.salario} onChange={handleChange}
-              placeholder="Ej: 150000"
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="beneficios">Beneficios</label>
-            <input
-              id="beneficios" name="beneficios" value={form.beneficios} onChange={handleChange}
-              placeholder="Ej: Capacitaciones, comedor, certificado"
-            />
-          </div>
-        </div>
-
-        {/* ── Fechas ────────────────────────────────────────────────────── */}
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="fechaPublicacion">Fecha de publicación</label>
-            <input id="fechaPublicacion" type="date" name="fechaPublicacion" value={form.fechaPublicacion} onChange={handleChange} />
-          </div>
-          <div className="form-group">
-            <label htmlFor="fechaLimite">Fecha límite de postulación</label>
-            <input id="fechaLimite" type="date" name="fechaLimite" value={form.fechaLimite} onChange={handleChange} />
-          </div>
-        </div>
-
-        {/* ── Carreras destinatarias ────────────────────────────────────── */}
-        <div className="form-group">
-          <span className="form-group-label">
-            Carreras destinatarias
-            <span className={styles.labelHint}>
-              (opcional — seleccioná las carreras a las que está orientada la oferta)
-            </span>
-          </span>
-          <div className={styles.chips}>
-            {CARRERAS_INSTITUTO.map(carrera => {
-              const activa = carrerasDestinatarias.includes(carrera);
-              return (
-                <label
-                  key={carrera}
-                  className={`${styles.chip} ${activa ? styles.chipActiva : ''}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={activa}
-                    onChange={() => handleCarreraToggle(carrera)}
-                  />
-                  {activa ? '✓ ' : ''}{carrera}
-                </label>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* ── Error + Submit ────────────────────────────────────────────── */}
-        {error && <p className="error-msg">{error}</p>}
-
-        <div className={styles.acciones}>
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? submitLabelLoading : submitLabel}
-          </button>
-          <button type="button" className="btn-secondary" onClick={onCancel}>
+        <div className={styles.footer}>
+          <button type="button" className="btn-secondary" onClick={onCancel} disabled={loading}>
             Cancelar
+          </button>
+          <button type="submit" className="btn-primary" disabled={loading}>
+            <Icon name="check" size={18} strokeWidth={2.2} />
+            {loading ? submitLabelLoading : submitLabel}
           </button>
         </div>
 

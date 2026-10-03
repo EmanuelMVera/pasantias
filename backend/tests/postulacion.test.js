@@ -63,12 +63,10 @@ describe('POSTULACION', () => {
     const { usuario: alumno, passwordPlana: passAlumno } = await crearAlumno();
     idsUsuarios.push(alumno.id);
     const { empresa } = await crearEmpresaConAdmin();
-    // RBAC-02: cambiar estado ya no lo hace admin_empresa — se necesita un
-    // reclutador responsable de la oferta (huérfana, sin creadaPorUsuarioId,
-    // así que cualquier reclutador activo de la empresa lo es).
+    // Cambiar estado es del reclutador RESPONSABLE de la oferta.
     const { usuarioReclutador, passwordPlana: passReclutador } = await agregarReclutador(empresa);
     idsUsuarios.push(usuarioReclutador.id);
-    const oferta = await crearOferta(empresa);
+    const oferta = await crearOferta(empresa, { creadaPorUsuarioId: usuarioReclutador.id });
 
     const tokenAlumno = await loginYObtenerToken(alumno.email, passAlumno);
     const postulacionRes = await request(app)
@@ -167,7 +165,7 @@ describe('POSTULACION', () => {
       expect(res.body.data.length).toBe(1);
     });
 
-    test('reclutador puede ver candidatos de una oferta de otro reclutador de su empresa, pero no gestionarlos', async () => {
+    test('reclutador NO ve ni gestiona los candidatos de una oferta de otro reclutador de su empresa', async () => {
       const { usuario: alumno } = await crearAlumno();
       idsUsuarios.push(alumno.id);
       const { empresa } = await crearEmpresaConAdmin();
@@ -183,7 +181,9 @@ describe('POSTULACION', () => {
       const ver = await request(app)
         .get(`/api/postulaciones/oferta/${oferta.id}`)
         .set('Authorization', `Bearer ${tokenOtro}`);
-      expect(ver.status).toBe(200);
+      expect(ver.status).toBe(403);
+      expect(ver.body.code).toBe('NO_ES_RESPONSABLE');
+      expect(ver.body.data).toBeUndefined();
 
       const gestionar = await request(app)
         .patch(`/api/postulaciones/${postulacion.id}/estado`)
@@ -192,7 +192,7 @@ describe('POSTULACION', () => {
       expect(gestionar.status).toBe(403);
     });
 
-    test('oferta huérfana (sin creadaPorUsuarioId): cualquier reclutador activo de la empresa puede gestionar sus candidatos', async () => {
+    test('oferta sin responsable: ningún reclutador ve ni gestiona sus candidatos hasta que el admin_empresa la asigne', async () => {
       const { usuario: alumno } = await crearAlumno();
       idsUsuarios.push(alumno.id);
       const { empresa } = await crearEmpresaConAdmin();
@@ -207,7 +207,13 @@ describe('POSTULACION', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({ estado: 'preseleccionado' });
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('NO_ES_RESPONSABLE');
+
+      const ver = await request(app)
+        .get(`/api/postulaciones/oferta/${ofertaHuerfana.id}`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(ver.status).toBe(403);
     });
   });
 });

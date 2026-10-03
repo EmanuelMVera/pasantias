@@ -499,13 +499,11 @@ test.describe('Administrador de empresa — cierre: perfiles del chat y responsa
     await expect(pendiente).toContainText(RECLUTADORA);
     await expect(pendiente).not.toContainText('Sin responsable asignado');
 
-    // Ya no quedan ofertas sin responsable: el filtro y el resumen lo reflejan.
+    // Sin responsable queda solo la oferta histórica del seed: el filtro lo refleja.
     await page.getByLabel('Responsable', { exact: true }).selectOption('sin');
-    await expect(page.getByText(/no hay ofertas con esos criterios/i)).toBeVisible();
-    await page.goto('/empresa');
-    const recientes = page.getByRole('region', { name: 'Ofertas recientes' });
-    await expect(recientes).toContainText(fx.ofertaPendiente.titulo);
-    await expect(recientes).not.toContainText('Sin responsable asignado');
+    await expect(page.locator('tbody tr')).toHaveCount(1);
+    await expect(page.locator('tbody tr')).toContainText(fx.ofertaHistorica.titulo);
+    await expect(page.locator('tbody tr').filter({ hasText: fx.ofertaPendiente.titulo })).toHaveCount(0);
   });
 
   test('Ofertas: cambiar responsable pide confirmación explícita con el traspaso', async ({ page }) => {

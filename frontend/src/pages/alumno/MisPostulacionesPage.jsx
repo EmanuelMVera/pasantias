@@ -167,14 +167,6 @@ export default function MisPostulacionesPage() {
                       {p.oferta?.modalidad && <span>💼 {p.oferta.modalidad}</span>}
                     </div>
 
-                    {/* Observaciones de la empresa */}
-                    {p.observacionesEmpresa && (
-                      <div className={styles.observaciones}>
-                        <span className={styles.observacionesLabel}>💬 Comentario de la empresa:</span>
-                        <p className={styles.observacionesTexto}>{p.observacionesEmpresa}</p>
-                      </div>
-                    )}
-
                     {/* Acciones */}
                     <div className={styles.cardActions}>
                       {p.oferta?.id && (

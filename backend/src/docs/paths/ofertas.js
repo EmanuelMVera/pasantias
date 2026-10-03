@@ -45,7 +45,7 @@ module.exports = {
     }),
     put: operation({
       tag: T, id: 'ofertasUpdate', summary: 'Editar el contenido de una oferta de mi empresa',
-      description: 'Solo el reclutador responsable (`creadaPorUsuarioId`) — o cualquier reclutador si la oferta es histórica sin responsable registrado. No acepta `estado`; usar `PATCH /{id}/estado`.',
+      description: 'Solo el reclutador responsable (`creadaPorUsuarioId`); una oferta sin responsable no la edita nadie hasta que el admin_empresa le asigne uno. No acepta `estado` (usar `PATCH /{id}/estado`) ni permite cambiar la moderación o el responsable. Editar una oferta **rechazada** la reenvía a revisión: vuelve a `pendiente` y se avisa al instituto, también en empresas de confianza.',
       roles: R_CREA_EDITA, csrf: true, params: ['id'], body: 'OfertaUpdate',
       responses: { 200: ok('Oferta') },
       errors: ['400', '401', '403', '403csrf', '404', '500'],

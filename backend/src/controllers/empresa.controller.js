@@ -20,21 +20,39 @@ const CAMPOS_EDITABLES_EMPRESA = [
 
 const _resolverEmpresa = empresaService.resolverEmpresaDelRequest;
 
+/**
+ * Alcance obligatorio del actor sobre ofertas y candidatos:
+ *   - admin_empresa → toda la empresa (null);
+ *   - reclutador    → solo las ofertas a su cargo (su id de usuario).
+ * Se aplica en el servidor antes que cualquier filtro del query.
+ */
+const responsableIdDe = (req) => (req.miembroEmpresa?.rolInterno === 'reclutador' ? req.usuario.id : null);
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
 exports.getDashboard = async (req, res) => {
   const empresa = await _resolverEmpresa(req);
   if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
 
+  const datosEmpresa = { id: empresa.id, razonSocial: empresa.razonSocial, estadoAprobacion: empresa.estadoAprobacion };
+  const rolEnEquipo = req.miembroEmpresa?.rolInterno || null;
+
+  // Reclutador: panel PERSONAL (solo sus ofertas y candidatos). Las métricas
+  // corporativas son del administrador de empresa.
+  const responsableId = responsableIdDe(req);
+  if (responsableId) {
+    const panel = await empresaService.obtenerPanelReclutador(empresa.id, responsableId);
+    return res.json({
+      success: true,
+      data: { empresa: datosEmpresa, rolEnEquipo, alcance: 'reclutador', ...panel },
+    });
+  }
+
   const metricas = await empresaService.obtenerMetricasDashboard(empresa.id);
 
   return res.json({
     success: true,
-    data: {
-      empresa: { id: empresa.id, razonSocial: empresa.razonSocial, estadoAprobacion: empresa.estadoAprobacion },
-      rolEnEquipo: req.miembroEmpresa?.rolInterno || null,
-      ...metricas,
-    },
+    data: { empresa: datosEmpresa, rolEnEquipo, alcance: 'empresa', ...metricas },
   });
 };
 
@@ -51,9 +69,21 @@ exports.getMisOfertas = async (req, res) => {
     estadoModeracion: req.query.estadoModeracion,
     responsable: req.query.responsable,
     q: req.query.q,
+    responsableId: responsableIdDe(req),
     page, limit, offset,
   });
   return res.json({ success: true, data, pagination, total: pagination.total });
+};
+
+// Detalle completo de una oferta de la empresa (para editarla o consultarla),
+// en cualquier estado. Reclutador: solo si está a su cargo.
+exports.getOfertaDeEmpresa = async (req, res) => {
+  const empresa = await _resolverEmpresa(req);
+  if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
+
+  const oferta = await empresaService.obtenerOfertaDeEmpresa(empresa.id, req.params.id, responsableIdDe(req));
+  if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
+  return res.json({ success: true, data: oferta });
 };
 
 // ── Responsable de una oferta (gobierno: solo admin_empresa) ──────────────────
@@ -185,6 +215,8 @@ exports.getAllCandidatos = async (req, res) => {
     estado: req.query.estado,
     responsable: req.query.responsable,
     ofertaId: req.query.ofertaId,
+    q: req.query.q,
+    responsableId: responsableIdDe(req),
     page, limit, offset,
   });
   return res.json({ success: true, data, pagination, conteoPorEstado, total: pagination.total });

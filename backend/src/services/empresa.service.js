@@ -217,14 +217,19 @@ function whereResponsable(responsable) {
  *   - responsable: id del usuario creador, o 'sin'
  *   - q: texto en título, área o nombre/apellido del responsable
  * Valores inválidos se ignoran (no filtran).
+ *
+ * ALCANCE OBLIGATORIO: con `responsableId` (lo pasa el controller cuando quien
+ * consulta es un reclutador) solo se devuelven las ofertas a su cargo, y el
+ * filtro `responsable` del query se ignora: no sirve para ampliar el alcance.
  */
 async function obtenerOfertasConConteo(empresaId, {
-  estado, estadoModeracion, responsable, q, page = 1, limit = 20, offset = 0,
+  estado, estadoModeracion, responsable, q, responsableId = null, page = 1, limit = 20, offset = 0,
 } = {}) {
   const where = { empresaId };
   if (ESTADOS_OFERTA.includes(estado)) where.estado = estado;
   if (ESTADOS_MODERACION.includes(estadoModeracion)) where.estadoModeracion = estadoModeracion;
-  Object.assign(where, whereResponsable(responsable) || {});
+  if (responsableId) where.creadaPorUsuarioId = responsableId;
+  else Object.assign(where, whereResponsable(responsable) || {});
 
   const texto = typeof q === 'string' ? q.trim().slice(0, 100) : '';
   if (texto) {
@@ -263,15 +268,22 @@ async function obtenerOfertasConConteo(empresaId, {
  * (GET /api/empresas/candidatos). Vista de supervisión: cada fila incluye la
  * oferta y su reclutador responsable.
  *
- * Filtros server-side, antes de paginar: `estado`, `responsable` (id | 'sin')
- * y `ofertaId`. `conteoPorEstado` se calcula sobre el alcance filtrado por
- * responsable/oferta (sin el filtro de estado), así los contadores de las
+ * Filtros server-side, antes de paginar: `estado`, `responsable` (id | 'sin'),
+ * `ofertaId` y `q` (nombre, apellido o email del candidato).
+ * `conteoPorEstado` se calcula sobre el alcance filtrado por
+ * responsable/oferta/q (sin el filtro de estado), así los contadores de las
  * pestañas de estado corresponden a lo que se está mirando.
+ *
+ * ALCANCE OBLIGATORIO: con `responsableId` (reclutador) solo entran las
+ * postulaciones de las ofertas a su cargo; el filtro `responsable` se ignora.
+ * Todos los demás filtros se aplican DENTRO de ese alcance.
  */
 async function obtenerCandidatosConFoto(empresaId, {
-  estado, responsable, ofertaId, page = 1, limit = 20, offset = 0,
+  estado, responsable, ofertaId, q, responsableId = null, page = 1, limit = 20, offset = 0,
 } = {}) {
-  const whereOfertas = { empresaId, ...(whereResponsable(responsable) || {}) };
+  const whereOfertas = responsableId
+    ? { empresaId, creadaPorUsuarioId: responsableId }
+    : { empresaId, ...(whereResponsable(responsable) || {}) };
   const idOferta = Number(ofertaId);
   if (Number.isInteger(idOferta) && idOferta > 0) whereOfertas.id = idOferta;
 
@@ -282,6 +294,35 @@ async function obtenerCandidatosConFoto(empresaId, {
   if (ofertaIds.length === 0) return vacio;
 
   const scope = { ofertaId: { [Op.in]: ofertaIds } };
+
+  // Búsqueda por candidato: se resuelve a ids de usuario DENTRO del alcance, así
+  // la lista, la paginación y los conteos usan exactamente el mismo conjunto.
+  const texto = typeof q === 'string' ? q.trim().slice(0, 100) : '';
+  if (texto) {
+    const patron = `%${escaparLike(texto)}%`;
+    const coincidencias = await Postulacion.findAll({
+      where: scope,
+      attributes: ['usuarioId'],
+      include: [{
+        model: Usuario,
+        as: 'usuario',
+        attributes: [],
+        required: true,
+        where: {
+          [Op.or]: [
+            { nombre: { [Op.iLike]: patron } },
+            { apellido: { [Op.iLike]: patron } },
+            { email: { [Op.iLike]: patron } },
+          ],
+        },
+      }],
+      raw: true,
+    });
+    const usuarioIds = [...new Set(coincidencias.map((c) => c.usuarioId))];
+    if (usuarioIds.length === 0) return vacio;
+    scope.usuarioId = { [Op.in]: usuarioIds };
+  }
+
   const where = estado ? { ...scope, estado } : scope;
 
   const [{ count, rows: postulaciones }, conteoPorEstado] = await Promise.all([
@@ -326,6 +367,132 @@ async function obtenerCandidatosConFoto(empresaId, {
   });
 
   return { data, pagination: buildPagination(count, { page, limit }), conteoPorEstado };
+}
+
+// ── Workspace del reclutador ────────────────────────────────────────────────
+
+const DIAS_CIERRE_PROXIMO = 7;
+const MAX_PROCESOS_INICIO = 5;
+
+/**
+ * Panel PERSONAL del reclutador (GET /api/empresas/dashboard cuando quien
+ * consulta es un reclutador). Todo sale de las ofertas a su cargo
+ * (`creadaPorUsuarioId = usuarioId`): nunca métricas de la empresa ni de otros
+ * reclutadores.
+ *
+ * Dos consultas fijas, sin N+1: sus ofertas y un GROUP BY (oferta, estado) de
+ * las postulaciones. De ahí se derivan los KPIs, los procesos activos y la
+ * lista "Para atender" — no hay tabla de tareas: son pendientes calculados del
+ * estado actual (candidatos en revisión o en entrevista, ofertas pendientes o
+ * rechazadas en moderación, ofertas activas que cierran en ≤ 7 días).
+ */
+async function obtenerPanelReclutador(empresaId, usuarioId) {
+  const ofertas = await Oferta.findAll({
+    where: { empresaId, creadaPorUsuarioId: usuarioId },
+    attributes: ['id', 'titulo', 'estado', 'estadoModeracion', 'fechaLimite', 'createdAt'],
+    order: [['createdAt', 'DESC'], ['id', 'DESC']],
+    raw: true,
+  });
+  const ofertaIds = ofertas.map((o) => o.id);
+
+  const filas = ofertaIds.length
+    ? await Postulacion.findAll({
+      where: { ofertaId: { [Op.in]: ofertaIds } },
+      attributes: ['ofertaId', 'estado', [sequelize.fn('COUNT', sequelize.col('id')), 'total']],
+      group: ['ofertaId', 'estado'],
+      raw: true,
+    })
+    : [];
+
+  const vacio = () => ({ enRevision: 0, preseleccionados: 0, entrevistas: 0, contratados: 0, rechazados: 0 });
+  const CLAVE = {
+    en_revision: 'enRevision', preseleccionado: 'preseleccionados', entrevista: 'entrevistas',
+    contratado: 'contratados', rechazado: 'rechazados',
+  };
+  const porOferta = new Map(ofertaIds.map((id) => [id, vacio()]));
+  const totales = vacio();
+  for (const f of filas) {
+    const clave = CLAVE[f.estado];
+    if (!clave) continue;
+    const n = parseInt(f.total, 10);
+    porOferta.get(f.ofertaId)[clave] += n;
+    totales[clave] += n;
+  }
+  const totalDe = (e) => e.enRevision + e.preseleccionados + e.entrevistas + e.contratados + e.rechazados;
+
+  const ahora = Date.now();
+  const diasParaCierre = (o) => (o.fechaLimite
+    ? Math.ceil((new Date(o.fechaLimite).getTime() - ahora) / (24 * 60 * 60 * 1000))
+    : null);
+
+  // Para atender — solo pendientes reales, sin ítems en 0. Orden: lo que
+  // bloquea una publicación primero, después candidatos, después avisos.
+  const paraAtender = [];
+  const agregar = (tipo, o, extra = {}) => paraAtender.push({ tipo, ofertaId: o.id, titulo: o.titulo, ...extra });
+  for (const o of ofertas) if (o.estadoModeracion === 'rechazada' && o.estado !== 'cerrada') agregar('oferta_rechazada', o);
+  for (const o of ofertas) {
+    const n = porOferta.get(o.id).enRevision;
+    if (n > 0) agregar('candidatos_en_revision', o, { cantidad: n });
+  }
+  for (const o of ofertas) {
+    const n = porOferta.get(o.id).entrevistas;
+    if (n > 0) agregar('candidatos_en_entrevista', o, { cantidad: n });
+  }
+  for (const o of ofertas) {
+    const dias = diasParaCierre(o);
+    const visible = ['aprobada', 'auto_aprobada'].includes(o.estadoModeracion);
+    if (o.estado === 'activa' && visible && dias !== null && dias >= 0 && dias <= DIAS_CIERRE_PROXIMO) {
+      agregar('cierre_proximo', o, { dias, fechaLimite: o.fechaLimite });
+    }
+  }
+  for (const o of ofertas) if (o.estadoModeracion === 'pendiente' && o.estado !== 'cerrada') agregar('oferta_pendiente_moderacion', o);
+
+  // Procesos activos: ofertas no cerradas, primero las que tienen candidatos
+  // esperando revisión (desempate: la más nueva).
+  const procesosActivos = ofertas
+    .filter((o) => o.estado !== 'cerrada')
+    .sort((a, b) => porOferta.get(b.id).enRevision - porOferta.get(a.id).enRevision)
+    .slice(0, MAX_PROCESOS_INICIO)
+    .map((o) => ({
+      oferta: { id: o.id, titulo: o.titulo, estado: o.estado, estadoModeracion: o.estadoModeracion, fechaLimite: o.fechaLimite },
+      totalCandidatos: totalDe(porOferta.get(o.id)),
+      porEstado: porOferta.get(o.id),
+    }));
+
+  return {
+    ofertas: {
+      activas: ofertas.filter((o) => o.estado === 'activa').length,
+      pausadas: ofertas.filter((o) => o.estado === 'pausada').length,
+      cerradas: ofertas.filter((o) => o.estado === 'cerrada').length,
+      pendienteModeracion: ofertas.filter((o) => o.estadoModeracion === 'pendiente').length,
+      rechazadas: ofertas.filter((o) => o.estadoModeracion === 'rechazada').length,
+      total: ofertas.length,
+    },
+    postulaciones: {
+      total: totalDe(totales),
+      enRevision: totales.enRevision,
+      preseleccionados: totales.preseleccionados,
+      entrevistas: totales.entrevistas,
+      contrataciones: totales.contratados,
+    },
+    paraAtender,
+    procesosActivos,
+  };
+}
+
+/**
+ * Una oferta de la empresa con todo su contenido, en cualquier estado (el
+ * detalle público solo devuelve ofertas visibles para alumnos). Con
+ * `responsableId` (reclutador) solo si está a su cargo. null si no corresponde.
+ */
+async function obtenerOfertaDeEmpresa(empresaId, ofertaId, responsableId = null) {
+  if (!esIdValido(ofertaId)) return null;
+  const where = { id: Number(ofertaId), empresaId };
+  if (responsableId) where.creadaPorUsuarioId = responsableId;
+  return Oferta.findOne({
+    where,
+    include: [{ model: Usuario, as: 'creadaPor', attributes: ATRIBUTOS_RESPONSABLE }],
+  });
 }
 
 const esIdValido = (valor) => (typeof valor === 'number' || (typeof valor === 'string' && /^\d+$/.test(valor)))
@@ -450,6 +617,8 @@ async function obtenerPerfilReclutador(solicitante, usuarioId) {
 }
 
 module.exports = {
+  obtenerPanelReclutador,
+  obtenerOfertaDeEmpresa,
   asignarResponsableOferta,
   obtenerPerfilReclutador,
   resolverEmpresaDelRequest,

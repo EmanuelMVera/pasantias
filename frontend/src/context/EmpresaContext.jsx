@@ -1,7 +1,7 @@
 /**
  * EmpresaContext.jsx — Contexto liviano de rol interno y empresa actual (FE-05).
  *
- * Antes: EquipoPage, EmpresaDashboardPage y MiEmpresaPage resolvían
+ * Antes: EquipoPage, el antiguo panel de empresa y MiEmpresaPage resolvían
  * `admin_empresa` vs `reclutador` cada una por su cuenta, con su propio
  * useState + useEffect. MiEmpresaPage llegaba a pedir el dashboard completo
  * (GET /empresas/dashboard) solo para leer un campo y descartar el resto.

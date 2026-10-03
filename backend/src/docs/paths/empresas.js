@@ -33,7 +33,7 @@ module.exports = {
   '/api/empresas/dashboard': {
     get: operation({
       tag: T, id: 'empresasDashboard', summary: 'Métricas del panel corporativo',
-      description: 'Alcance: toda la empresa (no el usuario que consulta). Incluye reclutadores activos, solicitudes de reclutador pendientes, las 5 ofertas con más postulaciones (top global) y las 5 ofertas más recientes con su responsable.',
+      description: 'La respuesta depende de quién consulta (`alcance`). **admin_empresa** → `alcance: "empresa"`: métricas de toda la empresa (reclutadores activos, solicitudes pendientes, top de ofertas y ofertas recientes con su responsable). **reclutador** → `alcance: "reclutador"`: panel PERSONAL, solo de las ofertas a su cargo (`ofertas`, `postulaciones`, `procesosActivos` — máx. 5 — y `paraAtender`: pendientes derivados del estado actual); no incluye `equipo`, `topOfertasPostulaciones` ni `ofertasRecientes`.',
       roles: R_MIEMBRO,
       responses: { 200: ok('DashboardEmpresa') },
       errors: ['401', '404empresa'],
@@ -43,7 +43,7 @@ module.exports = {
   '/api/empresas/mis-ofertas': {
     get: operation({
       tag: T, id: 'empresasMisOfertas', summary: 'Ofertas de mi empresa (con responsable y conteo de postulaciones)',
-      description: 'Los filtros se aplican en el servidor antes de paginar. Valores inválidos se ignoran.',
+      description: 'Alcance obligatorio según el actor: el admin_empresa recibe todas las ofertas de la empresa; el **reclutador solo las que tiene a su cargo** (el filtro `responsable` se ignora para él: no sirve para ampliar el alcance). Los filtros se aplican en el servidor, dentro de ese alcance y antes de paginar. Valores inválidos se ignoran.',
       roles: R_MIEMBRO,
       query: [
         'pageParam', 'limitParam', REF.param('estadoQuery'), REF.param('estadoModeracionQuery'),
@@ -83,6 +83,16 @@ module.exports = {
       bodyDescription: 'multipart/form-data con el campo `logo` (imagen validada, máx. 2 MB).',
       responses: { 200: { description: 'OK', content: { 'application/json': { schema: REF.schema('LogoUploadResponse') } } } },
       errors: ['400', '401', '403', '403csrf', '404empresa', '429'],
+    }),
+  },
+
+  '/api/empresas/ofertas/{id}': {
+    get: operation({
+      tag: T, id: 'empresasOfertaDetalle', summary: 'Detalle completo de una oferta de mi empresa',
+      description: 'Devuelve la oferta en cualquier estado (el detalle público `GET /api/ofertas/{id}` solo devuelve las visibles para alumnos). El reclutador solo la obtiene si es el responsable (404 si no, incluidas las ofertas sin responsable); el admin_empresa, cualquiera de su empresa.',
+      roles: R_MIEMBRO, params: ['id'],
+      responses: { 200: ok('Oferta') },
+      errors: ['401', '404', '404empresa'],
     }),
   },
 
@@ -129,12 +139,13 @@ module.exports = {
   '/api/empresas/candidatos': {
     get: operation({
       tag: T, id: 'empresasCandidatos', summary: 'Todas las postulaciones de mi empresa',
-      description: 'Cada postulación incluye la oferta y su responsable (`oferta.creadaPor`). `conteoPorEstado` se calcula sobre el alcance filtrado por responsable/oferta (sin el filtro de estado).',
+      description: 'Alcance obligatorio según el actor: el admin_empresa recibe las postulaciones de toda la empresa; el **reclutador solo las de las ofertas a su cargo** (`responsable` se ignora para él). Cada postulación incluye la oferta y su responsable (`oferta.creadaPor`). `conteoPorEstado` se calcula sobre el alcance filtrado por responsable/oferta/q (sin el filtro de estado).',
       roles: R_MIEMBRO,
       query: [
         'pageParam', 'limitParam', REF.param('estadoQuery'),
         { name: 'responsable', in: 'query', description: 'Id del usuario responsable de la oferta, o `sin` para las ofertas sin responsable.', schema: { type: 'string' } },
         { name: 'ofertaId', in: 'query', description: 'Solo las postulaciones de esa oferta de la empresa.', schema: { type: 'integer', minimum: 1 } },
+        { name: 'q', in: 'query', description: 'Texto en nombre, apellido o email del candidato (dentro del alcance del actor).', schema: { type: 'string', maxLength: 100 } },
       ],
       responses: {
         200: paginated('Postulacion', {

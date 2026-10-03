@@ -142,6 +142,69 @@ module.exports = {
     },
   },
 
+  DashboardReclutador: {
+    type: 'object',
+    description: 'Panel personal del reclutador (`alcance: "reclutador"` en GET /api/empresas/dashboard): solo ofertas a su cargo.',
+    properties: {
+      alcance: { type: 'string', enum: ['reclutador'] },
+      ofertas: {
+        type: 'object',
+        properties: {
+          activas: { type: 'integer' }, pausadas: { type: 'integer' }, cerradas: { type: 'integer' },
+          pendienteModeracion: { type: 'integer' }, rechazadas: { type: 'integer' }, total: { type: 'integer' },
+        },
+      },
+      postulaciones: {
+        type: 'object',
+        properties: {
+          total: { type: 'integer' }, enRevision: { type: 'integer' }, preseleccionados: { type: 'integer' },
+          entrevistas: { type: 'integer' }, contrataciones: { type: 'integer' },
+        },
+      },
+      procesosActivos: {
+        type: 'array',
+        description: 'Hasta 5 ofertas no cerradas, primero las que tienen candidatos esperando revisión.',
+        items: {
+          type: 'object',
+          properties: {
+            oferta: {
+              type: 'object',
+              properties: {
+                id: { type: 'integer' }, titulo: { type: 'string' },
+                estado: { type: 'string', enum: ['activa', 'pausada', 'cerrada'] },
+                estadoModeracion: { type: 'string', enum: ['pendiente', 'aprobada', 'rechazada', 'auto_aprobada'] },
+                fechaLimite: { type: 'string', format: 'date-time', nullable: true },
+              },
+            },
+            totalCandidatos: { type: 'integer' },
+            porEstado: {
+              type: 'object',
+              properties: {
+                enRevision: { type: 'integer' }, preseleccionados: { type: 'integer' }, entrevistas: { type: 'integer' },
+                contratados: { type: 'integer' }, rechazados: { type: 'integer' },
+              },
+            },
+          },
+        },
+      },
+      paraAtender: {
+        type: 'array',
+        description: 'Pendientes derivados del estado actual (no hay tabla de tareas). Sin ítems en cero.',
+        items: {
+          type: 'object',
+          properties: {
+            tipo: { type: 'string', enum: ['oferta_rechazada', 'candidatos_en_revision', 'candidatos_en_entrevista', 'cierre_proximo', 'oferta_pendiente_moderacion'] },
+            ofertaId: { type: 'integer' },
+            titulo: { type: 'string' },
+            cantidad: { type: 'integer', description: 'Solo en los tipos de candidatos.' },
+            dias: { type: 'integer', description: 'Solo en `cierre_proximo`: días hasta la fecha límite (0–7).' },
+            fechaLimite: { type: 'string', format: 'date-time' },
+          },
+        },
+      },
+    },
+  },
+
   DashboardEmpresa: {
     type: 'object',
     properties: {

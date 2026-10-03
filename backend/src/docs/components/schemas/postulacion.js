@@ -33,10 +33,10 @@ module.exports = {
 
   PostulacionEstadoUpdate: {
     type: 'object',
-    description: 'Ambos campos son opcionales; sin ninguno, la operación es un no-op y responde 200.',
+    description: 'Al menos uno de los dos campos (400 si no viene ninguno). Con solo `notasEmpresa` se guarda la nota interna sin cambiar el estado ni notificar al candidato.',
     properties: {
-      estado: { type: 'string', enum: ESTADOS },
-      notasEmpresa: { type: 'string' },
+      estado: { type: 'string', enum: ESTADOS, description: 'Tiene que ser una transición permitida desde el estado actual (flujo guiado).' },
+      notasEmpresa: { type: 'string', nullable: true, maxLength: 2000, description: 'Nota interna de la empresa. Nunca se le muestra al candidato. Vacío o null la borra.' },
     },
   },
 };

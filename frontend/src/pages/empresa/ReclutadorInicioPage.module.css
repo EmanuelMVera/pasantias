@@ -1,0 +1,208 @@
+/* ReclutadorInicioPage.module.css — Inicio del reclutador. */
+
+.error { margin-bottom: var(--space-4); }
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.columnas {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.bloque { min-width: 0; }
+
+/* ── Para atender ─────────────────────────────────────────────────────────── */
+.pendientes,
+.procesos {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pendiente {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.pendiente:first-child { border-top: 0; padding-top: 0; }
+.pendiente:last-child { padding-bottom: 0; }
+
+.pendienteIcono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.tono_orange { background: var(--warning-soft); color: var(--warning-text); }
+.tono_violet { background: var(--violet-soft); color: var(--violet-text); }
+.tono_red { background: var(--danger-soft); color: var(--danger-text); }
+.tono_blue { background: var(--info-soft); color: var(--info-text); }
+
+.pendienteInfo {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.pendienteTexto {
+  font-size: 0.93rem;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.pendienteContexto {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+
+.pendienteCta {
+  flex-shrink: 0;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.alDia {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--success-text);
+}
+
+.alDiaIcono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--success-soft);
+}
+
+/* ── Procesos activos ─────────────────────────────────────────────────────── */
+.proceso {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3) var(--space-4);
+  align-items: center;
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.proceso:first-child { border-top: 0; padding-top: 0; }
+
+.procesoCabecera {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+}
+
+.procesoTitulo {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.procesoBadges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.etapas {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  min-width: 0;
+}
+
+.etapas > div {
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  text-align: center;
+  min-width: 0;
+}
+
+.etapas dt {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+
+.etapas dd {
+  margin: 2px 0 0;
+  font-family: var(--font-numeric);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.etapas .etapaTotal { background: var(--info-soft); }
+.etapas .etapaTotal dd { color: var(--info-text); }
+
+.procesoCta {
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.verTodas {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-soft);
+  width: 100%;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.verTodas:hover { text-decoration: underline; }
+
+@media (max-width: 1100px) {
+  .columnas { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 900px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+}
+
+@media (max-width: 640px) {
+  .proceso { grid-template-columns: minmax(0, 1fr); }
+  .procesoCta { justify-self: start; min-height: 44px; display: inline-flex; align-items: center; }
+  .etapas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .etapas .etapaTotal { grid-column: 1 / -1; }
+  .pendiente { flex-wrap: wrap; }
+  .pendienteInfo { flex-basis: calc(100% - 52px); }
+  .pendienteCta { margin-left: 52px; min-height: 44px; display: inline-flex; align-items: center; }
+}

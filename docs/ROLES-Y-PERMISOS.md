@@ -88,9 +88,11 @@ es autoridad de permisos).
 | Asignar / cambiar el reclutador responsable de una oferta (`PATCH /api/empresas/ofertas/:id/responsable`) | — | — | — | ✅⁴ | — |
 | Moderar una oferta (aprobar / pausar / rechazar) | — | ✅ | — | — | — |
 
-¹ El reclutador solo sobre su propia oferta (`creadaPorUsuarioId === req.usuario.id`)
-o sobre una oferta histórica sin responsable registrado (`creadaPorUsuarioId IS NULL`,
-anterior a la migración 013) — nunca sobre la de otro reclutador.
+¹ El reclutador solo sobre las ofertas a su cargo (`creadaPorUsuarioId === req.usuario.id`) —
+nunca sobre la de otro reclutador. Una oferta **sin responsable** (`creadaPorUsuarioId IS NULL`)
+no la edita ni la opera ningún reclutador hasta que el `admin_empresa` le asigne uno (ya no
+existe el fallback "cualquier reclutador"). Editar una oferta **rechazada** la reenvía a
+revisión (`pendiente` + aviso al instituto), también en empresas de confianza.
 ² `admin_empresa` puede pausar/reactivar/cerrar **cualquier** oferta de su empresa
 (control institucional, sin importar quién la creó) pero **nunca** crea una ni edita
 su contenido — la cuenta empresa es una entidad institucional, no publica ofertas
@@ -112,8 +114,10 @@ anterior. Queda auditado como `asignar_responsable_oferta` /
 |---|:--:|:--:|:--:|:--:|:--:|
 | Postularme a una oferta | — | — | ✅ | — | — |
 | Ver "Mis Postulaciones" | — | — | ✅ | — | — |
-| Ver candidatos de una oferta / de mi empresa | — | — | — | ✅ | ✅ |
-| Cambiar el estado de una postulación (embudo de selección) | — | — | — | — (supervisa) | ✅ (responsable de la oferta) |
+| Ver candidatos de una oferta / de mi empresa | — | — | — | ✅ (todas) | ✅ (solo sus ofertas) |
+| Cambiar el estado de una postulación (flujo guiado⁶) | — | — | — | — (supervisa) | ✅ (responsable de la oferta) |
+| Nota interna de una postulación (`notasEmpresa`) | — | — | — (nunca la ve) | lectura | ✅ escribir (responsable) |
+| Historial de estados de una postulación (`GET /api/postulaciones/:id/historial`) | — | — | — | ✅ | ✅ (responsable) |
 | Recibir el aviso de "nueva postulación" | — | — | — | solo como respaldo³ | ✅ (responsable de la oferta) |
 
 ³ El aviso de una nueva postulación va al **reclutador responsable** de la oferta
@@ -128,12 +132,26 @@ avanzó bajo la responsabilidad de ese reclutador). El endpoint responde el mism
 si el usuario no existe, no es un reclutador activo o no hay relación — no permite
 enumerar reclutadores.
 
+⁶ Transiciones permitidas: en revisión → preseleccionado | no seleccionado;
+preseleccionado → entrevista | no seleccionado | en revisión; entrevista → contratado |
+no seleccionado | preseleccionado; no seleccionado → en revisión (reabrir); contratado es
+final. Otra transición responde 400 `TRANSICION_NO_PERMITIDA`.
+
+⁷ `GET /api/empresas/dashboard`, `/mis-ofertas`, `/candidatos` y
+`GET /api/postulaciones/oferta/:id` aplican el alcance del actor ANTES de cualquier
+filtro: el reclutador recibe solo lo de las ofertas a su cargo (el dashboard le devuelve
+su panel personal, `alcance: "reclutador"`), y el proceso de una oferta ajena o sin
+responsable le responde 403 `NO_ES_RESPONSABLE`. Si el `admin_empresa` reasigna una
+oferta, el alcance cambia en la próxima consulta.
+
 ### Empresa — perfil y equipo
 
 | Acción | público | admin | alumno / egresado | admin_empresa | reclutador |
 |---|:--:|:--:|:--:|:--:|:--:|
-| Ver dashboard / mis-ofertas / mi-empresa / equipo | — | — | — | ✅ | ✅ |
-| Filtrar ofertas y candidatos de la empresa por estado, moderación, responsable u oferta | — | — | — | ✅ | ✅ |
+| Ver dashboard / mis-ofertas / candidatos | — | — | — | ✅ toda la empresa | ✅ solo lo suyo⁷ |
+| Ver mi-empresa / equipo | — | — | — | ✅ | ✅ (consulta) |
+| Filtrar ofertas y candidatos por estado, moderación u oferta | — | — | — | ✅ | ✅ (dentro de su alcance) |
+| Filtrar por responsable | — | — | — | ✅ | — (se ignora) |
 | Editar el perfil de la empresa, subir logo | — | — | — | ✅ | — |
 | Solicitar el alta de un reclutador (al admin) | — | — | — | ✅ | — |
 | Ver las solicitudes de reclutador de mi empresa | — | — | — | ✅ | — |
@@ -190,7 +208,15 @@ una de sus ofertas.
   empresa tiene garantizada al menos una fila `admin_empresa` activa desde la
   migración 019.
 - **`reclutador` no puede tocar el equipo ni el perfil de la empresa**, solo lo
-  operativo: ofertas, candidatos, embudo de selección, chat.
+  operativo: sus ofertas, sus candidatos, el proceso de selección y el chat. Su
+  alcance es PERSONAL y lo impone el backend (nota ⁷): no ve ofertas ni candidatos
+  de otros reclutadores, ni de ofertas sin responsable.
+- **Flujo guiado del proceso de selección** (nota ⁶): el backend valida cada cambio
+  de estado; el frontend solo ofrece las transiciones que el backend devuelve en
+  `transicionesPermitidas`.
+- **Nota interna** (`notasEmpresa`): una sola nota editable por postulación, la
+  escribe el reclutador responsable, la lee el `admin_empresa`; nunca se envía al
+  candidato (los endpoints del alumno la omiten) ni genera notificación.
 - **`admin_empresa` gobierna y supervisa, no opera**: edita el perfil y el logo,
   gestiona el equipo y puede pausar / reactivar / cerrar cualquier oferta de su
   empresa, pero no crea ni edita ofertas ni mueve candidatos en el embudo. En el

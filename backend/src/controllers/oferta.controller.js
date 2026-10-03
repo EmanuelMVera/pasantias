@@ -116,8 +116,14 @@ exports.createOferta = async (req, res) => {
 };
 
 // ── Actualizar oferta (contenido) ───────────────────────────────────────────────
-// Solo reclutador (ver oferta.routes.js) y solo el creador — o cualquier
-// reclutador activo si la oferta es histórica y no tiene creador registrado.
+// Solo reclutador (ver oferta.routes.js) y solo el RESPONSABLE de la oferta.
+// Una oferta sin responsable no la edita nadie hasta que el admin_empresa le
+// asigne uno (ya no existe el fallback "cualquier reclutador").
+//
+// Editar una oferta RECHAZADA la reenvía a revisión: vuelve a 'pendiente' y se
+// avisa al instituto. Vale también para empresas de confianza: la confianza
+// habilita la publicación automática de ofertas nuevas, no saltarse la revisión
+// de una que el instituto ya rechazó.
 
 exports.updateOferta = async (req, res) => {
   const empresa = await _resolverEmpresa(req);
@@ -126,7 +132,7 @@ exports.updateOferta = async (req, res) => {
   const oferta = await Oferta.findOne({ where: { id: req.params.id, empresaId: empresa.id } });
   if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
 
-  if (oferta.creadaPorUsuarioId && oferta.creadaPorUsuarioId !== req.usuario.id) {
+  if (oferta.creadaPorUsuarioId !== req.usuario.id) {
     return res.status(403).json({
       success: false,
       message: 'Solo el reclutador responsable de esta oferta puede editar su contenido.',
@@ -136,16 +142,37 @@ exports.updateOferta = async (req, res) => {
 
   const body = ofertaService.sanitizarCamposOpcionales(req.body);
   delete body.estado; // el estado se cambia exclusivamente vía PATCH /:id/estado
+  // Ni la moderación ni el responsable se cambian desde el formulario.
+  delete body.estadoModeracion;
+  delete body.creadaPorUsuarioId;
+  delete body.empresaId;
   const { error, campos } = ofertaService.validarCamposPuesto(body);
   if (error) return res.status(400).json({ success: false, message: error });
 
-  await oferta.update({ ...body, ...campos });
-  return res.json({ success: true, data: oferta });
+  const reenviarARevision = oferta.estadoModeracion === 'rechazada';
+  await oferta.update({
+    ...body,
+    ...campos,
+    ...(reenviarARevision ? { estadoModeracion: 'pendiente' } : {}),
+  });
+
+  if (reenviarARevision) {
+    ofertaService.notificarAdminsNuevaOferta(oferta, empresa); // fire-and-forget
+  }
+
+  return res.json({
+    success: true,
+    message: reenviarARevision
+      ? 'Cambios guardados. La oferta volvió a revisión del instituto.'
+      : 'Cambios guardados.',
+    data: oferta,
+  });
 };
 
 // ── Cambiar estado (pausar / reactivar / cerrar) ────────────────────────────────
-// reclutador: solo su propia oferta (o histórica sin creador). admin_empresa:
-// cualquier oferta de su empresa — control institucional, nunca edita contenido.
+// reclutador: solo las ofertas a su cargo. admin_empresa: cualquier oferta de
+// su empresa (incluidas las que no tienen responsable) — control institucional,
+// nunca edita contenido.
 
 exports.cambiarEstadoOferta = async (req, res) => {
   const { estado } = req.body;
@@ -160,7 +187,7 @@ exports.cambiarEstadoOferta = async (req, res) => {
   if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
 
   const rolInterno = req.miembroEmpresa?.rolInterno;
-  const esResponsable = !oferta.creadaPorUsuarioId || oferta.creadaPorUsuarioId === req.usuario.id;
+  const esResponsable = oferta.creadaPorUsuarioId === req.usuario.id;
 
   if (rolInterno === 'reclutador' && !esResponsable) {
     return res.status(403).json({

@@ -1,0 +1,177 @@
+/* ReclutadorNav.module.css — barra horizontal del workspace del reclutador.
+   Navy como las sidebars de los otros perfiles (mismo producto), pero
+   horizontal: el reclutador no tiene sidebar. */
+
+.barra {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: var(--sidebar-bg);
+  color: #fff;
+  box-shadow: 0 1px 0 var(--sidebar-border), var(--shadow-xs);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  max-width: 1440px;
+  min-height: var(--topbar-h);
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+.marca { flex-shrink: 0; }
+
+/* ── Navegación principal ─────────────────────────────────────────────────── */
+.links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  margin-left: var(--space-3);
+}
+
+.link,
+.panelLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--sidebar-text);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.link:hover,
+.panelLink:hover {
+  background: var(--sidebar-hover);
+  color: #fff;
+}
+
+.link:focus-visible,
+.panelLink:focus-visible,
+.icono:focus-visible,
+.toggle:focus-visible,
+.nuevaOferta:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.activo,
+.activo:hover {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* ── Acciones (derecha) ───────────────────────────────────────────────────── */
+.acciones {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.nuevaOferta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--sidebar-bg);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.nuevaOferta:hover { background: var(--primary-light); }
+.nuevaOfertaDesktop { margin-right: var(--space-2); }
+
+.icono {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--sidebar-text);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.icono:hover,
+.iconoActivo {
+  background: var(--sidebar-hover);
+  color: #fff;
+}
+
+.contador {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-family: var(--font-numeric);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--sidebar-bg);
+}
+
+.contadorAlta { background: var(--danger); }
+
+/* ── Móvil / tablet ───────────────────────────────────────────────────────── */
+.toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--sidebar-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--sidebar-border);
+  background: var(--sidebar-bg);
+}
+
+.panelLink { min-height: 44px; }
+.nuevaOfertaPanel { min-height: 44px; margin-top: var(--space-2); }
+
+@media (max-width: 899px) {
+  .inner { gap: var(--space-2); padding: 0 var(--space-3); }
+  .toggle { display: inline-flex; }
+  .links,
+  .nuevaOfertaDesktop { display: none; }
+  .acciones { gap: 0; }
+}
+
+@media (min-width: 900px) {
+  .panel { display: none; }
+}

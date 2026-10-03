@@ -29,7 +29,8 @@
  *
  * Panel corporativo:
  * - GET  /dashboard              → Métricas del panel (todos los roles)
- * - GET  /mis-ofertas            → Lista de ofertas propias (todos los roles)
+ * - GET  /mis-ofertas            → Ofertas: toda la empresa (admin_empresa) o solo las propias (reclutador)
+ * - GET  /ofertas/:id            → Detalle completo de una oferta (reclutador: solo si es responsable)
  * - PATCH /ofertas/:id/responsable → Asignar/cambiar el reclutador responsable (solo admin_empresa)
  * - GET  /reclutadores/:id/perfil → Ficha de un reclutador (cualquier usuario con relación)
  *
@@ -77,6 +78,11 @@ router.get('/dashboard', ...miembro, asyncHandler(ctrl.getDashboard));
 
 // GET /api/empresas/mis-ofertas — Lista de ofertas con postulaciones (todos los miembros)
 router.get('/mis-ofertas', ...miembro, asyncHandler(ctrl.getMisOfertas));
+
+// GET /api/empresas/ofertas/:id — Oferta completa de la empresa, en cualquier
+// estado (el detalle público solo devuelve las visibles para alumnos).
+// Reclutador: solo si es el responsable. admin_empresa: lectura.
+router.get('/ofertas/:id', ...miembro, asyncHandler(ctrl.getOfertaDeEmpresa));
 
 // PATCH /api/empresas/ofertas/:id/responsable — Asigna o cambia el reclutador
 // responsable de una oferta (solo admin_empresa). Body: { responsableId }.

@@ -180,13 +180,24 @@ export default function EquipoPage() {
     <li key={m.id} className={`${styles.miembro} ${m.activo ? '' : styles.miembroSuspendido}`}>
       <Avatar src={m.usuario?.fotoPerfil} nombre={m.usuario?.nombre} apellido={m.usuario?.apellido} size={42} />
       <div className={styles.miembroInfo}>
-        <span className={styles.miembroNombre}>{nombreDe(m)}</span>
+        {/* El reclutador consulta: el nombre abre la ficha de su compañero. */}
+        {esAdminEmpresa || !m.usuario?.id ? (
+          <span className={styles.miembroNombre}>{nombreDe(m)}</span>
+        ) : (
+          <Link to={`/reclutador/${m.usuario.id}`} className={`${styles.miembroNombre} ${styles.miembroLink}`}>
+            {nombreDe(m)}
+          </Link>
+        )}
         <span className={styles.miembroDato}>{m.usuario?.email}</span>
-        <span className={styles.miembroDato}>Último acceso: {formatFecha(m.usuario?.ultimoAcceso)}</span>
+        {esAdminEmpresa && (
+          <span className={styles.miembroDato}>Último acceso: {formatFecha(m.usuario?.ultimoAcceso)}</span>
+        )}
       </div>
       <div className={styles.miembroEstado}>
         <span className="badge badge-tone-blue">Reclutador</span>
-        <span className={`badge badge-tone-${m.activo ? 'green' : 'red'}`}>{m.activo ? 'Activo' : 'Suspendido'}</span>
+        {esAdminEmpresa && (
+          <span className={`badge badge-tone-${m.activo ? 'green' : 'red'}`}>{m.activo ? 'Activo' : 'Suspendido'}</span>
+        )}
       </div>
       {esAdminEmpresa && (
         <ActionMenu label={`Acciones para ${nombreDe(m)}`} items={accionesDe(m)} />
@@ -207,7 +218,9 @@ export default function EquipoPage() {
                 Responsable: <strong>{nombreDe(cuentaAdmin)}</strong>
               </span>
               <span className={styles.miembroDato}>{cuentaAdmin.usuario?.email}</span>
-              <span className={styles.miembroDato}>Último acceso: {formatFecha(cuentaAdmin.usuario?.ultimoAcceso)}</span>
+              {esAdminEmpresa && (
+                <span className={styles.miembroDato}>Último acceso: {formatFecha(cuentaAdmin.usuario?.ultimoAcceso)}</span>
+              )}
             </div>
           </div>
         </Card>
@@ -226,7 +239,8 @@ export default function EquipoPage() {
           </EmptyState>
         ) : (
           <ul className={styles.lista}>
-            {[...activos, ...suspendidos].map(filaReclutador)}
+            {/* El reclutador ve a sus compañeros activos; los suspendidos son gestión del administrador. */}
+            {(esAdminEmpresa ? [...activos, ...suspendidos] : activos).map(filaReclutador)}
           </ul>
         )}
       </Card>
@@ -289,10 +303,10 @@ export default function EquipoPage() {
       <Toast toast={toast} />
 
       <PageHeader
-        title="Equipo"
+        title={esAdminEmpresa ? 'Equipo' : `Equipo de ${empresa?.razonSocial ?? 'la empresa'}`}
         subtitle={esAdminEmpresa
           ? 'Gestioná las personas con acceso al espacio de tu empresa.'
-          : 'Personas con acceso al espacio de la empresa.'}
+          : 'Las personas que trabajan en el espacio de la empresa.'}
         actions={esAdminEmpresa && (
           <button type="button" className="btn-primary" onClick={() => setModalAlta(true)} id="btn-nuevo-miembro">
             <Icon name="userPlus" size={18} />
@@ -309,13 +323,14 @@ export default function EquipoPage() {
         </div>
       ) : !error && (
         <>
-          <div className={styles.resumen}>
-            <StatCard compact iconName="users" tone="green" label="Reclutadores activos" value={activos.length} />
-            <StatCard compact iconName="pause" tone="neutral" label="Suspendidos" value={suspendidos.length} />
-            {esAdminEmpresa && (
+          {/* Los indicadores son de gestión: solo para el administrador de empresa. */}
+          {esAdminEmpresa && (
+            <div className={styles.resumen}>
+              <StatCard compact iconName="users" tone="green" label="Reclutadores activos" value={activos.length} />
+              <StatCard compact iconName="pause" tone="neutral" label="Suspendidos" value={suspendidos.length} />
               <StatCard compact iconName="clock" tone="orange" label="Solicitudes pendientes" value={pendientes.length} />
-            )}
-          </div>
+            </div>
+          )}
 
           {esAdminEmpresa ? (
             <>

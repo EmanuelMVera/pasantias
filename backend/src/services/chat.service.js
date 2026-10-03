@@ -87,8 +87,8 @@ async function resolverEmpresasBatch(usuarioIds) {
  *     alumnos, nunca admin_empresa, nunca empresas ajenas.
  *   - empresa (admin_empresa): solo compañeros activos de su propia empresa.
  *   - empresa (reclutador): compañeros de equipo + candidatos de ofertas bajo
- *     su responsabilidad (creadaPorUsuarioId propio, o NULL en ofertas
- *     huérfanas) en estado habilitante.
+ *     su responsabilidad (creadaPorUsuarioId propio) en estado habilitante.
+ *     Una oferta sin responsable no habilita chat con ningún reclutador.
  *   - admin: ya filtrado antes de llegar acá (chat.controller.js).
  * @returns {Array} usuarios con fotoPerfil y razonSocial resueltos
  */
@@ -128,10 +128,8 @@ async function buscarUsuarios(userId, rol, q) {
         const oferta = p.oferta;
         if (!oferta) return;
         const activos = activosPorEmpresa.get(oferta.empresaId) ?? new Set();
-        if (oferta.creadaPorUsuarioId) {
-          if (activos.has(oferta.creadaPorUsuarioId)) reclutadorIds.add(oferta.creadaPorUsuarioId);
-        } else {
-          activos.forEach((id) => reclutadorIds.add(id));
+        if (oferta.creadaPorUsuarioId && activos.has(oferta.creadaPorUsuarioId)) {
+          reclutadorIds.add(oferta.creadaPorUsuarioId);
         }
       });
     }
@@ -170,7 +168,7 @@ async function buscarUsuarios(userId, rol, q) {
           model: Oferta, as: 'oferta', attributes: [], required: true,
           where: {
             empresaId: { [Op.in]: empresaIdsComoReclutador },
-            [Op.or]: [{ creadaPorUsuarioId: userId }, { creadaPorUsuarioId: null }],
+            creadaPorUsuarioId: userId,
           },
         }],
       });

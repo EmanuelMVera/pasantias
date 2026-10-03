@@ -35,7 +35,7 @@ empresa tiene garantizada al menos una fila `admin_empresa` activa.
 | Rol | Qué puede hacer |
 |---|---|
 | `admin_empresa` | Gobierno y supervisión: editar perfil + logo, gestionar el equipo (solicitar/agregar reclutadores, suspender, quitar), ver todas las ofertas y candidatos de la empresa, pausar / reactivar / cerrar cualquier oferta y **asignar o cambiar el reclutador responsable** de una oferta. **No** crea ni edita ofertas ni cambia el estado de las postulaciones. |
-| `reclutador` | Solo operativo: crear/editar/cerrar ofertas, ver candidatos, mover el embudo de selección, chat. **No** toca equipo ni perfil de empresa, y **no** puede asignar ni cambiar responsables de ofertas. |
+| `reclutador` | Solo operativo y con alcance PERSONAL: crea ofertas (queda como responsable), edita / pausa / cierra las suyas, ve y gestiona solo los candidatos de sus ofertas (flujo guiado de estados, nota interna, historial), chat. Una oferta sin responsable no la opera hasta que se la asignen. **No** toca equipo ni perfil de empresa, y **no** puede asignar ni cambiar responsables de ofertas. |
 
 **Notificaciones.** Una nueva postulación se le avisa al reclutador responsable de la
 oferta (`creadaPorUsuarioId`); a los `admin_empresa` solo si la oferta no tiene un

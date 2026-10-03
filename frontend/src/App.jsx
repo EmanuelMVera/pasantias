@@ -41,7 +41,7 @@ import PerfilPage from './pages/alumno/PerfilPage';
 
 // Páginas de la empresa (requieren rol empresa)
 import EmpresaInicioPage from './pages/empresa/EmpresaInicioPage';
-import EmpresaOfertasPage from './pages/empresa/EmpresaOfertasPage';
+import OfertasEmpresaPage from './pages/empresa/OfertasEmpresaPage';
 import CrearOfertaPage from './pages/empresa/CrearOfertaPage';
 import EditarOfertaPage from './pages/empresa/EditarOfertaPage';
 import PostulantesMiOfertaPage from './pages/empresa/PostulantesMiOfertaPage';
@@ -74,6 +74,7 @@ import NotificacionesPage from './pages/NotificacionesPage';
 import Navbar from './components/Navbar/Navbar';
 import AdminShell from './components/AdminShell/AdminShell';
 import EmpresaShell from './components/EmpresaShell/EmpresaShell';
+import ReclutadorNav from './components/ReclutadorNav/ReclutadorNav';
 import { useEmpresa } from './hooks/useEmpresa';
 
 /**
@@ -184,20 +185,21 @@ function AppRoutes() {
           <EmpresaInicioPage />
         </ProtectedRoute>
       } />
-      {/* Ofertas de la empresa (supervisión). Va antes de /empresa/:empresaId. */}
+      {/* Ofertas: vista corporativa (admin_empresa) o "Mis ofertas" (reclutador). Va antes de /empresa/:empresaId. */}
       <Route path="/empresa/ofertas" element={
         <ProtectedRoute roles={['empresa']}>
-          <EmpresaOfertasPage />
+          <OfertasEmpresaPage />
         </ProtectedRoute>
       } />
+      {/* Crear y editar ofertas es exclusivo del reclutador (guard de rol interno). */}
       <Route path="/empresa/nueva-oferta" element={
         <ProtectedRoute roles={['empresa']}>
-          <CrearOfertaPage />
+          <SoloReclutador><CrearOfertaPage /></SoloReclutador>
         </ProtectedRoute>
       } />
       <Route path="/empresa/ofertas/:id/editar" element={
         <ProtectedRoute roles={['empresa']}>
-          <EditarOfertaPage />
+          <SoloReclutador><EditarOfertaPage /></SoloReclutador>
         </ProtectedRoute>
       } />
       <Route path="/empresa/postulantes/:ofertaId" element={
@@ -215,9 +217,10 @@ function AppRoutes() {
           <SeguridadPage />
         </ProtectedRoute>
       } />
+      {/* Mi empresa es del administrador de empresa; el reclutador va al perfil público. */}
       <Route path="/empresa/mi-empresa" element={
         <ProtectedRoute roles={['empresa']}>
-          <MiEmpresaPage />
+          <MiEmpresaPorRol />
         </ProtectedRoute>
       } />
       <Route path="/empresa/candidatos" element={
@@ -309,13 +312,39 @@ function AppRoutes() {
 }
 
 /**
+ * SoloReclutador — guard de ROL INTERNO para rutas operativas (crear/editar
+ * ofertas). ProtectedRoute solo conoce el rol global `empresa`; acá se
+ * distingue reclutador de admin_empresa para no mostrarle un formulario a quien
+ * el backend le va a responder 403. Es UX: la autoridad sigue siendo el backend.
+ */
+function SoloReclutador({ children }) {
+  const { esReclutador, loading } = useEmpresa();
+  if (loading) return <div className="app-loading" role="status">Cargando...</div>;
+  return esReclutador ? children : <Navigate to="/empresa" replace />;
+}
+
+/**
+ * /empresa/mi-empresa: pantalla de gobierno del administrador de empresa. El
+ * reclutador solo consulta la empresa → se lo lleva al perfil público, que es
+ * lo que ve un alumno.
+ */
+function MiEmpresaPorRol() {
+  const { empresa, esReclutador, loading } = useEmpresa();
+  if (loading) return <div className="app-loading" role="status">Cargando...</div>;
+  if (esReclutador && empresa?.id) return <Navigate to={`/empresa/${empresa.id}`} replace />;
+  return <MiEmpresaPage />;
+}
+
+/**
  * Chrome — Estructura visual común.
  *
- * Tres experiencias autenticadas distintas:
+ * Cuatro experiencias autenticadas distintas:
  * - Rol admin (Administrador del Sistema): AdminShell (sidebar + topbar).
  * - Rol empresa con rolInterno admin_empresa (Administrador de Empresa):
  *   EmpresaShell — mismo lenguaje visual, secciones de gobierno de la empresa.
- * - Reclutador, alumno/egresado y páginas públicas: navbar horizontal.
+ * - Rol empresa con rolInterno reclutador: ReclutadorNav — barra horizontal
+ *   propia (workspace operativo, sin sidebar).
+ * - Alumno/egresado y páginas públicas: Navbar.
  *
  * El rol interno de un usuario empresa llega asíncrono (EmpresaContext): hasta
  * que se resuelve no se dibuja ningún chrome, para no mostrarle por un instante
@@ -323,7 +352,7 @@ function AppRoutes() {
  */
 function Chrome() {
   const { usuario } = useAuth();
-  const { esAdminEmpresa, loading: cargandoEmpresa } = useEmpresa();
+  const { esAdminEmpresa, esReclutador, loading: cargandoEmpresa } = useEmpresa();
 
   if (usuario?.rol === 'admin') {
     return (
@@ -358,7 +387,7 @@ function Chrome() {
   return (
     <>
       <a href="#contenido" className="skip-link">Saltar al contenido</a>
-      <Navbar />
+      {esReclutador ? <ReclutadorNav /> : <Navbar />}
       <main id="contenido">
         <AppRoutes />
       </main>

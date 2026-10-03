@@ -70,7 +70,25 @@ function calcularCompatibilidad(perfil, oferta) {
 }
 
 /**
- * Agrega aliases semánticos a una postulación para retrocompatibilidad con el frontend.
+ * Flujo guiado del proceso de selección: desde cada estado, a cuáles se puede
+ * pasar. Se avanza de a un paso o se descarta; también se puede retroceder un
+ * paso (corregir un error de carga) y reabrir un "no seleccionado". Contratado
+ * es final.
+ */
+const TRANSICIONES_POSTULACION = {
+  en_revision:     ['preseleccionado', 'rechazado'],
+  preseleccionado: ['entrevista', 'rechazado', 'en_revision'],
+  entrevista:      ['contratado', 'rechazado', 'preseleccionado'],
+  rechazado:       ['en_revision'],
+  contratado:      [],
+};
+const transicionesDesde = (estado) => TRANSICIONES_POSTULACION[estado] || [];
+
+const NOTA_INTERNA_MAX = 2000;
+
+/**
+ * Postulación para la EMPRESA (reclutador / admin_empresa): incluye la nota
+ * interna y aliases de retrocompatibilidad con el frontend.
  */
 function formatearPostulacion(p) {
   const plain = p?.toJSON ? p.toJSON() : p;
@@ -79,6 +97,20 @@ function formatearPostulacion(p) {
     estadoActual:         plain.estado,
     ultimaActualizacion:  plain.updatedAt,
     observacionesEmpresa: plain.notasEmpresa,
+  };
+}
+
+/**
+ * Postulación para el ALUMNO: nunca incluye la nota interna de la empresa
+ * (`notasEmpresa`), que es seguimiento privado del reclutador.
+ */
+function formatearPostulacionAlumno(p) {
+  const plain = p?.toJSON ? p.toJSON() : p;
+  const { notasEmpresa: _notaInterna, ...publica } = plain;
+  return {
+    ...publica,
+    estadoActual:        plain.estado,
+    ultimaActualizacion: plain.updatedAt,
   };
 }
 
@@ -119,5 +151,9 @@ module.exports = {
   validarPostulacion,
   calcularCompatibilidad,
   formatearPostulacion,
+  formatearPostulacionAlumno,
+  TRANSICIONES_POSTULACION,
+  transicionesDesde,
+  NOTA_INTERNA_MAX,
   obtenerMetricasAlumno,
 };

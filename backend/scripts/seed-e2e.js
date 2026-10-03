@@ -117,6 +117,17 @@ async function sembrar() {
     tipoPuesto: 'trainee', cantidadVacantes: 1,
     estado: 'activa', estadoModeracion: 'pendiente',
   });
+  // Oferta HISTÓRICA sin responsable (cerrada, sin postulaciones): ningún
+  // reclutador la gestiona hasta que el admin_empresa le asigne uno. La usa
+  // reclutador.spec.js; ningún otro spec la modifica.
+  await Oferta.create({
+    empresaId: empresa.id,
+    titulo: fx.ofertaHistorica.titulo,
+    descripcion: 'Pasantía de soporte técnico ya cerrada, previa al registro de responsables. Datos E2E.',
+    area: 'Soporte', modalidad: 'presencial',
+    tipoPuesto: 'pasante', cantidadVacantes: 1,
+    estado: 'cerrada', estadoModeracion: 'aprobada',
+  });
 
   // ── Postulación pre-sembrada (para "ver candidatos") ──────────────────────
   await Postulacion.create({ usuarioId: alumno2.id, ofertaId: ofertaActiva.id, estado: 'en_revision' });
@@ -139,7 +150,7 @@ async function sembrar() {
     console.log(`   ${k.padEnd(13)} ${fx[k].email}`);
   }
   console.log(`   empresa       ${fx.empresa.razonSocial} (aprobada)`);
-  console.log(`   ofertas       "${fx.ofertaActiva.titulo}" (activa), "${fx.ofertaPendiente.titulo}" (pendiente)`);
+  console.log(`   ofertas       "${fx.ofertaActiva.titulo}" (activa), "${fx.ofertaPendiente.titulo}" (pendiente), "${fx.ofertaHistorica.titulo}" (cerrada, sin responsable)`);
   console.log(`   solicitud     "${fx.solicitud.razonSocial}" (pendiente)\n`);
 }
 

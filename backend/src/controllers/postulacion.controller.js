@@ -63,7 +63,7 @@ exports.postular = async (req, res) => {
   return res.status(201).json({
     success: true,
     message: 'Postulación enviada correctamente.',
-    data: postulacionService.formatearPostulacion(postulacion),
+    data: postulacionService.formatearPostulacionAlumno(postulacion),
   });
 };
 
@@ -92,7 +92,8 @@ exports.getMisPostulaciones = async (req, res) => {
     groupCount(Postulacion, 'estado', { usuarioId }),
   ]);
 
-  const data = rows.map(postulacionService.formatearPostulacion);
+  // Sin la nota interna de la empresa: es seguimiento privado del reclutador.
+  const data = rows.map(postulacionService.formatearPostulacionAlumno);
   const pagination = buildPagination(count, { page, limit });
   return res.json({ success: true, data, pagination, conteoPorEstado, total: pagination.total });
 };
@@ -110,6 +111,21 @@ exports.getPostulacionesByOferta = async (req, res) => {
   });
   if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
 
+  // El proceso de una oferta es la mesa de trabajo de su reclutador
+  // responsable. Otro reclutador de la empresa (o cualquiera, si la oferta no
+  // tiene responsable asignado) no accede: la supervisión es del admin_empresa.
+  const esReclutador = req.miembroEmpresa?.rolInterno === 'reclutador';
+  if (esReclutador && oferta.creadaPorUsuarioId !== req.usuario.id) {
+    return res.status(403).json({
+      success: false,
+      message: oferta.creadaPorUsuarioId
+        ? 'Este proceso está a cargo de otro reclutador.'
+        : 'Esta oferta todavía no tiene un responsable asignado. El administrador de la empresa tiene que asignarla.',
+      code: 'NO_ES_RESPONSABLE',
+    });
+  }
+  const puedeGestionar = esReclutador;
+
   const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
   const { estado } = req.query;
 
@@ -122,7 +138,8 @@ exports.getPostulacionesByOferta = async (req, res) => {
       include: [{
         model: Usuario,
         as: 'usuario',
-        attributes: { exclude: ['password', 'tokenReset', 'tokenResetExpira'] },
+        // Solo lo necesario para trabajar el proceso (sin teléfono ni datos de cuenta).
+        attributes: ['id', 'nombre', 'apellido', 'email', 'fotoPerfil', 'ubicacion', 'rol'],
         include: [{ model: Perfil, as: 'perfil' }],
       }],
       order: [['createdAt', 'DESC'], ['id', 'DESC']],
@@ -140,6 +157,9 @@ exports.getPostulacionesByOferta = async (req, res) => {
       estadoActual:         plain.estado,
       ultimaActualizacion:  plain.updatedAt,
       observacionesEmpresa: plain.notasEmpresa,
+      // Estados a los que se puede pasar desde el actual (flujo guiado). Vacío
+      // para quien solo supervisa.
+      transicionesPermitidas: puedeGestionar ? postulacionService.transicionesDesde(plain.estado) : [],
       cvDisponible: !!perfil?.cvPath,
       cvUrl:        perfil?.cvPath || null,
       compatibilidadOferta: postulacionService.calcularCompatibilidad(perfil, oferta),
@@ -165,10 +185,46 @@ exports.getPostulacionesByOferta = async (req, res) => {
       titulo: oferta.titulo,
       habilidadesRequeridas: oferta.habilidadesRequeridas,
       estado: oferta.estado,
+      estadoModeracion: oferta.estadoModeracion,
+      fechaLimite: oferta.fechaLimite,
       creadaPorUsuarioId: oferta.creadaPorUsuarioId,
       creadaPor: oferta.creadaPor ? oferta.creadaPor.toJSON() : null,
     },
+    puedeGestionar,
   });
+};
+
+// ── Historial de estados de una postulación (empresa) ────────────────────────
+// Lectura para el reclutador responsable y para el admin_empresa (supervisión).
+// Usa PostulacionHistorialEstado: no hay otro registro de historial.
+
+exports.getHistorial = async (req, res) => {
+  const postulacion = await Postulacion.findByPk(req.params.id, {
+    attributes: ['id', 'estado', 'fechaPostulacion', 'createdAt'],
+    include: [{ model: Oferta, as: 'oferta', attributes: ['id', 'empresaId', 'creadaPorUsuarioId'] }],
+  });
+  if (!postulacion) return res.status(404).json({ success: false, message: 'Postulación no encontrada.' });
+
+  const empresa = await _resolverEmpresa(req);
+  if (!empresa || postulacion.oferta.empresaId !== empresa.id) {
+    return res.status(404).json({ success: false, message: 'Postulación no encontrada.' });
+  }
+  if (req.miembroEmpresa?.rolInterno === 'reclutador' && postulacion.oferta.creadaPorUsuarioId !== req.usuario.id) {
+    return res.status(403).json({
+      success: false,
+      message: 'Solo el reclutador responsable de esta oferta puede ver este proceso.',
+      code: 'NO_ES_RESPONSABLE',
+    });
+  }
+
+  const historial = await PostulacionHistorialEstado.findAll({
+    where: { postulacionId: postulacion.id },
+    attributes: ['id', 'estadoAnterior', 'estadoNuevo', 'createdAt'],
+    include: [{ model: Usuario, as: 'cambiadoPor', attributes: ['id', 'nombre', 'apellido', 'rol'] }],
+    order: [['createdAt', 'ASC'], ['id', 'ASC']],
+  });
+
+  return res.json({ success: true, estadoActual: postulacion.estado, data: historial });
 };
 
 // ── Cambiar estado de postulación (empresa) ───────────────────────────────────
@@ -187,14 +243,11 @@ exports.updateEstado = async (req, res) => {
     return res.status(403).json({ success: false, message: 'No tenés permiso para modificar esta postulación.' });
   }
 
-  // RBAC-02: las acciones operativas sobre un candidato (cambiar estado,
-  // notas) corresponden al reclutador responsable de la oferta — mismo
-  // patrón que updateOferta/cambiarEstadoOferta. Ofertas huérfanas (sin
-  // creadaPorUsuarioId, previas a la migración 013) quedan gestionables por
-  // cualquier reclutador activo de la empresa.
-  const esResponsable = !postulacion.oferta.creadaPorUsuarioId
-    || postulacion.oferta.creadaPorUsuarioId === req.usuario.id;
-  if (!esResponsable) {
+  // Las acciones operativas sobre un candidato (cambiar estado, nota interna)
+  // son del reclutador RESPONSABLE de la oferta. Una oferta sin responsable no
+  // la gestiona nadie hasta que el admin_empresa le asigne uno (ya no existe
+  // el fallback "cualquier reclutador").
+  if (postulacion.oferta.creadaPorUsuarioId !== req.usuario.id) {
     return res.status(403).json({
       success: false,
       message: 'Solo el reclutador responsable de esta oferta puede gestionar a sus candidatos.',
@@ -203,19 +256,34 @@ exports.updateEstado = async (req, res) => {
   }
 
   const estadoAnterior = postulacion.estado;
+  const cambiaEstado = Boolean(estado) && estado !== estadoAnterior;
+
+  // Flujo guiado: solo las transiciones permitidas desde el estado actual.
+  if (cambiaEstado && !postulacionService.transicionesDesde(estadoAnterior).includes(estado)) {
+    return res.status(400).json({
+      success: false,
+      message: `No se puede pasar de "${estadoAnterior.replace(/_/g, ' ')}" a "${estado.replace(/_/g, ' ')}".`,
+      code: 'TRANSICION_NO_PERMITIDA',
+      transicionesPermitidas: postulacionService.transicionesDesde(estadoAnterior),
+    });
+  }
 
   const updateData = {};
-  if (estado) updateData.estado = estado;
-  if (notasEmpresa !== undefined) updateData.notasEmpresa = notasEmpresa;
+  if (cambiaEstado) updateData.estado = estado;
+  if (notasEmpresa !== undefined) {
+    // Nota interna: nunca se le muestra al candidato ni se le notifica.
+    const nota = typeof notasEmpresa === 'string' ? notasEmpresa.trim() : '';
+    updateData.notasEmpresa = nota || null;
+  }
   await postulacion.update(updateData);
 
-  if (estado && estado !== estadoAnterior) {
+  if (cambiaEstado) {
     await PostulacionHistorialEstado.create({
       postulacionId: postulacion.id,
       estadoAnterior,
       estadoNuevo: estado,
       cambiadoPorUsuarioId: req.usuario.id,
-      notaInterna: notasEmpresa || null,
+      notaInterna: updateData.notasEmpresa || null,
     });
   }
 
@@ -226,7 +294,7 @@ exports.updateEstado = async (req, res) => {
     contratado:      '¡Felicitaciones! Fuiste seleccionado/a',
   };
 
-  if (estado) {
+  if (cambiaEstado) {
     await crearNotificacion({
       usuarioId: postulacion.usuarioId,
       titulo: estadoTexto[estado] || 'Estado actualizado',
@@ -245,5 +313,12 @@ exports.updateEstado = async (req, res) => {
     });
   }
 
-  return res.json({ success: true, message: 'Postulación actualizada.', data: postulacionService.formatearPostulacion(postulacion) });
+  return res.json({
+    success: true,
+    message: 'Postulación actualizada.',
+    data: {
+      ...postulacionService.formatearPostulacion(postulacion),
+      transicionesPermitidas: postulacionService.transicionesDesde(postulacion.estado),
+    },
+  });
 };

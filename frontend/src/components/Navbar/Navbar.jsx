@@ -1,9 +1,10 @@
 /**
- * Navbar.jsx — Barra de navegación de alumno/egresado y RECLUTADOR.
+ * Navbar.jsx — Barra de navegación de ALUMNO/EGRESADO.
  *
- * No lo usan el admin del sistema (components/AdminShell) ni el administrador
- * de empresa (components/EmpresaShell): ambos tienen su propio shell con
- * sidebar + topbar. Ver `Chrome` en App.jsx.
+ * Cada perfil tiene su propio chrome (ver `Chrome` en App.jsx): el admin del
+ * sistema (components/AdminShell) y el administrador de empresa
+ * (components/EmpresaShell) usan sidebar + topbar; el reclutador, su barra
+ * horizontal (components/ReclutadorNav).
  *
  * - Badge de notificaciones con prioridad (alta → rojo) y de mensajes de chat.
  * - La campana navega a /notificaciones (y se marca activa ahí).
@@ -13,7 +14,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { useEmpresa } from '../../hooks/useEmpresa';
 import { useNotifCounters } from '../../hooks/useNotifCounters';
 import Brand from '../Brand/Brand';
 import Icon from '../ui/Icon';
@@ -24,9 +24,6 @@ export default function Navbar() {
   const { usuario } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  // Gratis para usuarios no-empresa: EmpresaContext corta su fetch antes de
-  // pedir nada si `usuario.rol !== 'empresa'` — no duplica requests.
-  const { esReclutador } = useEmpresa();
   const { noLeidas, prioridadAlta, mensajesNL } = useNotifCounters(usuario);
 
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -59,17 +56,9 @@ export default function Navbar() {
     { to: '/perfil', label: 'Mi Perfil' },
   ];
 
-  // Usuario empresa en este navbar = reclutador (operativo): publica ofertas y
-  // gestiona candidatos. Si el rol interno no se pudo resolver, queda solo el
-  // panel (el backend igual decide qué puede hacer).
-  const linksEmpresa = esReclutador
-    ? [
-        { to: '/empresa', label: 'Panel' },
-        { to: '/empresa/nueva-oferta', label: '+ Nueva Oferta' },
-        { to: '/empresa/candidatos', label: 'Candidatos' },
-        { to: '/empresa/equipo', label: 'Equipo' },
-      ]
-    : [{ to: '/empresa', label: 'Panel' }];
+  // Caso borde: un usuario empresa cuyo rol interno no se pudo resolver (sin
+  // membresía activa) cae acá con un único link; el backend decide qué puede hacer.
+  const linksEmpresa = [{ to: '/empresa', label: 'Panel' }];
 
   const links = usuario.rol === 'empresa' ? linksEmpresa : linksAlumnoEgresado;
 

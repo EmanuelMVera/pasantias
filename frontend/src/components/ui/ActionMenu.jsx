@@ -12,6 +12,10 @@
  * - Se dibuja en un portal con `position: fixed` calculada desde el botón al abrir:
  *   así no lo recorta el `overflow` del contenedor de la tabla.
  * - Se cierra si la página hace scroll o cambia de tamaño (la posición ya no sería válida).
+ * - `triggerLabel` (opcional): en vez del botón "⋯" muestra un botón con ese
+ *   texto y un chevron (p. ej. "Cambiar estado"), para que la acción principal
+ *   de una fila no quede escondida detrás de un ícono. `label` sigue siendo el
+ *   nombre accesible.
  * - Un ítem con `separatorBefore: true` dibuja una línea divisoria arriba suyo
  *   (para separar grupos de acciones).
  * - Si `items` está vacío no renderiza nada.
@@ -27,7 +31,7 @@ const ALTO_ITEM = 42;
 const MARGEN = 8;
 const ALTO_SEPARADOR = 9;
 
-export default function ActionMenu({ items, label = 'Más acciones', disabled = false }) {
+export default function ActionMenu({ items, label = 'Más acciones', disabled = false, triggerLabel }) {
   const [pos, setPos] = useState(null); // null = cerrado
   const botonRef = useRef(null);
   const menuRef = useRef(null);
@@ -95,7 +99,7 @@ export default function ActionMenu({ items, label = 'Más acciones', disabled = 
       <button
         ref={botonRef}
         type="button"
-        className={styles.trigger}
+        className={`${styles.trigger} ${triggerLabel ? styles.triggerTexto : ''}`}
         aria-haspopup="menu"
         aria-expanded={abierto}
         aria-label={label}
@@ -103,7 +107,14 @@ export default function ActionMenu({ items, label = 'Más acciones', disabled = 
         disabled={disabled}
         onClick={alternar}
       >
-        <Icon name="dots" size={18} />
+        {triggerLabel ? (
+          <>
+            {triggerLabel}
+            <Icon name="chevronDown" size={16} />
+          </>
+        ) : (
+          <Icon name="dots" size={18} />
+        )}
       </button>
 
       {abierto && createPortal(

@@ -1,4 +1,4 @@
-/* CrearOfertaPage.module.css — formulario de publicación de oferta. */
+/* CrearOfertaPage.module.css — formulario de oferta (OfertaForm: crear y editar). */
 
 .tipoGrid {
   display: flex;
@@ -102,9 +102,57 @@
 
 .chip input { display: none; }
 
-.acciones {
+/* ── Layout en secciones (Card) ───────────────────────────────────────────── */
+.pagina > form,
+.pagina > .aviso { max-width: 860px; }
+
+.form {
   display: flex;
-  gap: 1rem;
-  align-items: center;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.seccion { min-width: 0; }
+
+.campos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--warning-soft);
+  color: var(--warning-text);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.aviso svg { flex-shrink: 0; margin-top: 2px; }
+
+.footer {
+  display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+.footer button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+
+@media (max-width: 560px) {
+  .footer { flex-direction: column-reverse; }
+  .footer button { width: 100%; }
+  .tipoCard { min-width: 0; flex-basis: 100%; }
 }
