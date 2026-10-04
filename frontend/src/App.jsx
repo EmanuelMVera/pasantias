@@ -47,6 +47,7 @@ import EditarOfertaPage from './pages/empresa/EditarOfertaPage';
 import PostulantesMiOfertaPage from './pages/empresa/PostulantesMiOfertaPage';
 import EquipoPage from './pages/empresa/EquipoPage';
 import SeguridadPage from './pages/empresa/SeguridadPage';
+import MiPerfilReclutadorPage from './pages/empresa/MiPerfilReclutadorPage';
 import MiEmpresaPage from './pages/empresa/MiEmpresaPage';
 import CandidatosEmpresaPage from './pages/empresa/CandidatosEmpresaPage';
 
@@ -211,6 +212,12 @@ function AppRoutes() {
       <Route path="/empresa/equipo" element={
         <ProtectedRoute roles={['empresa']}>
           <SoloAdminEmpresa><EquipoPage /></SoloAdminEmpresa>
+        </ProtectedRoute>
+      } />
+      {/* Mi perfil: datos personales del reclutador (el admin_empresa usa Mi empresa). */}
+      <Route path="/empresa/mi-perfil" element={
+        <ProtectedRoute roles={['empresa']}>
+          <SoloReclutador><MiPerfilReclutadorPage /></SoloReclutador>
         </ProtectedRoute>
       } />
       <Route path="/empresa/seguridad" element={

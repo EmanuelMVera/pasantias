@@ -4,6 +4,7 @@ const { operation, ok, paginated, message, REF } = require('../helpers');
 const T = 'empresas';
 const R_MIEMBRO = ['empresa/admin_empresa', 'empresa/reclutador'];
 const R_ADMIN = ['empresa/admin_empresa'];
+const R_RECLUTADOR = ['empresa/reclutador'];
 
 // respuesta con envelope + `data` + claves sueltas extra (rolEnEquipo, total, ...)
 const okWith = (dataSchema, extra = {}, dataIsArray = false) => ({
@@ -123,6 +124,46 @@ module.exports = {
         }),
       },
       errors: ['400', '401', '403', '403csrf', '404', '404empresa'],
+    }),
+  },
+
+  '/api/empresas/reclutadores/mi-perfil': {
+    get: operation({
+      tag: T, id: 'empresasMiPerfilReclutador', summary: 'Mi perfil (reclutador)',
+      description: 'Datos personales del reclutador autenticado, con la misma forma que la ficha pública. Solo reclutador: el admin_empresa gestiona la empresa desde Mi empresa.',
+      roles: R_RECLUTADOR,
+      responses: { 200: ok('ReclutadorPerfil') },
+      errors: ['401', '403', '404', '404empresa'],
+    }),
+    patch: operation({
+      tag: T, id: 'empresasMiPerfilReclutadorUpdate', summary: 'Editar mi perfil (reclutador)',
+      description: 'Whitelist estricta: `nombre`, `apellido`, `telefono`, `ubicacion`. Cualquier otro campo (email, rol, empresa, activo, password, fotoPerfil…) responde 400. `nombre`/`apellido` no pueden quedar vacíos; `telefono`/`ubicacion` vacíos o null se guardan como null. La foto se cambia por `POST /api/empresas/reclutadores/mi-perfil/foto`.',
+      roles: R_RECLUTADOR, csrf: true,
+      body: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          nombre: { type: 'string', minLength: 1, maxLength: 100 },
+          apellido: { type: 'string', minLength: 1, maxLength: 100 },
+          telefono: { type: 'string', maxLength: 30, nullable: true },
+          ubicacion: { type: 'string', maxLength: 150, nullable: true },
+        },
+      },
+      responses: { 200: message({ data: REF.schema('ReclutadorPerfil') }) },
+      errors: ['400', '401', '403', '403csrf', '404empresa'],
+    }),
+  },
+
+  '/api/empresas/reclutadores/mi-perfil/foto': {
+    post: operation({
+      tag: T, id: 'empresasMiPerfilReclutadorFoto', summary: 'Subir mi foto de perfil (reclutador)',
+      description: 'Guarda la URL final en `Usuario.fotoPerfil` (los reclutadores no tienen Perfil académico). Misma validación que el resto de las imágenes.',
+      roles: R_RECLUTADOR, csrf: true,
+      body: { type: 'object', required: ['foto'], properties: { foto: { type: 'string', format: 'binary' } } },
+      bodyContentType: 'multipart/form-data',
+      bodyDescription: 'multipart/form-data con el campo `foto` (JPG, PNG o WEBP validada por magic bytes, máx. 2 MB).',
+      responses: { 200: { description: 'OK', content: { 'application/json': { schema: REF.schema('FotoUploadResponse') } } } },
+      errors: ['400', '401', '403', '403csrf', '404empresa', '429'],
     }),
   },
 

@@ -11,12 +11,14 @@
  *
  * El backend decide quién puede verla (misma empresa, o un candidato con
  * relación de chat) y responde 404 en cualquier otro caso. No se edita desde
- * acá ni muestra métricas del reclutador.
+ * acá ni muestra métricas del reclutador; si es la ficha PROPIA, ofrece
+ * "Editar mi perfil" (/empresa/mi-perfil).
  */
 
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { empresaService } from '../../services/empresa.service';
+import { useAuth } from '../../hooks/useAuth';
 import Avatar from '../../components/Avatar/Avatar';
 import Card from '../../components/ui/Card';
 import EmptyState from '../../components/ui/EmptyState';
@@ -25,6 +27,7 @@ import styles from './ReclutadorPerfilPage.module.css';
 
 export default function ReclutadorPerfilPage() {
   const { usuarioId } = useParams();
+  const { usuario } = useAuth();
   const navigate = useNavigate();
   const idValido = /^\d+$/.test(usuarioId ?? '');
 
@@ -109,6 +112,13 @@ export default function ReclutadorPerfilPage() {
             <Icon name="building" size={18} />
             Ver empresa
           </Link>
+          {/* Solo en la ficha propia: los demás la ven siempre en modo consulta. */}
+          {usuario?.id === perfil.id && (
+            <Link to="/empresa/mi-perfil" className="btn-secondary">
+              <Icon name="edit" size={18} />
+              Editar mi perfil
+            </Link>
+          )}
         </div>
       </Card>
     </div>

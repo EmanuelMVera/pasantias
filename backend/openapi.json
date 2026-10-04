@@ -3997,6 +3997,217 @@
         }
       }
     },
+    "/api/empresas/reclutadores/mi-perfil": {
+      "get": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasMiPerfilReclutador",
+        "summary": "Mi perfil (reclutador)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/ReclutadorPerfil"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Datos personales del reclutador autenticado, con la misma forma que la ficha pública. Solo reclutador: el admin_empresa gestiona la empresa desde Mi empresa.\n\n**Roles:** empresa/reclutador"
+      },
+      "patch": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasMiPerfilReclutadorUpdate",
+        "summary": "Editar mi perfil (reclutador)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "$ref": "#/components/schemas/ReclutadorPerfil"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404Empresa"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Whitelist estricta: `nombre`, `apellido`, `telefono`, `ubicacion`. Cualquier otro campo (email, rol, empresa, activo, password, fotoPerfil…) responde 400. `nombre`/`apellido` no pueden quedar vacíos; `telefono`/`ubicacion` vacíos o null se guardan como null. La foto se cambia por `POST /api/empresas/reclutadores/mi-perfil/foto`.\n\n**Roles:** empresa/reclutador",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "apellido": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "telefono": {
+                    "type": "string",
+                    "maxLength": 30,
+                    "nullable": true
+                  },
+                  "ubicacion": {
+                    "type": "string",
+                    "maxLength": 150,
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/empresas/reclutadores/mi-perfil/foto": {
+      "post": {
+        "tags": [
+          "empresas"
+        ],
+        "operationId": "empresasMiPerfilReclutadorFoto",
+        "summary": "Subir mi foto de perfil (reclutador)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FotoUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404Empresa"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Guarda la URL final en `Usuario.fotoPerfil` (los reclutadores no tienen Perfil académico). Misma validación que el resto de las imágenes.\n\n**Roles:** empresa/reclutador",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "foto"
+                ],
+                "properties": {
+                  "foto": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          },
+          "description": "multipart/form-data con el campo `foto` (JPG, PNG o WEBP validada por magic bytes, máx. 2 MB)."
+        }
+      }
+    },
     "/api/empresas/reclutadores/{id}/perfil": {
       "get": {
         "tags": [

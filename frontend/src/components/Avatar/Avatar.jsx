@@ -31,7 +31,9 @@ export default function Avatar({
   style,
   imgClassName = '',
 }) {
-  const [imgError, setImgError] = useState(false);
+  // El error se recuerda POR URL: si la foto/logo cambia (p. ej. tras subir una
+  // nueva), se vuelve a intentar aunque la anterior hubiera fallado.
+  const [srcConError, setSrcConError] = useState(null);
 
   const nombreCompleto = `${nombre ?? ''} ${apellido ?? ''}`.trim() || 'Usuario';
   const inicial = (nombre?.[0] ?? apellido?.[0] ?? '?').toUpperCase();
@@ -54,7 +56,7 @@ export default function Avatar({
     ...style,
   };
 
-  const mostrarImagen = Boolean(src) && !imgError;
+  const mostrarImagen = Boolean(src) && srcConError !== src;
 
   return (
     <div className={className} style={containerStyle} role="img" aria-label={nombreCompleto}>
@@ -64,7 +66,7 @@ export default function Avatar({
           alt=""
           className={imgClassName}
           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          onError={() => setImgError(true)}
+          onError={() => setSrcConError(src)}
         />
       ) : (
         <span aria-hidden="true">{inicial}</span>

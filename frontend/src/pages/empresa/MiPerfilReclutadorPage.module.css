@@ -1,0 +1,126 @@
+/* MiPerfilReclutadorPage.module.css — Mi perfil del reclutador (columna angosta). */
+
+.contenido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 720px;
+}
+
+.bloque { padding: var(--space-5); }
+
+.identidad {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.identidadTexto {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* Dos clases: le gana a `.page-container h2` (márgenes y borde de título). */
+.bloque .nombre {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.4rem;
+  line-height: 1.2;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.rolEmpresa {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+
+.fotoAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+/* El input real queda accesible pero oculto: lo dispara el <label> estilo botón. */
+.inputArchivo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.inputArchivo:focus-visible + .botonArchivo {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.botonArchivo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.ayuda {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.errorFoto { margin: 0; }
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.form input:disabled {
+  background: var(--surface-muted, #f1f5f9);
+  color: var(--text-soft);
+  cursor: not-allowed;
+}
+
+.acciones {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cuenta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.cuenta dt {
+  margin-bottom: 2px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.cuenta dd {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.cuenta a { color: var(--primary); text-decoration: none; }
+.cuenta a:hover { text-decoration: underline; }
+
+@media (max-width: 560px) {
+  .bloque { padding: var(--space-4); }
+  .identidad { flex-direction: column; align-items: flex-start; gap: var(--space-4); }
+  .acciones :global(.btn-primary) { width: 100%; justify-content: center; }
+}

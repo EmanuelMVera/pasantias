@@ -11,6 +11,12 @@ export const empresaService = {
   asignarResponsableOferta: (ofertaId, responsableId) => api.patch(`/empresas/ofertas/${ofertaId}/responsable`, { responsableId }),
   // Ficha de contacto de un reclutador (el backend decide quién puede verla).
   getPerfilReclutador:   (usuarioId) => api.get(`/empresas/reclutadores/${usuarioId}/perfil`),
+  // Mi perfil (solo reclutador): datos personales + foto subida como imagen.
+  getMiPerfilReclutador:    () => api.get('/empresas/reclutadores/mi-perfil'),
+  updateMiPerfilReclutador: (data) => api.patch('/empresas/reclutadores/mi-perfil', data),
+  subirFotoMiPerfilReclutador: (formData) => api.post('/empresas/reclutadores/mi-perfil/foto', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
   getMiEmpresa:          () => api.get('/empresas/mi-empresa'),
   getPublico:            (empresaId) => api.get(`/empresas/${empresaId}`), // Perfil de empresa (datos públicos, pero requiere sesión)
   updateMiEmpresa:       (data) => api.put('/empresas/mi-empresa', data),

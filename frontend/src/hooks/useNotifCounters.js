@@ -9,16 +9,24 @@
  *   del sistema no usa chat, así que no se pide).
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { notificacionService } from '../services/notificacion.service';
 import { mensajeService } from '../services/chat.service';
+import { totalMensajesNoLeidos, EVENTO_CHAT_LEIDO } from '../utils/chatContadores';
 
 export function useNotifCounters(usuario, { incluirChat = true } = {}) {
   const location = useLocation();
   const [noLeidas, setNoLeidas] = useState(0);
   const [prioridadAlta, setPrioridadAlta] = useState(false);
   const [mensajesNL, setMensajesNL] = useState(0);
+
+  // Backend devuelve `noLeidos` por conversación (ver utils/chatContadores).
+  const contarMensajes = useCallback(() => {
+    mensajeService.getConversaciones()
+      .then(({ data }) => setMensajesNL(totalMensajesNoLeidos(data.data ?? data ?? [])))
+      .catch(() => { });
+  }, []);
 
   useEffect(() => {
     if (!usuario) return;
@@ -35,14 +43,17 @@ export function useNotifCounters(usuario, { incluirChat = true } = {}) {
       .catch(() => { });
 
     if (!incluirChat) return;
-    mensajeService.getConversaciones()
-      .then(({ data }) => {
-        const lista = data.data ?? data ?? [];
-        const total = lista.reduce((acc, c) => acc + (c.mensajesNoLeidos ?? 0), 0);
-        setMensajesNL(total);
-      })
-      .catch(() => { });
-  }, [usuario, location.pathname, incluirChat]);
+    contarMensajes();
+  }, [usuario, location.pathname, incluirChat, contarMensajes]);
+
+  // Al marcar una conversación como leída (useConversacion) el badge se
+  // recalcula enseguida: si no, la recarga por cambio de ruta podía llegar
+  // antes de que el servidor registrara la lectura y quedaba el número viejo.
+  useEffect(() => {
+    if (!usuario || !incluirChat) return undefined;
+    window.addEventListener(EVENTO_CHAT_LEIDO, contarMensajes);
+    return () => window.removeEventListener(EVENTO_CHAT_LEIDO, contarMensajes);
+  }, [usuario, incluirChat, contarMensajes]);
 
   return { noLeidas, prioridadAlta, mensajesNL };
 }

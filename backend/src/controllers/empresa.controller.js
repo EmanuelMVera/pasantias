@@ -1,6 +1,6 @@
 'use strict';
 
-const { Empresa, Oferta } = require('../models');
+const { Empresa, Oferta, Usuario } = require('../models');
 const empresaService = require('../services/empresa.service');
 const { whereOfertaVisible } = require('../services/oferta.service');
 const equipoService  = require('../services/empresaEquipo.service');
@@ -155,6 +155,43 @@ exports.getPerfilReclutador = async (req, res) => {
   const perfil = await empresaService.obtenerPerfilReclutador(req.usuario, req.params.id);
   if (!perfil) return res.status(404).json({ success: false, message: 'Perfil no disponible.' });
   return res.json({ success: true, data: perfil });
+};
+
+// ── Mi perfil del reclutador ──────────────────────────────────────────────────
+// Datos personales del propio reclutador (los reclutadores no tienen un Perfil
+// académico: todo vive en Usuario). Misma forma que la ficha pública.
+
+const miFicha = (req) => empresaService.obtenerPerfilReclutador(req.usuario, req.usuario.id);
+
+exports.getMiPerfilReclutador = async (req, res) => {
+  const perfil = await miFicha(req);
+  if (!perfil) return res.status(404).json({ success: false, message: 'Perfil no disponible.' });
+  return res.json({ success: true, data: perfil });
+};
+
+// PATCH: el validador ya garantizó la whitelist (nombre, apellido, telefono,
+// ubicacion). Los opcionales vacíos se guardan como null.
+exports.updateMiPerfilReclutador = async (req, res) => {
+  const cambios = {};
+  for (const campo of ['nombre', 'apellido', 'telefono', 'ubicacion']) {
+    if (req.body[campo] === undefined) continue;
+    const valor = typeof req.body[campo] === 'string' ? req.body[campo].trim() : null;
+    cambios[campo] = valor || null;
+  }
+  await Usuario.update(cambios, { where: { id: req.usuario.id } });
+  return res.json({ success: true, message: 'Perfil actualizado.', data: await miFicha(req) });
+};
+
+// POST foto: misma validación segura que el resto de las imágenes (multer 2 MB
+// + JPG/PNG/WEBP + magic bytes + almacenamiento público). Borra la anterior si
+// era propia.
+exports.uploadFotoMiPerfilReclutador = async (req, res) => {
+  const usuario = await Usuario.findByPk(req.usuario.id, { attributes: ['id', 'fotoPerfil'] });
+  const { urlPublica, archivoId } = await procesarSubidaImagen({
+    req, tipo: 'foto_perfil', valorAnterior: usuario?.fotoPerfil,
+  });
+  await Usuario.update({ fotoPerfil: urlPublica }, { where: { id: req.usuario.id } });
+  return res.json({ success: true, message: 'Foto de perfil actualizada.', fotoPerfil: urlPublica, archivoId });
 };
 
 // ── Perfil de empresa ─────────────────────────────────────────────────────────

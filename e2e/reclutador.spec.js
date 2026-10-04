@@ -219,7 +219,7 @@ test.describe('Reclutador — workspace operativo', () => {
     await alumno.dispose();
   });
 
-  test('menú de usuario: ver empresa (perfil público) y seguridad; sin Equipo', async ({ page }) => {
+  test('menú de usuario: mi perfil, ver empresa (perfil público) y seguridad; sin Equipo', async ({ page }) => {
     const abrirMenu = async () => page.locator('[aria-haspopup="true"]').click();
 
     await abrirMenu();
@@ -228,8 +228,19 @@ test.describe('Reclutador — workspace operativo', () => {
     await expect(menu).toContainText(fx.reclutador.email);
     await expect(menu).toContainText(fx.empresa.razonSocial);
     await expect(menu).toContainText('Reclutador');
-    await expect(menu.getByRole('link')).toHaveText(['Ver empresa', 'Seguridad de mi cuenta']);
+    await expect(menu.getByRole('link')).toHaveText(['Mi perfil', 'Ver empresa', 'Seguridad de mi cuenta']);
 
+    // Mi perfil: datos personales editables; email y empresa solo lectura.
+    await menu.getByRole('link', { name: 'Mi perfil' }).click();
+    await expect(page).toHaveURL(/\/empresa\/mi-perfil$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Mi perfil' })).toBeVisible();
+    await expect(page.locator('#mp-email')).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled(); // sin cambios todavía
+    await page.locator('#mp-telefono').fill('11-4000-1234');
+    await page.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(page.getByText('Perfil actualizado.')).toBeVisible();
+
+    await abrirMenu();
     await menu.getByRole('link', { name: 'Ver empresa' }).click();
     await expect(page).toHaveURL(/\/empresa\/\d+$/);
     await expect(page.getByRole('heading', { name: fx.empresa.razonSocial })).toBeVisible();

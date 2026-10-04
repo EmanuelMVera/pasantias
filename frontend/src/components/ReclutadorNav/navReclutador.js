@@ -23,11 +23,13 @@ export const RECLUTADOR_LINKS = [
 ];
 
 /**
- * Accesos del menú de usuario. "Ver empresa" abre el perfil PÚBLICO de la
+ * Accesos del menú de usuario. "Mi perfil" edita sus datos personales
+ * (/empresa/mi-perfil). "Ver empresa" abre el perfil PÚBLICO de la
  * empresa (lo mismo que ve un alumno), no la pantalla de administración.
  */
 export function menuUsuarioReclutador(empresaId) {
   return [
+    { to: '/empresa/mi-perfil', label: 'Mi perfil', icon: 'user' },
     ...(empresaId ? [{ to: `/empresa/${empresaId}`, label: 'Ver empresa', icon: 'building' }] : []),
     { to: '/empresa/seguridad', label: 'Seguridad de mi cuenta', icon: 'lock' },
   ];

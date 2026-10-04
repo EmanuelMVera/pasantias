@@ -169,6 +169,37 @@ describe('SEC-03 — Subida de imágenes', () => {
     expect(denegado.status).toBe(403);
   });
 
+  // ── foto del reclutador (Mi perfil) ─────────────────────────────────────────
+  test('mi perfil del reclutador: PNG real → Usuario.fotoPerfil; contenido inválido → 400; admin_empresa → 403', async () => {
+    const { usuarioAdmin, empresa, passwordPlana } = await crearEmpresaConAdmin();
+    const { usuarioReclutador } = await agregarReclutador(empresa);
+    idsUsuarios.push(usuarioAdmin.id, usuarioReclutador.id);
+    const tokenRecl = await loginYObtenerToken(usuarioReclutador.email, passwordPlana);
+    const tokenAdmin = await loginYObtenerToken(usuarioAdmin.email, passwordPlana);
+    const URL_FOTO = '/api/empresas/reclutadores/mi-perfil/foto';
+
+    const ok = await request(app).post(URL_FOTO)
+      .set('Authorization', `Bearer ${tokenRecl}`)
+      .attach('foto', PNG, { filename: 'yo.png', contentType: 'image/png' });
+    expect(ok.status).toBe(200);
+    expect(ok.body.fotoPerfil).toMatch(/\/uploads\/public\/foto_[0-9a-f-]+\.png$/);
+    archivosPublicos.push(bn(ok.body.fotoPerfil));
+    const u = await Usuario.findByPk(usuarioReclutador.id, { attributes: ['fotoPerfil'] });
+    expect(u.fotoPerfil).toBe(ok.body.fotoPerfil);
+
+    // Se declara PNG pero el contenido no lo es (magic bytes) → 400, la foto no cambia.
+    const falso = await request(app).post(URL_FOTO)
+      .set('Authorization', `Bearer ${tokenRecl}`)
+      .attach('foto', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), { filename: 'x.png', contentType: 'image/png' });
+    expect(falso.status).toBe(400);
+    expect((await Usuario.findByPk(usuarioReclutador.id, { attributes: ['fotoPerfil'] })).fotoPerfil).toBe(ok.body.fotoPerfil);
+
+    const denegado = await request(app).post(URL_FOTO)
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .attach('foto', PNG, { filename: 'yo.png', contentType: 'image/png' });
+    expect(denegado.status).toBe(403);
+  });
+
   // ── foto/logo por URL externa ───────────────────────────────────────────────
   describe('URL externa (foto de perfil / logo de empresa)', () => {
     const URL_EXTERNA = 'https://i.pravatar.cc/150?img=5';

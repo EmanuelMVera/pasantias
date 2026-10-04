@@ -86,8 +86,8 @@ src/
 - **Reclutador = workspace operativo personal; no administra el equipo.**
   `ReclutadorNav`: Inicio · Mis ofertas · Candidatos + "+ Nueva oferta" (única
   acción global de creación: las páginas no la repiten en su cabecera y se oculta
-  mientras se crea / edita una oferta). Menú de usuario: Ver empresa y Seguridad de
-  mi cuenta. **Admin empresa = gobierno y supervisión del equipo** (`EmpresaShell`).
+  mientras se crea / edita una oferta). Menú de usuario: Mi perfil (`/empresa/mi-perfil`, datos
+  personales + foto), Ver empresa y Seguridad de mi cuenta. **Admin empresa = gobierno y supervisión del equipo** (`EmpresaShell`).
 
 Rutas públicas (sin login): `/`, `/login`, `/registro-empresa`, `/forgot-password`,
 `/reset-password/:token`, y el listado/detalle de ofertas a nivel API.

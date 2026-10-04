@@ -10,6 +10,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { mensajeService } from '../services/chat.service';
+import { EVENTO_CHAT_LEIDO } from '../utils/chatContadores';
 
 const POLL_INTERVAL = 10_000; // ms
 
@@ -67,7 +68,11 @@ export function useConversacion({ convActivaId, setConversaciones, setPartnerInf
         setSoloLectura(!!data.soloLectura);
         setMotivoSoloLectura(data.motivoSoloLectura || '');
         setErrorConv('');
-        mensajeService.marcarLeida(convActivaId).catch(() => {});
+        mensajeService.marcarLeida(convActivaId)
+          // Al abrir la conversación, el badge global se recalcula recién
+          // cuando el servidor ya registró la lectura.
+          .then(() => { if (inicial) window.dispatchEvent(new Event(EVENTO_CHAT_LEIDO)); })
+          .catch(() => {});
         setConversaciones((prev) =>
           prev.map((c) => (c.usuario?.id === convActivaId ? { ...c, noLeidos: 0 } : c))
         );

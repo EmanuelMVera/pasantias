@@ -277,4 +277,58 @@ describe('RESPONSABLE DE OFERTA Y PERFIL DE RECLUTADOR', () => {
     const token = await loginYObtenerToken(admin.email, passwordPlana);
     expect((await perfil(token, rec1.id)).status).toBe(200);
   });
+
+  // ── Mi perfil del reclutador (/reclutadores/mi-perfil) ──────────────────────
+
+  const MI_PERFIL = '/api/empresas/reclutadores/mi-perfil';
+
+  test('mi perfil: el reclutador consulta y edita nombre, apellido, teléfono y ubicación; la ficha pública lo refleja', async () => {
+    const { empresa, rec1, tokenAdmin, passwordPlana } = await escenario();
+    const token = await loginYObtenerToken(rec1.email, passwordPlana);
+
+    const propio = await auth(request(app).get(MI_PERFIL), token);
+    expect(propio.status).toBe(200);
+    expect(propio.body.data).toMatchObject({ id: rec1.id, email: rec1.email, empresa: { id: empresa.id } });
+
+    const res = await auth(request(app).patch(MI_PERFIL), token)
+      .send({ nombre: '  Tony ', apellido: 'Stark', telefono: '11-5555-0000', ubicacion: '' });
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ nombre: 'Tony', apellido: 'Stark', telefono: '11-5555-0000', ubicacion: null });
+
+    const ficha = await perfil(tokenAdmin, rec1.id);
+    expect(ficha.body.data).toMatchObject({ nombre: 'Tony', apellido: 'Stark', telefono: '11-5555-0000', ubicacion: null });
+  });
+
+  test('mi perfil: whitelist estricta — email, rol, empresa, estado, password o foto → 400 y nada cambia', async () => {
+    const { rec1, passwordPlana } = await escenario();
+    const token = await loginYObtenerToken(rec1.email, passwordPlana);
+
+    for (const intruso of [
+      { email: 'otro@x.test' }, { rol: 'admin' }, { empresaId: 1 }, { activo: false },
+      { habilitado: false }, { password: 'Nueva1234!' }, { fotoPerfil: 'https://x.test/a.png' },
+      { rolInterno: 'admin_empresa' }, { nombre: 'Ok', rol: 'admin' },
+    ]) {
+      const res = await auth(request(app).patch(MI_PERFIL), token).send(intruso);
+      expect(res.status).toBe(400);
+    }
+    for (const invalido of [{}, { nombre: '   ' }, { apellido: null }, { telefono: 'x'.repeat(31) }, { ubicacion: 5 }]) {
+      expect((await auth(request(app).patch(MI_PERFIL), token).send(invalido)).status).toBe(400);
+    }
+
+    const despues = (await auth(request(app).get(MI_PERFIL), token)).body.data;
+    expect(despues).toMatchObject({ email: rec1.email, nombre: rec1.nombre, apellido: rec1.apellido, fotoPerfil: null });
+  });
+
+  test('mi perfil: solo reclutador — admin_empresa 403, alumno 404 (no es miembro de una empresa), sin sesión 401', async () => {
+    const { tokenAdmin } = await escenario();
+    const { usuario: alumno, passwordPlana: passAlumno } = await crearAlumno();
+    idsUsuarios.push(alumno.id);
+    const tokenAlumno = await loginYObtenerToken(alumno.email, passAlumno);
+
+    expect((await request(app).get(MI_PERFIL)).status).toBe(401);
+    for (const [token, esperado] of [[tokenAdmin, 403], [tokenAlumno, 404]]) {
+      expect((await auth(request(app).get(MI_PERFIL), token)).status).toBe(esperado);
+      expect((await auth(request(app).patch(MI_PERFIL), token).send({ nombre: 'X' })).status).toBe(esperado);
+    }
+  });
 });

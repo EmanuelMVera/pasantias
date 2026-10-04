@@ -60,7 +60,7 @@ const router = require('express').Router();
 const { verifyToken } = require('../middleware/auth.middleware');
 const { verifyEmpresaMember, authorizeEmpresaRoles } = require('../middleware/empresa.middleware');
 const validate = require('../middleware/validate.middleware');
-const { validateUpdateEmpresa } = require('../validators/empresa.validator');
+const { validateUpdateEmpresa, validateMiPerfilReclutador } = require('../validators/empresa.validator');
 const asyncHandler = require('../utils/asyncHandler');
 const { uploadLimiter } = require('../middleware/rateLimit');
 const { multerImagen } = require('../services/archivoImagen.service');
@@ -70,6 +70,8 @@ const ctrl = require('../controllers/empresa.controller');
 const miembro    = [verifyToken, verifyEmpresaMember];
 // soloAdmin: solo admin_empresa puede gestionar equipo y editar perfil
 const soloAdmin  = [...miembro, authorizeEmpresaRoles('admin_empresa')];
+// soloReclutador: datos personales del propio reclutador (Mi perfil)
+const soloReclutador = [...miembro, authorizeEmpresaRoles('reclutador')];
 
 // ── Panel corporativo ─────────────────────────────────────────────────────────
 
@@ -88,6 +90,16 @@ router.get('/ofertas/:id', ...miembro, asyncHandler(ctrl.getOfertaDeEmpresa));
 // responsable de una oferta (solo admin_empresa). Body: { responsableId }.
 // Acción de gobierno: no edita el contenido de la oferta ni sus postulaciones.
 router.patch('/ofertas/:id/responsable', ...soloAdmin, asyncHandler(ctrl.asignarResponsableOferta));
+
+// Mi perfil del RECLUTADOR (solo reclutador; el admin_empresa usa Mi empresa).
+// Declaradas antes de /reclutadores/:id/perfil para que "mi-perfil" nunca se
+// interprete como un id.
+// GET   /api/empresas/reclutadores/mi-perfil       — sus datos
+// PATCH /api/empresas/reclutadores/mi-perfil       — nombre, apellido, telefono, ubicacion
+// POST  /api/empresas/reclutadores/mi-perfil/foto  — foto (campo `foto`, imagen validada)
+router.get('/reclutadores/mi-perfil', ...soloReclutador, asyncHandler(ctrl.getMiPerfilReclutador));
+router.patch('/reclutadores/mi-perfil', ...soloReclutador, validate(validateMiPerfilReclutador), asyncHandler(ctrl.updateMiPerfilReclutador));
+router.post('/reclutadores/mi-perfil/foto', ...soloReclutador, uploadLimiter, multerImagen.single('foto'), asyncHandler(ctrl.uploadFotoMiPerfilReclutador));
 
 // GET /api/empresas/reclutadores/:id/perfil — Ficha de contacto de un reclutador.
 // No exige ser miembro de una empresa: la autorización (misma empresa, o un

@@ -74,6 +74,7 @@ es autoridad de permisos).
 | Editar mi perfil académico, subir CV / carta / foto | — | — | ✅ | — | — |
 | Ver perfil público de otro usuario / de una empresa | — | ✅ | ✅ | ✅ | ✅ |
 | Ver la ficha de un reclutador (`GET /api/empresas/reclutadores/:id/perfil`) | — | ✅ | ✅ con relación⁵ | ✅ misma empresa | ✅ misma empresa |
+| Mi perfil: ver / editar nombre, apellido, teléfono y ubicación; subir foto (`/api/empresas/reclutadores/mi-perfil[/foto]`) | — | — | — | — (403) | ✅ solo el propio⁹ |
 
 ### Ofertas
 
@@ -217,8 +218,13 @@ una de sus ofertas.
   ve estadísticas corporativas. Su alcance es PERSONAL y lo impone el backend
   (nota ⁷): no ve ofertas ni candidatos de otros reclutadores, ni de ofertas sin
   responsable. En el frontend no tiene sección Equipo: su barra es Inicio · Mis
-  ofertas · Candidatos + "Nueva oferta", y el menú de usuario solo ofrece Ver
-  empresa y Seguridad de mi cuenta.
+  ofertas · Candidatos + "Nueva oferta", y el menú de usuario ofrece Mi perfil,
+  Ver empresa y Seguridad de mi cuenta.
+- ⁹ **Mi perfil del reclutador** (`/empresa/mi-perfil`): whitelist estricta
+  (`nombre`, `apellido`, `telefono`, `ubicacion`; cualquier otro campo → 400).
+  Email, rol, empresa, estado y contraseña no se editan ahí (la contraseña vive en
+  Seguridad). La foto se sube como imagen validada (JPG/PNG/WEBP, 2 MB, magic bytes)
+  y se guarda en `Usuario.fotoPerfil`: los reclutadores no tienen Perfil académico.
 - ⁸ `GET /api/empresas/equipo` sigue respondiendo al reclutador (lectura de la
   nómina, sin datos de gestión); todas las acciones de equipo (`solicitudes`,
   `solicitar`, `recuperacion`, `PATCH`/`DELETE` de miembros) son solo `admin_empresa`.

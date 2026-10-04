@@ -18,6 +18,13 @@ import Card from '../../components/ui/Card';
 import EmptyState from '../../components/ui/EmptyState';
 import styles from './EmpresaPublicaPage.module.css';
 
+/** Iniciales para el fallback del logo: "S.H.I.E.L.D." → "SH", "Nube Code SRL" → "NC". */
+function inicialesEmpresa(razonSocial) {
+  const palabras = String(razonSocial ?? '').split(/\s+/).map((p) => p.replace(/[^\p{L}\p{N}]/gu, '')).filter(Boolean);
+  const texto = palabras.length > 1 ? palabras[0][0] + palabras[1][0] : (palabras[0] ?? '').slice(0, 2);
+  return texto.toUpperCase() || '?';
+}
+
 export default function EmpresaPublicaPage() {
   const { empresaId } = useParams();
   const { usuario } = useAuth();
@@ -30,6 +37,7 @@ export default function EmpresaPublicaPage() {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
+  const [logoConError, setLogoConError] = useState(null); // URL del logo que falló al cargar
 
   useEffect(() => {
     if (!idValido) return;
@@ -71,9 +79,10 @@ export default function EmpresaPublicaPage() {
       {/* ── Header ── */}
       <div className={styles.header}>
         <div className={styles.logo}>
-          {data.logo
-            ? <img src={data.logo} alt={data.razonSocial} className={styles.logoImg} />
-            : data.razonSocial?.[0]?.toUpperCase()}
+          {/* Si el logo existe pero no carga (URL rota o externa caída): iniciales, nunca imagen rota. */}
+          {data.logo && logoConError !== data.logo
+            ? <img src={data.logo} alt={data.razonSocial} className={styles.logoImg} onError={() => setLogoConError(data.logo)} />
+            : <span aria-hidden="true">{inicialesEmpresa(data.razonSocial)}</span>}
         </div>
 
         <div className={styles.headerInfo}>
