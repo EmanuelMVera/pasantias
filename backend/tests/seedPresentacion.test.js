@@ -1,10 +1,10 @@
 'use strict';
 
 /**
- * seedPresentacion.test.js — escenario dirigido de Delta Innovación IT.
+ * seedPresentacion.test.js — escenario dirigido de S.H.I.E.L.D.
  *
  * Cubre: exactamente 3 cuentas públicas (ninguna admin), equipo (1 cuenta
- * administradora + 2 reclutadores activos + 1 solicitud pendiente), ofertas
+ * administradora + 3 reclutadores activos + 1 solicitud pendiente), ofertas
  * con un reclutador como responsable (nunca el admin_empresa) y una sola
  * histórica sin responsable, chats y notificaciones coherentes con las reglas
  * reales, independencia del admin real, sin archivos ficticios, idempotencia,
@@ -23,6 +23,11 @@ const {
   EMP_ADMIN,
   RECLUTA,
   RECLUTA_2,
+  RECLUTA_3,
+  RAZON_SOCIAL,
+  EMPRESA_CUIT,
+  LEGACY_PRESENTACION,
+  CANDIDATO_EMAILS,
   ALUMNO,
   OUR_EMAILS,
   SOLICITUD_RECLUTADOR_PENDIENTE,
@@ -32,7 +37,6 @@ const { puedeEnviarMensaje, puedeVerConversacion } = require('../src/services/ch
 const { crearAdmin, loginYObtenerToken } = require('./helpers/factories');
 const { limpiarUsuarios, cerrarConexion } = require('./helpers/cleanup');
 
-const RAZON_SOCIAL = 'Delta Innovación IT';
 
 // Cada test corre el seed completo (limpia + siembra empresa, 7 ofertas,
 // 16 postulaciones+historial, chats, notificaciones, logs) — más que el
@@ -133,11 +137,12 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
     expect(perfil.cartaArchivoId).toBeNull();
   });
 
-  test('ofertas: el responsable es siempre un reclutador (Diego o Lucía), nunca el admin_empresa; una sola histórica sin responsable', async () => {
+  test('ofertas: el responsable es siempre un reclutador (Tony, Thor o Steve), nunca el admin_empresa; una sola histórica sin responsable', async () => {
     await ejecutarSeedPresentacion({ verbose: false });
     const empAdmin = await Usuario.findOne({ where: { email: EMP_ADMIN.email } });
-    const diego = await Usuario.findOne({ where: { email: RECLUTA.email } });
-    const lucia = await Usuario.findOne({ where: { email: RECLUTA_2.email } });
+    const tony = await Usuario.findOne({ where: { email: RECLUTA.email } });
+    const thor = await Usuario.findOne({ where: { email: RECLUTA_2.email } });
+    const steve = await Usuario.findOne({ where: { email: RECLUTA_3.email } });
     const empresa = await Empresa.findOne({ where: { razonSocial: RAZON_SOCIAL } });
     const ofertas = await Oferta.findAll({
       where: { empresaId: empresa.id },
@@ -149,7 +154,7 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
     expect(sinResponsable).toHaveLength(1); // el caso histórico intencional
     expect(sinResponsable[0].estadoModeracion).toBe('rechazada');
 
-    const porId = new Map([[diego.id, diego], [lucia.id, lucia]]);
+    const porId = new Map([tony, thor, steve].map((u) => [u.id, u]));
     const conResponsable = ofertas.filter((o) => o.creadaPorUsuarioId !== null);
     for (const o of conResponsable) {
       expect(o.creadaPorUsuarioId).not.toBe(empAdmin.id);
@@ -158,40 +163,45 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
       // El responsable ya era parte del equipo cuando se publicó la oferta.
       expect(new Date(responsable.createdAt).getTime()).toBeLessThanOrEqual(new Date(o.createdAt).getTime());
     }
-    // Los dos reclutadores tienen ofertas a cargo.
-    expect(conResponsable.some((o) => o.creadaPorUsuarioId === diego.id)).toBe(true);
-    expect(conResponsable.some((o) => o.creadaPorUsuarioId === lucia.id)).toBe(true);
+    // Los tres reclutadores tienen ofertas a cargo; Tony, la mayoría (es el de la demo).
+    for (const r of [tony, thor, steve]) {
+      expect(conResponsable.some((o) => o.creadaPorUsuarioId === r.id)).toBe(true);
+    }
+    expect(conResponsable.filter((o) => o.creadaPorUsuarioId === tony.id)).toHaveLength(3);
 
     // Cubre todo el ciclo de vida y toda la moderación.
     expect(new Set(ofertas.map((o) => o.estado))).toEqual(new Set(['activa', 'pausada', 'cerrada']));
     expect(new Set(ofertas.map((o) => o.estadoModeracion))).toEqual(new Set(['aprobada', 'pendiente', 'rechazada']));
   });
 
-  test('equipo de Delta: 1 cuenta administradora, 2 reclutadores activos y 1 solicitud pendiente (Mateo, no Lucía)', async () => {
+  test('equipo de S.H.I.E.L.D.: Nick Fury administra, Tony/Thor/Steve reclutan y Sam Wilson está pendiente', async () => {
     await ejecutarSeedPresentacion({ verbose: false });
     const empresa = await Empresa.findOne({ where: { razonSocial: RAZON_SOCIAL } });
     expect(empresa.nivelConfianza).toBe('estandar'); // explícito
 
     const membresias = await EmpresaUsuario.findAll({
       where: { empresaId: empresa.id },
-      include: [{ model: Usuario, as: 'usuario', attributes: ['email', 'rol'] }],
+      include: [{ model: Usuario, as: 'usuario', attributes: ['email', 'rol', 'nombre', 'apellido'] }],
     });
     const admins = membresias.filter((m) => m.rolInterno === 'admin_empresa');
     const reclutadores = membresias.filter((m) => m.rolInterno === 'reclutador' && m.activo);
     expect(admins).toHaveLength(1);
     expect(admins[0].usuario.email).toBe(EMP_ADMIN.email);
-    expect(reclutadores.map((m) => m.usuario.email).sort()).toEqual([RECLUTA_2.email, RECLUTA.email].sort());
+    expect(`${admins[0].usuario.nombre} ${admins[0].usuario.apellido}`).toBe('Nick Fury');
+    expect(reclutadores.map((m) => `${m.usuario.nombre} ${m.usuario.apellido}`).sort())
+      .toEqual(['Steve Rogers', 'Thor Odinson', 'Tony Stark']);
+    expect(reclutadores.map((m) => m.usuario.email).sort()).toEqual([RECLUTA.email, RECLUTA_2.email, RECLUTA_3.email].sort());
     expect(membresias.every((m) => m.usuario.rol === 'empresa')).toBe(true);
 
     const pendientes = await SolicitudReclutador.findAll({ where: { empresaId: empresa.id, estado: 'pendiente' } });
     expect(pendientes).toHaveLength(1);
     expect(pendientes[0].email).toBe(SOLICITUD_RECLUTADOR_PENDIENTE.email);
-    expect(pendientes[0].email).not.toBe(RECLUTA_2.email);
+    expect(`${pendientes[0].nombre} ${pendientes[0].apellido}`).toBe('Sam Wilson');
     // Quien está pendiente todavía no tiene cuenta.
     expect(await Usuario.count({ where: { email: SOLICITUD_RECLUTADOR_PENDIENTE.email } })).toBe(0);
   });
 
-  test('ningún usuario del escenario tiene rol admin; Lucía y los candidatos no son cuentas públicas', async () => {
+  test('ningún usuario del escenario tiene rol admin; Thor, Steve y los candidatos no son cuentas públicas', async () => {
     await ejecutarSeedPresentacion({ verbose: false });
     expect(await Usuario.count({ where: { email: OUR_EMAILS, rol: 'admin' } })).toBe(0);
 
@@ -207,7 +217,7 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
     const usuarios = await Usuario.findAll({ where: { email: OUR_EMAILS }, attributes: ['id', 'email', 'rol'] });
     const idDe = (email) => usuarios.find((u) => u.email === email).id;
     const admin = idDe(EMP_ADMIN.email);
-    const diego = idDe(RECLUTA.email);
+    const tony = idDe(RECLUTA.email);
     const alumno = idDe(ALUMNO.email);
     const candidatos = usuarios.filter((u) => u.rol !== 'empresa').map((u) => u.id);
     const ids = usuarios.map((u) => u.id);
@@ -219,8 +229,8 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
     const pares = new Set(mensajes.map((m) => [m.emisorId, m.receptorId].sort((a, b) => a - b).join('-')));
     const par = (a, b) => [a, b].sort((x, y) => x - y).join('-');
 
-    expect(pares.has(par(admin, diego))).toBe(true);   // chat interno del equipo
-    expect(pares.has(par(diego, alumno))).toBe(true);  // reclutador ↔ alumno demo
+    expect(pares.has(par(admin, tony))).toBe(true);   // chat interno del equipo
+    expect(pares.has(par(tony, alumno))).toBe(true);  // reclutador ↔ alumno demo
     for (const c of candidatos) expect(pares.has(par(admin, c))).toBe(false);
 
     // Cada conversación sembrada pasa la MISMA regla que aplica producción.
@@ -236,8 +246,8 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
   test('notificaciones: "Nueva postulación recibida" va a los reclutadores, nunca al admin_empresa', async () => {
     await ejecutarSeedPresentacion({ verbose: false });
     const admin = await Usuario.findOne({ where: { email: EMP_ADMIN.email } });
-    const diego = await Usuario.findOne({ where: { email: RECLUTA.email } });
-    const lucia = await Usuario.findOne({ where: { email: RECLUTA_2.email } });
+    const tony = await Usuario.findOne({ where: { email: RECLUTA.email } });
+    const thor = await Usuario.findOne({ where: { email: RECLUTA_2.email } });
     const alumno = await Usuario.findOne({ where: { email: ALUMNO.email } });
 
     const deAdmin = await Notificacion.findAll({ where: { usuarioId: admin.id } });
@@ -248,12 +258,12 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
     expect(deAdmin.some((n) => /rechazada/i.test(n.titulo))).toBe(true);
     expect(deAdmin.some((n) => n.accionURL === '/empresa/equipo')).toBe(true);
 
-    for (const reclutador of [diego, lucia]) {
+    for (const reclutador of [tony, thor]) {
       const propias = await Notificacion.findAll({ where: { usuarioId: reclutador.id } });
       expect(propias.some((n) => n.titulo === 'Nueva postulación recibida')).toBe(true);
       expect(propias.length).toBeLessThanOrEqual(10); // cantidad razonable, sin ruido
     }
-    expect(await Notificacion.count({ where: { usuarioId: lucia.id, titulo: 'Se te asignó una oferta' } })).toBe(1);
+    expect(await Notificacion.count({ where: { usuarioId: thor.id, titulo: 'Se te asignó una oferta' } })).toBe(1);
 
     // Alumno: mezcla de leídas y no leídas.
     const deAlumno = await Notificacion.findAll({ where: { usuarioId: alumno.id } });
@@ -261,10 +271,10 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
     expect(deAlumno.some((n) => !n.leida)).toBe(true);
   });
 
-  test('alumno demo: historia principal — contratado solo en Frontend (de Diego); Backend en revisión y UX/UI no seleccionado', async () => {
+  test('alumno demo (Peter Parker): contratado solo en Frontend (de Tony); Backend en revisión y UX/UI no seleccionado', async () => {
     await ejecutarSeedPresentacion({ verbose: false });
     const alumno = await Usuario.findOne({ where: { email: ALUMNO.email } });
-    const diego = await Usuario.findOne({ where: { email: RECLUTA.email } });
+    const tony = await Usuario.findOne({ where: { email: RECLUTA.email } });
     const postulaciones = await Postulacion.findAll({
       where: { usuarioId: alumno.id },
       attributes: ['id', 'estado'],
@@ -276,7 +286,15 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
       'Pasante en Desarrollo Backend (Node.js)': 'en_revision',
       'Pasante en Diseño UX/UI': 'rechazado',
     });
-    for (const p of postulaciones) expect(p.oferta.creadaPorUsuarioId).toBe(diego.id);
+    const steve = await Usuario.findOne({ where: { email: RECLUTA_3.email } });
+    const responsableDe = Object.fromEntries(postulaciones.map((p) => [p.oferta.titulo, p.oferta.creadaPorUsuarioId]));
+    expect(responsableDe).toEqual({
+      [HISTORIA_PRINCIPAL.ofertaTitulo]: tony.id,
+      'Pasante en Desarrollo Backend (Node.js)': tony.id,
+      'Pasante en Diseño UX/UI': steve.id,
+    });
+    expect(`${alumno.nombre} ${alumno.apellido}`).toBe('Peter Parker');
+    expect(alumno.fotoPerfil).toBeNull();
 
     const frontend = postulaciones.find((p) => p.oferta.titulo === HISTORIA_PRINCIPAL.ofertaTitulo);
     const historial = await PostulacionHistorialEstado.findAll({
@@ -285,7 +303,7 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
     expect(historial.map((h) => h.estadoNuevo)).toEqual(HISTORIA_PRINCIPAL.cadena);
   });
 
-  test('postulaciones de Delta: el embudo usa los 5 estados y el historial termina en el estado actual', async () => {
+  test('postulaciones de S.H.I.E.L.D.: el embudo usa los 5 estados y el historial termina en el estado actual', async () => {
     await ejecutarSeedPresentacion({ verbose: false });
     const empresa = await Empresa.findOne({ where: { razonSocial: RAZON_SOCIAL } });
     const ofertas = await Oferta.findAll({ where: { empresaId: empresa.id }, attributes: ['id', 'estadoModeracion', 'creadaPorUsuarioId'] });
@@ -311,7 +329,7 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
 
   test('notificaciones: ningún accionURL roto conocido (ej. "/empresa/ofertas", que no es una ruta real)', async () => {
     await ejecutarSeedPresentacion({ verbose: false });
-    const emails = [EMP_ADMIN.email, RECLUTA.email, RECLUTA_2.email, ALUMNO.email];
+    const emails = [EMP_ADMIN.email, RECLUTA.email, RECLUTA_2.email, RECLUTA_3.email, ALUMNO.email];
     const usuarios = await Usuario.findAll({ where: { email: emails }, attributes: ['id'] });
     const notifs = await Notificacion.findAll({ where: { usuarioId: usuarios.map((u) => u.id) }, attributes: ['accionURL'] });
 
@@ -327,7 +345,7 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
 
   test('activity_logs: usa un rango de IP reservado para documentación (RFC 5737), nunca una IP real', async () => {
     await ejecutarSeedPresentacion({ verbose: false });
-    const emails = [EMP_ADMIN.email, RECLUTA.email, RECLUTA_2.email, ALUMNO.email];
+    const emails = [EMP_ADMIN.email, RECLUTA.email, RECLUTA_2.email, RECLUTA_3.email, ALUMNO.email];
     const usuarios = await Usuario.findAll({ where: { email: emails }, attributes: ['id'] });
     const logs = await ActivityLog.findAll({ where: { usuarioId: usuarios.map((u) => u.id) }, attributes: ['ip'] });
 
@@ -393,18 +411,20 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
 
   // ── Candidatos sintéticos (autocontenido: no depende de ningún otro seed) ──
 
-  test('crea exactamente 10 candidatos sintéticos candidatoNN@demo.invalid, cada uno con Perfil', async () => {
+  test('crea exactamente 10 candidatos sintéticos @demo.invalid (sin duplicar a Peter), cada uno con Perfil y sin foto', async () => {
     await ejecutarSeedPresentacion({ verbose: false });
 
     const candidatos = await Usuario.findAll({
-      where: { email: { [Op.like]: 'candidato%@demo.invalid' } },
-      attributes: ['id', 'email', 'rol'],
+      where: { email: CANDIDATO_EMAILS },
+      attributes: ['id', 'email', 'rol', 'nombre', 'fotoPerfil'],
     });
     expect(candidatos).toHaveLength(10);
     expect(candidatos.some((c) => c.rol === 'egresado')).toBe(true);
+    expect(candidatos.map((c) => c.nombre)).not.toContain(ALUMNO.nombre);
     for (const c of candidatos) {
-      expect(c.email).toMatch(/^candidato\d{2}@demo\.invalid$/);
+      expect(c.email).toMatch(/^[a-z.]+@demo\.invalid$/);
       expect(['alumno', 'egresado']).toContain(c.rol);
+      expect(c.fotoPerfil).toBeNull(); // sin fotos de terceros: fallback de iniciales
     }
 
     const perfiles = await Perfil.count({ where: { usuarioId: candidatos.map((c) => c.id) } });
@@ -441,11 +461,34 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
     expect(new Set(pares).size).toBe(pares.length);
   });
 
+  test('limpia el escenario ANTERIOR (Delta + Lucía + candidatoNN) por identificadores exactos, sin tocar una homónima', async () => {
+    await ejecutarSeedPresentacion({ verbose: false });
+    // Se simula una base vieja: el S.H.I.E.L.D. actual se reemplaza por la
+    // Delta del seed anterior (mismo CUIT ficticio) con sus usuarios.
+    await (await Empresa.findOne({ where: { razonSocial: RAZON_SOCIAL } })).destroy({ force: true });
+    const hash = await bcrypt.hash('x-no-importa', 4);
+    const base = { password: hash, activo: true, habilitado: true };
+    await Empresa.create({ razonSocial: 'Delta Innovación IT', cuit: EMPRESA_CUIT, estadoAprobacion: 'aprobada' });
+    const [emailLucia, emailCandidato] = LEGACY_PRESENTACION.emails;
+    await Usuario.create({ ...base, rol: 'empresa', nombre: 'Lucía', apellido: 'Ferrari', email: emailLucia });
+    await Usuario.create({ ...base, rol: 'alumno', nombre: 'Sofía', apellido: 'Ramírez', email: emailCandidato });
+    // Una homónima creada a mano (otro CUIT) NO es del seed: no se toca.
+    const homonima = await Empresa.create({ razonSocial: 'Delta Innovación IT', cuit: '30999999991', estadoAprobacion: 'aprobada' });
+
+    await ejecutarSeedPresentacion({ verbose: false });
+
+    expect(await Empresa.count({ where: { cuit: EMPRESA_CUIT } })).toBe(1);
+    expect(await Empresa.count({ where: { razonSocial: RAZON_SOCIAL, cuit: EMPRESA_CUIT } })).toBe(1);
+    expect(await Usuario.count({ where: { email: LEGACY_PRESENTACION.emails }, paranoid: false })).toBe(0);
+    expect(await Empresa.findByPk(homonima.id)).not.toBeNull();
+    await homonima.destroy({ force: true });
+  });
+
   test('idempotente: correr el seed dos veces no duplica los candidatos sintéticos ni las postulaciones', async () => {
     await ejecutarSeedPresentacion({ verbose: false });
     await ejecutarSeedPresentacion({ verbose: false });
 
-    const candidatos = await Usuario.count({ where: { email: { [Op.like]: 'candidato%@demo.invalid' } } });
+    const candidatos = await Usuario.count({ where: { email: CANDIDATO_EMAILS } });
     expect(candidatos).toBe(10);
     expect(await Usuario.count({ where: { email: RECLUTA_2.email } })).toBe(1);
 

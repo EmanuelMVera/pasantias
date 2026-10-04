@@ -2,7 +2,7 @@
  * seedShowcase.js — deja el ambiente de demo completo: corre
  * seedPresentacion.js + seedInstitucional.js en secuencia.
  *
- *   - Presentación: la historia dirigida de Delta Innovación IT (las 3 cuentas
+ *   - Presentación: la historia dirigida de S.H.I.E.L.D. (las 3 cuentas
  *     públicas de LoginPage + su equipo y candidatos).
  *   - Institucional: volumen para paneles, filtros, estadísticas y exportación.
  *
@@ -32,7 +32,7 @@ const { ejecutarSeedInstitucional } = require('./seedInstitucional');
 
 /** Siembra los dos datasets (cada uno limpia antes su propio namespace). */
 async function ejecutarShowcase({ verbose = false } = {}) {
-  if (verbose) console.log('── 1/2: escenario dirigido (Delta Innovación IT) ─────────────────');
+  if (verbose) console.log('── 1/2: escenario dirigido (S.H.I.E.L.D.) ──────────────────────');
   const presentacion = await ejecutarSeedPresentacion({ verbose });
 
   if (verbose) console.log('\n── 2/2: dataset institucional (volumen) ──────────────────────────');

@@ -203,7 +203,7 @@ Todos los datos ficticios salen de **dos seeds** y se administran con cinco coma
 
 | Comando | Para qué |
 |---|---|
-| `npm run db:seed:presentacion` | Escenario **dirigido**: la historia navegable de Delta Innovación IT (las 3 cuentas de `LoginPage`). |
+| `npm run db:seed:presentacion` | Escenario **dirigido**: la historia navegable de S.H.I.E.L.D. (las 3 cuentas de `LoginPage`). |
 | `npm run db:seed:institucional` | **Volumen**: 20 empresas, 80 alumnos, ofertas y postulaciones para estadísticas, filtros, paginación, auditoría y exportaciones. |
 | `npm run db:seed:showcase` | Los dos anteriores juntos. |
 | `npm run db:showcase:reset` | **Reconstruye**: limpia todos los datos ficticios conocidos (incluidos residuos viejos), vuelve a sembrar y valida. |
@@ -247,7 +247,7 @@ después restaurar el Build Command normal y quitar la variable. Para solo verif
 
 | Origen | Cómo se identifica |
 |---|---|
-| Presentación | `empresa@demo.com`, `reclutador@demo.com`, `alumno@demo.com`, `lucia.ferrari@demo.invalid`, `candidatoNN@demo.invalid`, la empresa "Delta Innovación IT" y la solicitud de empresa demo. También la cuenta legacy `sistema@demo.com` (rol admin) de una versión vieja del seed. |
+| Presentación | `empresa@demo.com`, `reclutador@demo.com`, `alumno@demo.com`, `thor.odinson@demo.invalid`, `steve.rogers@demo.invalid`, los 10 candidatos `@demo.invalid` (lista exacta), la empresa "S.H.I.E.L.D." con el CUIT ficticio del seed y la solicitud de empresa demo. También el escenario **anterior** por identificadores exactos ("Delta Innovación IT" con ese mismo CUIT, `lucia.ferrari@demo.invalid`, `candidato01..10@demo.invalid`) y la cuenta legacy `sistema@demo.com` (rol admin). Una empresa homónima creada a mano (otro CUIT) nunca se toca. |
 | Institucional | Usuarios `@institucional.invalid` y empresas con CUIT `307000000NN`. |
 | Antiguo `seedDemo` | Lista **exacta y cerrada** (`backend/src/utils/seedLegacy.js`): 50 emails `nombre.apellido@<empresa>.demo`, 20 alumnos `3700000N@itbeltran.com.ar` (tienen que coincidir email **y** nombre **y** apellido) y 20 razones sociales (solo si todos sus miembros son de esa lista). |
 
@@ -260,68 +260,73 @@ legacy, si tienen miembros reales) ni ningún usuario fuera de esos namespaces. 
 limpieza y cada siembra es transaccional por dataset e idempotente: correrlo dos veces
 deja los mismos conteos.
 
-#### B.3 Escenario de presentación — Delta Innovación IT
+#### B.3 Escenario de presentación — S.H.I.E.L.D.
+
+Los nombres del elenco son referencias reconocibles para la exposición; todo lo demás
+(ofertas, perfiles, chats, notificaciones) es una bolsa de empleo profesional y
+realista. Sin fotos ni logos de terceros: los avatares usan el fallback de iniciales y
+el logo de la empresa es un "SH" neutro. La marca de la aplicación sigue siendo
+SisPasantías; el dataset institucional no se tematiza.
 
 | | |
 |---|---|
-| Cuentas públicas (`LoginPage`, password `Demo1234!`) | `empresa@demo.com` (Carolina Méndez, admin_empresa) · `reclutador@demo.com` (Diego Herrera, reclutador) · `alumno@demo.com` (Martín Gómez, alumno) |
-| Resto del elenco (sin login público) | `lucia.ferrari@demo.invalid` (Lucía Ferrari, **segunda reclutadora activa**) · 10 candidatos `candidatoNN@demo.invalid` |
-| Equipo | 1 cuenta administradora + 2 reclutadores activos + 1 solicitud de reclutador pendiente (Mateo Silva) |
-| Empresa | Aprobada, **nivel de confianza estándar** (explícito) |
+| Cuentas públicas (`LoginPage`, password `Demo1234!`) | `empresa@demo.com` (Nick Fury, admin_empresa) · `reclutador@demo.com` (Tony Stark, reclutador) · `alumno@demo.com` (Peter Parker, alumno) |
+| Resto del elenco (sin login público) | `thor.odinson@demo.invalid` (Thor Odinson) y `steve.rogers@demo.invalid` (Steve Rogers), reclutadores activos · 10 candidatos `@demo.invalid`: Kate Bishop, Miles Morales, America Chavez, Riri Williams, Shuri, Cassie Lang, Billy Maximoff, Harley Keener, Tommy Maximoff, Kamala Khan |
+| Equipo | 1 cuenta administradora (Nick Fury) + 3 reclutadores activos (Tony, Thor, Steve) + 1 solicitud de reclutador pendiente (Sam Wilson, sin cuenta todavía) |
+| Empresa | S.H.I.E.L.D. — Tecnología, seguridad e innovación, Buenos Aires. Aprobada, **nivel de confianza estándar** (explícito) |
 
 Las 7 ofertas cubren todo el ciclo de vida y la moderación:
 
 | Oferta | Responsable | Estado | Moderación |
 |---|---|---|---|
-| Pasante en Desarrollo Frontend (React) | Diego | activa | aprobada |
-| Pasante en Desarrollo Backend (Node.js) | Diego | activa | aprobada |
-| Trainee en QA y Automatización de Pruebas | Lucía | activa | aprobada |
-| Pasante en Análisis de Datos | Diego | activa | pendiente |
-| Pasante en Soporte y Administración de Redes | Lucía | pausada | aprobada |
-| Pasante en Diseño UX/UI | Diego | cerrada | aprobada |
+| Pasante en Desarrollo Frontend (React) | Tony | activa | aprobada |
+| Pasante en Desarrollo Backend (Node.js) | Tony | activa | aprobada |
+| Pasante en Análisis de Datos | Tony | activa | pendiente |
+| Trainee en QA y Automatización de Pruebas | Thor (reasignada desde Tony) | activa | aprobada |
+| Pasante en Soporte y Administración de Redes | Thor | pausada | aprobada |
+| Pasante en Diseño UX/UI | Steve | cerrada | aprobada |
 | Pasante en Ciberseguridad | **sin responsable** (histórica, a propósito) | activa | rechazada |
 
 El responsable de una oferta (`creadaPorUsuarioId`) es siempre un reclutador activo,
 nunca el admin_empresa. La de Ciberseguridad queda sin responsable **a propósito**, para
 mostrar "Sin responsable asignado" y la acción de asignar responsable.
 
-**Historia principal de la exposición — Diego → Frontend → Martín → contratado.**
-Diego (reclutador del equipo de Carolina) crea "Pasante en Desarrollo Frontend
-(React)" → el instituto la aprueba → Martín la ve y se postula → Diego recibe la
-postulación y lo lleva por en revisión → preseleccionado → entrevista → contratado.
-El historial de estados, el chat Diego ↔ Martín (coordinación de la entrevista y
-aviso de la incorporación), las notificaciones de ambos y la auditoría cuentan esa
-misma historia con fechas coherentes (oferta hace 25 días, aprobada hace 24,
-postulación hace 14, contratado hace 5).
+**Historia principal de la exposición — Tony → Frontend → Peter → contratado.**
+Nick Fury administra S.H.I.E.L.D.; Tony Stark (reclutador) crea "Pasante en Desarrollo
+Frontend (React)" → el instituto la aprueba → Peter Parker la ve y se postula → Tony
+recibe la postulación y lo lleva por en revisión → preseleccionado → entrevista →
+contratado. El historial de estados, el chat Tony ↔ Peter (coordinación de la
+entrevista y aviso de la incorporación), las notificaciones de ambos y la auditoría
+cuentan esa misma historia con fechas relativas coherentes (oferta hace 25 días,
+aprobada hace 24, postulación hace 14, contratado hace 5).
 
 16 postulaciones (3 del alumno demo + 13 de candidatos sintéticos): 5 en revisión, 3
-preseleccionados, 2 en entrevista, 3 contratados y 3 no seleccionados. El alumno demo
-tiene Frontend → **contratado** (historia principal), Backend → en revisión y UX/UI →
-no seleccionado, las tres de Diego: Martín no está contratado en ninguna otra oferta.
-La contratación de QA (Lucía) es de un candidato sintético, Agustín Molina; Lucía
-conserva sus ofertas, candidatos (uno en entrevista) y su propio chat.
+preseleccionados, 2 en entrevista, 3 contratados y 3 no seleccionados. Peter tiene
+Frontend (Tony) → **contratado**, Backend (Tony) → en revisión y UX/UI (Steve) → no
+seleccionado: no está contratado en ninguna otra oferta. Thor contrata a Harley Keener
+en QA (y tiene a Cassie Lang en entrevista); Steve contrató a Kamala Khan en UX/UI.
 
-Chats y notificaciones respetan las reglas reales: hay conversación interna Carolina ↔
-Diego y conversaciones reclutador ↔ candidato (Diego ↔ Martín, Diego ↔ Sofía, Lucía ↔
-Agustín); **no** hay ninguna admin_empresa ↔ candidato. "Nueva postulación recibida" y
-los cambios de estado son de los reclutadores y del alumno; la administradora recibe
+Chats y notificaciones respetan las reglas reales: hay conversación interna Nick ↔ Tony
+y conversaciones reclutador ↔ candidato (Tony ↔ Peter, Tony ↔ Kate Bishop, Thor ↔
+Harley Keener); **no** hay ninguna admin_empresa ↔ candidato. "Nueva postulación
+recibida" y los cambios de estado son de los reclutadores y del alumno; Nick recibe
 avisos de moderación de ofertas, altas del equipo y mensajes internos.
 
 **Conteos exactos** (migración desde vacío + `db:seed:presentacion` únicamente):
 
 | Tabla | Conteo |
 |---|---|
-| usuarios | 14 (3 login + Lucía + 10 candidatos sintéticos) |
+| usuarios | 15 (3 login + Thor + Steve + 10 candidatos sintéticos) |
 | empresas | 1 |
-| empresa_usuarios | 3 (1 admin_empresa + 2 reclutadores) |
+| empresa_usuarios | 4 (1 admin_empresa + 3 reclutadores) |
 | ofertas | 7 (6 con responsable + 1 sin responsable) |
 | postulaciones | 16 |
 | postulacion_historial_estados | 35 |
 | mensajes | 22 (4 conversaciones) |
-| notificaciones | 31 |
-| activity_logs | 19 |
+| notificaciones | 38 |
+| activity_logs | 20 |
 | solicitudes_empresa | 1 (pendiente) |
-| solicitudes_reclutador | 3 (2 aprobadas + 1 pendiente) |
+| solicitudes_reclutador | 4 (3 aprobadas + 1 pendiente) |
 | archivos | 0 |
 
 Los usuarios `@demo.invalid` no aparecen en `LoginPage` ni en `GET /api/demo/status` (esa
@@ -387,13 +392,21 @@ PRESENTACIÓN
 ✓ Chat admin_empresa ↔ alumno/candidatos: 0
 ✓ Notificación "nueva postulación" al admin_empresa: 0
 …
-✓ Historia: "Pasante en Desarrollo Frontend (React)" pertenece a Diego
-✓ Historia: estado actual de Martín en Frontend = contratado
-✓ Historia: historial de Martín/Frontend = en_revision → preseleccionado → entrevista → contratado
-✓ Historia: mensajes Diego ↔ Martín posteriores a la entrevista (tras la contratación): 4
-✓ Historia: Martín contratado en una sola oferta: 1
+✓ Empresa demo: S.H.I.E.L.D.
+✓ Nick Fury es admin_empresa activo (rol global empresa)
+✓ Tony Stark es reclutador activo
+✓ Thor Odinson es reclutador activo
+✓ Steve Rogers es reclutador activo
+✓ Sam Wilson: solicitud de reclutador pendiente (sin cuenta todavía)
+✓ Alumno principal: Peter Parker
+✓ Historia: "Pasante en Desarrollo Frontend (React)" pertenece a Tony Stark
+✓ Historia: estado actual de Peter Parker en Frontend = contratado
+✓ Historia: historial de Peter Parker/Frontend = en_revision → preseleccionado → entrevista → contratado
+✓ Historia: chat Tony Stark ↔ Peter Parker: 10 mensaje/s
+✓ Chat interno Nick Fury ↔ Tony Stark: 6 mensaje/s
+✓ Chat Nick Fury (admin_empresa) ↔ Peter Parker: 0
+✓ Peter Parker no recibe notas internas (vista: 0, notificaciones: 0)
 …
-✓ Lucía: 2 oferta/s propias con 6 candidato/s
 
 INSTITUCIONAL
 
@@ -413,11 +426,14 @@ admin_empresa no reciba "nueva postulación", que ninguna postulación sea anter
 oferta, que el historial de estados termine en el estado actual, que no haya ningún rol
 `admin` en los namespaces ficticios y que existan empresas de confianza con ofertas de
 publicación automática. Además valida la **historia principal** con checks semánticos
-(no solo conteos): Diego es reclutador activo de Delta y responsable de Frontend;
-Martín está postulado y contratado ahí, con el historial completo en orden; existe el
-chat Diego ↔ Martín con mensajes posteriores a la entrevista; Diego tiene ofertas
+(no solo conteos), siempre por email / nombre / relación, nunca por id: S.H.I.E.L.D.
+existe; Nick Fury es admin_empresa activo; Tony, Thor y Steve son reclutadores activos;
+Sam Wilson tiene la solicitud pendiente; Tony es responsable de Frontend; Peter está
+postulado y contratado ahí, con el historial completo en orden; existen los chats
+Tony ↔ Peter (con mensajes posteriores a la entrevista) y Nick ↔ Tony; Peter no recibe
+notas internas; Tony tiene ofertas
 activas, candidatos y avisos de "nueva postulación"; el admin_empresa no recibe
-notificaciones operativas de postulaciones ni chatea con Martín; y Lucía conserva
+notificaciones operativas de postulaciones ni chatea con Peter; y Thor y Steve conservan
 ofertas y candidatos propios.
 
 ### C. Qué NO ejecutar contra Neon de producción
@@ -505,7 +521,7 @@ npm run db:admin:status -- --email=admin@tudominio.edu --email=compañero@tudomi
                                # Nunca muestra el hash. No modifica nada.
 
 # Solo staging/demo — nunca en la producción real:
-ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:presentacion     # escenario dirigido (Delta Innovación IT, 3 cuentas de LoginPage)
+ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:presentacion     # escenario dirigido (S.H.I.E.L.D., 3 cuentas de LoginPage)
 ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:institucional    # volumen (sin login público)
 ALLOW_PRODUCTION_DEMO_SEED=true npm run db:seed:showcase         # los dos anteriores juntos
 ALLOW_PRODUCTION_DEMO_SEED=true npm run db:showcase:reset        # limpia TODO lo ficticio, resiembra y valida

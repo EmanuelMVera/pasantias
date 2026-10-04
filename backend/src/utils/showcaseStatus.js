@@ -15,9 +15,11 @@
  *     termina en el estado actual;
  *   - ningún usuario con rol admin en los namespaces ficticios;
  *   - hay empresas de confianza y ofertas de publicación automática;
- *   - la HISTORIA PRINCIPAL de la demo (Diego → Frontend → Martín → contratado)
+ *   - el ELENCO (S.H.I.E.L.D., Nick Fury, Tony / Thor / Steve, Sam Wilson
+ *     pendiente, Peter Parker) y la HISTORIA PRINCIPAL (Tony → Frontend → Peter → contratado)
  *     está completa: responsable, estado, historial en orden, chat posterior a
- *     la entrevista, y Diego y Lucía con trabajo propio (revisarHistoriaPrincipal).
+ *     la entrevista, Peter sin notas internas, y los 3 reclutadores con trabajo propio
+ *     (revisarElenco / revisarHistoriaPrincipal).
  *
  * Uso:
  *   npm run db:seed:showcase:status
@@ -39,15 +41,16 @@ const {
   PostulacionHistorialEstado, Mensaje, Notificacion, SolicitudReclutador,
 } = require('../models');
 const {
-  escenarioExiste, EMP_ADMIN, RECLUTA, RECLUTA_2, ALUMNO,
+  escenarioExiste, EMP_ADMIN, RECLUTA, RECLUTA_2, RECLUTA_3, ALUMNO, SOLICITUD_RECLUTADOR_PENDIENTE, EMPRESA_CUIT,
   RAZON_SOCIAL, LOGIN_EMAILS, CANDIDATO_EMAILS, OUR_EMAILS, HISTORIA_PRINCIPAL,
 } = require('./seedPresentacion');
 const { DOMINIO, CUIT_PREFIJO } = require('./seedInstitucional');
+const { formatearPostulacionAlumno } = require('../services/postulacion.service');
 
 // Lo que el escenario de presentación tiene que tener (ver seedPresentacion.js).
 const ESPERADO = {
   logins: 3,
-  reclutadoresActivos: 2,
+  reclutadoresActivos: 3,
   solicitudesPendientes: 1,
   candidatos: 10,
   ofertas: 7,
@@ -130,29 +133,64 @@ const notifsNuevaPostulacion = (userIds) => (userIds.length
   ? Notificacion.count({ where: { usuarioId: { [Op.in]: userIds }, titulo: TITULO_NUEVA_POSTULACION } })
   : 0);
 
+const nombreDe = (u) => `${u.nombre} ${u.apellido ?? ''}`.trim();
+
+/**
+ * Elenco del escenario dirigido: empresa, administrador, los 3 reclutadores,
+ * la solicitud pendiente y el alumno principal — por email + nombre + relación,
+ * nunca por id. Solo SELECT/COUNT.
+ */
+async function revisarElenco({ check, empresa, membresias, usuarios }) {
+  check(Boolean(empresa), `Empresa demo: ${RAZON_SOCIAL}`);
+  const persona = (cuenta) => usuarios.find((u) => u.email === cuenta.email
+    && u.nombre === cuenta.nombre && u.apellido === cuenta.apellido);
+  const miembro = (cuenta, rolInterno) => {
+    const u = persona(cuenta);
+    return Boolean(u) && membresias.some((m) => m.usuarioId === u.id && m.rolInterno === rolInterno && m.activo);
+  };
+
+  check(miembro(EMP_ADMIN, 'admin_empresa') && persona(EMP_ADMIN)?.rol === 'empresa',
+    `${nombreDe(EMP_ADMIN)} es admin_empresa activo (rol global empresa)`);
+  for (const r of [RECLUTA, RECLUTA_2, RECLUTA_3]) {
+    check(miembro(r, 'reclutador'), `${nombreDe(r)} es reclutador activo`);
+  }
+
+  const [solicitudSam, cuentaSam] = await Promise.all([
+    SolicitudReclutador.count({ where: { empresaId: empresa.id, email: SOLICITUD_RECLUTADOR_PENDIENTE.email, estado: 'pendiente' } }),
+    Usuario.count({ where: { email: SOLICITUD_RECLUTADOR_PENDIENTE.email } }),
+  ]);
+  check(solicitudSam === 1 && cuentaSam === 0,
+    `${nombreDe(SOLICITUD_RECLUTADOR_PENDIENTE)}: solicitud de reclutador pendiente (sin cuenta todavía)`);
+
+  check(persona(ALUMNO)?.rol === 'alumno', `Alumno principal: ${nombreDe(ALUMNO)}`);
+}
+
 /**
  * Historia principal de la demo (HISTORIA_PRINCIPAL en seedPresentacion.js):
- * Diego → Frontend → Martín → contratado. Checks semánticos, no solo conteos.
- * Solo SELECT/COUNT.
+ * Tony → Frontend → Peter → contratado. Checks semánticos, no solo conteos.
+ * Solo SELECT/COUNT (y una llamada pura a formatearPostulacionAlumno).
  */
-async function revisarHistoriaPrincipal({ check, empresa, membresias, ofertas, postulaciones, ids }) {
-  const { diegoId, luciaId, alumnoId, adminId } = ids;
-  const delta = (m) => m.usuarioId === diegoId && m.rolInterno === 'reclutador' && m.activo;
-  check(Boolean(diegoId) && membresias.some(delta), 'Historia: Diego Herrera es reclutador activo de Delta');
+async function revisarHistoriaPrincipal({ check, empresa, ofertas, postulaciones, ids }) {
+  const { tonyId, thorId, steveId, alumnoId, adminId } = ids;
+  const TONY = nombreDe(RECLUTA);
+  const PETER = nombreDe(ALUMNO);
+
+  const deTony = ofertas.filter((o) => o.creadaPorUsuarioId === tonyId);
+  check(deTony.length > 0, `${TONY}: ${deTony.length} oferta/s a su cargo`);
 
   const frontend = await Oferta.findOne({
     where: { empresaId: empresa.id, titulo: HISTORIA_PRINCIPAL.ofertaTitulo },
     attributes: ['id', 'creadaPorUsuarioId'],
     raw: true,
   });
-  check(Boolean(frontend) && frontend.creadaPorUsuarioId === diegoId,
-    `Historia: "${HISTORIA_PRINCIPAL.ofertaTitulo}" pertenece a Diego`);
+  check(Boolean(frontend) && frontend.creadaPorUsuarioId === tonyId,
+    `Historia: "${HISTORIA_PRINCIPAL.ofertaTitulo}" pertenece a ${TONY}`);
 
   const post = frontend && alumnoId
     ? postulaciones.find((p) => p.ofertaId === frontend.id && p.usuarioId === alumnoId)
     : null;
-  check(Boolean(post), 'Historia: Martín está postulado a Frontend');
-  check(post?.estado === 'contratado', `Historia: estado actual de Martín en Frontend = ${post?.estado ?? 'sin postulación'}`);
+  check(Boolean(post), `Historia: ${PETER} está postulado a Frontend`);
+  check(post?.estado === 'contratado', `Historia: estado actual de ${PETER} en Frontend = ${post?.estado ?? 'sin postulación'}`);
 
   const historial = post
     ? await PostulacionHistorialEstado.findAll({
@@ -166,49 +204,68 @@ async function revisarHistoriaPrincipal({ check, empresa, membresias, ofertas, p
   const encadenado = historial.every((h, i) => (i === 0 ? h.estadoAnterior === null : h.estadoAnterior === cadena[i - 1]));
   const posteriorAPostular = post ? historial.every((h) => new Date(h.createdAt) >= new Date(post.createdAt)) : false;
   check(cadena.join('>') === HISTORIA_PRINCIPAL.cadena.join('>') && encadenado && posteriorAPostular,
-    `Historia: historial de Martín/Frontend = ${cadena.join(' → ') || 'vacío'}`);
+    `Historia: historial de ${PETER}/Frontend = ${cadena.join(' → ') || 'vacío'}`);
 
-  const entreDiegoYMartin = diegoId && alumnoId
-    ? {
-      [Op.or]: [
-        { emisorId: diegoId, receptorId: alumnoId },
-        { emisorId: alumnoId, receptorId: diegoId },
-      ],
-    }
-    : null;
+  const entre = (a, b) => (a && b
+    ? { [Op.or]: [{ emisorId: a, receptorId: b }, { emisorId: b, receptorId: a }] }
+    : null);
+  const tonyPeter = entre(tonyId, alumnoId);
   const contratadoEn = historial.find((h) => h.estadoNuevo === 'contratado')?.createdAt;
-  const [chatDiegoMartin, mensajesPosteriores] = await Promise.all([
-    entreDiegoYMartin ? Mensaje.count({ where: entreDiegoYMartin }) : 0,
-    entreDiegoYMartin && contratadoEn
-      ? Mensaje.count({ where: { ...entreDiegoYMartin, createdAt: { [Op.gt]: contratadoEn } } })
+  const [chatTonyPeter, mensajesPosteriores, chatNickTony, chatNickPeter] = await Promise.all([
+    tonyPeter ? Mensaje.count({ where: tonyPeter }) : 0,
+    tonyPeter && contratadoEn
+      ? Mensaje.count({ where: { ...tonyPeter, createdAt: { [Op.gt]: contratadoEn } } })
       : 0,
-  ]);
-  check(chatDiegoMartin > 0, `Historia: chat Diego ↔ Martín: ${chatDiegoMartin} mensaje/s`);
-  check(mensajesPosteriores > 0, `Historia: mensajes Diego ↔ Martín posteriores a la entrevista (tras la contratación): ${mensajesPosteriores}`);
-
-  const contratacionesMartin = postulaciones.filter((p) => p.usuarioId === alumnoId && p.estado === 'contratado').length;
-  check(contratacionesMartin === 1, `Historia: Martín contratado en una sola oferta: ${contratacionesMartin}`);
-
-  // Workspace de Diego: trabajo propio suficiente para la demo.
-  const deDiego = ofertas.filter((o) => o.creadaPorUsuarioId === diegoId);
-  const idsDiego = new Set(deDiego.map((o) => o.id));
-  const candidatosDiego = postulaciones.filter((p) => idsDiego.has(p.ofertaId)).length;
-  const [notifDiego, notifOperativasAdmin, chatAdminMartin] = await Promise.all([
-    diegoId ? notifsNuevaPostulacion([diegoId]) : 0,
-    adminId ? Notificacion.count({ where: { usuarioId: adminId, tipo: { [Op.in]: ['postulacion', 'estado'] } } }) : 0,
+    mensajesEntre([adminId].filter(Boolean), [tonyId].filter(Boolean)),
     mensajesEntre([adminId].filter(Boolean), [alumnoId].filter(Boolean)),
   ]);
-  check(deDiego.some((o) => o.estado === 'activa'), `Diego: ofertas activas: ${deDiego.filter((o) => o.estado === 'activa').length}`);
-  check(candidatosDiego > 0, `Diego: candidatos en sus ofertas: ${candidatosDiego}`);
-  check(notifDiego > 0, `Diego: notificaciones "nueva postulación": ${notifDiego}`);
-  check(notifOperativasAdmin === 0, `Notificaciones operativas de postulaciones al admin_empresa: ${notifOperativasAdmin}`);
-  check(chatAdminMartin === 0, `Chat admin_empresa ↔ Martín: ${chatAdminMartin}`);
+  check(chatTonyPeter > 0, `Historia: chat ${TONY} ↔ ${PETER}: ${chatTonyPeter} mensaje/s`);
+  check(mensajesPosteriores > 0, `Historia: mensajes ${TONY} ↔ ${PETER} posteriores a la entrevista (tras la contratación): ${mensajesPosteriores}`);
+  check(chatNickTony > 0, `Chat interno ${nombreDe(EMP_ADMIN)} ↔ ${TONY}: ${chatNickTony} mensaje/s`);
+  check(chatNickPeter === 0, `Chat ${nombreDe(EMP_ADMIN)} (admin_empresa) ↔ ${PETER}: ${chatNickPeter}`);
 
-  // Lucía conserva sus propios procesos.
-  const deLucia = new Set(ofertas.filter((o) => o.creadaPorUsuarioId === luciaId).map((o) => o.id));
-  const candidatosLucia = postulaciones.filter((p) => deLucia.has(p.ofertaId)).length;
-  check(Boolean(luciaId) && deLucia.size > 0 && candidatosLucia > 0,
-    `Lucía: ${deLucia.size} oferta/s propias con ${candidatosLucia} candidato/s`);
+  const contratacionesPeter = postulaciones.filter((p) => p.usuarioId === alumnoId && p.estado === 'contratado').length;
+  check(contratacionesPeter === 1, `Historia: ${PETER} contratado en una sola oferta: ${contratacionesPeter}`);
+
+  // Workspace de Tony: trabajo propio suficiente para la demo.
+  const idsTony = new Set(deTony.map((o) => o.id));
+  const candidatosTony = postulaciones.filter((p) => idsTony.has(p.ofertaId)).length;
+  const [notifTony, notifOperativasAdmin] = await Promise.all([
+    tonyId ? notifsNuevaPostulacion([tonyId]) : 0,
+    adminId ? Notificacion.count({ where: { usuarioId: adminId, tipo: { [Op.in]: ['postulacion', 'estado'] } } }) : 0,
+  ]);
+  check(deTony.some((o) => o.estado === 'activa'), `${TONY}: ofertas activas: ${deTony.filter((o) => o.estado === 'activa').length}`);
+  check(candidatosTony > 0, `${TONY}: candidatos en sus ofertas: ${candidatosTony}`);
+  check(notifTony > 0, `${TONY}: notificaciones operativas "nueva postulación": ${notifTony}`);
+  check(notifOperativasAdmin === 0, `Notificaciones operativas de postulaciones al admin_empresa: ${notifOperativasAdmin}`);
+
+  // El alumno nunca recibe la nota interna: ni la vista del alumno la expone,
+  // ni sus notificaciones contienen el texto de una nota o de una nota interna
+  // del historial.
+  const delAlumno = alumnoId
+    ? await Postulacion.findAll({ where: { usuarioId: alumnoId }, attributes: ['id', 'estado', 'notasEmpresa', 'updatedAt'] })
+    : [];
+  const notasHist = delAlumno.length
+    ? (await PostulacionHistorialEstado.findAll({
+      where: { postulacionId: { [Op.in]: delAlumno.map((p) => p.id) }, notaInterna: { [Op.ne]: null } },
+      attributes: ['notaInterna'], raw: true,
+    })).map((h) => h.notaInterna)
+    : [];
+  const notas = [...delAlumno.map((p) => p.notasEmpresa).filter(Boolean), ...notasHist];
+  const notifsAlumno = alumnoId
+    ? await Notificacion.findAll({ where: { usuarioId: alumnoId }, attributes: ['titulo', 'mensaje'], raw: true })
+    : [];
+  const vistaConNota = delAlumno.filter((p) => 'notasEmpresa' in formatearPostulacionAlumno(p)).length;
+  const notifConNota = notifsAlumno.filter((n) => notas.some((t) => `${n.titulo} ${n.mensaje}`.includes(t))).length;
+  check(vistaConNota === 0 && notifConNota === 0, `${PETER} no recibe notas internas (vista: ${vistaConNota}, notificaciones: ${notifConNota})`);
+
+  // Thor y Steve conservan sus propios procesos.
+  for (const [cuenta, id] of [[RECLUTA_2, thorId], [RECLUTA_3, steveId]]) {
+    const propias = new Set(ofertas.filter((o) => o.creadaPorUsuarioId === id).map((o) => o.id));
+    const candidatos = postulaciones.filter((p) => propias.has(p.ofertaId)).length;
+    check(Boolean(id) && propias.size > 0 && candidatos > 0,
+      `${nombreDe(cuenta)}: ${propias.size} oferta/s propias con ${candidatos} candidato/s`);
+  }
 }
 
 // ── Presentación ────────────────────────────────────────────────────────────
@@ -222,17 +279,17 @@ async function diagnosticarPresentacion() {
   }
 
   const usuarios = await Usuario.findAll({
-    where: { email: { [Op.in]: OUR_EMAILS } }, attributes: ['id', 'email', 'rol'], raw: true,
+    where: { email: { [Op.in]: OUR_EMAILS } }, attributes: ['id', 'email', 'rol', 'nombre', 'apellido'], raw: true,
   });
   const idDe = (email) => usuarios.find((u) => u.email === email)?.id ?? null;
   const adminId = idDe(EMP_ADMIN.email);
   const alumnoId = idDe(ALUMNO.email);
-  const reclutadorIds = [idDe(RECLUTA.email), idDe(RECLUTA_2.email)].filter(Boolean);
+  const reclutadorIds = [idDe(RECLUTA.email), idDe(RECLUTA_2.email), idDe(RECLUTA_3.email)].filter(Boolean);
   const candidatoIds = usuarios.filter((u) => CANDIDATO_EMAILS.includes(u.email)).map((u) => u.id);
   const logins = usuarios.filter((u) => LOGIN_EMAILS.includes(u.email)).length;
 
   const empresa = await Empresa.findOne({
-    where: { razonSocial: RAZON_SOCIAL }, attributes: ['id', 'nivelConfianza'], raw: true,
+    where: { razonSocial: RAZON_SOCIAL, cuit: EMPRESA_CUIT }, attributes: ['id', 'nivelConfianza'], raw: true,
   });
   const membresias = await EmpresaUsuario.findAll({
     where: { empresaId: empresa.id }, attributes: ['empresaId', 'usuarioId', 'rolInterno', 'activo'], raw: true,
@@ -324,9 +381,12 @@ async function diagnosticarPresentacion() {
   check(notifAdmin === 0, `Notificación "nueva postulación" al admin_empresa: ${notifAdmin}`);
   check(adminsIndebidos === 0, `Usuarios con rol admin en el escenario: ${adminsIndebidos}`);
 
+  await revisarElenco({ check, empresa, membresias, usuarios });
   await revisarHistoriaPrincipal({
-    check, empresa, membresias, ofertas, postulaciones,
-    ids: { diegoId: idDe(RECLUTA.email), luciaId: idDe(RECLUTA_2.email), alumnoId, adminId },
+    check, empresa, ofertas, postulaciones,
+    ids: {
+      tonyId: idDe(RECLUTA.email), thorId: idDe(RECLUTA_2.email), steveId: idDe(RECLUTA_3.email), alumnoId, adminId,
+    },
   });
 
   return { cargado: true, datos, checks };

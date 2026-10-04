@@ -13,9 +13,14 @@
  *
  * QUÉ BORRA — solo namespaces ficticios explícitos, nunca por patrones amplios:
  *   - Presentación: empresa@demo.com, reclutador@demo.com, alumno@demo.com,
- *     lucia.ferrari@demo.invalid, candidatoNN@demo.invalid, la empresa "Delta
- *     Innovación IT", la solicitud de empresa demo y la cuenta legacy
+ *     thor.odinson@ / steve.rogers@ y los 10 candidatos @demo.invalid (lista
+ *     exacta, CANDIDATO_EMAILS), la empresa "S.H.I.E.L.D." con el CUIT ficticio
+ *     del seed, la solicitud de empresa demo y la cuenta legacy
  *     sistema@demo.com (rol admin, residuo de una versión vieja del seed).
+ *     También el escenario ANTERIOR, por identificadores exactos
+ *     (LEGACY_PRESENTACION): "Delta Innovación IT" (mismo CUIT ficticio),
+ *     lucia.ferrari@demo.invalid y candidato01..10@demo.invalid — así un reset
+ *     sobre una base vieja no deja Delta y S.H.I.E.L.D. a la vez.
  *   - Institucional: usuarios `@institucional.invalid` y empresas con CUIT
  *     `307000000NN`.
  *   - seedDemo: la lista exacta de 50 emails `.demo`, 20 alumnos

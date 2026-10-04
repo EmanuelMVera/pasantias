@@ -65,7 +65,7 @@ describe('showcase — reset y status', () => {
     const p = r.status.presentacion.datos;
     expect(p).toMatchObject({
       adminsEmpresa: 1,
-      reclutadoresActivos: 2,
+      reclutadoresActivos: 3,
       solicitudesPendientes: 1,
       logins: 3,
       candidatos: 10,
@@ -176,11 +176,14 @@ describe('showcase — reset y status', () => {
     expect(salida).toMatch(/SHOWCASE SISPASANTÍAS/);
     expect(salida).toMatch(/PRESENTACIÓN/);
     expect(salida).toMatch(/INSTITUCIONAL/);
-    expect(salida).toMatch(/✓ Reclutadores activos: 2/);
+    expect(salida).toMatch(/✓ Reclutadores activos: 3/);
     expect(salida).toMatch(/✓ Ofertas sin responsable intencional: 1/);
-    // Historia principal de la demo: Diego → Frontend → Martín → contratado.
-    expect(salida).toMatch(/✓ Historia: estado actual de Martín en Frontend = contratado/);
-    expect(salida).toMatch(/✓ Historia: historial de Martín\/Frontend = en_revision → preseleccionado → entrevista → contratado/);
+    // Elenco e historia principal: Tony → Frontend → Peter → contratado.
+    expect(salida).toMatch(/✓ Empresa demo: S\.H\.I\.E\.L\.D\./);
+    expect(salida).toMatch(/✓ Nick Fury es admin_empresa activo/);
+    expect(salida).toMatch(/✓ Sam Wilson: solicitud de reclutador pendiente/);
+    expect(salida).toMatch(/✓ Historia: estado actual de Peter Parker en Frontend = contratado/);
+    expect(salida).toMatch(/✓ Historia: historial de Peter Parker\/Frontend = en_revision → preseleccionado → entrevista → contratado/);
     expect(salida).toMatch(/SHOWCASE COHERENTE/);
     expect(salida).not.toContain('Demo1234!');
     expect(salida).not.toMatch(/\$2[aby]\$/); // ningún hash bcrypt

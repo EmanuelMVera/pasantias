@@ -20,6 +20,11 @@ const {
   ALUMNO,
 } = require('../src/utils/seedPresentacion');
 
+// El segundo test corre el seed completo del escenario (bcrypt + ~250 filas):
+// bajo carga supera el timeout default de Jest (5s). Mismo criterio que
+// seedPresentacion.test.js.
+jest.setTimeout(30000);
+
 describe('GET /api/demo/status', () => {
   beforeAll(async () => {
     await Usuario.destroy({
