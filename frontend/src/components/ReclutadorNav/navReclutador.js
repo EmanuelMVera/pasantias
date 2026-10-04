@@ -2,7 +2,8 @@
  * navReclutador.js — links y menú de usuario del Reclutador (lo usa ReclutadorNav.jsx).
  *
  * Principal: solo el trabajo operativo diario. Las consultas secundarias
- * (empresa, equipo, seguridad de la cuenta) van al menú de usuario.
+ * (empresa, seguridad de la cuenta) van al menú de usuario. El reclutador no
+ * tiene sección Equipo: administrar integrantes es del administrador de empresa.
  */
 
 const empieza = (prefijo) => (pathname) => pathname === prefijo || pathname.startsWith(`${prefijo}/`);
@@ -28,7 +29,6 @@ export const RECLUTADOR_LINKS = [
 export function menuUsuarioReclutador(empresaId) {
   return [
     ...(empresaId ? [{ to: `/empresa/${empresaId}`, label: 'Ver empresa', icon: 'building' }] : []),
-    { to: '/empresa/equipo', label: 'Ver equipo', icon: 'users' },
     { to: '/empresa/seguridad', label: 'Seguridad de mi cuenta', icon: 'lock' },
   ];
 }

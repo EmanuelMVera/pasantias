@@ -207,9 +207,10 @@ function AppRoutes() {
           <PostulantesMiOfertaPage />
         </ProtectedRoute>
       } />
+      {/* Equipo es gobierno del administrador de empresa: el reclutador no tiene esta sección. */}
       <Route path="/empresa/equipo" element={
         <ProtectedRoute roles={['empresa']}>
-          <EquipoPage />
+          <SoloAdminEmpresa><EquipoPage /></SoloAdminEmpresa>
         </ProtectedRoute>
       } />
       <Route path="/empresa/seguridad" element={
@@ -321,6 +322,18 @@ function SoloReclutador({ children }) {
   const { esReclutador, loading } = useEmpresa();
   if (loading) return <div className="app-loading" role="status">Cargando...</div>;
   return esReclutador ? children : <Navigate to="/empresa" replace />;
+}
+
+/**
+ * SoloAdminEmpresa — guard de ROL INTERNO para pantallas de gobierno (Equipo).
+ * El reclutador es un workspace operativo personal: no administra integrantes,
+ * así que se lo devuelve a su inicio. Es UX: el backend sigue exigiendo
+ * admin_empresa en cada acción de gestión del equipo.
+ */
+function SoloAdminEmpresa({ children }) {
+  const { esAdminEmpresa, loading } = useEmpresa();
+  if (loading) return <div className="app-loading" role="status">Cargando...</div>;
+  return esAdminEmpresa ? children : <Navigate to="/empresa" replace />;
 }
 
 /**

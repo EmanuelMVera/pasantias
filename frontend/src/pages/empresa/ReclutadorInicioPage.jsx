@@ -12,6 +12,11 @@
  *
  * No hay embudo ni métricas de la empresa: eso es del administrador de empresa.
  * No se inventa nada: si no hay pendientes dice "Todo al día por ahora".
+ *
+ * Sin botón "Nueva oferta" en la cabecera: la acción global vive en la barra
+ * (ReclutadorNav). Solo se repite en el EmptyState cuando no hay ninguna oferta.
+ * Las ofertas cerradas no son "procesos activos" (las filtra el backend); su
+ * historial se consulta desde Mis ofertas.
  */
 
 import { useEffect, useState } from 'react';
@@ -60,7 +65,8 @@ function describir(item) {
       return {
         icon: 'shield', tone: 'blue',
         texto: 'Esperando revisión institucional',
-        to: '/empresa/ofertas?moderacion=pendiente', cta: 'Ver oferta',
+        // Filtro exacto: pendientes de moderación + el título de esta oferta.
+        to: `/empresa/ofertas?moderacion=pendiente&q=${encodeURIComponent(item.titulo)}`, cta: 'Ver oferta',
       };
     default:
       return null;
@@ -93,6 +99,7 @@ export default function ReclutadorInicioPage() {
   const post = panel?.postulaciones ?? {};
   const pendientes = (panel?.paraAtender ?? []).map((it) => ({ ...it, ...describir(it) })).filter((it) => it.cta);
   const procesos = panel?.procesosActivos ?? [];
+  const sinOfertas = !ofertas.total;
   const razonSocial = empresa?.razonSocial;
 
   return (
@@ -102,12 +109,6 @@ export default function ReclutadorInicioPage() {
         subtitle={razonSocial
           ? `Gestioná tus ofertas y candidatos de ${razonSocial}.`
           : 'Gestioná tus ofertas y candidatos.'}
-        actions={(
-          <Link to="/empresa/nueva-oferta" className="btn-primary">
-            <Icon name="plus" size={18} strokeWidth={2.2} />
-            Nueva oferta
-          </Link>
-        )}
       />
 
       {error && <p className={`error-msg ${styles.error}`} role="alert">{error}</p>}
@@ -164,9 +165,17 @@ export default function ReclutadorInicioPage() {
           {/* ── Mis procesos activos ───────────────────────────────────────── */}
           <Card as="section" titleId="sec-procesos" title="Mis procesos activos" className={styles.bloque}>
             {procesos.length === 0 ? (
-              <EmptyState iconName="briefcase" title="Todavía no tenés procesos activos." hint="Publicá una oferta para empezar a recibir postulaciones.">
-                <Link to="/empresa/nueva-oferta" className="btn-primary">Nueva oferta</Link>
-              </EmptyState>
+              // Sin ninguna oferta: crear la primera. Con ofertas pero todas
+              // cerradas: su historial sigue en Mis ofertas.
+              sinOfertas ? (
+                <EmptyState iconName="briefcase" title="Todavía no tenés ofertas." hint="Publicá tu primera oferta para empezar a recibir postulaciones.">
+                  <Link to="/empresa/nueva-oferta" className="btn-primary">Crear primera oferta</Link>
+                </EmptyState>
+              ) : (
+                <EmptyState iconName="briefcase" title="No tenés procesos activos." hint="Tus ofertas cerradas y sus candidatos siguen disponibles en Mis ofertas.">
+                  <Link to="/empresa/ofertas" className="btn-secondary">Ver mis ofertas</Link>
+                </EmptyState>
+              )
             ) : (
               <>
                 <ul className={styles.procesos}>

@@ -13,7 +13,12 @@
  *
  * Acciones por oferta: "Gestionar candidatos" + menú ⋯ (editar, pausar /
  * reactivar, cerrar). Solo se muestran las que aplican al estado actual; cerrar
- * es irreversible y pide confirmación.
+ * es irreversible y pide confirmación. Una oferta cerrada conserva "Gestionar
+ * candidatos": cerrar solo corta las postulaciones nuevas; el proceso de
+ * selección de quienes ya se postularon sigue (regla del backend).
+ *
+ * "Nueva oferta" no se repite en la cabecera (es la acción global de la barra);
+ * solo aparece en el EmptyState cuando no hay ninguna oferta.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -33,7 +38,6 @@ import EmptyState from '../../components/ui/EmptyState';
 import ActionMenu from '../../components/ui/ActionMenu';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import Toast from '../../components/ui/Toast';
-import Icon from '../../components/ui/Icon';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import { ESTADO_LABEL, ESTADO_TONO, MODERACION_LABEL, MODERACION_TONO } from '../../utils/ofertaEstados';
 import styles from './EmpresaOfertasPage.module.css';
@@ -172,12 +176,6 @@ export default function MisOfertasPage() {
       <PageHeader
         title="Mis ofertas"
         subtitle="Gestioná las publicaciones que tenés asignadas."
-        actions={(
-          <Link to="/empresa/nueva-oferta" className="btn-primary">
-            <Icon name="plus" size={18} strokeWidth={2.2} />
-            Nueva oferta
-          </Link>
-        )}
       />
 
       {error && <p className={`error-msg ${styles.error}`} role="alert">{error}</p>}

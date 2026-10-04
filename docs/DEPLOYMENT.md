@@ -285,16 +285,27 @@ El responsable de una oferta (`creadaPorUsuarioId`) es siempre un reclutador act
 nunca el admin_empresa. La de Ciberseguridad queda sin responsable **a propósito**, para
 mostrar "Sin responsable asignado" y la acción de asignar responsable.
 
-16 postulaciones (4 del alumno demo + 12 de candidatos sintéticos): 5 en revisión, 3
-preseleccionados, 3 en entrevista, 2 contratados y 3 no seleccionados. El alumno demo
-tiene Frontend → entrevista, Backend → en revisión, QA → contratado y UX/UI → no
-seleccionado.
+**Historia principal de la exposición — Diego → Frontend → Martín → contratado.**
+Diego (reclutador del equipo de Carolina) crea "Pasante en Desarrollo Frontend
+(React)" → el instituto la aprueba → Martín la ve y se postula → Diego recibe la
+postulación y lo lleva por en revisión → preseleccionado → entrevista → contratado.
+El historial de estados, el chat Diego ↔ Martín (coordinación de la entrevista y
+aviso de la incorporación), las notificaciones de ambos y la auditoría cuentan esa
+misma historia con fechas coherentes (oferta hace 25 días, aprobada hace 24,
+postulación hace 14, contratado hace 5).
+
+16 postulaciones (3 del alumno demo + 13 de candidatos sintéticos): 5 en revisión, 3
+preseleccionados, 2 en entrevista, 3 contratados y 3 no seleccionados. El alumno demo
+tiene Frontend → **contratado** (historia principal), Backend → en revisión y UX/UI →
+no seleccionado, las tres de Diego: Martín no está contratado en ninguna otra oferta.
+La contratación de QA (Lucía) es de un candidato sintético, Agustín Molina; Lucía
+conserva sus ofertas, candidatos (uno en entrevista) y su propio chat.
 
 Chats y notificaciones respetan las reglas reales: hay conversación interna Carolina ↔
-Diego y conversaciones reclutador ↔ candidato (Diego ↔ Martín, Lucía ↔ Martín, y cada
-uno con un candidato sintético); **no** hay ninguna admin_empresa ↔ candidato. "Nueva
-postulación recibida" les llega a los reclutadores; la administradora recibe avisos de
-moderación de ofertas, altas del equipo y mensajes internos.
+Diego y conversaciones reclutador ↔ candidato (Diego ↔ Martín, Diego ↔ Sofía, Lucía ↔
+Agustín); **no** hay ninguna admin_empresa ↔ candidato. "Nueva postulación recibida" y
+los cambios de estado son de los reclutadores y del alumno; la administradora recibe
+avisos de moderación de ofertas, altas del equipo y mensajes internos.
 
 **Conteos exactos** (migración desde vacío + `db:seed:presentacion` únicamente):
 
@@ -305,10 +316,10 @@ moderación de ofertas, altas del equipo y mensajes internos.
 | empresa_usuarios | 3 (1 admin_empresa + 2 reclutadores) |
 | ofertas | 7 (6 con responsable + 1 sin responsable) |
 | postulaciones | 16 |
-| postulacion_historial_estados | 34 |
-| mensajes | 19 (5 conversaciones) |
-| notificaciones | 26 |
-| activity_logs | 17 |
+| postulacion_historial_estados | 35 |
+| mensajes | 22 (4 conversaciones) |
+| notificaciones | 31 |
+| activity_logs | 19 |
 | solicitudes_empresa | 1 (pendiente) |
 | solicitudes_reclutador | 3 (2 aprobadas + 1 pendiente) |
 | archivos | 0 |
@@ -376,6 +387,14 @@ PRESENTACIÓN
 ✓ Chat admin_empresa ↔ alumno/candidatos: 0
 ✓ Notificación "nueva postulación" al admin_empresa: 0
 …
+✓ Historia: "Pasante en Desarrollo Frontend (React)" pertenece a Diego
+✓ Historia: estado actual de Martín en Frontend = contratado
+✓ Historia: historial de Martín/Frontend = en_revision → preseleccionado → entrevista → contratado
+✓ Historia: mensajes Diego ↔ Martín posteriores a la entrevista (tras la contratación): 4
+✓ Historia: Martín contratado en una sola oferta: 1
+…
+✓ Lucía: 2 oferta/s propias con 6 candidato/s
+
 INSTITUCIONAL
 
 ✓ Empresas: 20
@@ -393,7 +412,13 @@ admin_empresa como responsable, que no haya chats admin_empresa ↔ alumno, que 
 admin_empresa no reciba "nueva postulación", que ninguna postulación sea anterior a su
 oferta, que el historial de estados termine en el estado actual, que no haya ningún rol
 `admin` en los namespaces ficticios y que existan empresas de confianza con ofertas de
-publicación automática.
+publicación automática. Además valida la **historia principal** con checks semánticos
+(no solo conteos): Diego es reclutador activo de Delta y responsable de Frontend;
+Martín está postulado y contratado ahí, con el historial completo en orden; existe el
+chat Diego ↔ Martín con mensajes posteriores a la entrevista; Diego tiene ofertas
+activas, candidatos y avisos de "nueva postulación"; el admin_empresa no recibe
+notificaciones operativas de postulaciones ni chatea con Martín; y Lucía conserva
+ofertas y candidatos propios.
 
 ### C. Qué NO ejecutar contra Neon de producción
 

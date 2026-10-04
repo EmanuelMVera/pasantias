@@ -167,8 +167,10 @@ describe('showcase — reset y status', () => {
 
   test('status CLI: imprime el informe sin secretos y sale con 0 si es coherente', async () => {
     await ejecutarShowcaseReset({ verbose: false });
+    // DOTENV_CONFIG_QUIET: dotenv imprime "tips" aleatorios (p. ej. "agentic
+    // secret storage") que harían fallar el chequeo de secretos sin motivo.
     const salida = execFileSync('node', ['src/utils/showcaseStatus.js'], {
-      cwd: BACKEND_DIR, env: { ...process.env }, stdio: 'pipe',
+      cwd: BACKEND_DIR, env: { ...process.env, DOTENV_CONFIG_QUIET: 'true' }, stdio: 'pipe',
     }).toString();
 
     expect(salida).toMatch(/SHOWCASE SISPASANTÍAS/);
@@ -176,6 +178,9 @@ describe('showcase — reset y status', () => {
     expect(salida).toMatch(/INSTITUCIONAL/);
     expect(salida).toMatch(/✓ Reclutadores activos: 2/);
     expect(salida).toMatch(/✓ Ofertas sin responsable intencional: 1/);
+    // Historia principal de la demo: Diego → Frontend → Martín → contratado.
+    expect(salida).toMatch(/✓ Historia: estado actual de Martín en Frontend = contratado/);
+    expect(salida).toMatch(/✓ Historia: historial de Martín\/Frontend = en_revision → preseleccionado → entrevista → contratado/);
     expect(salida).toMatch(/SHOWCASE COHERENTE/);
     expect(salida).not.toContain('Demo1234!');
     expect(salida).not.toMatch(/\$2[aby]\$/); // ningún hash bcrypt

@@ -42,7 +42,9 @@ test.describe('Reclutador — workspace operativo', () => {
     await expect(nav).toHaveCount(1);
     await expect(nav.getByRole('link')).toHaveText(['Inicio', 'Mis ofertas', 'Candidatos']);
     await expect(nav.locator('a[aria-current="page"]')).toHaveText('Inicio');
-    await expect(page.getByRole('link', { name: 'Nueva oferta' }).first()).toBeVisible();
+    // "Nueva oferta" es la acción global de la barra: una sola vez, no repetida en el Inicio.
+    await expect(page.getByRole('link', { name: 'Nueva oferta' })).toHaveCount(1);
+    await expect(page.getByRole('main').getByRole('link', { name: 'Nueva oferta' })).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Chat' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Notificaciones' })).toBeVisible();
     for (const secundaria of ['Equipo', 'Mi empresa', 'Seguridad', 'Ver empresa']) {
@@ -85,6 +87,7 @@ test.describe('Reclutador — workspace operativo', () => {
     await expect(page).toHaveURL(/\/empresa\/ofertas$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Mis ofertas' })).toBeVisible();
     await expect(page.getByText('Gestioná las publicaciones que tenés asignadas.')).toBeVisible();
+    await expect(page.getByRole('main').getByRole('link', { name: 'Nueva oferta' })).toHaveCount(0);
 
     for (const col of ['Oferta', 'Estado', 'Moderación', 'Candidatos', 'Vacantes', 'Cierre', 'Acciones']) {
       await expect(page.getByRole('columnheader', { name: col, exact: true })).toBeVisible();
@@ -112,9 +115,11 @@ test.describe('Reclutador — workspace operativo', () => {
   });
 
   test('crear una oferta y editar la propia', async ({ page }) => {
-    await page.getByRole('link', { name: 'Nueva oferta' }).first().click();
+    await page.getByRole('link', { name: 'Nueva oferta' }).click();
     await expect(page).toHaveURL(/\/empresa\/nueva-oferta$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Nueva oferta' })).toBeVisible();
+    // En la propia página de creación el CTA global no se muestra (llevaría acá mismo).
+    await expect(page.getByRole('link', { name: 'Nueva oferta' })).toHaveCount(0);
     for (const seccion of ['Información del puesto', 'Condiciones', 'Perfil buscado', 'Publicación']) {
       await expect(page.getByRole('heading', { name: seccion })).toBeVisible();
     }
@@ -214,7 +219,7 @@ test.describe('Reclutador — workspace operativo', () => {
     await alumno.dispose();
   });
 
-  test('menú de usuario: ver empresa (perfil público), equipo de solo lectura y seguridad', async ({ page }) => {
+  test('menú de usuario: ver empresa (perfil público) y seguridad; sin Equipo', async ({ page }) => {
     const abrirMenu = async () => page.locator('[aria-haspopup="true"]').click();
 
     await abrirMenu();
@@ -223,20 +228,16 @@ test.describe('Reclutador — workspace operativo', () => {
     await expect(menu).toContainText(fx.reclutador.email);
     await expect(menu).toContainText(fx.empresa.razonSocial);
     await expect(menu).toContainText('Reclutador');
+    await expect(menu.getByRole('link')).toHaveText(['Ver empresa', 'Seguridad de mi cuenta']);
 
     await menu.getByRole('link', { name: 'Ver empresa' }).click();
     await expect(page).toHaveURL(/\/empresa\/\d+$/);
     await expect(page.getByRole('heading', { name: fx.empresa.razonSocial })).toBeVisible();
 
-    await abrirMenu();
-    await page.getByRole('link', { name: 'Ver equipo' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: `Equipo de ${fx.empresa.razonSocial}` })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Cuenta administradora' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Reclutadores' })).toContainText(RECLUTADORA);
-    await expect(page.locator('#btn-nuevo-miembro')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /^acciones para/i })).toHaveCount(0);
-    await expect(page.getByRole('tab')).toHaveCount(0);
-    await expect(page.getByText(/reclutadores activos|suspendidos|solicitudes pendientes/i)).toHaveCount(0);
+    // Equipo es del administrador de empresa: la ruta lo devuelve a su inicio.
+    await page.goto('/empresa/equipo');
+    await expect(page).toHaveURL(/\/empresa$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Mi espacio de reclutamiento' })).toBeVisible();
 
     // Mi empresa no es su pantalla: va al perfil público.
     await page.goto('/empresa/mi-empresa');

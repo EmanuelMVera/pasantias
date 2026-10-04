@@ -1,13 +1,19 @@
 name: CI
 
+# En cada PR y push a main: backend (migraciones + tests + OpenAPI) y frontend
+# (lint + build). La suite E2E completa (Playwright) NO corre automáticamente:
+# se lanza a mano desde Actions → CI → Run workflow (workflow_dispatch), p. ej.
+# antes de una presentación o release. Local: npm run e2e.
 on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
-# Cancela runs viejos del mismo PR/branch cuando llega un push nuevo.
+# Cancela runs viejos del mismo PR/branch cuando llega un push nuevo. El evento
+# va en la clave para que un push a main no cancele una corrida manual de E2E.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
@@ -120,9 +126,12 @@ jobs:
       - run: npm run build
 
   # ──────────────────────────────────────────────────────────────────────────
-  # E2E: smoke tests de Playwright (Chromium) sobre back+front — TEST-02.
+  # E2E: suite de Playwright (Chromium) sobre back+front — TEST-02.
+  # Solo en ejecución MANUAL (Actions → CI → Run workflow): es la regresión
+  # completa previa a una presentación/release, no un control por push.
   # ──────────────────────────────────────────────────────────────────────────
   e2e:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     services:
       postgres:

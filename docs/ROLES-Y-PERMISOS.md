@@ -149,7 +149,8 @@ oferta, el alcance cambia en la próxima consulta.
 | Acción | público | admin | alumno / egresado | admin_empresa | reclutador |
 |---|:--:|:--:|:--:|:--:|:--:|
 | Ver dashboard / mis-ofertas / candidatos | — | — | — | ✅ toda la empresa | ✅ solo lo suyo⁷ |
-| Ver mi-empresa / equipo | — | — | — | ✅ | ✅ (consulta) |
+| Ver mi-empresa / equipo (API) | — | — | — | ✅ | ✅ (consulta)⁸ |
+| Pantalla Equipo (`/empresa/equipo`) | — | — | — | ✅ | — (redirige a `/empresa`) |
 | Filtrar ofertas y candidatos por estado, moderación u oferta | — | — | — | ✅ | ✅ (dentro de su alcance) |
 | Filtrar por responsable | — | — | — | ✅ | — (se ignora) |
 | Editar el perfil de la empresa, subir logo | — | — | — | ✅ | — |
@@ -207,23 +208,37 @@ una de sus ofertas.
   `Usuario` — no existe ningún "dueño implícito" ni membresía virtual; toda
   empresa tiene garantizada al menos una fila `admin_empresa` activa desde la
   migración 019.
-- **`reclutador` no puede tocar el equipo ni el perfil de la empresa**, solo lo
-  operativo: sus ofertas, sus candidatos, el proceso de selección y el chat. Su
-  alcance es PERSONAL y lo impone el backend (nota ⁷): no ve ofertas ni candidatos
-  de otros reclutadores, ni de ofertas sin responsable.
+- **`reclutador`: workspace operativo personal; no administra el equipo.** Crea
+  ofertas (queda como responsable), edita / pausa / reactiva / cierra las suyas,
+  gestiona sus candidatos con el flujo guiado, escribe notas internas, consulta el
+  historial, ve perfiles, chatea con candidatos cuando las reglas lo permiten,
+  consulta su empresa (perfil público, `/empresa/:id`) y recibe notificaciones
+  operativas. No toca el equipo, los responsables ni el perfil de la empresa, y no
+  ve estadísticas corporativas. Su alcance es PERSONAL y lo impone el backend
+  (nota ⁷): no ve ofertas ni candidatos de otros reclutadores, ni de ofertas sin
+  responsable. En el frontend no tiene sección Equipo: su barra es Inicio · Mis
+  ofertas · Candidatos + "Nueva oferta", y el menú de usuario solo ofrece Ver
+  empresa y Seguridad de mi cuenta.
+- ⁸ `GET /api/empresas/equipo` sigue respondiendo al reclutador (lectura de la
+  nómina, sin datos de gestión); todas las acciones de equipo (`solicitudes`,
+  `solicitar`, `recuperacion`, `PATCH`/`DELETE` de miembros) son solo `admin_empresa`.
+- **Cerrar una oferta** corta las postulaciones nuevas pero no el proceso de
+  selección: su responsable puede seguir moviendo a quienes ya se postularon (y
+  consultar historial y notas) desde Mis ofertas → Gestionar candidatos.
 - **Flujo guiado del proceso de selección** (nota ⁶): el backend valida cada cambio
   de estado; el frontend solo ofrece las transiciones que el backend devuelve en
   `transicionesPermitidas`.
 - **Nota interna** (`notasEmpresa`): una sola nota editable por postulación, la
   escribe el reclutador responsable, la lee el `admin_empresa`; nunca se envía al
   candidato (los endpoints del alumno la omiten) ni genera notificación.
-- **`admin_empresa` gobierna y supervisa, no opera**: edita el perfil y el logo,
-  gestiona el equipo y puede pausar / reactivar / cerrar cualquier oferta de su
-  empresa, pero no crea ni edita ofertas ni mueve candidatos en el embudo. En el
-  frontend tiene un shell propio (sidebar + topbar, `EmpresaShell`) con Resumen,
-  Ofertas, Candidatos, Equipo y Mi empresa; el reclutador conserva el navbar y su
-  panel operativo. Esa separación es solo de presentación: la autoridad sigue
-  siendo `authorizeEmpresaRoles` en el backend.
+- **`admin_empresa`: gobierno y supervisión del equipo; no opera**: ve todas las
+  ofertas y candidatos de la empresa, edita el perfil y el logo, administra el
+  equipo, asigna responsables y puede pausar / reactivar / cerrar cualquier oferta
+  de su empresa, pero no crea ni edita ofertas ni mueve candidatos en el embudo. En
+  el frontend tiene un shell propio (sidebar + topbar, `EmpresaShell`) con Resumen,
+  Ofertas, Candidatos, Equipo y Mi empresa; el reclutador usa su barra horizontal
+  (`ReclutadorNav`). Esa separación es de presentación: la autoridad sigue siendo
+  `authorizeEmpresaRoles` en el backend.
 - **Notificaciones de empresa:** la nueva postulación va al reclutador responsable
   (ver nota ³); el resultado de la moderación de una oferta va a los
   `admin_empresa` **y** al reclutador responsable, sin duplicar.

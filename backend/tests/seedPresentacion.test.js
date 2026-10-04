@@ -26,6 +26,7 @@ const {
   ALUMNO,
   OUR_EMAILS,
   SOLICITUD_RECLUTADOR_PENDIENTE,
+  HISTORIA_PRINCIPAL,
 } = require('../src/utils/seedPresentacion');
 const { puedeEnviarMensaje, puedeVerConversacion } = require('../src/services/chatPermission.service');
 const { crearAdmin, loginYObtenerToken } = require('./helpers/factories');
@@ -250,7 +251,7 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
     for (const reclutador of [diego, lucia]) {
       const propias = await Notificacion.findAll({ where: { usuarioId: reclutador.id } });
       expect(propias.some((n) => n.titulo === 'Nueva postulación recibida')).toBe(true);
-      expect(propias.length).toBeLessThanOrEqual(8); // cantidad razonable, sin ruido
+      expect(propias.length).toBeLessThanOrEqual(10); // cantidad razonable, sin ruido
     }
     expect(await Notificacion.count({ where: { usuarioId: lucia.id, titulo: 'Se te asignó una oferta' } })).toBe(1);
 
@@ -260,12 +261,28 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
     expect(deAlumno.some((n) => !n.leida)).toBe(true);
   });
 
-  test('alumno demo: sus 4 postulaciones cubren entrevista, en revisión, contratado y no seleccionado', async () => {
+  test('alumno demo: historia principal — contratado solo en Frontend (de Diego); Backend en revisión y UX/UI no seleccionado', async () => {
     await ejecutarSeedPresentacion({ verbose: false });
     const alumno = await Usuario.findOne({ where: { email: ALUMNO.email } });
-    const postulaciones = await Postulacion.findAll({ where: { usuarioId: alumno.id }, attributes: ['estado'] });
-    expect(postulaciones.map((p) => p.estado).sort())
-      .toEqual(['contratado', 'en_revision', 'entrevista', 'rechazado']);
+    const diego = await Usuario.findOne({ where: { email: RECLUTA.email } });
+    const postulaciones = await Postulacion.findAll({
+      where: { usuarioId: alumno.id },
+      attributes: ['id', 'estado'],
+      include: [{ model: Oferta, as: 'oferta', attributes: ['titulo', 'creadaPorUsuarioId'] }],
+    });
+    const estadoEn = Object.fromEntries(postulaciones.map((p) => [p.oferta.titulo, p.estado]));
+    expect(estadoEn).toEqual({
+      [HISTORIA_PRINCIPAL.ofertaTitulo]: 'contratado',
+      'Pasante en Desarrollo Backend (Node.js)': 'en_revision',
+      'Pasante en Diseño UX/UI': 'rechazado',
+    });
+    for (const p of postulaciones) expect(p.oferta.creadaPorUsuarioId).toBe(diego.id);
+
+    const frontend = postulaciones.find((p) => p.oferta.titulo === HISTORIA_PRINCIPAL.ofertaTitulo);
+    const historial = await PostulacionHistorialEstado.findAll({
+      where: { postulacionId: frontend.id }, order: [['id', 'ASC']], attributes: ['estadoNuevo'],
+    });
+    expect(historial.map((h) => h.estadoNuevo)).toEqual(HISTORIA_PRINCIPAL.cadena);
   });
 
   test('postulaciones de Delta: el embudo usa los 5 estados y el historial termina en el estado actual', async () => {
@@ -406,7 +423,7 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
     expect(emails.some((e) => e.endsWith('@demo.invalid'))).toBe(false);
   });
 
-  test('conteo determinístico: exactamente 16 postulaciones (4 del alumno demo + 12 del pool sintético), sin importar qué otros seeds corrieron antes', async () => {
+  test('conteo determinístico: exactamente 16 postulaciones (3 del alumno demo + 13 del pool sintético), sin importar qué otros seeds corrieron antes', async () => {
     await ejecutarSeedPresentacion({ verbose: false });
     const empresa = await Empresa.findOne({ where: { razonSocial: RAZON_SOCIAL } });
     const ofertas = await Oferta.findAll({ where: { empresaId: empresa.id }, attributes: ['id'] });

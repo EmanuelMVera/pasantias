@@ -48,11 +48,6 @@
 .miembro:first-child { padding-top: 0; }
 .miembro:last-child { border-bottom: none; padding-bottom: 0; }
 
-.miembroSuspendido .miembroLink { color: var(--primary); text-decoration: none; }
-.miembroLink:hover { text-decoration: underline; }
-
-.miembroNombre { color: var(--text-soft); }
-
 .miembroInfo {
   display: flex;
   flex-direction: column;
@@ -68,6 +63,8 @@
   color: var(--text-strong);
   overflow-wrap: anywhere;
 }
+
+.miembroSuspendido .miembroNombre { color: var(--text-soft); }
 
 .miembroDato {
   font-size: 0.84rem;

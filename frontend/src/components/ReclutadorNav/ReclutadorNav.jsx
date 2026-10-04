@@ -8,11 +8,16 @@
  *   SisPasantías   Inicio · Mis ofertas · Candidatos      [+ Nueva oferta]  Chat  Campana  Diego Herrera ▾
  *
  * - Navegación principal: solo el trabajo diario (inicio, sus ofertas, sus
- *   candidatos). Ver empresa, Ver equipo y Seguridad son secundarios y viven en
- *   el menú de usuario (`reclutadorMenu`).
+ *   candidatos). Ver empresa y Seguridad son secundarios y viven en el menú de
+ *   usuario (`menuUsuarioReclutador`). No hay "Equipo": es del administrador de
+ *   empresa (la ruta /empresa/equipo redirige al reclutador a /empresa).
+ * - "+ Nueva oferta" es la ÚNICA acción global de creación: las páginas no la
+ *   repiten en su cabecera (solo un EmptyState cuando no hay ofertas). Se
+ *   oculta mientras se crea o edita una oferta.
  * - Identidad: el reclutador es una PERSONA de la empresa (nombre completo).
- * - Móvil (<900px): hamburguesa con los 3 links + Nueva oferta. Chat, campana y
- *   usuario quedan siempre a la vista, sin duplicarse en el panel.
+ * - Móvil (<900px): hamburguesa con los 3 links + Nueva oferta (una sola vez;
+ *   el botón de escritorio se oculta). Chat, campana y usuario quedan siempre
+ *   a la vista, sin duplicarse en el panel.
  *
  * Contratos compartidos con el resto de los shells (los usan los E2E):
  * `nav[aria-label="Principal"]`, panel `#nav-mobile`, botón
@@ -60,7 +65,9 @@ export default function ReclutadorNav() {
   const cerrar = () => setAbierto(false);
   const enNotificaciones = pathname === '/notificaciones';
   const enChat = pathname === '/chat' || pathname.startsWith('/chat/');
-  const enNuevaOferta = pathname === '/empresa/nueva-oferta';
+  // El CTA global "Nueva oferta" se oculta mientras se crea o edita una oferta:
+  // llevaría a la página actual o interrumpiría la edición en curso.
+  const editandoOferta = pathname === '/empresa/nueva-oferta' || /^\/empresa\/ofertas\/[^/]+\/editar\/?$/.test(pathname);
 
   const renderLinks = (claseLink) => RECLUTADOR_LINKS.map((l) => {
     const activo = l.match(pathname);
@@ -77,11 +84,10 @@ export default function ReclutadorNav() {
     );
   });
 
-  const nuevaOferta = (clase) => (
+  const nuevaOferta = (clase) => !editandoOferta && (
     <Link
       to="/empresa/nueva-oferta"
       className={`${styles.nuevaOferta} ${clase}`}
-      aria-current={enNuevaOferta ? 'page' : undefined}
       onClick={cerrar}
     >
       <Icon name="plus" size={18} strokeWidth={2.2} />

@@ -46,10 +46,19 @@
  * Además siembra: 1 empresa aprobada (nivel de confianza estándar, explícito)
  * + logo por URL externa, 7 ofertas cubriendo ciclo de vida (activa/pausada/
  * cerrada) y moderación (aprobada/pendiente/rechazada, ejes independientes),
- * 16 postulaciones con historial de estados (4 del alumno demo + 12 del pool
+ * 16 postulaciones con historial de estados (3 del alumno demo + 13 del pool
  * de candidatos sintéticos, repartidas en todo el embudo), conversaciones de
  * chat, notificaciones, solicitudes de reclutador y de empresa, y registros
  * de auditoría (activity_logs).
+ *
+ * HISTORIA PRINCIPAL de la exposición (ver HISTORIA_PRINCIPAL): Diego crea
+ * "Pasante en Desarrollo Frontend (React)" → el instituto la aprueba → Martín
+ * se postula → Diego lo lleva por en_revision → preseleccionado → entrevista →
+ * contratado. Historial, chat Diego ↔ Martín, notificaciones de ambos y
+ * auditoría cuentan esa misma historia con fechas coherentes. Martín tiene
+ * además Backend (en revisión) y UX/UI (no seleccionado), ambas de Diego, y no
+ * está contratado en ninguna otra oferta. La contratación de QA (Lucía) es de
+ * un candidato sintético (Agustín Molina). showcaseStatus.js la valida.
  *
  * Autocontenido: crea todo su elenco, no depende de ningún otro seed.
  *
@@ -125,6 +134,13 @@ const RECLUTA_2 = { email: 'lucia.ferrari@demo.invalid', nombre: 'Lucía', apell
 const SOLICITUD_RECLUTADOR_PENDIENTE = { nombre: 'Mateo', apellido: 'Silva', email: 'mateo.silva@demo.invalid' };
 
 const RAZON_SOCIAL = 'Delta Innovación IT';
+
+// Historia principal de la demo (ver cabecera): la oferta de Diego en la que
+// Martín recorre todo el flujo guiado. La consume showcaseStatus.js.
+const HISTORIA_PRINCIPAL = {
+  ofertaTitulo: 'Pasante en Desarrollo Frontend (React)',
+  cadena: ['en_revision', 'preseleccionado', 'entrevista', 'contratado'],
+};
 const EMPRESA_CUIT = '30712345689';
 const SOLICITUD_EMPRESA_EMAIL = 'registro@nubecode.demo';
 
@@ -451,7 +467,7 @@ async function sembrar(transaction) {
   const ofertaDefs = [
     {
       key: 'frontend',
-      titulo: 'Pasante en Desarrollo Frontend (React)',
+      titulo: HISTORIA_PRINCIPAL.ofertaTitulo,
       descripcion:
         'Sumate al equipo de producto para construir interfaces con React. Vas a trabajar junto a ' +
         'desarrolladores semi-senior en componentes reutilizables, consumo de APIs y mejoras de UX. ' +
@@ -467,9 +483,11 @@ async function sembrar(transaction) {
       estadoModeracion: 'aprobada',
       vistas: 148,
       cantidadVacantes: 2,
-      fechaPublicacion: daysAgo(25),
+      // Diego la crea hace 25 días; el instituto la aprueba (y queda
+      // publicada) al día siguiente.
+      fechaPublicacion: daysAgo(24, 13),
       fechaLimite: daysAgo(-20),
-      createdAt: daysAgo(25),
+      createdAt: daysAgo(25, 9),
     },
     {
       key: 'backend',
@@ -633,21 +651,28 @@ async function sembrar(transaction) {
   say('🚀 Creando postulaciones + historial de estados...');
 
   // Helper: crea la postulación y su cadena de historial en una sola pasada.
-  async function postular({ usuario, oferta, estado, cartaPresentacion, notasEmpresa, cadena, diasBase, cvId }) {
-    const fecha = daysAgo(diasBase, 11);
+  //   cadena: ['en_revision', 'preseleccionado', ...] — pasos consecutivos del
+  //           flujo guiado (TRANSICIONES_POSTULACION), nunca saltos.
+  //   pasos:  opcional, [{ dias, hora, nota }] por cada paso de la cadena, para
+  //           las historias que necesitan una cronología exacta (la historia
+  //           principal Diego ↔ Martín). Sin `pasos`, la cadena avanza de a 2
+  //           días desde `diasBase`.
+  async function postular({ usuario, oferta, estado, cartaPresentacion, notasEmpresa, cadena, diasBase, pasos, cvId }) {
+    const momentos = cadena.map((_, i) => (pasos?.[i]
+      ? daysAgo(pasos[i].dias, pasos[i].hora)
+      : daysAgo(Math.max(0, diasBase - i * 2), i === 0 ? 11 : 12 + i)));
     const post = await Postulacion.create({
       usuarioId: usuario.id,
       ofertaId: oferta.id,
       cartaPresentacion,
       estado,
-      fechaPostulacion: fecha,
+      fechaPostulacion: momentos[0],
       notasEmpresa: notasEmpresa || null,
       cvArchivoId: cvId || null,
-      createdAt: fecha,
-      updatedAt: daysAgo(Math.max(0, diasBase - (cadena.length - 1) * 2), 16),
+      createdAt: momentos[0],
+      updatedAt: momentos[momentos.length - 1],
     }, { transaction });
 
-    // cadena: ['en_revision', 'preseleccionado', ...] — pasos consecutivos.
     let anterior = null;
     for (let i = 0; i < cadena.length; i++) {
       const nuevo = cadena[i];
@@ -659,33 +684,45 @@ async function sembrar(transaction) {
         motivo: i === 0
           ? 'Postulación enviada por el alumno.'
           : `Cambio de estado a "${nuevo}" desde el panel de la empresa.`,
-        notaInterna: i === 0 ? null : 'Registrado durante la demo.',
-        createdAt: daysAgo(Math.max(0, diasBase - i * 2), 12 + i),
+        notaInterna: i === 0 ? null : (pasos?.[i]?.nota ?? null),
+        createdAt: momentos[i],
       }, { transaction });
       anterior = nuevo;
     }
     return post;
   }
 
-  // 6a. Postulaciones del ALUMNO DEMO (con historial completo)
-  await postular({
+  // 6a. HISTORIA PRINCIPAL DE LA DEMO — Diego ↔ Martín en Frontend.
+  //   Diego crea "Pasante en Desarrollo Frontend (React)" (hace 25 días), el
+  //   instituto la aprueba (hace 24), Martín se postula (hace 14) y Diego lo
+  //   lleva por todo el flujo guiado hasta contratarlo (hace 5). Las fechas
+  //   encajan con el chat (8a), las notificaciones (9a/9c) y la auditoría (10).
+  const postMartinFrontend = await postular({
     usuario: alumno,
     oferta: ofertas.frontend,
-    estado: 'entrevista',
-    diasBase: 12,
+    estado: 'contratado',
     cartaPresentacion:
       'Hola, me interesa mucho esta pasantía. Vengo trabajando con React en mis proyectos ' +
       '(gestor de turnos, clon de Trello) y me gustaría crecer en un equipo con code review y mentoría. ' +
       'Tengo disponibilidad inmediata para modalidad híbrida.',
-    notasEmpresa: 'Buen dominio de React para el nivel. Proyecto final sólido. Avanza a entrevista técnica.',
-    cadena: ['en_revision', 'preseleccionado', 'entrevista'],
+    notasEmpresa: 'Entrevista técnica muy buena: resolvió el ejercicio de React con criterio y explicó bien sus decisiones. Se incorpora al equipo de producto; RRHH coordina el convenio y el inicio.',
+    cadena: HISTORIA_PRINCIPAL.cadena,
+    pasos: [
+      { dias: 14, hora: 11 },
+      { dias: 12, hora: 10, nota: 'Buen dominio de React para el nivel. Proyecto final sólido.' },
+      { dias: 9, hora: 10, nota: 'Entrevista técnica agendada para el jueves 16:00 por videollamada.' },
+      { dias: 5, hora: 9, nota: 'Entrevista muy buena. Cubre una de las 2 vacantes.' },
+    ],
   });
 
-  await postular({
+  // 6b. Otras postulaciones del alumno demo — variedad, todas con Diego. Ninguna
+  //     otra contratación: Martín queda contratado en una sola oferta.
+  // Se postuló antes de quedar contratado en Frontend; sigue sin revisar.
+  const postMartinBackend = await postular({
     usuario: alumno,
     oferta: ofertas.backend,
     estado: 'en_revision',
-    diasBase: 5,
+    diasBase: 16,
     cartaPresentacion:
       'Me postulo a la pasantía de backend. Hice una API REST con Node, Express y PostgreSQL para mi ' +
       'proyecto final, con autenticación JWT y tests. Quiero profundizar en buenas prácticas de backend.',
@@ -694,26 +731,15 @@ async function sembrar(transaction) {
 
   await postular({
     usuario: alumno,
-    oferta: ofertas.qa,
-    estado: 'contratado',
-    diasBase: 20,
-    cartaPresentacion:
-      'Me interesa iniciarme en QA. Soy detallista y ya programo, así que la parte de automatización ' +
-      'con Playwright me entusiasma. Disponibilidad inmediata.',
-    notasEmpresa: 'Entrevista muy buena. Se incorpora al equipo de QA. Inicio coordinado con RRHH.',
-    cadena: ['en_revision', 'preseleccionado', 'entrevista', 'contratado'],
-  });
-
-  await postular({
-    usuario: alumno,
     oferta: ofertas.ux,
     estado: 'rechazado',
-    diasBase: 40, // posterior a la publicación de la oferta (hace 43 días)
     cartaPresentacion:
       'Aunque mi foco es desarrollo, tengo interés en UX y manejo básico de Figma. Me gustaría ' +
       'aprender del proceso de diseño de producto.',
     notasEmpresa: 'Perfil más orientado a desarrollo que a diseño. Se sugiere postular a las vacantes técnicas.',
     cadena: ['en_revision', 'rechazado'],
+    // Posterior a la publicación de la oferta (hace 43 días).
+    pasos: [{ dias: 40, hora: 11 }, { dias: 38, hora: 12 }],
   });
 
   // 6b. Pool de candidatos SINTÉTICOS (creados acá mismo, ver
@@ -752,16 +778,20 @@ async function sembrar(transaction) {
     poolAlumnos.push(candidato);
   }
 
-  // 12 postulaciones del pool (algunos candidatos aplican a dos ofertas). Con
-  // las 4 del alumno demo son 16, repartidas en todo el embudo:
-  //   en revisión 5 · preseleccionado 3 · entrevista 3 · contratado 2 · no seleccionado 3
+  // 13 postulaciones del pool (algunos candidatos aplican a dos ofertas). Con
+  // las 3 del alumno demo son 16, repartidas en todo el embudo:
+  //   en revisión 5 · preseleccionado 3 · entrevista 2 · contratado 3 · no seleccionado 3
   //
   // `c` es el número del candidato. `diasBase` es explícito por entrada: la
   // postulación tiene que ser POSTERIOR a la publicación de su oferta
-  // (frontend 25, backend 18, qa 22, soporte 35, ux 43 días atrás) y la cadena
-  // de estados avanza de a 2 días sin pasarse de hoy. Ninguna postulación va a
-  // 'datos' (pendiente de moderación) ni a 'ciber' (rechazada): esas ofertas
-  // no son visibles para los alumnos.
+  // (frontend 24, backend 18, qa 22, soporte 35, ux 43 días atrás) y la cadena
+  // de estados avanza de a 2 días sin pasarse de hoy (o sigue `pasos`, cuando
+  // tiene que encajar con un chat). Ninguna postulación va a 'datos'
+  // (pendiente de moderación) ni a 'ciber' (rechazada): esas ofertas no son
+  // visibles para los alumnos.
+  //
+  // QA (Lucía): la contratación es de Agustín Molina — Martín queda contratado
+  // solo en Frontend, la historia principal.
   const CADENA = {
     en_revision: ['en_revision'],
     preseleccionado: ['en_revision', 'preseleccionado'],
@@ -777,22 +807,30 @@ async function sembrar(transaction) {
     { c: 5,  oferta: 'backend',  estado: 'en_revision',     diasBase: 4 },
     { c: 6,  oferta: 'backend',  estado: 'preseleccionado', diasBase: 10 },
     { c: 7,  oferta: 'qa',       estado: 'rechazado',       diasBase: 15 },
-    { c: 8,  oferta: 'qa',       estado: 'entrevista',      diasBase: 14 },
+    // Agustín: encaja con su chat con Lucía (8d) — entrevista coordinada hace 13
+    // días, contratado hace 6.
+    {
+      c: 8, oferta: 'qa', estado: 'contratado',
+      pasos: [{ dias: 19, hora: 11 }, { dias: 16, hora: 10 }, { dias: 13, hora: 12 }, { dias: 6, hora: 9 }],
+    },
+    { c: 6,  oferta: 'qa',       estado: 'entrevista',      diasBase: 17 },
     { c: 2,  oferta: 'qa',       estado: 'en_revision',     diasBase: 9 },
     { c: 9,  oferta: 'soporte',  estado: 'preseleccionado', diasBase: 28 },
     { c: 3,  oferta: 'soporte',  estado: 'en_revision',     diasBase: 30 },
     { c: 10, oferta: 'ux',       estado: 'contratado',      diasBase: 36 },
   ].map((p) => ({ ...p, cadena: CADENA[p.estado] }));
 
+  const postPool = {}; // `${c}-${oferta}` → postulación (la usa la auditoría)
   for (const plan of poolPlan) {
     const cand = poolAlumnos[plan.c - 1];
-    await postular({
+    postPool[`${plan.c}-${plan.oferta}`] = await postular({
       usuario: cand,
       oferta: ofertas[plan.oferta],
       estado: plan.estado,
       diasBase: plan.diasBase,
+      pasos: plan.pasos,
       cartaPresentacion:
-        `Hola, soy ${cand.nombre} ${cand.apellido}, estudiante de IT Beltrán. Me postulo a esta ` +
+        `Hola, soy ${cand.nombre} ${cand.apellido}, ${cand.rol === 'egresado' ? 'egresado/a' : 'estudiante'} de IT Beltrán. Me postulo a esta ` +
         'búsqueda porque se alinea con lo que estoy estudiando y busco mi primera experiencia laboral.',
       notasEmpresa: plan.estado === 'rechazado'
         ? 'No avanza en esta instancia. Perfil a re-contactar en futuras búsquedas.'
@@ -884,47 +922,51 @@ async function sembrar(transaction) {
     }
   }
 
-  // 8a. Reclutador ↔ Alumno demo — coordinación de entrevista (oferta Frontend)
+  // 8a. HISTORIA PRINCIPAL — Diego ↔ Martín (oferta Frontend, de Diego).
+  //     Preseleccionado hace 12 días → Diego propone entrevista (10) → queda
+  //     agendada y pasa a "entrevista" (9) → entrevista el jueves (7) →
+  //     contratado (5) → Diego le avisa y le cuenta los próximos pasos.
   await conversacion([
-    { de: reclutador, a: alumno, texto: 'Hola Martín, soy Diego de Delta Innovación IT. Revisamos tu postulación al puesto de Frontend y nos gustó tu proyecto final. ¿Tenés disponibilidad para una entrevista técnica esta semana?', dias: 9, hora: 10 },
-    { de: alumno, a: reclutador, texto: '¡Hola Diego! Muchas gracias. Sí, tengo disponibilidad. Me vendría bien miércoles o jueves a la tarde.', dias: 9, hora: 12 },
-    { de: reclutador, a: alumno, texto: 'Perfecto. Agendemos el jueves a las 16:00. Es por videollamada, te llega el link por mail. Va a durar unos 45 minutos: repaso de tu experiencia y un ejercicio corto de React.', dias: 8, hora: 9 },
-    { de: alumno, a: reclutador, texto: 'Genial, confirmado para el jueves 16:00. ¿Necesito preparar algo en particular?', dias: 8, hora: 13 },
-    { de: reclutador, a: alumno, texto: 'Solo tener el entorno de desarrollo listo (Node + un editor). El ejercicio es sobre componentes y estado. Cualquier duda escribime.', dias: 8, hora: 14 },
-    { de: alumno, a: reclutador, texto: '¡Perfecto! Nos vemos el jueves. Gracias Diego.', dias: 7, hora: 18, leido: false },
+    { de: reclutador, a: alumno, texto: 'Hola Martín, soy Diego de Delta Innovación IT. Revisamos tu postulación al puesto de Frontend y nos gustó tu proyecto final. ¿Tenés disponibilidad para una entrevista técnica esta semana?', dias: 10, hora: 10 },
+    { de: alumno, a: reclutador, texto: '¡Hola Diego! Muchas gracias. Sí, tengo disponibilidad. Me vendría bien miércoles o jueves a la tarde.', dias: 10, hora: 12 },
+    { de: reclutador, a: alumno, texto: 'Perfecto. Agendemos el jueves a las 16:00. Es por videollamada, te llega el link por mail. Va a durar unos 45 minutos: repaso de tu experiencia y un ejercicio corto de React.', dias: 9, hora: 9 },
+    { de: alumno, a: reclutador, texto: 'Genial, confirmado para el jueves 16:00. ¿Necesito preparar algo en particular?', dias: 9, hora: 13 },
+    { de: reclutador, a: alumno, texto: 'Solo tener el entorno de desarrollo listo (Node + un editor). El ejercicio es sobre componentes y estado. Cualquier duda escribime.', dias: 9, hora: 14 },
+    { de: alumno, a: reclutador, texto: '¡Perfecto! Nos vemos el jueves. Gracias Diego.', dias: 8, hora: 18 },
+    // Después de la entrevista (jueves, hace 7 días) y del pase a contratado.
+    { de: reclutador, a: alumno, texto: 'Hola Martín, quería contarte que la entrevista salió muy bien y decidimos avanzar con tu incorporación a la pasantía de Frontend. Ya vas a ver la postulación como seleccionada en el sistema. ¡Felicitaciones!', dias: 5, hora: 10 },
+    { de: alumno, a: reclutador, texto: '¡Muchas gracias, Diego! Es una gran noticia. Estoy muy contento de sumarme al equipo.', dias: 5, hora: 12 },
+    { de: reclutador, a: alumno, texto: 'Nos alegra mucho. Desde RRHH te van a contactar esta semana para enviarte el convenio de pasantía y coordinar la fecha de inicio. Cualquier duda, escribime por acá.', dias: 5, hora: 15 },
+    { de: alumno, a: reclutador, texto: 'Perfecto, quedo atento al mail de RRHH. ¡Gracias de nuevo!', dias: 4, hora: 19, leido: false },
   ]);
 
-  // 8b. Reclutadora (Lucía) ↔ Alumno demo — onboarding tras ser contratado en
-  //     QA. La oferta de QA es de Lucía: es ELLA quien escribe, no la cuenta
-  //     administradora (admin_empresa no chatea con candidatos).
-  await conversacion([
-    { de: reclutadora2, a: alumno, texto: 'Hola Martín, soy Lucía, reclutadora de Delta Innovación IT. ¡Felicitaciones! Quedaste seleccionado para la pasantía de QA. Te escribo para coordinar el inicio.', dias: 13, hora: 11 },
-    { de: alumno, a: reclutadora2, texto: '¡Hola Lucía! Muchísimas gracias, qué buena noticia. Estoy disponible para empezar cuando me indiquen.', dias: 13, hora: 15 },
-    { de: reclutadora2, a: alumno, texto: 'Genial. El lunes que viene a las 10:00 en la oficina de Avellaneda para la inducción. Traé tu DNI y el certificado de alumno regular. Te enviamos el convenio de pasantía por mail para revisar.', dias: 12, hora: 9 },
-    { de: alumno, a: reclutadora2, texto: 'Perfecto, el lunes 10:00 estoy ahí con la documentación. Ya recibí el convenio, lo reviso y consulto si tengo dudas.', dias: 12, hora: 16, leido: false },
-  ]);
-
-  // 8c. Admin empresa ↔ Reclutador — coordinación interna del equipo
+  // 8b. Admin empresa ↔ Reclutador — coordinación interna del equipo. Carolina
+  //     supervisa; no opera candidatos ni chatea con ellos.
   await conversacion([
     { de: empAdmin, a: reclutador, texto: 'Diego, ¿cómo venimos con las postulaciones de Frontend? Necesito el resumen para la reunión de mañana.', dias: 6, hora: 10 },
-    { de: reclutador, a: empAdmin, texto: 'Tenemos 4 postulaciones. Martín Gómez avanzó a entrevista técnica (jueves), hay una preseleccionada más, una en revisión y una que descartamos por perfil.', dias: 6, hora: 11 },
-    { de: empAdmin, a: reclutador, texto: 'Bien. Acordate de cargar las notas de cada candidato en el sistema así queda el historial. ¿La oferta de Datos ya está publicada?', dias: 6, hora: 11 },
-    { de: reclutador, a: empAdmin, texto: 'Sí, la creé ayer pero todavía figura pendiente de moderación del admin del sistema. En cuanto la aprueben empieza a recibir postulaciones.', dias: 5, hora: 17 },
-    { de: empAdmin, a: reclutador, texto: 'Perfecto. Pedí además el alta de Mateo Silva como tercer reclutador; está pendiente de aprobación del instituto. Y quedó una oferta vieja de Ciberseguridad sin responsable: si la retomamos te la asigno.', dias: 3, hora: 18, leido: false },
+    { de: reclutador, a: empAdmin, texto: 'Tenemos 4 postulaciones. Ayer entrevisté a Martín Gómez y fue muy bien: mi idea es avanzar con su incorporación. Además hay una preseleccionada, una en revisión y una que descartamos por perfil.', dias: 6, hora: 11 },
+    { de: empAdmin, a: reclutador, texto: 'Buenísimo. Acordate de cargar las notas de cada candidato en el sistema así queda el historial. ¿Y la oferta de Datos?', dias: 6, hora: 12 },
+    { de: reclutador, a: empAdmin, texto: 'La termino de redactar esta semana. Como somos empresa estándar, pasa por la moderación del instituto antes de publicarse.', dias: 6, hora: 13 },
+    { de: empAdmin, a: reclutador, texto: 'Perfecto. Pedí además el alta de Mateo Silva como tercer reclutador; está pendiente de aprobación del instituto. Y quedó una oferta vieja de Ciberseguridad sin responsable: si la retomamos te la asigno.', dias: 3, hora: 18 },
+    { de: reclutador, a: empAdmin, texto: 'Dale. Ya cargué la oferta de Datos: figura pendiente de moderación. En cuanto la aprueben empieza a recibir postulaciones.', dias: 2, hora: 17, leido: false },
   ]);
 
-  // 8d. Reclutador (Diego) ↔ candidata preseleccionada en Frontend (su oferta)
+  // 8c. Reclutador (Diego) ↔ candidata preseleccionada en Frontend (su oferta):
+  //     el chat no es exclusivo de la historia principal.
   const candFrontend = poolAlumnos[0]; // Sofía Ramírez
   await conversacion([
     { de: reclutador, a: candFrontend, texto: `Hola ${candFrontend.nombre}, gracias por postularte a Frontend. Quedaste preseleccionada, en los próximos días te contactamos para coordinar una entrevista.`, dias: 11, hora: 11 },
     { de: candFrontend, a: reclutador, texto: '¡Hola! Muchas gracias por el aviso. Quedo atenta.', dias: 11, hora: 14, leido: false },
   ]);
 
-  // 8e. Reclutadora (Lucía) ↔ candidato en entrevista en QA (su oferta)
+  // 8d. Reclutadora (Lucía) ↔ Agustín Molina — su contratación en QA (su
+  //     oferta). Es ELLA quien escribe: admin_empresa no chatea con candidatos.
   const candQa = poolAlumnos[7]; // Agustín Molina
   await conversacion([
-    { de: reclutadora2, a: candQa, texto: `Hola ${candQa.nombre}, soy Lucía de Delta Innovación IT. Avanzaste a la etapa de entrevista para QA. ¿Podés el martes a las 11:00 por videollamada?`, dias: 9, hora: 10 },
-    { de: candQa, a: reclutadora2, texto: 'Hola Lucía, sí, el martes 11:00 me queda perfecto. ¡Gracias!', dias: 9, hora: 13, leido: false },
+    { de: reclutadora2, a: candQa, texto: `Hola ${candQa.nombre}, soy Lucía de Delta Innovación IT. Avanzaste a la etapa de entrevista para QA. ¿Podés el martes a las 11:00 por videollamada?`, dias: 13, hora: 10 },
+    { de: candQa, a: reclutadora2, texto: 'Hola Lucía, sí, el martes 11:00 me queda perfecto. ¡Gracias!', dias: 13, hora: 13 },
+    { de: reclutadora2, a: candQa, texto: '¡Felicitaciones, Agustín! Quedaste seleccionado para la posición de QA. El lunes a las 10:00 te esperamos en la oficina de Avellaneda para la inducción; te enviamos el convenio por mail para revisar.', dias: 6, hora: 11 },
+    { de: candQa, a: reclutadora2, texto: '¡Muchísimas gracias, Lucía! El lunes 10:00 estoy ahí. Ya recibí el convenio, lo reviso y consulto si tengo dudas.', dias: 6, hora: 16, leido: false },
   ]);
 
   // 9. NOTIFICACIONES ──────────────────────────────────────────────────────
@@ -942,40 +984,58 @@ async function sembrar(transaction) {
     }, { transaction });
   }
 
-  // 9a. Alumno demo
-  await notif({ usuarioId: alumno.id, tipo: 'estado', titulo: 'Avanzaste a Entrevista', mensaje: 'Tu postulación a "Pasante en Desarrollo Frontend (React)" en Delta Innovación IT pasó a estado Entrevista.', tipoVisual: 'success', prioridad: 'alta', accionURL: '/mis-postulaciones', leida: true, createdAt: daysAgo(8, 13) });
-  await notif({ usuarioId: alumno.id, tipo: 'chat', titulo: 'Nuevo mensaje de Diego Herrera', mensaje: 'Tenés un mensaje nuevo sobre la coordinación de tu entrevista.', accionURL: '/chat', createdAt: daysAgo(8, 14) });
-  await notif({ usuarioId: alumno.id, tipo: 'estado', titulo: '¡Fuiste contratado!', mensaje: 'Felicitaciones: fuiste seleccionado para la pasantía "Trainee en QA y Automatización de Pruebas".', tipoVisual: 'success', prioridad: 'urgente', accionURL: '/mis-postulaciones', createdAt: daysAgo(14, 10) });
-  await notif({ usuarioId: alumno.id, tipo: 'chat', titulo: 'Nuevo mensaje de Lucía Ferrari', mensaje: 'Te escribió para coordinar el inicio de la pasantía de QA.', accionURL: '/chat', leida: true, createdAt: daysAgo(13, 11) });
-  await notif({ usuarioId: alumno.id, tipo: 'estado', titulo: 'Actualización en tu postulación', mensaje: 'Tu postulación a "Pasante en Diseño UX/UI" fue actualizada a estado Rechazado.', tipoVisual: 'warning', accionURL: '/mis-postulaciones', leida: true, createdAt: daysAgo(38, 12) });
-  await notif({ usuarioId: alumno.id, tipo: 'oferta', titulo: 'Nueva oferta compatible con tu perfil', mensaje: 'Se publicó "Pasante en Desarrollo Backend (Node.js)", compatible con tu área de interés (Desarrollo Web).', accionURL: '/ofertas', createdAt: daysAgo(18, 8) });
-  await notif({ usuarioId: alumno.id, tipo: 'sistema', titulo: 'Completá tu perfil', mensaje: 'Los perfiles completos reciben hasta 3× más respuestas de las empresas. Revisá tu CV y tus habilidades.', prioridad: 'baja', accionURL: '/perfil', createdAt: daysAgo(30, 10) });
+  // Títulos y textos iguales a los que genera producción
+  // (postulacion.controller.js / adminModeracion.service.js), con la fecha del
+  // evento que los dispara.
+  const FRONTEND = ofertas.frontend.titulo;
+  const estadoNotif = (usuarioId, titulo, oferta, estado, extra) => notif({
+    usuarioId, tipo: 'estado', titulo,
+    mensaje: `Tu postulación para "${oferta.titulo}" cambió a: ${estado.replace(/_/g, ' ')}.`,
+    accionURL: '/mis-postulaciones', ...extra,
+  });
+
+  // 9a. Alumno demo — su lado de la historia principal (Frontend), de la más
+  //     vieja a la más nueva; la contratación y el último mensaje sin leer.
+  await notif({ usuarioId: alumno.id, tipo: 'sistema', titulo: 'Completá tu perfil', mensaje: 'Los perfiles completos reciben hasta 3× más respuestas de las empresas. Revisá tu CV y tus habilidades.', prioridad: 'baja', accionURL: '/perfil', leida: true, createdAt: daysAgo(30, 10) });
+  await estadoNotif(alumno.id, 'Tu postulación no fue seleccionada', ofertas.ux, 'rechazado', { tipoVisual: 'warning', leida: true, createdAt: daysAgo(38, 12) });
+  await notif({ usuarioId: alumno.id, tipo: 'oferta', titulo: 'Nueva oferta compatible con tu perfil', mensaje: `Se publicó "${FRONTEND}", compatible con tu área de interés (Desarrollo Web).`, accionURL: '/ofertas', leida: true, createdAt: daysAgo(24, 14) });
+  await notif({ usuarioId: alumno.id, tipo: 'oferta', titulo: 'Nueva oferta compatible con tu perfil', mensaje: `Se publicó "${ofertas.backend.titulo}", compatible con tu área de interés (Desarrollo Web).`, accionURL: '/ofertas', leida: true, createdAt: daysAgo(17, 14) });
+  await estadoNotif(alumno.id, 'Fuiste preseleccionado/a', ofertas.frontend, 'preseleccionado', { tipoVisual: 'success', leida: true, createdAt: daysAgo(12, 10) });
+  await notif({ usuarioId: alumno.id, tipo: 'chat', titulo: 'Nuevo mensaje de Diego Herrera', mensaje: 'Te escribió para coordinar una entrevista técnica.', accionURL: '/chat', leida: true, createdAt: daysAgo(10, 10) });
+  await estadoNotif(alumno.id, 'Tu entrevista fue programada', ofertas.frontend, 'entrevista', { tipoVisual: 'success', prioridad: 'alta', leida: true, createdAt: daysAgo(9, 10) });
+  await estadoNotif(alumno.id, '¡Felicitaciones! Fuiste seleccionado/a', ofertas.frontend, 'contratado', { tipoVisual: 'success', prioridad: 'urgente', createdAt: daysAgo(5, 9) });
+  await notif({ usuarioId: alumno.id, tipo: 'chat', titulo: 'Nuevo mensaje de Diego Herrera', mensaje: 'Te escribió sobre tu incorporación y los próximos pasos con RRHH.', accionURL: '/chat', createdAt: daysAgo(5, 15) });
 
   // 9b. Administradora de empresa — GOBIERNO, no operación: moderación de
-  //     ofertas, altas del equipo y mensajes internos. Nunca "Nueva postulación
-  //     recibida": ese aviso es del reclutador responsable.
-  await notif({ usuarioId: empAdmin.id, tipo: 'oferta', titulo: 'Una de tus ofertas fue rechazada', mensaje: '"Pasante en Ciberseguridad" fue rechazada en la moderación. Motivo: el detalle de tareas es insuficiente. Podés volver a cargarla con más información.', tipoVisual: 'error', prioridad: 'alta', accionURL: '/empresa/ofertas', leida: true, createdAt: daysAgo(54, 16) });
+  //     ofertas (producción la avisa al admin_empresa Y al responsable), altas
+  //     del equipo y mensajes internos. Nunca "Nueva postulación recibida" ni
+  //     cambios de estado de candidatos: eso es del reclutador responsable.
+  await notif({ usuarioId: empAdmin.id, tipo: 'oferta', titulo: '❌ Tu oferta fue rechazada', mensaje: 'La oferta "Pasante en Ciberseguridad" fue rechazada por el administrador.', tipoVisual: 'error', prioridad: 'alta', accionURL: '/empresa/ofertas', leida: true, createdAt: daysAgo(54, 16) });
   await notif({ usuarioId: empAdmin.id, tipo: 'sistema', titulo: 'Reclutadora aprobada', mensaje: 'El instituto aprobó el alta de Lucía Ferrari. Ya forma parte del equipo de Delta Innovación IT.', tipoVisual: 'success', accionURL: '/empresa/equipo', leida: true, createdAt: daysAgo(38, 12) });
-  await notif({ usuarioId: empAdmin.id, tipo: 'oferta', titulo: 'Tu oferta fue aprobada', mensaje: '"Pasante en Desarrollo Frontend (React)" superó la moderación y ya es visible para los alumnos.', tipoVisual: 'success', accionURL: '/empresa/ofertas', leida: true, createdAt: daysAgo(24, 13) });
-  await notif({ usuarioId: empAdmin.id, tipo: 'oferta', titulo: 'Tu oferta fue aprobada', mensaje: '"Pasante en Desarrollo Backend (Node.js)" superó la moderación y ya es visible para los alumnos.', tipoVisual: 'success', accionURL: '/empresa/ofertas', leida: true, createdAt: daysAgo(17, 13) });
-  await notif({ usuarioId: empAdmin.id, tipo: 'chat', titulo: 'Nuevo mensaje de Diego Herrera', mensaje: 'Te respondió sobre el estado de las búsquedas activas.', accionURL: '/chat', createdAt: daysAgo(5, 17) });
+  await notif({ usuarioId: empAdmin.id, tipo: 'oferta', titulo: '✅ Tu oferta fue aprobada', mensaje: `La oferta "${FRONTEND}" fue aprobada y está publicada.`, tipoVisual: 'success', accionURL: '/empresa/ofertas', leida: true, createdAt: daysAgo(24, 13) });
+  await notif({ usuarioId: empAdmin.id, tipo: 'oferta', titulo: '✅ Tu oferta fue aprobada', mensaje: `La oferta "${ofertas.backend.titulo}" fue aprobada y está publicada.`, tipoVisual: 'success', accionURL: '/empresa/ofertas', leida: true, createdAt: daysAgo(17, 13) });
   await notif({ usuarioId: empAdmin.id, tipo: 'sistema', titulo: 'Solicitud de reclutador enviada', mensaje: 'Tu solicitud de alta para Mateo Silva está pendiente de aprobación del instituto. Podés seguirla en la sección Equipo.', tipoVisual: 'warning', accionURL: '/empresa/equipo', createdAt: daysAgo(3, 15) });
+  await notif({ usuarioId: empAdmin.id, tipo: 'chat', titulo: 'Nuevo mensaje de Diego Herrera', mensaje: 'Te respondió sobre la oferta de Datos.', accionURL: '/chat', createdAt: daysAgo(2, 17) });
 
-  // 9c. Reclutador (Diego) — operación de SUS ofertas
+  // 9c. Reclutador (Diego) — operación de SUS ofertas: la historia principal
+  //     (Frontend) y el resto de su trabajo.
   await notif({ usuarioId: reclutador.id, tipo: 'sistema', titulo: 'Te sumaron al equipo', mensaje: 'Ahora sos parte del equipo de Delta Innovación IT como reclutador. Ya podés crear ofertas y gestionar candidatos.', tipoVisual: 'success', accionURL: '/empresa', leida: true, createdAt: daysAgo(50, 10) });
-  await notif({ usuarioId: reclutador.id, tipo: 'oferta', titulo: 'Tu oferta fue aprobada', mensaje: '"Pasante en Desarrollo Backend (Node.js)" superó la moderación y ya es visible para los alumnos.', tipoVisual: 'success', accionURL: '/empresa', leida: true, createdAt: daysAgo(17, 13) });
-  await notif({ usuarioId: reclutador.id, tipo: 'postulacion', titulo: 'Nueva postulación recibida', mensaje: 'Martín Gómez se postuló a "Pasante en Desarrollo Frontend (React)".', tipoVisual: 'success', accionURL: `/empresa/postulantes/${ofertas.frontend.id}`, leida: true, createdAt: daysAgo(12, 11) });
-  await notif({ usuarioId: reclutador.id, tipo: 'chat', titulo: 'Nuevo mensaje de Martín Gómez', mensaje: 'Confirmó la entrevista técnica del jueves.', accionURL: '/chat', createdAt: daysAgo(7, 18) });
-  await notif({ usuarioId: reclutador.id, tipo: 'postulacion', titulo: 'Nueva postulación recibida', mensaje: 'Martín Gómez se postuló a "Pasante en Desarrollo Backend (Node.js)".', tipoVisual: 'success', accionURL: `/empresa/postulantes/${ofertas.backend.id}`, createdAt: daysAgo(5, 11) });
-  await notif({ usuarioId: reclutador.id, tipo: 'postulacion', titulo: 'Nueva postulación recibida', mensaje: 'Camila Ortiz se postuló a "Pasante en Desarrollo Backend (Node.js)".', tipoVisual: 'success', accionURL: `/empresa/postulantes/${ofertas.backend.id}`, createdAt: daysAgo(4, 11) });
-  await notif({ usuarioId: reclutador.id, tipo: 'oferta', titulo: 'Tu oferta está pendiente de moderación', mensaje: '"Pasante en Análisis de Datos" fue enviada y espera la aprobación del administrador del sistema.', accionURL: '/empresa', createdAt: daysAgo(2, 10) });
+  await notif({ usuarioId: reclutador.id, tipo: 'oferta', titulo: '✅ Tu oferta fue aprobada', mensaje: `La oferta "${FRONTEND}" fue aprobada y está publicada.`, tipoVisual: 'success', accionURL: '/empresa', leida: true, createdAt: daysAgo(24, 13) });
+  await notif({ usuarioId: reclutador.id, tipo: 'oferta', titulo: '✅ Tu oferta fue aprobada', mensaje: `La oferta "${ofertas.backend.titulo}" fue aprobada y está publicada.`, tipoVisual: 'success', accionURL: '/empresa', leida: true, createdAt: daysAgo(17, 13) });
+  await notif({ usuarioId: reclutador.id, tipo: 'postulacion', titulo: 'Nueva postulación recibida', mensaje: `Martín Gómez se postuló a "${ofertas.backend.titulo}".`, tipoVisual: 'success', accionURL: `/empresa/postulantes/${ofertas.backend.id}`, leida: true, createdAt: daysAgo(16, 11) });
+  await notif({ usuarioId: reclutador.id, tipo: 'postulacion', titulo: 'Nueva postulación recibida', mensaje: `Martín Gómez se postuló a "${FRONTEND}".`, tipoVisual: 'success', accionURL: `/empresa/postulantes/${ofertas.frontend.id}`, leida: true, createdAt: daysAgo(14, 11) });
+  await notif({ usuarioId: reclutador.id, tipo: 'chat', titulo: 'Nuevo mensaje de Martín Gómez', mensaje: 'Confirmó la entrevista técnica del jueves.', accionURL: '/chat', leida: true, createdAt: daysAgo(9, 13) });
+  await notif({ usuarioId: reclutador.id, tipo: 'postulacion', titulo: 'Nueva postulación recibida', mensaje: `Nicolás Duarte se postuló a "${FRONTEND}".`, tipoVisual: 'success', accionURL: `/empresa/postulantes/${ofertas.frontend.id}`, createdAt: daysAgo(6, 11) });
+  await notif({ usuarioId: reclutador.id, tipo: 'postulacion', titulo: 'Nueva postulación recibida', mensaje: `Camila Ortiz se postuló a "${ofertas.backend.titulo}".`, tipoVisual: 'success', accionURL: `/empresa/postulantes/${ofertas.backend.id}`, createdAt: daysAgo(4, 11) });
+  await notif({ usuarioId: reclutador.id, tipo: 'chat', titulo: 'Nuevo mensaje de Martín Gómez', mensaje: 'Respondió sobre su incorporación a Frontend.', accionURL: '/chat', createdAt: daysAgo(4, 19) });
 
   // 9d. Reclutadora (Lucía) — operación de SUS ofertas
   await notif({ usuarioId: reclutadora2.id, tipo: 'sistema', titulo: 'Te sumaron al equipo', mensaje: 'Ahora sos parte del equipo de Delta Innovación IT como reclutadora. Ya podés crear ofertas y gestionar candidatos.', tipoVisual: 'success', accionURL: '/empresa', leida: true, createdAt: daysAgo(38, 10) });
   await notif({ usuarioId: reclutadora2.id, tipo: 'oferta', titulo: 'Se te asignó una oferta', mensaje: 'Ahora sos responsable de "Trainee en QA y Automatización de Pruebas".', accionURL: `/empresa/postulantes/${ofertas.qa.id}`, leida: true, createdAt: daysAgo(21, 15) });
-  await notif({ usuarioId: reclutadora2.id, tipo: 'postulacion', titulo: 'Nueva postulación recibida', mensaje: 'Martín Gómez se postuló a "Trainee en QA y Automatización de Pruebas".', tipoVisual: 'success', accionURL: `/empresa/postulantes/${ofertas.qa.id}`, leida: true, createdAt: daysAgo(20, 11) });
+  await notif({ usuarioId: reclutadora2.id, tipo: 'postulacion', titulo: 'Nueva postulación recibida', mensaje: 'Agustín Molina se postuló a "Trainee en QA y Automatización de Pruebas".', tipoVisual: 'success', accionURL: `/empresa/postulantes/${ofertas.qa.id}`, leida: true, createdAt: daysAgo(19, 11) });
+  await notif({ usuarioId: reclutadora2.id, tipo: 'chat', titulo: 'Nuevo mensaje de Agustín Molina', mensaje: 'Confirmó la entrevista del martes para QA.', accionURL: '/chat', leida: true, createdAt: daysAgo(13, 13) });
   await notif({ usuarioId: reclutadora2.id, tipo: 'postulacion', titulo: 'Nueva postulación recibida', mensaje: 'Nicolás Duarte se postuló a "Trainee en QA y Automatización de Pruebas".', tipoVisual: 'success', accionURL: `/empresa/postulantes/${ofertas.qa.id}`, createdAt: daysAgo(9, 11) });
-  await notif({ usuarioId: reclutadora2.id, tipo: 'chat', titulo: 'Nuevo mensaje de Agustín Molina', mensaje: 'Confirmó la entrevista del martes para QA.', accionURL: '/chat', createdAt: daysAgo(9, 13) });
+  await notif({ usuarioId: reclutadora2.id, tipo: 'chat', titulo: 'Nuevo mensaje de Agustín Molina', mensaje: 'Respondió sobre el inicio de la pasantía de QA.', accionURL: '/chat', createdAt: daysAgo(6, 16) });
   await notif({ usuarioId: reclutadora2.id, tipo: 'oferta', titulo: 'Oferta próxima a vencer', mensaje: '"Trainee en QA y Automatización de Pruebas" cierra en 5 días. Revisá las postulaciones pendientes.', tipoVisual: 'warning', prioridad: 'alta', accionURL: '/empresa', createdAt: daysAgo(1, 9) });
 
   // 10. ACTIVITY LOGS (auditoría) ──────────────────────────────────────────
@@ -994,19 +1054,35 @@ async function sembrar(transaction) {
   await log({ usuarioId: reclutador.id, accion: 'crear_oferta', entidad: 'oferta', entidadId: ofertas.ux.id, detalle: { titulo: ofertas.ux.titulo }, createdAt: daysAgo(43, 9) });
   await log({ usuarioId: reclutadora2.id, accion: 'login', entidad: 'usuario', entidadId: reclutadora2.id, createdAt: daysAgo(38, 11) });
   await log({ usuarioId: reclutadora2.id, accion: 'crear_oferta', entidad: 'oferta', entidadId: ofertas.soporte.id, detalle: { titulo: ofertas.soporte.titulo }, createdAt: daysAgo(35, 9) });
-  await log({ usuarioId: reclutador.id, accion: 'crear_oferta', entidad: 'oferta', entidadId: ofertas.frontend.id, detalle: { titulo: ofertas.frontend.titulo }, createdAt: daysAgo(25, 9) });
+  await log({ usuarioId: reclutador.id, accion: 'crear_oferta', entidad: 'oferta', entidadId: ofertas.frontend.id, detalle: { titulo: FRONTEND }, createdAt: daysAgo(25, 9) });
   // QA la publicó Diego y al día siguiente Carolina se la reasignó a Lucía
   // (acción de gobierno del admin_empresa — queda auditada).
   await log({ usuarioId: reclutador.id, accion: 'crear_oferta', entidad: 'oferta', entidadId: ofertas.qa.id, detalle: { titulo: ofertas.qa.titulo }, createdAt: daysAgo(22, 9) });
   await log({ usuarioId: empAdmin.id, accion: 'reasignar_responsable_oferta', entidad: 'oferta', entidadId: ofertas.qa.id, detalle: { empresaId: empresa.id, responsableAnteriorId: reclutador.id, responsableNuevoId: reclutadora2.id }, createdAt: daysAgo(21, 15) });
   await log({ usuarioId: reclutador.id, accion: 'crear_oferta', entidad: 'oferta', entidadId: ofertas.backend.id, detalle: { titulo: ofertas.backend.titulo }, createdAt: daysAgo(18, 9) });
   await log({ usuarioId: reclutador.id, accion: 'crear_oferta', entidad: 'oferta', entidadId: ofertas.datos.id, detalle: { titulo: ofertas.datos.titulo }, createdAt: daysAgo(2, 10) });
-  await log({ usuarioId: alumno.id, accion: 'login', entidad: 'usuario', entidadId: alumno.id, detalle: { rol: 'alumno' }, createdAt: daysAgo(20, 20) });
-  await log({ usuarioId: alumno.id, accion: 'postular', entidad: 'oferta', entidadId: ofertas.qa.id, detalle: { titulo: ofertas.qa.titulo }, createdAt: daysAgo(20, 11) });
-  await log({ usuarioId: alumno.id, accion: 'postular', entidad: 'oferta', entidadId: ofertas.frontend.id, detalle: { titulo: ofertas.frontend.titulo }, createdAt: daysAgo(12, 11) });
-  await log({ usuarioId: alumno.id, accion: 'postular', entidad: 'oferta', entidadId: ofertas.backend.id, detalle: { titulo: ofertas.backend.titulo }, createdAt: daysAgo(5, 11) });
-  await log({ usuarioId: reclutador.id, accion: 'cambiar_estado_postulacion', entidad: 'postulacion', detalle: { oferta: ofertas.frontend.titulo, candidato: 'Martín Gómez', de: 'preseleccionado', a: 'entrevista' }, createdAt: daysAgo(8, 12) });
-  await log({ usuarioId: reclutadora2.id, accion: 'cambiar_estado_postulacion', entidad: 'postulacion', detalle: { oferta: ofertas.qa.titulo, candidato: 'Martín Gómez', de: 'entrevista', a: 'contratado' }, createdAt: daysAgo(14, 10) });
+  // Postulaciones y cambios de estado: mismo formato que postulacion.controller.js.
+  const postularLog = (usuario, post, oferta, createdAt) => log({
+    usuarioId: usuario.id, accion: 'postular', entidad: 'postulacion', entidadId: post.id,
+    detalle: { ofertaId: oferta.id, ofertaTitulo: oferta.titulo, empresa: RAZON_SOCIAL }, createdAt,
+  });
+  const cambioLog = (usuario, post, oferta, nuevoEstado, createdAt) => log({
+    usuarioId: usuario.id, accion: 'cambiar_estado_postulacion', entidad: 'postulacion', entidadId: post.id,
+    detalle: { nuevoEstado, oferta: oferta.titulo }, createdAt,
+  });
+  const agustin = poolAlumnos[7];
+  const postAgustinQa = postPool['8-qa'];
+
+  await log({ usuarioId: alumno.id, accion: 'login', entidad: 'usuario', entidadId: alumno.id, detalle: { rol: 'alumno' }, createdAt: daysAgo(14, 10) });
+  await postularLog(alumno, postMartinBackend, ofertas.backend, daysAgo(16, 11));
+  // Historia principal: Martín → Frontend, gestionado por Diego hasta contratado.
+  await postularLog(alumno, postMartinFrontend, ofertas.frontend, daysAgo(14, 11));
+  await cambioLog(reclutador, postMartinFrontend, ofertas.frontend, 'preseleccionado', daysAgo(12, 10));
+  await cambioLog(reclutador, postMartinFrontend, ofertas.frontend, 'entrevista', daysAgo(9, 10));
+  await cambioLog(reclutador, postMartinFrontend, ofertas.frontend, 'contratado', daysAgo(5, 9));
+  // Contratación de QA: Agustín, gestionado por Lucía.
+  await postularLog(agustin, postAgustinQa, ofertas.qa, daysAgo(19, 11));
+  await cambioLog(reclutadora2, postAgustinQa, ofertas.qa, 'contratado', daysAgo(6, 9));
   await log({ usuarioId: empAdmin.id, accion: 'login', entidad: 'usuario', entidadId: empAdmin.id, detalle: { rol: 'empresa' }, createdAt: daysAgo(1, 17) });
   await log({ usuarioId: empAdmin.id, accion: 'cerrar_oferta', entidad: 'oferta', entidadId: ofertas.ux.id, detalle: { titulo: ofertas.ux.titulo, motivo: 'Vacante cubierta' }, createdAt: daysAgo(20, 15) });
 
@@ -1142,6 +1218,7 @@ module.exports = {
   RECLUTA_2,
   SOLICITUD_RECLUTADOR_PENDIENTE,
   RAZON_SOCIAL,
+  HISTORIA_PRINCIPAL,
   LOGIN_EMAILS,
   CANDIDATO_EMAILS,
   OUR_EMAILS,
@@ -1175,7 +1252,7 @@ if (require.main === module) {
       console.log(`  Empresa:        ${r.empresa} (aprobada, nivel de confianza estándar) — CUIT ${EMPRESA_CUIT}`);
       console.log(`  Equipo:         1 cuenta administradora + ${r.reclutadores} reclutadores activos (Diego Herrera y Lucía Ferrari)`);
       console.log(`  Ofertas:        ${r.ofertas} (6 con reclutador responsable + 1 histórica sin responsable, a propósito)`);
-      console.log(`  Postulaciones:  ${r.postulaciones} (4 del alumno demo + 12 de candidatos sintéticos, en todo el embudo)`);
+      console.log(`  Postulaciones:  ${r.postulaciones} (3 del alumno demo + 13 de candidatos sintéticos, en todo el embudo)`);
       console.log(`  Candidatos:     ${r.candidatos} usuarios sintéticos candidatoNN@demo.invalid (sin login en LoginPage)`);
       console.log(`  Chats:          ${r.conversaciones} conversaciones (${r.mensajes} mensajes) — equipo y reclutador ↔ candidato`);
       console.log(`  Notificaciones: ${r.notificaciones}`);

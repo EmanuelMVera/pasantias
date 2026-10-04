@@ -2,7 +2,9 @@
  * EquipoPage.jsx — Equipo de la empresa.
  *
  * Ruta: /empresa/equipo  (`?tab=solicitudes` abre la segunda pestaña)
- * Acceso: el administrador de empresa gestiona; el reclutador solo ve.
+ * Acceso: SOLO el administrador de empresa (gobierno del equipo). El guard
+ * `SoloAdminEmpresa` de App.jsx redirige al reclutador a /empresa, y el
+ * backend sigue exigiendo admin_empresa en cada acción de gestión.
  *
  * Estructura:
  *   - Resumen: reclutadores activos · suspendidos · solicitudes pendientes.
@@ -86,12 +88,12 @@ const CONFIRMACIONES = {
 };
 
 export default function EquipoPage() {
-  const { esAdminEmpresa, empresa } = useEmpresa();
+  const { empresa } = useEmpresa();
   const esTabla = useMediaQuery('(min-width: 768px)');
   const { toast, showToast } = useToast(4500);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = searchParams.get('tab') === 'solicitudes' && esAdminEmpresa ? 'solicitudes' : 'miembros';
+  const tab = searchParams.get('tab') === 'solicitudes' ? 'solicitudes' : 'miembros';
   const setTab = (t) => setSearchParams(t === 'miembros' ? {} : { tab: t }, { replace: true });
 
   const [equipo,      setEquipo]      = useState([]);
@@ -109,13 +111,10 @@ export default function EquipoPage() {
     try {
       const equipoRes = await empresaService.getEquipo();
       setEquipo(equipoRes.data.data ?? []);
-      // Las solicitudes son solo del admin_empresa (el backend responde 403 al resto).
-      if (equipoRes.data.rolEnEquipo === 'admin_empresa') {
-        try {
-          const solRes = await empresaService.getMisSolicitudesReclutador();
-          setSolicitudes(solRes.data.data ?? []);
-        } catch { /* secundario: no bloquea la pantalla */ }
-      }
+      try {
+        const solRes = await empresaService.getMisSolicitudesReclutador();
+        setSolicitudes(solRes.data.data ?? []);
+      } catch { /* secundario: no bloquea la pantalla */ }
       setError('');
     } catch {
       setError('No se pudo cargar el equipo. Intentá de nuevo.');
@@ -180,28 +179,15 @@ export default function EquipoPage() {
     <li key={m.id} className={`${styles.miembro} ${m.activo ? '' : styles.miembroSuspendido}`}>
       <Avatar src={m.usuario?.fotoPerfil} nombre={m.usuario?.nombre} apellido={m.usuario?.apellido} size={42} />
       <div className={styles.miembroInfo}>
-        {/* El reclutador consulta: el nombre abre la ficha de su compañero. */}
-        {esAdminEmpresa || !m.usuario?.id ? (
-          <span className={styles.miembroNombre}>{nombreDe(m)}</span>
-        ) : (
-          <Link to={`/reclutador/${m.usuario.id}`} className={`${styles.miembroNombre} ${styles.miembroLink}`}>
-            {nombreDe(m)}
-          </Link>
-        )}
+        <span className={styles.miembroNombre}>{nombreDe(m)}</span>
         <span className={styles.miembroDato}>{m.usuario?.email}</span>
-        {esAdminEmpresa && (
-          <span className={styles.miembroDato}>Último acceso: {formatFecha(m.usuario?.ultimoAcceso)}</span>
-        )}
+        <span className={styles.miembroDato}>Último acceso: {formatFecha(m.usuario?.ultimoAcceso)}</span>
       </div>
       <div className={styles.miembroEstado}>
         <span className="badge badge-tone-blue">Reclutador</span>
-        {esAdminEmpresa && (
-          <span className={`badge badge-tone-${m.activo ? 'green' : 'red'}`}>{m.activo ? 'Activo' : 'Suspendido'}</span>
-        )}
+        <span className={`badge badge-tone-${m.activo ? 'green' : 'red'}`}>{m.activo ? 'Activo' : 'Suspendido'}</span>
       </div>
-      {esAdminEmpresa && (
-        <ActionMenu label={`Acciones para ${nombreDe(m)}`} items={accionesDe(m)} />
-      )}
+      <ActionMenu label={`Acciones para ${nombreDe(m)}`} items={accionesDe(m)} />
     </li>
   );
 
@@ -218,9 +204,7 @@ export default function EquipoPage() {
                 Responsable: <strong>{nombreDe(cuentaAdmin)}</strong>
               </span>
               <span className={styles.miembroDato}>{cuentaAdmin.usuario?.email}</span>
-              {esAdminEmpresa && (
-                <span className={styles.miembroDato}>Último acceso: {formatFecha(cuentaAdmin.usuario?.ultimoAcceso)}</span>
-              )}
+              <span className={styles.miembroDato}>Último acceso: {formatFecha(cuentaAdmin.usuario?.ultimoAcceso)}</span>
             </div>
           </div>
         </Card>
@@ -233,14 +217,11 @@ export default function EquipoPage() {
       >
         {reclutadores.length === 0 ? (
           <EmptyState iconName="userPlus" title="Todavía no hay reclutadores en el equipo.">
-            {esAdminEmpresa && (
-              <button type="button" className="btn-primary" onClick={() => setModalAlta(true)}>{textoAlta}</button>
-            )}
+            <button type="button" className="btn-primary" onClick={() => setModalAlta(true)}>{textoAlta}</button>
           </EmptyState>
         ) : (
           <ul className={styles.lista}>
-            {/* El reclutador ve a sus compañeros activos; los suspendidos son gestión del administrador. */}
-            {(esAdminEmpresa ? [...activos, ...suspendidos] : activos).map(filaReclutador)}
+            {[...activos, ...suspendidos].map(filaReclutador)}
           </ul>
         )}
       </Card>
@@ -303,11 +284,9 @@ export default function EquipoPage() {
       <Toast toast={toast} />
 
       <PageHeader
-        title={esAdminEmpresa ? 'Equipo' : `Equipo de ${empresa?.razonSocial ?? 'la empresa'}`}
-        subtitle={esAdminEmpresa
-          ? 'Gestioná las personas con acceso al espacio de tu empresa.'
-          : 'Las personas que trabajan en el espacio de la empresa.'}
-        actions={esAdminEmpresa && (
+        title="Equipo"
+        subtitle="Gestioná las personas con acceso al espacio de tu empresa."
+        actions={(
           <button type="button" className="btn-primary" onClick={() => setModalAlta(true)} id="btn-nuevo-miembro">
             <Icon name="userPlus" size={18} />
             {textoAlta}
@@ -323,33 +302,26 @@ export default function EquipoPage() {
         </div>
       ) : !error && (
         <>
-          {/* Los indicadores son de gestión: solo para el administrador de empresa. */}
-          {esAdminEmpresa && (
-            <div className={styles.resumen}>
-              <StatCard compact iconName="users" tone="green" label="Reclutadores activos" value={activos.length} />
-              <StatCard compact iconName="pause" tone="neutral" label="Suspendidos" value={suspendidos.length} />
-              <StatCard compact iconName="clock" tone="orange" label="Solicitudes pendientes" value={pendientes.length} />
-            </div>
-          )}
+          <div className={styles.resumen}>
+            <StatCard compact iconName="users" tone="green" label="Reclutadores activos" value={activos.length} />
+            <StatCard compact iconName="pause" tone="neutral" label="Suspendidos" value={suspendidos.length} />
+            <StatCard compact iconName="clock" tone="orange" label="Solicitudes pendientes" value={pendientes.length} />
+          </div>
 
-          {esAdminEmpresa ? (
-            <>
-              <Tabs
-                idPrefix="equipo"
-                ariaLabel="Secciones del equipo"
-                stretch
-                value={tab}
-                onChange={setTab}
-                tabs={[
-                  { key: 'miembros', label: 'Miembros', icon: 'users' },
-                  { key: 'solicitudes', label: 'Solicitudes', icon: 'inbox', count: pendientes.length || undefined, alerta: true },
-                ]}
-              />
-              <TabPanel idPrefix="equipo" tabKey={tab}>
-                {tab === 'miembros' ? panelMiembros : panelSolicitudes}
-              </TabPanel>
-            </>
-          ) : panelMiembros}
+          <Tabs
+            idPrefix="equipo"
+            ariaLabel="Secciones del equipo"
+            stretch
+            value={tab}
+            onChange={setTab}
+            tabs={[
+              { key: 'miembros', label: 'Miembros', icon: 'users' },
+              { key: 'solicitudes', label: 'Solicitudes', icon: 'inbox', count: pendientes.length || undefined, alerta: true },
+            ]}
+          />
+          <TabPanel idPrefix="equipo" tabKey={tab}>
+            {tab === 'miembros' ? panelMiembros : panelSolicitudes}
+          </TabPanel>
         </>
       )}
 

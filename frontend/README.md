@@ -33,7 +33,7 @@ src/
 ├── pages/
 │   ├── auth/             LoginPage, ForgotPasswordPage, ResetPasswordPage, SolicitudEmpresaPage
 │   ├── alumno/           Dashboard, OfertasPage, OfertaDetallePage, MisPostulacionesPage, PerfilPage, PerfilPublicoPage
-│   ├── empresa/          EmpresaInicioPage (admin_empresa → EmpresaResumenPage, reclutador → ReclutadorInicioPage), OfertasEmpresaPage (admin_empresa → EmpresaOfertasPage, reclutador → MisOfertasPage), ReclutadorPerfilPage (/reclutador/:usuarioId), CrearOfertaPage, PostulantesMiOfertaPage, EquipoPage, MiEmpresaPage, CandidatosEmpresaPage, SeguridadPage
+│   ├── empresa/          EmpresaInicioPage (admin_empresa → EmpresaResumenPage, reclutador → ReclutadorInicioPage), OfertasEmpresaPage (admin_empresa → EmpresaOfertasPage, reclutador → MisOfertasPage), ReclutadorPerfilPage (/reclutador/:usuarioId), CrearOfertaPage, PostulantesMiOfertaPage, EquipoPage (solo admin_empresa), MiEmpresaPage, CandidatosEmpresaPage, SeguridadPage
 │   ├── admin/            AdminDashboardPage, AdminUsuariosPage, AdminOfertasPage, AdminSolicitudesPage, AdminLogsPage
 │   ├── HomePage.jsx      Landing pública
 │   ├── ChatPage.jsx      Mensajería
@@ -79,6 +79,15 @@ src/
   (`admin_empresa` / `reclutador`) una vez por sesión para **decidir qué mostrar**
   (botones de gestión de equipo, edición del perfil de empresa…). No es autoridad
   de permisos — el backend siempre revalida con `authorizeEmpresaRoles`.
+- **Guards de rol interno** (`App.jsx`, UX sobre la autoridad del backend):
+  `SoloReclutador` (crear / editar ofertas), `SoloAdminEmpresa` (`/empresa/equipo`)
+  y `MiEmpresaPorRol` (el reclutador va al perfil público de su empresa). Cada uno
+  redirige a `/empresa` a quien no corresponde.
+- **Reclutador = workspace operativo personal; no administra el equipo.**
+  `ReclutadorNav`: Inicio · Mis ofertas · Candidatos + "+ Nueva oferta" (única
+  acción global de creación: las páginas no la repiten en su cabecera y se oculta
+  mientras se crea / edita una oferta). Menú de usuario: Ver empresa y Seguridad de
+  mi cuenta. **Admin empresa = gobierno y supervisión del equipo** (`EmpresaShell`).
 
 Rutas públicas (sin login): `/`, `/login`, `/registro-empresa`, `/forgot-password`,
 `/reset-password/:token`, y el listado/detalle de ofertas a nivel API.
@@ -112,8 +121,10 @@ Matriz de permisos completa: [`../docs/ROLES-Y-PERMISOS.md`](../docs/ROLES-Y-PER
 | `npm run preview` | Sirve el `dist/` para probarlo |
 | `npm run lint` | ESLint sobre todo `src/` — **debe pasar** (gate de CI) |
 
-No hay tests unitarios de frontend; la cobertura end-to-end la dan los smoke tests
-de Playwright en [`../e2e/`](../e2e/) (levantan front + back reales).
+No hay tests unitarios de frontend; la cobertura end-to-end la dan los tests de
+Playwright en [`../e2e/`](../e2e/) (levantan front + back reales). En CI corren solo
+a mano (Actions → CI → Run workflow); en local, `npm run e2e` desde la raíz, o un
+spec/grep concreto: `npm run e2e -- e2e/reclutador.spec.js -g "texto"`.
 
 ---
 

@@ -157,7 +157,7 @@ La **matriz de permisos completa** (qué puede hacer cada rol) está en
 |---|---|
 | `npm run dev` | Backend + frontend en paralelo (`concurrently`) |
 | `npm run install:all` | Instala dependencias de raíz, backend y frontend |
-| `npm run e2e` | Corre los smoke tests E2E de Playwright (levanta back+front, siembra una base dedicada) |
+| `npm run e2e` | Corre la suite E2E de Playwright (levanta back+front, siembra una base dedicada). Acepta filtros: `npm run e2e -- e2e/reclutador.spec.js -g "texto"` |
 | `npm run e2e:ui` | Playwright en modo UI (debug) |
 | `npm run e2e:report` | Abre el último reporte HTML de Playwright |
 | `npm run e2e:seed` | Solo re-crea y siembra la base E2E |
@@ -214,9 +214,21 @@ salvo `ENABLE_API_DOCS=true`.
 | **E2E** | `npm run e2e` (raíz) | 13 flujos críticos de 4 roles en un navegador real (Playwright + Chromium). Base **dedicada** `pasantias_db_e2e`, recreada en cada corrida. Ver [`e2e/`](e2e/) y `backend/README.md` §Tests E2E. |
 | **Lint / build front** | `cd frontend && npm run lint && npm run build` | ESLint + compilación. |
 
-Los tres corren en CI en cada push a `main` y en cada PR
-([`.github/workflows/ci.yml`](.github/workflows/ci.yml)), más el chequeo de
-reversibilidad de migraciones y el drift de `schema.sql`.
+En CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)), en cada push a
+`main` y en cada PR corren **backend** (tests + reversibilidad de migraciones +
+drift de `schema.sql` + spec OpenAPI) y **lint / build del frontend**.
+
+La suite **E2E completa no corre en cada push** (tarda y consume muchos recursos).
+Se ejecuta a mano, como regresión completa antes de una presentación o release:
+
+- **Local:** `npm run e2e` (raíz).
+- **GitHub:** Actions → workflow **CI** → **Run workflow** (`workflow_dispatch`): corre
+  backend, frontend y el job `e2e`.
+
+Durante el desarrollo, correr solo los tests relacionados con el cambio (p. ej.
+`cd backend && npx jest tests/reclutadorScope.test.js`, o
+`npm run e2e -- e2e/reclutador.spec.js -g "Mis ofertas"`: los argumentos extra pasan
+a `playwright test`, y la base E2E se prepara igual).
 
 ---
 

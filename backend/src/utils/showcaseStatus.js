@@ -14,7 +14,10 @@
  *   - ninguna postulación es anterior a su oferta, y el historial de estados
  *     termina en el estado actual;
  *   - ningún usuario con rol admin en los namespaces ficticios;
- *   - hay empresas de confianza y ofertas de publicación automática.
+ *   - hay empresas de confianza y ofertas de publicación automática;
+ *   - la HISTORIA PRINCIPAL de la demo (Diego → Frontend → Martín → contratado)
+ *     está completa: responsable, estado, historial en orden, chat posterior a
+ *     la entrevista, y Diego y Lucía con trabajo propio (revisarHistoriaPrincipal).
  *
  * Uso:
  *   npm run db:seed:showcase:status
@@ -37,7 +40,7 @@ const {
 } = require('../models');
 const {
   escenarioExiste, EMP_ADMIN, RECLUTA, RECLUTA_2, ALUMNO,
-  RAZON_SOCIAL, LOGIN_EMAILS, CANDIDATO_EMAILS, OUR_EMAILS,
+  RAZON_SOCIAL, LOGIN_EMAILS, CANDIDATO_EMAILS, OUR_EMAILS, HISTORIA_PRINCIPAL,
 } = require('./seedPresentacion');
 const { DOMINIO, CUIT_PREFIJO } = require('./seedInstitucional');
 
@@ -127,6 +130,87 @@ const notifsNuevaPostulacion = (userIds) => (userIds.length
   ? Notificacion.count({ where: { usuarioId: { [Op.in]: userIds }, titulo: TITULO_NUEVA_POSTULACION } })
   : 0);
 
+/**
+ * Historia principal de la demo (HISTORIA_PRINCIPAL en seedPresentacion.js):
+ * Diego → Frontend → Martín → contratado. Checks semánticos, no solo conteos.
+ * Solo SELECT/COUNT.
+ */
+async function revisarHistoriaPrincipal({ check, empresa, membresias, ofertas, postulaciones, ids }) {
+  const { diegoId, luciaId, alumnoId, adminId } = ids;
+  const delta = (m) => m.usuarioId === diegoId && m.rolInterno === 'reclutador' && m.activo;
+  check(Boolean(diegoId) && membresias.some(delta), 'Historia: Diego Herrera es reclutador activo de Delta');
+
+  const frontend = await Oferta.findOne({
+    where: { empresaId: empresa.id, titulo: HISTORIA_PRINCIPAL.ofertaTitulo },
+    attributes: ['id', 'creadaPorUsuarioId'],
+    raw: true,
+  });
+  check(Boolean(frontend) && frontend.creadaPorUsuarioId === diegoId,
+    `Historia: "${HISTORIA_PRINCIPAL.ofertaTitulo}" pertenece a Diego`);
+
+  const post = frontend && alumnoId
+    ? postulaciones.find((p) => p.ofertaId === frontend.id && p.usuarioId === alumnoId)
+    : null;
+  check(Boolean(post), 'Historia: Martín está postulado a Frontend');
+  check(post?.estado === 'contratado', `Historia: estado actual de Martín en Frontend = ${post?.estado ?? 'sin postulación'}`);
+
+  const historial = post
+    ? await PostulacionHistorialEstado.findAll({
+      where: { postulacionId: post.id },
+      attributes: ['estadoAnterior', 'estadoNuevo', 'createdAt'],
+      order: [['createdAt', 'ASC'], ['id', 'ASC']],
+      raw: true,
+    })
+    : [];
+  const cadena = historial.map((h) => h.estadoNuevo);
+  const encadenado = historial.every((h, i) => (i === 0 ? h.estadoAnterior === null : h.estadoAnterior === cadena[i - 1]));
+  const posteriorAPostular = post ? historial.every((h) => new Date(h.createdAt) >= new Date(post.createdAt)) : false;
+  check(cadena.join('>') === HISTORIA_PRINCIPAL.cadena.join('>') && encadenado && posteriorAPostular,
+    `Historia: historial de Martín/Frontend = ${cadena.join(' → ') || 'vacío'}`);
+
+  const entreDiegoYMartin = diegoId && alumnoId
+    ? {
+      [Op.or]: [
+        { emisorId: diegoId, receptorId: alumnoId },
+        { emisorId: alumnoId, receptorId: diegoId },
+      ],
+    }
+    : null;
+  const contratadoEn = historial.find((h) => h.estadoNuevo === 'contratado')?.createdAt;
+  const [chatDiegoMartin, mensajesPosteriores] = await Promise.all([
+    entreDiegoYMartin ? Mensaje.count({ where: entreDiegoYMartin }) : 0,
+    entreDiegoYMartin && contratadoEn
+      ? Mensaje.count({ where: { ...entreDiegoYMartin, createdAt: { [Op.gt]: contratadoEn } } })
+      : 0,
+  ]);
+  check(chatDiegoMartin > 0, `Historia: chat Diego ↔ Martín: ${chatDiegoMartin} mensaje/s`);
+  check(mensajesPosteriores > 0, `Historia: mensajes Diego ↔ Martín posteriores a la entrevista (tras la contratación): ${mensajesPosteriores}`);
+
+  const contratacionesMartin = postulaciones.filter((p) => p.usuarioId === alumnoId && p.estado === 'contratado').length;
+  check(contratacionesMartin === 1, `Historia: Martín contratado en una sola oferta: ${contratacionesMartin}`);
+
+  // Workspace de Diego: trabajo propio suficiente para la demo.
+  const deDiego = ofertas.filter((o) => o.creadaPorUsuarioId === diegoId);
+  const idsDiego = new Set(deDiego.map((o) => o.id));
+  const candidatosDiego = postulaciones.filter((p) => idsDiego.has(p.ofertaId)).length;
+  const [notifDiego, notifOperativasAdmin, chatAdminMartin] = await Promise.all([
+    diegoId ? notifsNuevaPostulacion([diegoId]) : 0,
+    adminId ? Notificacion.count({ where: { usuarioId: adminId, tipo: { [Op.in]: ['postulacion', 'estado'] } } }) : 0,
+    mensajesEntre([adminId].filter(Boolean), [alumnoId].filter(Boolean)),
+  ]);
+  check(deDiego.some((o) => o.estado === 'activa'), `Diego: ofertas activas: ${deDiego.filter((o) => o.estado === 'activa').length}`);
+  check(candidatosDiego > 0, `Diego: candidatos en sus ofertas: ${candidatosDiego}`);
+  check(notifDiego > 0, `Diego: notificaciones "nueva postulación": ${notifDiego}`);
+  check(notifOperativasAdmin === 0, `Notificaciones operativas de postulaciones al admin_empresa: ${notifOperativasAdmin}`);
+  check(chatAdminMartin === 0, `Chat admin_empresa ↔ Martín: ${chatAdminMartin}`);
+
+  // Lucía conserva sus propios procesos.
+  const deLucia = new Set(ofertas.filter((o) => o.creadaPorUsuarioId === luciaId).map((o) => o.id));
+  const candidatosLucia = postulaciones.filter((p) => deLucia.has(p.ofertaId)).length;
+  check(Boolean(luciaId) && deLucia.size > 0 && candidatosLucia > 0,
+    `Lucía: ${deLucia.size} oferta/s propias con ${candidatosLucia} candidato/s`);
+}
+
 // ── Presentación ────────────────────────────────────────────────────────────
 
 async function diagnosticarPresentacion() {
@@ -161,7 +245,7 @@ async function diagnosticarPresentacion() {
   const postulaciones = ofertas.length
     ? await Postulacion.findAll({
       where: { ofertaId: { [Op.in]: ofertas.map((o) => o.id) } },
-      attributes: ['id', 'ofertaId', 'estado', 'createdAt'],
+      attributes: ['id', 'ofertaId', 'usuarioId', 'estado', 'createdAt'],
       raw: true,
     })
     : [];
@@ -239,6 +323,11 @@ async function diagnosticarPresentacion() {
   check(notifReclutadores > 0, `Notificación "nueva postulación" al reclutador: ${notifReclutadores > 0 ? 'existe' : 'no existe'}`);
   check(notifAdmin === 0, `Notificación "nueva postulación" al admin_empresa: ${notifAdmin}`);
   check(adminsIndebidos === 0, `Usuarios con rol admin en el escenario: ${adminsIndebidos}`);
+
+  await revisarHistoriaPrincipal({
+    check, empresa, membresias, ofertas, postulaciones,
+    ids: { diegoId: idDe(RECLUTA.email), luciaId: idDe(RECLUTA_2.email), alumnoId, adminId },
+  });
 
   return { cargado: true, datos, checks };
 }
