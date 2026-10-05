@@ -62,7 +62,7 @@ describe('Cierre del perfil Alumno/Egresado', () => {
     const res = await auth(request(app).put('/api/users/perfil'), token).send({ telefono: '+54 11 1234-5678' });
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({
-      telefono: '+54 11 1234-5678',
+      telefono: '+541112345678',
       nombre: usuario.nombre,
       email: usuario.email,
       rol: 'alumno',

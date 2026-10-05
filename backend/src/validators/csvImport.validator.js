@@ -10,7 +10,7 @@
  *   legajo,nombre,apellido,email,rol,carrera,anioEgreso,telefono,ubicacion
  */
 
-const { esEmailValido } = require('./common.validator');
+const { esEmailValido, normalizarTelefonoAR, normalizarEspacios } = require('./common.validator');
 const { esCarreraValida } = require('../services/catalogo.service');
 const { normalizarLegajo } = require('../utils/legajo');
 
@@ -35,10 +35,10 @@ function validarFilaCsv(filaCruda, regexLegajo) {
   if (!legajo) errores.push('legajo es obligatorio.');
   else if (!regexLegajo.test(legajo)) errores.push('legajo no tiene un formato válido.');
 
-  const nombre = String(filaCruda.nombre || '').trim();
+  const nombre = normalizarEspacios(filaCruda.nombre || '');
   if (!nombre) errores.push('nombre es obligatorio.');
 
-  const apellido = String(filaCruda.apellido || '').trim();
+  const apellido = normalizarEspacios(filaCruda.apellido || '');
   if (!apellido) errores.push('apellido es obligatorio.');
 
   const email = String(filaCruda.email || '').trim().toLowerCase();
@@ -70,7 +70,13 @@ function validarFilaCsv(filaCruda, regexLegajo) {
     }
   }
 
-  const telefono = String(filaCruda.telefono || '').trim() || null;
+  // Teléfono: mismo formato canónico que los formularios (+54 + 10 dígitos).
+  const telefonoCrudo = String(filaCruda.telefono || '').trim();
+  let telefono = null;
+  if (telefonoCrudo) {
+    telefono = normalizarTelefonoAR(telefonoCrudo);
+    if (!telefono) errores.push(`telefono "${telefonoCrudo}" no es un teléfono argentino válido (código de área sin 0 + número sin 15).`);
+  }
   const ubicacion = String(filaCruda.ubicacion || '').trim() || null;
 
   return {

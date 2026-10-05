@@ -1,4 +1,5 @@
 import Modal from '../Modal/Modal';
+import TelefonoArgentinaInput from '../ui/TelefonoArgentinaInput';
 import { PASSWORD_MIN_LENGTH } from '../../utils/passwordStrength';
 import styles from './UsuarioFormModal.module.css';
 
@@ -68,8 +69,12 @@ export default function UsuarioFormModal({
               </select>
             </div>
             <div className="form-group">
-              <label htmlFor="u-telefono">Teléfono</label>
-              <input id="u-telefono" name="telefono" value={form.telefono} onChange={onChange} placeholder="+54 11 1234-5678" />
+              {/* El backend lo guarda canónico (+54 + 10 dígitos). */}
+              <TelefonoArgentinaInput
+                id="u-telefono" label="Teléfono"
+                value={form.telefono ?? ''}
+                onChange={(valor) => onChange({ target: { name: 'telefono', value: valor } })}
+              />
             </div>
           </div>
 

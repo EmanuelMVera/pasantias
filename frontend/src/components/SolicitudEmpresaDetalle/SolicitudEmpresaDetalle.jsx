@@ -1,6 +1,7 @@
 import EstadoSolicitudBadge from '../EstadoSolicitudBadge/EstadoSolicitudBadge';
 import { formatFecha, parseCarreras } from '../EstadoSolicitudBadge/estadoSolicitud.utils';
 import styles from './SolicitudEmpresaDetalle.module.css';
+import { formatearCuitParaVista, formatearTelefonoParaVista } from '../../utils/formatos';
 
 /**
  * Contenido del detalle de una solicitud de empresa. No lleva marco propio: la
@@ -36,11 +37,11 @@ export default function SolicitudEmpresaDetalle({
         <h4 className={styles.detalleSectionTitle}>Empresa</h4>
         <dl className={styles.detalleDL}>
           <dt>Razón Social</dt><dd>{detalle.razonSocial}</dd>
-          <dt>CUIT</dt><dd>{detalle.cuit}</dd>
+          <dt>CUIT</dt><dd>{formatearCuitParaVista(detalle.cuit)}</dd>
           <dt>Rubro</dt><dd>{detalle.rubro || '—'}</dd>
           <dt>Ciudad</dt><dd>{detalle.ciudad || '—'}</dd>
           <dt>Dirección</dt><dd>{detalle.direccion || '—'}</dd>
-          <dt>Teléfono</dt><dd>{detalle.telefono || '—'}</dd>
+          <dt>Teléfono</dt><dd>{formatearTelefonoParaVista(detalle.telefono) || '—'}</dd>
           <dt>Email contacto</dt>
           <dd><a href={`mailto:${detalle.email}`}>{detalle.email}</a></dd>
           {detalle.sitioWeb && (
@@ -74,7 +75,7 @@ export default function SolicitudEmpresaDetalle({
               <><dt>Cargo</dt><dd>{detalle.responsableCargo}</dd></>
             )}
             {detalle.responsableTelefono && (
-              <><dt>Teléfono</dt><dd>{detalle.responsableTelefono}</dd></>
+              <><dt>Teléfono</dt><dd>{formatearTelefonoParaVista(detalle.responsableTelefono)}</dd></>
             )}
           </dl>
         ) : (

@@ -91,7 +91,11 @@ describe('showcase — reset y status', () => {
     // CUIT ficticios pero formalmente válidos (validación matemática, sin AFIP).
     const checks = [...r.status.presentacion.checks, ...r.status.institucional.checks];
     expect(checks.find((c) => /CUIT demo formalmente válido/.test(c.texto)).ok).toBe(true);
-    expect(checks.find((c) => /CUIT formalmente válido: 20\/20/.test(c.texto)).ok).toBe(true);
+    expect(checks.find((c) => /CUIT canónico y formalmente válido: 20\/20/.test(c.texto)).ok).toBe(true);
+    expect(checks.find((c) => /CUIT demo en formato canónico/.test(c.texto)).ok).toBe(true);
+    // Teléfonos de la demo e institucionales guardados en el formato canónico (+54 + 10 dígitos).
+    expect(checks.find((c) => /Teléfonos demo en formato canónico/.test(c.texto)).ok).toBe(true);
+    expect(checks.find((c) => /Teléfonos institucionales en formato canónico/.test(c.texto)).ok).toBe(true);
   });
 
   test('reset: idempotente — dos corridas seguidas dejan los mismos conteos en toda la base', async () => {

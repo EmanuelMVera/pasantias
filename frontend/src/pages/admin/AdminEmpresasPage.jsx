@@ -38,6 +38,7 @@ import Toast from '../../components/ui/Toast';
 import Icon from '../../components/ui/Icon';
 import Paginacion from '../../components/Paginacion/Paginacion';
 import styles from './AdminEmpresasPage.module.css';
+import { formatearCuitParaVista } from '../../utils/formatos';
 
 // Tonos de badge (clases globales .badge-tone-*): el texto siempre acompaña al color.
 const ESTADO_TONO = {
@@ -234,7 +235,7 @@ export default function AdminEmpresasPage() {
                 {empresas.map((e) => (
                   <tr key={e.id}>
                     <td className="cell-break"><strong>{e.razonSocial}</strong></td>
-                    <td className={styles.cuit}>{e.cuit ?? '—'}</td>
+                    <td className={styles.cuit}>{formatearCuitParaVista(e.cuit) || '—'}</td>
                     <td className="cell-break">
                       {nombreResponsable(e)}
                       {e.usuario?.email && <small className={styles.sub}>{e.usuario.email}</small>}
@@ -253,7 +254,7 @@ export default function AdminEmpresasPage() {
                 <DataCard
                   key={e.id}
                   title={e.razonSocial}
-                  subtitle={e.cuit ? `CUIT ${e.cuit}` : undefined}
+                  subtitle={e.cuit ? `CUIT ${formatearCuitParaVista(e.cuit)}` : undefined}
                   badge={<EstadoBadge estado={e.estadoAprobacion} />}
                   fields={[
                     { label: 'Responsable', value: e.usuario ? `${nombreResponsable(e)} · ${e.usuario.email}` : null },

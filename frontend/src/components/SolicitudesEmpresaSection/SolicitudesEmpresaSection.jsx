@@ -6,6 +6,7 @@ import DataCard from '../ui/DataCard';
 import EmptyState from '../ui/EmptyState';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import styles from './SolicitudesEmpresaSection.module.css';
+import { formatearCuitParaVista } from '../../utils/formatos';
 
 /**
  * SolicitudesEmpresaSection.jsx — listado de solicitudes de empresa: tabla
@@ -35,7 +36,7 @@ export default function SolicitudesEmpresaSection({
     );
   }
 
-  const detalleEmpresa = (s) => [s.rubro, s.cuit && `CUIT ${s.cuit}`].filter(Boolean).join(' · ');
+  const detalleEmpresa = (s) => [s.rubro, s.cuit && `CUIT ${formatearCuitParaVista(s.cuit)}`].filter(Boolean).join(' · ');
 
   return (
     <>

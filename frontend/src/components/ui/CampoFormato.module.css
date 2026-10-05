@@ -1,0 +1,55 @@
+/* CampoFormato.module.css — CuitInput y TelefonoArgentinaInput. */
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.telefono {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.prefijo {
+  flex-shrink: 0;
+  padding: 0 0.6rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  border-right: 1px solid var(--border);
+  line-height: 2.2;
+}
+
+/* Ancho fijo para el código de área; el número ocupa el resto. */
+.telefono input.area {
+  flex: 0 0 5.5rem;
+  width: 5.5rem;
+  min-width: 0;
+}
+
+.telefono input.numero {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.ayuda {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.error {
+  margin: 0.15rem 0 0;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--danger-text, #b42318);
+}
+
+.invalido,
+.invalido:focus {
+  border-color: var(--danger, #d92d20) !important;
+}

@@ -46,6 +46,10 @@ const {
 } = require('./seedPresentacion');
 const { DOMINIO, CUIT_PREFIJO } = require('./seedInstitucional');
 const { esCuitValido } = require('../validators/common.validator');
+
+// Formato canónico de persistencia de teléfonos (common.validator::normalizarTelefonoAR).
+const TELEFONO_CANONICO = /^\+54\d{10}$/;
+const CUIT_CANONICO = /^\d{11}$/;
 const { formatearPostulacionAlumno } = require('../services/postulacion.service');
 
 // Lo que el escenario de presentación tiene que tener (ver seedPresentacion.js).
@@ -144,7 +148,11 @@ const nombreDe = (u) => `${u.nombre} ${u.apellido ?? ''}`.trim();
 async function revisarElenco({ check, empresa, membresias, usuarios }) {
   check(Boolean(empresa), `Empresa demo: ${RAZON_SOCIAL}`);
   // Solo validación matemática (dígito verificador), sin consultar a AFIP.
+  check(CUIT_CANONICO.test(EMPRESA_CUIT), `CUIT demo en formato canónico (11 dígitos, sin guiones)`);
   check(esCuitValido(EMPRESA_CUIT), `CUIT demo formalmente válido (${EMPRESA_CUIT})`);
+  const telefonos = usuarios.map((u) => u.telefono).filter(Boolean);
+  const telCanonicos = telefonos.filter((t) => TELEFONO_CANONICO.test(t)).length;
+  check(telCanonicos === telefonos.length, `Teléfonos demo en formato canónico (+54 + 10 dígitos): ${telCanonicos}/${telefonos.length}`);
   const persona = (cuenta) => usuarios.find((u) => u.email === cuenta.email
     && u.nombre === cuenta.nombre && u.apellido === cuenta.apellido);
   const miembro = (cuenta, rolInterno) => {
@@ -282,7 +290,7 @@ async function diagnosticarPresentacion() {
   }
 
   const usuarios = await Usuario.findAll({
-    where: { email: { [Op.in]: OUR_EMAILS } }, attributes: ['id', 'email', 'rol', 'nombre', 'apellido'], raw: true,
+    where: { email: { [Op.in]: OUR_EMAILS } }, attributes: ['id', 'email', 'rol', 'nombre', 'apellido', 'telefono'], raw: true,
   });
   const idDe = (email) => usuarios.find((u) => u.email === email)?.id ?? null;
   const adminId = idDe(EMP_ADMIN.email);
@@ -401,7 +409,7 @@ async function diagnosticarInstitucional() {
   const { checks, check } = agregador();
 
   const usuarios = await Usuario.findAll({
-    where: { email: { [Op.iLike]: `%@${DOMINIO}` } }, attributes: ['id', 'rol', 'ultimoAcceso'], raw: true,
+    where: { email: { [Op.iLike]: `%@${DOMINIO}` } }, attributes: ['id', 'rol', 'ultimoAcceso', 'telefono'], raw: true,
   });
   if (usuarios.length === 0) {
     check(false, 'El dataset institucional NO está cargado (npm run db:seed:institucional)');
@@ -473,8 +481,11 @@ async function diagnosticarInstitucional() {
   };
 
   check(empresas.length > 0, `Empresas: ${empresas.length}`);
-  const cuitsInvalidos = empresas.filter((x) => !esCuitValido(x.cuit)).length;
-  check(cuitsInvalidos === 0, `Empresas institucionales con CUIT formalmente válido: ${empresas.length - cuitsInvalidos}/${empresas.length}`);
+  const cuitsInvalidos = empresas.filter((x) => !CUIT_CANONICO.test(x.cuit) || !esCuitValido(x.cuit)).length;
+  const telInstitucionales = usuarios.map((u) => u.telefono).filter(Boolean);
+  const telInstCanonicos = telInstitucionales.filter((t) => TELEFONO_CANONICO.test(t)).length;
+  check(telInstCanonicos === telInstitucionales.length, `Teléfonos institucionales en formato canónico: ${telInstCanonicos}/${telInstitucionales.length}`);
+  check(cuitsInvalidos === 0, `Empresas institucionales con CUIT canónico y formalmente válido: ${empresas.length - cuitsInvalidos}/${empresas.length}`);
   check(sinNivel === 0 && datos.estandar > 0, `Estándar: ${datos.estandar}`);
   check(confiables.size > 0, `Confiables: ${confiables.size}`);
   check(datos.reclutadores > 0, `Reclutadores: ${datos.reclutadores} (suspendidos: ${datos.reclutadoresSuspendidos})`);

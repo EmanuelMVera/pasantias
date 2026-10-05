@@ -149,6 +149,14 @@ demostración; se cargan y verifican con los comandos de `docs/DEPLOYMENT.md`
 - **Catálogo único de carreras:** una sola lista institucional
   (`backend/src/data/catalogos.json`, expuesta en `GET /api/catalogos/carreras`)
   alimenta las ofertas, el registro de empresas y la importación CSV.
+- **Formatos canónicos:** cada dato se guarda en UNA sola representación y la
+  pantalla lo formatea para mostrarlo. CUIT: 11 dígitos sin guiones
+  (`30999999979`, se ve `30-99999997-9`). Teléfono: `+54` + 10 dígitos
+  (`+541144445555`, se ve `+54 11 4444-5555`; el formulario pide código de área
+  y número por separado, sin 0 ni 15). Emails en minúsculas; textos sin
+  espacios sobrantes (sin cambiar mayúsculas). La identidad de una empresa es
+  su CUIT: no se acepta una solicitud nueva si ya hay una empresa o una
+  solicitud pendiente con ese CUIT (una rechazada sí puede volver a presentarse).
 - **Validación:** el backend valida todo lo que se guarda (emails, CUIT con
   dígito verificador, teléfonos, URLs, fechas, números y listas cerradas),
   aunque el frontend ya lo haya chequeado.

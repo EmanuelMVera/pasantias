@@ -37,7 +37,8 @@ describe('Reglas comunes (common.validator.js)', () => {
     ['123', false],
     ['+54 11 1234-5678', true],
     ['(011) 4300-1234', true],
-    ['+1 (555) 010-9999', true],
+    ['+1 (555) 010-9999', false], // solo teléfonos argentinos
+    ['+54 9 11 4444-5555', true],
     ['1234567890123456', false], // 16 dígitos
   ])('esTelefonoValido(%p) → %p', (tel, esperado) => {
     expect(esTelefonoValido(tel)).toBe(esperado);
@@ -179,7 +180,7 @@ describe('Validación de formularios contra la API', () => {
   test.each([
     [{ anioEgreso: 2027 }, /año de egreso es administrado por el instituto/],
     [{ linkedin: 'mi linkedin' }, /LinkedIn debe ser una URL válida/],
-    [{ telefono: 'hola' }, /teléfono no es válido/],
+    [{ telefono: 'hola' }, /no es un teléfono argentino válido/],
     [{ disponibilidad: 'cuando pueda' }, /disponibilidad no es válido/i],
     [{ habilidades: { a: 1 } }, /Habilidades debe ser una lista/],
     [{ visibilidadPerfil: 'solo_empresas_verificadas' }, /visibilidad del perfil debe ser verdadero o falso/],
@@ -203,7 +204,7 @@ describe('Validación de formularios contra la API', () => {
     expect(res.body.data).toMatchObject({
       habilidades: ['React', 'SQL'],
       certificaciones: ['AWS', 'Scrum'],
-      telefono: '+54 11 1234-5678',
+      telefono: '+541112345678',
       visibilidadPerfil: false,
       disponibilidad: '1_mes',
     });
@@ -227,7 +228,7 @@ describe('Validación de formularios contra la API', () => {
     [{ cuit: 'hola' }, /CUIT no es válido/],
     [{ cuit: '30712345678' }, /CUIT no es válido/],
     [{ email: 'abc' }, /email de contacto institucional no tiene un formato de email válido/],
-    [{ telefono: 'llamame al fijo' }, /teléfono institucional no es válido/],
+    [{ telefono: 'llamame al fijo' }, /teléfono institucional no es un teléfono argentino válido/],
     [{ sitioWeb: 'basura' }, /sitio web debe ser una URL válida/],
     [{ reclutadores: [{ nombre: 'Leo', apellido: 'X', email: 'no-es-email' }] }, /Reclutador #1: El email no tiene un formato/],
   ])('solicitud de empresa con %j → 400', async (extra, mensaje) => {
@@ -253,7 +254,7 @@ describe('Validación de formularios contra la API', () => {
     const MI_PERFIL = '/api/empresas/reclutadores/mi-perfil';
     const malo = await auth(request(app).patch(MI_PERFIL), tokenReclutador).send({ telefono: 'hola' });
     expect(malo.status).toBe(400);
-    expect(malo.body.message).toMatch(/teléfono no es válido/);
+    expect(malo.body.message).toMatch(/no es un teléfono argentino válido/);
     const bueno = await auth(request(app).patch(MI_PERFIL), tokenReclutador).send({ telefono: '+54 11 1234-5678' });
     expect(bueno.status).toBe(200);
   });
@@ -275,7 +276,7 @@ describe('Validación de formularios contra la API', () => {
   test.each([
     [{ rol: 'superadmin' }, /rol no es válido/],
     [{ email: 'abc' }, /email no tiene un formato/],
-    [{ telefono: 'hola' }, /teléfono no es válido/],
+    [{ telefono: 'hola' }, /no es un teléfono argentino válido/],
   ])('admin crea usuario con %j → 400', async (extra, mensaje) => {
     const res = await auth(request(app).post('/api/admin/usuarios'), tokenAdmin).send({
       nombre: 'Ana', apellido: 'Prueba', email: `val-${Date.now()}@test.local`, password: 'Test1234!', rol: 'admin', ...extra,

@@ -28,7 +28,9 @@ import Card from '../../components/ui/Card';
 import Icon from '../../components/ui/Icon';
 import Toast from '../../components/ui/Toast';
 import styles from './MiEmpresaPage.module.css';
-import { esTelefonoValido } from '../../utils/validacion';
+import TelefonoArgentinaInput from '../../components/ui/TelefonoArgentinaInput';
+import { enfocarPrimerError, errorTelefonoAR } from '../../utils/validacion';
+import { formatearCuitParaVista, normalizarTelefonoAR } from '../../utils/formatos';
 
 const ESTADO = {
   aprobada:  { label: 'Aprobada', tone: 'green' },
@@ -65,6 +67,7 @@ export default function MiEmpresaPage() {
   const [loading,    setLoading]    = useState(true);
   const [guardando,  setGuardando]  = useState(false);
   const [error,      setError]      = useState('');
+  const [errorTelefono, setErrorTelefono] = useState('');
   const [logoFile,     setLogoFile]     = useState(null);
   const [logoPreview,  setLogoPreview]  = useState(null);
   const [logoError,    setLogoError]    = useState('');
@@ -117,17 +120,25 @@ export default function MiEmpresaPage() {
       setError('El sitio web no parece una URL válida. Ej: www.empresa.com o https://empresa.com');
       return;
     }
-    if (form.telefono.trim() && !esTelefonoValido(form.telefono)) {
-      setError('El teléfono no es válido (solo números, espacios, +, paréntesis y guiones).');
+    // El error del teléfono se muestra junto al campo (TelefonoArgentinaInput).
+    const errorTel = errorTelefonoAR(form.telefono);
+    if (errorTel) {
+      setErrorTelefono(errorTel);
+      enfocarPrimerError(['telefono'], { telefono: errorTel });
       return;
     }
 
     setGuardando(true);
     try {
-      const { data } = await empresaService.updateMiEmpresa({ ...form, sitioWeb: urlNorm || '' });
+      // Teléfono en formato canónico (+54 + 10 dígitos); el backend lo vuelve a normalizar.
+      const { data } = await empresaService.updateMiEmpresa({
+        ...form,
+        sitioWeb: urlNorm || '',
+        telefono: normalizarTelefonoAR(form.telefono) ?? form.telefono,
+      });
       const updated = data.data ?? data;
       setEmpresa(updated);
-      setForm((prev) => ({ ...prev, sitioWeb: updated.sitioWeb ?? '' }));
+      setForm((prev) => ({ ...prev, sitioWeb: updated.sitioWeb ?? '', telefono: updated.telefono ?? '' }));
       showToast('Datos de empresa actualizados correctamente.', 'success');
       refrescar();
     } catch (err) {
@@ -279,7 +290,7 @@ export default function MiEmpresaPage() {
       <Card as="section" titleId="sec-institucional" title="Datos institucionales" className={styles.bloque}>
         <dl className={styles.datos}>
           <div><dt>Razón social</dt><dd>{empresa?.razonSocial ?? '—'}</dd></div>
-          <div><dt>CUIT</dt><dd>{empresa?.cuit ?? '—'}</dd></div>
+          <div><dt>CUIT</dt><dd>{formatearCuitParaVista(empresa?.cuit) || '—'}</dd></div>
           <div><dt>Estado</dt><dd><span className={`badge badge-tone-${estado.tone}`}>{estado.label}</span></dd></div>
           <div className={styles.datoAncho}>
             <dt>Nivel de confianza</dt>
@@ -337,10 +348,12 @@ export default function MiEmpresaPage() {
         <Card as="section" titleId="sec-contacto" title="Contacto y ubicación" className={styles.bloque}>
           <div className={styles.campos}>
             <div className="form-group">
-              <label htmlFor="telefono">Teléfono institucional</label>
-              <input
-                id="telefono" name="telefono" type="tel" value={form.telefono} onChange={handleChange}
-                placeholder="Ej: 11-4300-1234" disabled={!esAdmin}
+              <TelefonoArgentinaInput
+                id="telefono" label="Teléfono institucional"
+                value={form.telefono}
+                onChange={(telefono) => { setForm((prev) => ({ ...prev, telefono })); setErrorTelefono(''); }}
+                error={errorTelefono}
+                disabled={!esAdmin}
               />
             </div>
             <div className="form-group">

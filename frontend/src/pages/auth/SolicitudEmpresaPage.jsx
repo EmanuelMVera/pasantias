@@ -19,7 +19,12 @@ import { Link } from 'react-router-dom';
 import { solicitudEmpresaService } from '../../services/solicitudEmpresa.service';
 import Brand from '../../components/Brand/Brand';
 import { useCarreras } from '../../hooks/useCarreras';
-import { esCuitValido, esEmailValido, esTelefonoValido, esUrlValida, primerError } from '../../utils/validacion';
+import CuitInput from '../../components/ui/CuitInput';
+import TelefonoArgentinaInput from '../../components/ui/TelefonoArgentinaInput';
+import { completarUrl, normalizarTelefonoAR } from '../../utils/formatos';
+import {
+  enfocarPrimerError, errorCuit, errorTelefonoAR, esEmailValido, esUrlValida,
+} from '../../utils/validacion';
 import styles from './SolicitudEmpresaPage.module.css';
 
 const INITIAL_FORM = {
@@ -43,6 +48,54 @@ const INITIAL_FORM = {
   puestos:     '',
 };
 
+// Orden visual de los campos: al enviar con errores se enfoca el primero.
+const ORDEN_CAMPOS = [
+  'razonSocial', 'cuit', 'rubro', 'sitioWeb', 'telefono', 'email',
+  'responsableNombre', 'responsableApellido', 'responsableEmail', 'responsableTelefono',
+];
+
+const OBLIGATORIOS = {
+  razonSocial: 'Completá la razón social.',
+  cuit: 'Completá el CUIT.',
+  rubro: 'Completá el rubro.',
+  email: 'Completá el email de contacto institucional.',
+  responsableNombre: 'Completá el nombre del responsable.',
+  responsableApellido: 'Completá el apellido del responsable.',
+  responsableEmail: 'Completá el email del responsable.',
+};
+
+/** Errores por campo { id: mensaje } (mismas reglas que el backend, que valida igual). */
+function validarFormulario(form, reclutadores) {
+  const e = {};
+  for (const [campo, msg] of Object.entries(OBLIGATORIOS)) {
+    if (!String(form[campo] ?? '').trim()) e[campo] = msg;
+  }
+  if (!e.cuit && errorCuit(form.cuit)) e.cuit = errorCuit(form.cuit);
+  if (!e.email && !esEmailValido(form.email)) e.email = 'El email no tiene un formato válido.';
+  if (!e.responsableEmail && !esEmailValido(form.responsableEmail)) e.responsableEmail = 'El email no tiene un formato válido.';
+  if (form.sitioWeb.trim() && !esUrlValida(completarUrl(form.sitioWeb))) {
+    e.sitioWeb = 'Ingresá una dirección completa (ej. https://www.empresa.com).';
+  }
+  if (errorTelefonoAR(form.telefono)) e.telefono = errorTelefonoAR(form.telefono);
+  if (errorTelefonoAR(form.responsableTelefono)) e.responsableTelefono = errorTelefonoAR(form.responsableTelefono);
+  reclutadores.forEach((rec, i) => {
+    const tieneAlgo = rec.nombre.trim() || rec.apellido.trim() || rec.email.trim();
+    if (!tieneAlgo) return;
+    if (!rec.nombre.trim() || !rec.apellido.trim() || !rec.email.trim()) {
+      e[`rec-email-${i}`] = `El reclutador #${i + 1} requiere nombre, apellido y email completos.`;
+    } else if (!esEmailValido(rec.email)) {
+      e[`rec-email-${i}`] = `El email del reclutador #${i + 1} no tiene un formato válido.`;
+    }
+  });
+  return e;
+}
+
+/** Mensaje de error debajo de un campo (aria-describedby apunta a `<id>-error`). */
+function ErrorCampo({ id, mensaje }) {
+  if (!mensaje) return null;
+  return <p id={`${id}-error`} className={styles.fieldError} role="alert">{mensaje}</p>;
+}
+
 export default function SolicitudEmpresaPage() {
   const [form, setForm]           = useState(INITIAL_FORM);
   const [carreras, setCarreras]   = useState([]);
@@ -51,13 +104,23 @@ export default function SolicitudEmpresaPage() {
   const [reclutadores, setReclutadores] = useState([{ nombre: '', apellido: '', email: '' }]);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
+  const [errores, setErrores]     = useState({});
   const [success, setSuccess]     = useState(false);
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
-  function handleChange(e) {
-    const { name, value } = e.target;
+  function setCampo(name, value) {
     setForm(prev => ({ ...prev, [name]: value }));
+    setErrores(prev => (prev[name] ? { ...prev, [name]: '' } : prev));
   }
+
+  function handleChange(e) {
+    setCampo(e.target.name, e.target.value);
+  }
+
+  /** aria-invalid + aria-describedby para un campo con error. */
+  const aria = (id) => (errores[id]
+    ? { 'aria-invalid': true, 'aria-describedby': `${id}-error` }
+    : {});
 
   function handleCarreraToggle(carrera) {
     setCarreras(prev =>
@@ -69,6 +132,7 @@ export default function SolicitudEmpresaPage() {
 
   function handleReclutadorChange(idx, field, value) {
     setReclutadores(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+    setErrores(prev => (prev[`rec-email-${idx}`] ? { ...prev, [`rec-email-${idx}`]: '' } : prev));
   }
 
   function agregarReclutador() {
@@ -83,47 +147,14 @@ export default function SolicitudEmpresaPage() {
     e.preventDefault();
     setError('');
 
-    // Validación frontend mínima
-    const faltantes = [];
-    if (!form.razonSocial.trim())        faltantes.push('Razón Social');
-    if (!form.cuit.trim())               faltantes.push('CUIT');
-    if (!form.rubro.trim())              faltantes.push('Rubro');
-    if (!form.email.trim())              faltantes.push('Email de contacto institucional');
-    if (!form.responsableNombre.trim())  faltantes.push('Nombre del responsable');
-    if (!form.responsableApellido.trim()) faltantes.push('Apellido del responsable');
-    if (!form.responsableEmail.trim())   faltantes.push('Email del responsable');
-
-    if (faltantes.length > 0) {
-      setError(`Por favor completá los campos obligatorios: ${faltantes.join(', ')}.`);
+    // Errores junto a cada campo + foco en el primero (el formulario es largo:
+    // nadie tiene que bajar hasta el final para saber qué falta).
+    const nuevos = validarFormulario(form, reclutadores);
+    setErrores(nuevos);
+    const orden = [...ORDEN_CAMPOS, ...reclutadores.map((_, i) => `rec-email-${i}`)];
+    if (enfocarPrimerError(orden, nuevos)) {
+      setError('Revisá los campos marcados.');
       return;
-    }
-
-    // Formatos (mismas reglas que el backend, que valida igual)
-    const errorFormato = primerError([
-      [form.cuit, esCuitValido, 'El CUIT no es válido: deben ser 11 dígitos (ej. 30-12345678-9) con dígito verificador correcto.'],
-      [form.email, esEmailValido, 'El email de contacto institucional no tiene un formato válido.'],
-      [form.responsableEmail, esEmailValido, 'El email del responsable no tiene un formato válido.'],
-      [form.sitioWeb, esUrlValida, 'El sitio web debe ser una dirección completa (ej. https://www.empresa.com).'],
-      [form.telefono, esTelefonoValido, 'El teléfono institucional no es válido (solo números, espacios, +, paréntesis y guiones).'],
-      [form.responsableTelefono, esTelefonoValido, 'El teléfono del responsable no es válido (solo números, espacios, +, paréntesis y guiones).'],
-    ]);
-    if (errorFormato) {
-      setError(errorFormato);
-      return;
-    }
-
-    // Validar reclutadores: si alguno tiene dato, los 3 campos son requeridos
-    for (let i = 0; i < reclutadores.length; i++) {
-      const r = reclutadores[i];
-      const tieneAlgo = r.nombre.trim() || r.apellido.trim() || r.email.trim();
-      if (tieneAlgo && (!r.nombre.trim() || !r.apellido.trim() || !r.email.trim())) {
-        setError(`El reclutador #${i + 1} requiere nombre, apellido y email completos.`);
-        return;
-      }
-      if (tieneAlgo && !esEmailValido(r.email)) {
-        setError(`El email del reclutador #${i + 1} no tiene un formato válido.`);
-        return;
-      }
     }
 
     setLoading(true);
@@ -133,14 +164,25 @@ export default function SolicitudEmpresaPage() {
         r.nombre.trim() && r.apellido.trim() && r.email.trim()
       );
 
+      // Se envía el formato canónico (el backend igual lo vuelve a normalizar):
+      // CUIT de 11 dígitos, teléfonos +54…, URL absoluta.
       await solicitudEmpresaService.crear({
         ...form,
+        sitioWeb: completarUrl(form.sitioWeb),
+        telefono: normalizarTelefonoAR(form.telefono) ?? form.telefono,
+        responsableTelefono: normalizarTelefonoAR(form.responsableTelefono) ?? form.responsableTelefono,
         carrerasInteres: carreras,
         reclutadores:    recls,
       });
       setSuccess(true);
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al enviar la solicitud. Intentá de nuevo.');
+      const mensaje = err.response?.data?.message || 'Error al enviar la solicitud. Intentá de nuevo.';
+      // CUIT ya registrado / con solicitud pendiente: el error va junto al campo.
+      if (/CUIT/.test(mensaje)) {
+        setErrores((prev) => ({ ...prev, cuit: mensaje }));
+        enfocarPrimerError(['cuit'], { cuit: mensaje });
+      }
+      setError(mensaje);
     } finally {
       setLoading(false);
     }
@@ -208,17 +250,18 @@ export default function SolicitudEmpresaPage() {
                   id="razonSocial" name="razonSocial" type="text"
                   value={form.razonSocial} onChange={handleChange}
                   placeholder="Ej: Tech Solutions S.A."
-                  className={styles.input} required
+                  className={styles.input} {...aria('razonSocial')} required
                 />
+                <ErrorCampo id="razonSocial" mensaje={errores.razonSocial} />
               </div>
               <div className={styles.field}>
                 <label htmlFor="cuit" className={styles.label}>
                   CUIT <span className={styles.required}>*</span>
                 </label>
-                <input
-                  id="cuit" name="cuit" type="text"
-                  value={form.cuit} onChange={handleChange}
-                  placeholder="Ej: 30-12345678-9"
+                <CuitInput
+                  id="cuit" name="cuit"
+                  value={form.cuit} onChange={(cuit) => setCampo('cuit', cuit)}
+                  error={errores.cuit}
                   className={styles.input} required
                 />
               </div>
@@ -233,17 +276,20 @@ export default function SolicitudEmpresaPage() {
                   id="rubro" name="rubro" type="text"
                   value={form.rubro} onChange={handleChange}
                   placeholder="Ej: Tecnología e Informática"
-                  className={styles.input} required
+                  className={styles.input} {...aria('rubro')} required
                 />
+                <ErrorCampo id="rubro" mensaje={errores.rubro} />
               </div>
               <div className={styles.field}>
                 <label htmlFor="sitioWeb" className={styles.label}>Sitio web</label>
                 <input
                   id="sitioWeb" name="sitioWeb" type="url"
+                  onBlur={() => setCampo('sitioWeb', completarUrl(form.sitioWeb))}
                   value={form.sitioWeb} onChange={handleChange}
                   placeholder="https://www.empresa.com"
-                  className={styles.input}
+                  className={styles.input} {...aria('sitioWeb')}
                 />
+                <ErrorCampo id="sitioWeb" mensaje={errores.sitioWeb} />
               </div>
             </div>
 
@@ -258,12 +304,11 @@ export default function SolicitudEmpresaPage() {
                 />
               </div>
               <div className={styles.field}>
-                <label htmlFor="telefono" className={styles.label}>Teléfono institucional</label>
-                <input
-                  id="telefono" name="telefono" type="tel"
-                  value={form.telefono} onChange={handleChange}
-                  placeholder="Ej: 11-4300-1234"
-                  className={styles.input}
+                <TelefonoArgentinaInput
+                  id="telefono" label="Teléfono institucional"
+                  value={form.telefono} onChange={(v) => setCampo('telefono', v)}
+                  error={errores.telefono}
+                  labelClassName={styles.label} inputClassName={styles.input}
                 />
               </div>
             </div>
@@ -286,8 +331,9 @@ export default function SolicitudEmpresaPage() {
                   id="email" name="email" type="email"
                   value={form.email} onChange={handleChange}
                   placeholder="contacto@empresa.com"
-                  className={styles.input} required
+                  className={styles.input} {...aria('email')} required
                 />
+                <ErrorCampo id="email" mensaje={errores.email} />
                 <span className={styles.fieldHint}>
                   Email visible en el perfil de la empresa (no es el de acceso al sistema).
                 </span>
@@ -316,8 +362,9 @@ export default function SolicitudEmpresaPage() {
                   id="responsableNombre" name="responsableNombre" type="text"
                   value={form.responsableNombre} onChange={handleChange}
                   placeholder="Ej: María"
-                  className={styles.input} required
+                  className={styles.input} {...aria('responsableNombre')} required
                 />
+                <ErrorCampo id="responsableNombre" mensaje={errores.responsableNombre} />
               </div>
               <div className={styles.field}>
                 <label htmlFor="responsableApellido" className={styles.label}>
@@ -327,8 +374,9 @@ export default function SolicitudEmpresaPage() {
                   id="responsableApellido" name="responsableApellido" type="text"
                   value={form.responsableApellido} onChange={handleChange}
                   placeholder="Ej: González"
-                  className={styles.input} required
+                  className={styles.input} {...aria('responsableApellido')} required
                 />
+                <ErrorCampo id="responsableApellido" mensaje={errores.responsableApellido} />
               </div>
             </div>
 
@@ -341,8 +389,9 @@ export default function SolicitudEmpresaPage() {
                   id="responsableEmail" name="responsableEmail" type="email"
                   value={form.responsableEmail} onChange={handleChange}
                   placeholder="responsable@empresa.com"
-                  className={styles.input} required
+                  className={styles.input} {...aria('responsableEmail')} required
                 />
+                <ErrorCampo id="responsableEmail" mensaje={errores.responsableEmail} />
                 <span className={styles.fieldHint}>
                   Con este email se creará la cuenta de acceso al sistema.
                 </span>
@@ -360,14 +409,11 @@ export default function SolicitudEmpresaPage() {
 
             <div className={styles.row}>
               <div className={styles.field}>
-                <label htmlFor="responsableTelefono" className={styles.label}>
-                  Teléfono del responsable
-                </label>
-                <input
-                  id="responsableTelefono" name="responsableTelefono" type="tel"
-                  value={form.responsableTelefono} onChange={handleChange}
-                  placeholder="Ej: +54 11 5555-1234"
-                  className={styles.input}
+                <TelefonoArgentinaInput
+                  id="responsableTelefono" label="Teléfono del responsable"
+                  value={form.responsableTelefono} onChange={(v) => setCampo('responsableTelefono', v)}
+                  error={errores.responsableTelefono}
+                  labelClassName={styles.label} inputClassName={styles.input}
                 />
               </div>
             </div>
@@ -439,7 +485,8 @@ export default function SolicitudEmpresaPage() {
             </p>
 
             {reclutadores.map((r, idx) => (
-              <div key={idx} className={styles.reclutadorRow}>
+              <div key={idx}>
+              <div className={styles.reclutadorRow}>
                 <input
                   type="text"
                   placeholder="Nombre *"
@@ -455,11 +502,14 @@ export default function SolicitudEmpresaPage() {
                   className={styles.input}
                 />
                 <input
+                  id={`rec-email-${idx}`}
                   type="email"
                   placeholder="Email *"
+                  aria-label={`Email del reclutador #${idx + 1}`}
                   value={r.email}
                   onChange={e => handleReclutadorChange(idx, 'email', e.target.value)}
                   className={styles.input}
+                  {...aria(`rec-email-${idx}`)}
                 />
                 {reclutadores.length > 1 && (
                   <button
@@ -471,6 +521,8 @@ export default function SolicitudEmpresaPage() {
                     ✕
                   </button>
                 )}
+              </div>
+              <ErrorCampo id={`rec-email-${idx}`} mensaje={errores[`rec-email-${idx}`]} />
               </div>
             ))}
 

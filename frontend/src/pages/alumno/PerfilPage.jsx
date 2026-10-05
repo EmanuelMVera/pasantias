@@ -38,7 +38,9 @@ import FotoPerfilUpload from '../../components/FotoPerfilUpload/FotoPerfilUpload
 import TagsInput from '../../components/TagsInput/TagsInput';
 import CvUpload from '../../components/CvUpload/CvUpload';
 import CartaRecomendacionUpload from '../../components/CartaRecomendacionUpload/CartaRecomendacionUpload';
-import { esTelefonoValido, esUrlValida, primerError } from '../../utils/validacion';
+import TelefonoArgentinaInput from '../../components/ui/TelefonoArgentinaInput';
+import { enfocarPrimerError, errorTelefonoAR, esUrlValida, primerError } from '../../utils/validacion';
+import { normalizarTelefonoAR } from '../../utils/formatos';
 import styles from './PerfilPage.module.css';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -121,6 +123,7 @@ export default function PerfilPage() {
   const [perfil, setPerfil]       = useState(null);
   const [loading, setLoading]     = useState(true);
   const [guardando, setGuardando] = useState(false);
+  const [errorTelefono, setErrorTelefono] = useState('');
 
   const [form, setForm] = useState({
     descripcion:           '',
@@ -189,10 +192,16 @@ export default function PerfilPage() {
       [form.linkedin, esUrlValida, 'LinkedIn debe ser una dirección completa (ej. https://linkedin.com/in/tu-perfil).'],
       [form.github, esUrlValida, 'GitHub debe ser una dirección completa (ej. https://github.com/tu-usuario).'],
       [form.portfolio, esUrlValida, 'El portfolio debe ser una dirección completa (ej. https://mi-portfolio.com).'],
-      [form.telefono, esTelefonoValido, 'El teléfono no es válido (solo números, espacios, +, paréntesis y guiones).'],
     ]);
     if (errorFormato) {
       showToast(errorFormato, 'error');
+      return;
+    }
+    // El error del teléfono va junto al campo.
+    const errorTel = errorTelefonoAR(form.telefono);
+    if (errorTel) {
+      setErrorTelefono(errorTel);
+      enfocarPrimerError(['pf-telefono'], { 'pf-telefono': errorTel });
       return;
     }
     setGuardando(true);
@@ -202,6 +211,7 @@ export default function PerfilPage() {
       // y la carta van por sus propios endpoints de subida.
       const payload = {
         ...Object.fromEntries(CAMPOS_EDITABLES.map((c) => [c, form[c]])),
+        telefono: normalizarTelefonoAR(form.telefono) ?? form.telefono, // canónico +54…
         certificaciones: textToCert(form.certificaciones),
         habilidades: tagTextToArray(form.habilidadesTexto),
         idiomas: tagTextToArray(form.idiomasTexto),
@@ -310,9 +320,12 @@ export default function PerfilPage() {
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="pf-telefono">Teléfono de contacto</label>
-              <input id="pf-telefono" name="telefono" value={form.telefono || ''} onChange={handleChange}
-                placeholder="Ej: +54 9 11 1234-5678" />
+              <TelefonoArgentinaInput
+                id="pf-telefono" label="Teléfono de contacto"
+                value={form.telefono || ''}
+                onChange={(telefono) => { setForm((prev) => ({ ...prev, telefono })); setErrorTelefono(''); }}
+                error={errorTelefono}
+              />
             </div>
             <div className="form-group">
               <label htmlFor="pf-ubicacion">Ubicación (ciudad / provincia)</label>

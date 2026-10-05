@@ -293,10 +293,10 @@ describe('RESPONSABLE DE OFERTA Y PERFIL DE RECLUTADOR', () => {
     const res = await auth(request(app).patch(MI_PERFIL), token)
       .send({ nombre: '  Tony ', apellido: 'Stark', telefono: '11-5555-0000', ubicacion: '' });
     expect(res.status).toBe(200);
-    expect(res.body.data).toMatchObject({ nombre: 'Tony', apellido: 'Stark', telefono: '11-5555-0000', ubicacion: null });
+    expect(res.body.data).toMatchObject({ nombre: 'Tony', apellido: 'Stark', telefono: '+541155550000', ubicacion: null });
 
     const ficha = await perfil(tokenAdmin, rec1.id);
-    expect(ficha.body.data).toMatchObject({ nombre: 'Tony', apellido: 'Stark', telefono: '11-5555-0000', ubicacion: null });
+    expect(ficha.body.data).toMatchObject({ nombre: 'Tony', apellido: 'Stark', telefono: '+541155550000', ubicacion: null });
   });
 
   test('mi perfil: whitelist estricta — email, rol, empresa, estado, password o foto → 400 y nada cambia', async () => {

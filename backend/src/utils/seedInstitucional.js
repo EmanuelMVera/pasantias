@@ -313,7 +313,7 @@ async function sembrar(transaction) {
       descripcion: `${nombreEmpresa} es una empresa del rubro ${rubro} con sede en ${CIUDADES[i % CIUDADES.length]}. Dataset institucional generado para pruebas de escala.`,
       rubro,
       sitioWeb: `https://${nombreEmpresa.toLowerCase().replace(/\s+/g, '')}.demo.invalid`,
-      telefono: `11-4${String(1000 + i).padStart(4, '0')}-${String(2000 + i).padStart(4, '0')}`,
+      telefono: `+5411${4000 + i}${String(2000 + i).padStart(4, '0')}`, // canónico: +54 + 10 dígitos
       direccion: `Calle ${100 + i * 7}`,
       ciudad: CIUDADES[i % CIUDADES.length],
       // Logo por URL https externa — nunca un objeto R2 ni fila Archivo.

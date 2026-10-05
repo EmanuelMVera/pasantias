@@ -7,10 +7,45 @@ const {
   sequelize,
 } = require('../models');
 const HttpError = require('../utils/httpError');
+const { Op } = require('sequelize');
+const { normalizarTelefonoAR } = require('../validators/common.validator');
 const { enviarEmail, escapeHtml } = require('../utils/mailer');
 const { config } = require('../config/env');
 const { registrarAuditoria } = require('../utils/auditLog');
 const logger = require('../utils/logger');
+
+/**
+ * ¿Se puede presentar una solicitud nueva con este CUIT? (canónico: 11 dígitos)
+ *   - Empresa existente (no eliminada) con ese CUIT → 409 CUIT_EMPRESA_EXISTENTE
+ *     (incluye las creadas por una solicitud ya aprobada).
+ *   - Solicitud PENDIENTE con ese CUIT → 409 CUIT_SOLICITUD_PENDIENTE.
+ *   - Solicitudes RECHAZADAS → no bloquean: la empresa puede corregir sus datos
+ *     y volver a presentarse.
+ * La comparación con las solicitudes se hace por DÍGITOS en la base
+ * (regexp_replace): las filas legacy pueden tener el CUIT con guiones, y
+ * "30-99999997-9" y "30999999979" son el mismo CUIT.
+ * Sin UNIQUE en solicitud_empresas.cuit: impediría los reintentos tras un rechazo.
+ */
+async function verificarCuitDisponible(cuit) {
+  const empresa = await Empresa.findOne({ where: { cuit }, attributes: ['id'] });
+  if (empresa) {
+    const err = new HttpError(409, 'Ya hay una empresa registrada con este CUIT. Si formás parte de ella, pedile acceso a su administrador o contactá al instituto.');
+    err.code = 'CUIT_EMPRESA_EXISTENTE';
+    throw err;
+  }
+  const pendiente = await SolicitudEmpresa.findOne({
+    where: {
+      estado: 'pendiente',
+      [Op.and]: [sequelize.where(sequelize.fn('regexp_replace', sequelize.col('cuit'), '[^0-9]', '', 'g'), cuit)],
+    },
+    attributes: ['id'],
+  });
+  if (pendiente) {
+    const err = new HttpError(409, 'Ya existe una solicitud pendiente para este CUIT.');
+    err.code = 'CUIT_SOLICITUD_PENDIENTE';
+    throw err;
+  }
+}
 
 /**
  * Aprueba una solicitud de empresa:
@@ -49,16 +84,18 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId, lo
       email:     loginEmail,
       password:  hash,
       rol:       'empresa',
-      telefono:  solicitud.responsableTelefono || solicitud.telefono || null,
+      // Solicitudes nuevas ya traen el teléfono canónico; las legacy se
+      // normalizan si se puede (si no, se conserva el valor original).
+      telefono:  telefonoCanonico(solicitud.responsableTelefono || solicitud.telefono),
       ubicacion: solicitud.ciudad || null,
       activo:    true,
       habilitado: true,
     }, { transaction: t });
 
-    // empresas.cuit ahora es VARCHAR(11) con CHECK de solo dígitos (EST-08
-    // §4.5). El formulario de solicitud no fuerza ese formato, así que se
-    // normaliza acá; si no quedan exactamente 11 dígitos, se deja null en
-    // vez de bloquear la aprobación — se completa a mano después.
+    // empresas.cuit es VARCHAR(11) con CHECK de solo dígitos (EST-08 §4.5).
+    // Las solicitudes nuevas ya guardan el CUIT canónico (validador); esto
+    // cubre las LEGACY con guiones. Si no quedan 11 dígitos, null en vez de
+    // bloquear la aprobación (se completa a mano después).
     const cuitLimpio = (solicitud.cuit || '').replace(/\D/g, '');
 
     nuevaEmpresa = await Empresa.create({
@@ -68,7 +105,7 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId, lo
       sitioWeb:         solicitud.sitioWeb    || null,
       direccion:        solicitud.direccion   || null,
       ciudad:           solicitud.ciudad      || null,
-      telefono:         solicitud.telefono    || null,
+      telefono:         telefonoCanonico(solicitud.telefono),
       descripcion:      solicitud.descripcion || null,
       estadoAprobacion: 'aprobada',
       aprobadaPorUsuarioId: adminUsuarioId,
@@ -256,4 +293,12 @@ async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip, requestId, l
   });
 }
 
-module.exports = { aprobarSolicitud, rechazarSolicitud, enviarConfirmacionSolicitud };
+/** Canónico si el valor (posiblemente legacy) se puede normalizar; si no, el original. */
+function telefonoCanonico(valor) {
+  if (!valor) return null;
+  return normalizarTelefonoAR(valor) ?? valor;
+}
+
+module.exports = {
+  aprobarSolicitud, rechazarSolicitud, enviarConfirmacionSolicitud, verificarCuitDisponible,
+};

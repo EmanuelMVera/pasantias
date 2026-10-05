@@ -24,6 +24,7 @@ import Card from '../../components/ui/Card';
 import EmptyState from '../../components/ui/EmptyState';
 import Icon from '../../components/ui/Icon';
 import styles from './ReclutadorPerfilPage.module.css';
+import { formatearTelefonoParaVista } from '../../utils/formatos';
 
 export default function ReclutadorPerfilPage() {
   const { usuarioId } = useParams();
@@ -76,7 +77,7 @@ export default function ReclutadorPerfilPage() {
   const nombre = `${perfil.nombre} ${perfil.apellido}`.trim();
   const contacto = [
     { key: 'email', label: 'Email', icon: 'mail', valor: perfil.email, href: `mailto:${perfil.email}` },
-    { key: 'telefono', label: 'Teléfono', icon: 'phone', valor: perfil.telefono },
+    { key: 'telefono', label: 'Teléfono', icon: 'phone', valor: formatearTelefonoParaVista(perfil.telefono) },
     { key: 'ubicacion', label: 'Ubicación', icon: 'mapPin', valor: perfil.ubicacion },
   ].filter((c) => c.valor);
 

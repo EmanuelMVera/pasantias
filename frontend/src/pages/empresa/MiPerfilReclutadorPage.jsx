@@ -25,7 +25,9 @@ import Card from '../../components/ui/Card';
 import Toast from '../../components/ui/Toast';
 import Icon from '../../components/ui/Icon';
 import Avatar from '../../components/Avatar/Avatar';
-import { esTelefonoValido } from '../../utils/validacion';
+import TelefonoArgentinaInput from '../../components/ui/TelefonoArgentinaInput';
+import { enfocarPrimerError, errorTelefonoAR } from '../../utils/validacion';
+import { normalizarTelefonoAR } from '../../utils/formatos';
 import styles from './MiPerfilReclutadorPage.module.css';
 
 const TIPOS_IMAGEN = ['image/png', 'image/jpeg', 'image/webp'];
@@ -42,6 +44,7 @@ export default function MiPerfilReclutadorPage() {
   const [form, setForm] = useState(formDesde(null));
   const [error, setError] = useState('');
   const [errorForm, setErrorForm] = useState('');
+  const [errorTelefono, setErrorTelefono] = useState('');
   const [guardando, setGuardando] = useState(false);
 
   const [fotoFile, setFotoFile] = useState(null);
@@ -60,7 +63,10 @@ export default function MiPerfilReclutadorPage() {
 
   useEffect(() => () => { if (fotoPreview) URL.revokeObjectURL(fotoPreview); }, [fotoPreview]);
 
-  const cambios = perfil ? CAMPOS.some((c) => form[c].trim() !== (perfil[c] ?? '')) : false;
+  // El teléfono se compara en formato canónico: "+54 11 40001234" (en edición) y
+  // "+541140001234" (guardado) son el mismo dato.
+  const valorComparable = (c, v) => (c === 'telefono' ? (normalizarTelefonoAR(v) ?? (v ?? '').trim()) : (v ?? '').trim());
+  const cambios = perfil ? CAMPOS.some((c) => valorComparable(c, form[c]) !== valorComparable(c, perfil[c])) : false;
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -73,14 +79,18 @@ export default function MiPerfilReclutadorPage() {
       setErrorForm('El nombre y el apellido no pueden quedar vacíos.');
       return;
     }
-    if (form.telefono.trim() && !esTelefonoValido(form.telefono)) {
-      setErrorForm('El teléfono no es válido (solo números, espacios, +, paréntesis y guiones).');
+    // El error del teléfono se muestra junto al campo.
+    const errorTel = errorTelefonoAR(form.telefono);
+    if (errorTel) {
+      setErrorTelefono(errorTel);
+      enfocarPrimerError(['mp-telefono'], { 'mp-telefono': errorTel });
       return;
     }
     setGuardando(true);
     setErrorForm('');
     try {
       const body = Object.fromEntries(CAMPOS.map((c) => [c, form[c].trim()]));
+      body.telefono = normalizarTelefonoAR(form.telefono) ?? body.telefono; // canónico +54…
       const { data } = await empresaService.updateMiPerfilReclutador(body);
       setPerfil(data.data);
       setForm(formDesde(data.data));
@@ -206,8 +216,12 @@ export default function MiPerfilReclutadorPage() {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label htmlFor="mp-telefono">Teléfono</label>
-                <input id="mp-telefono" name="telefono" type="tel" value={form.telefono} onChange={handleChange} maxLength={30} autoComplete="tel" />
+                <TelefonoArgentinaInput
+                  id="mp-telefono" label="Teléfono"
+                  value={form.telefono}
+                  onChange={(telefono) => { setForm((prev) => ({ ...prev, telefono })); setErrorTelefono(''); setErrorForm(''); }}
+                  error={errorTelefono}
+                />
               </div>
               <div className="form-group">
                 <label htmlFor="mp-ubicacion">Ubicación</label>

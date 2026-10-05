@@ -6,10 +6,12 @@ const solicitudEmpresaService = require('../services/solicitudEmpresa.service');
 
 /**
  * POST /api/solicitudes-empresa
- * La validación de inputs se realiza en validate.middleware + solicitudEmpresa.validator.
- * Este controller solo normaliza y persiste. Va envuelto en asyncHandler en la
- * ruta: cualquier error propaga a error.middleware (SEC-02), no se traga con un
- * 500 a mano.
+ *
+ * validate(validateCrearSolicitud) ya dejó el body NORMALIZADO (formato
+ * canónico): CUIT de 11 dígitos, emails en minúsculas, teléfonos +54…, textos
+ * con trim, vacíos como null, carreras del catálogo y reclutadores limpios. Acá
+ * no se vuelve a normalizar: se controla que el CUIT no esté ya en uso y se
+ * persiste. Va envuelto en asyncHandler (los errores van a error.middleware).
  */
 async function crearSolicitud(req, res) {
     const {
@@ -19,41 +21,28 @@ async function crearSolicitud(req, res) {
       reclutadores,
     } = req.body;
 
-    // Normalizar reclutadores: el validator ya garantizó que cada entrada es válida
-    const reclutadoresLimpios = (Array.isArray(reclutadores) ? reclutadores : [])
-      .filter((r) => r?.nombre?.trim() && r?.apellido?.trim() && r?.email?.trim())
-      .map((r) => ({
-        nombre:   r.nombre.trim(),
-        apellido: r.apellido.trim(),
-        email:    r.email.trim().toLowerCase(),
-      }));
-
-    // Normalizar carrerasInteres (puede venir como JSON string desde multipart)
-    let carrerasArr = [];
-    if (Array.isArray(carrerasInteres)) {
-      carrerasArr = carrerasInteres;
-    } else if (carrerasInteres) {
-      try { carrerasArr = JSON.parse(carrerasInteres); } catch { carrerasArr = []; }
-    }
+    // La identidad de una empresa es su CUIT (no la razón social): 409 si ya
+    // hay una empresa con ese CUIT o una solicitud pendiente.
+    await solicitudEmpresaService.verificarCuitDisponible(cuit);
 
     const solicitud = await SolicitudEmpresa.create({
-      razonSocial:   razonSocial.trim(),
-      cuit:          cuit.trim(),
-      rubro:         rubro.trim(),
-      sitioWeb:      sitioWeb?.trim()      || null,
-      direccion:     direccion?.trim()     || null,
-      ciudad:        ciudad?.trim()        || null,
-      email:         email.trim().toLowerCase(),
-      telefono:      telefono?.trim()      || null,
-      responsableNombre:   responsableNombre.trim(),
-      responsableApellido: responsableApellido.trim(),
-      responsableEmail:    responsableEmail.trim().toLowerCase(),
-      responsableTelefono: responsableTelefono?.trim() || null,
-      responsableCargo:    responsableCargo?.trim()    || null,
-      carrerasInteres: carrerasArr,
-      descripcion: descripcion?.trim() || null,
-      puestos:     puestos?.trim()     || null,
-      reclutadores: reclutadoresLimpios,
+      razonSocial,
+      cuit,
+      rubro,
+      sitioWeb: sitioWeb ?? null,
+      direccion: direccion ?? null,
+      ciudad: ciudad ?? null,
+      email,
+      telefono: telefono ?? null,
+      responsableNombre,
+      responsableApellido,
+      responsableEmail,
+      responsableTelefono: responsableTelefono ?? null,
+      responsableCargo: responsableCargo ?? null,
+      carrerasInteres: carrerasInteres ?? [],
+      descripcion: descripcion ?? null,
+      puestos: puestos ?? null,
+      reclutadores: reclutadores ?? [],
       estado: 'pendiente',
     });
 

@@ -17,6 +17,7 @@ import { empresaService } from '../../services/empresa.service';
 import Card from '../../components/ui/Card';
 import EmptyState from '../../components/ui/EmptyState';
 import styles from './EmpresaPublicaPage.module.css';
+import { formatearTelefonoParaVista } from '../../utils/formatos';
 
 /** Iniciales para el fallback del logo: "S.H.I.E.L.D." → "SH", "Nube Code SRL" → "NC". */
 function inicialesEmpresa(razonSocial) {
@@ -117,7 +118,7 @@ export default function EmpresaPublicaPage() {
         <Card as="section" title="Contacto">
           <div className={styles.contacto}>
             {data.direccion && <span>📌 {data.direccion}</span>}
-            {data.telefono  && <span>📞 {data.telefono}</span>}
+            {data.telefono  && <span>📞 {formatearTelefonoParaVista(data.telefono)}</span>}
           </div>
         </Card>
       )}

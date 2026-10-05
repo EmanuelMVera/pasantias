@@ -45,15 +45,38 @@ function esUrlValida(url) {
 }
 
 /**
- * Teléfono: dígitos, espacios, +, paréntesis y guiones. Entre 6 y 15 dígitos
- * (E.164 admite hasta 15) — sin forzar el formato argentino. "hola" no pasa.
+ * Teléfono ARGENTINO → formato CANÓNICO de persistencia: "+54" + los 10
+ * dígitos del número nacional (código de área sin 0 + número sin 15), estilo
+ * E.164 sin el 9 de móvil. Ej.: "+541144445555".
+ *
+ * Acepta las formas que escribe una persona y las legacy:
+ *   "11 4444-5555", "(011) 4444-5555", "1144445555", "+54 11 4444-5555",
+ *   "+54 9 11 4444-5555", "54 11 4444 5555"
+ * Rechaza (null): letras, números que no son argentinos ("+1 …"), y los que no
+ * quedan en exactamente 10 dígitos nacionales — p. ej. con el 15 de celular
+ * incluido, porque no se puede saber con certeza dónde termina el código de
+ * área (el formulario pide "sin 0 y sin 15").
+ *
+ * @returns {string|null}
  */
-function esTelefonoValido(tel) {
-  if (typeof tel !== 'string') return false;
+function normalizarTelefonoAR(tel) {
+  if (typeof tel !== 'string') return null;
   const t = tel.trim();
-  if (!/^\+?[\d\s()-]+$/.test(t)) return false;
-  const digitos = t.replace(/\D/g, '').length;
-  return digitos >= 6 && digitos <= 15;
+  if (!t || !/^\+?[\d\s()-]+$/.test(t)) return null;
+  let d = t.replace(/\D/g, '');
+  if (t.startsWith('+') && !d.startsWith('54')) return null; // otro país
+  if (d.startsWith('54') && d.length > 10) {
+    d = d.slice(2);
+    if (d.length === 11 && d.startsWith('9')) d = d.slice(1); // +54 9 (móvil internacional)
+  }
+  if (d.startsWith('0')) d = d.slice(1); // 0 de discado nacional
+  if (d.length !== 10 || d.startsWith('0')) return null;
+  return `+54${d}`;
+}
+
+/** Teléfono argentino válido (se puede normalizar al formato canónico). */
+function esTelefonoValido(tel) {
+  return normalizarTelefonoAR(tel) !== null;
 }
 
 const CUIT_PESOS = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
@@ -163,6 +186,18 @@ function esUrlImagenExternaValida(url) {
   return true;
 }
 
+/**
+ * Normalización prudente de texto: trim exterior y, en textos de UNA línea,
+ * espacios/tabulaciones repetidos → uno ("  Peter   Parker " → "Peter Parker").
+ * Los textos multilínea solo se recortan (no se tocan sus saltos de línea).
+ * Nunca cambia mayúsculas/minúsculas: "S.H.I.E.L.D.", "iOS", "McDonald's"
+ * quedan como se escribieron.
+ */
+function normalizarEspacios(texto) {
+  const t = String(texto ?? '').trim();
+  return t.includes('\n') ? t : t.replace(/[ \t]+/g, ' ');
+}
+
 // ── validarCampos ───────────────────────────────────────────────────────────
 
 const vacio = (v) => v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
@@ -222,7 +257,7 @@ function validarValor(valor, r, label) {
   switch (r.tipo) {
     case 'texto': {
       if (typeof valor !== 'string') return { error: `${label} debe ser texto.` };
-      const t = valor.trim();
+      const t = normalizarEspacios(valor);
       if (r.max && t.length > r.max) return { error: `${label} admite hasta ${r.max} caracteres.` };
       if (r.min && t.length < r.min) return { error: `${label} debe tener al menos ${r.min} caracteres.` };
       return { valor: t };
@@ -240,12 +275,13 @@ function validarValor(valor, r, label) {
       return { valor: u };
     }
     case 'telefono': {
-      if (!esTelefonoValido(valor)) {
-        return { error: `${label} no es válido (solo números, espacios, +, paréntesis y guiones).` };
+      // Se guarda SIEMPRE el canónico (+54 + 10 dígitos), nunca la forma
+      // visual: "11-4444-5555" y "(11) 4444 5555" son el mismo dato.
+      const canonico = normalizarTelefonoAR(valor);
+      if (!canonico) {
+        return { error: `${label} no es un teléfono argentino válido: código de área sin 0 y número sin 15 (ej. 11 4444-5555).` };
       }
-      const t = valor.trim().replace(/\s+/g, ' ');
-      if (t.length > (r.max ?? 30)) return { error: `${label} admite hasta ${r.max ?? 30} caracteres.` };
-      return { valor: t };
+      return { valor: canonico };
     }
     case 'entero': {
       const n = parsearEntero(valor, r.min ?? Number.MIN_SAFE_INTEGER, r.max ?? Number.MAX_SAFE_INTEGER);
@@ -304,6 +340,8 @@ module.exports = {
   esUrlValida,
   esUrlImagenExternaValida,
   esTelefonoValido,
+  normalizarTelefonoAR,
+  normalizarEspacios,
   esCuitValido,
   normalizarCuit,
   digitoVerificadorCuit,
