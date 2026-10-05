@@ -5,7 +5,10 @@
  *
  * Rutas públicas (sin autenticación):
  * - GET /               → Lista todas las ofertas activas y aprobadas
- * - GET /:id            → Detalle de una oferta específica
+ * - GET /:id            → Detalle de una oferta específica. Con sesión de
+ *                          alumno/egresado (opcional) agrega `miPostulacion` y
+ *                          `cvCargado`, y le deja ver una oferta ya no publicada
+ *                          (pausada/cerrada) a la que se había postulado.
  *
  * Rutas protegidas (alumno/egresado):
  * - GET /recomendadas   → Buscador inteligente basado en el perfil del alumno [NUEVO]
@@ -27,7 +30,7 @@
 
 const router = require('express').Router();
 const ctrl = require('../controllers/oferta.controller');
-const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
+const { verifyToken, optionalToken, authorizeRoles } = require('../middleware/auth.middleware');
 const { verifyEmpresaMember, authorizeEmpresaRoles } = require('../middleware/empresa.middleware');
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -45,7 +48,7 @@ router.get(
 // ── Rutas públicas ────────────────────────────────────────────────────────────
 // Cualquier visitante puede ver las ofertas disponibles sin necesidad de estar logueado
 router.get('/', asyncHandler(ctrl.getOfertas));           // Lista de ofertas con filtros opcionales
-router.get('/:id', asyncHandler(ctrl.getOfertaById));     // Detalle de una oferta y su empresa
+router.get('/:id', optionalToken, asyncHandler(ctrl.getOfertaById)); // Detalle de una oferta y su empresa
 
 // ── Rutas empresa ────────────────────────────────────────────────────────────
 // verifyEmpresaMember inyecta req.empresa/req.miembroEmpresa para los controllers.

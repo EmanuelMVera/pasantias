@@ -1,47 +1,44 @@
 /**
- * MisPostulacionesPage.jsx — Lista de postulaciones del alumno/egresado.
+ * MisPostulacionesPage.jsx — Postulaciones del alumno/egresado.
  *
- * Muestra todas las postulaciones del usuario con:
- * - Estado actual (en_revision, preseleccionado, entrevista, contratado, rechazado)
- * - Fecha de última actualización
- * - Observaciones de la empresa (si existen)
- * - Botón "💬 Chatear con reclutador" solo cuando el estado lo habilita
- *   (preseleccionado, entrevista, contratado)
+ * Ruta: /mis-postulaciones[?estado=<estado>] (roles alumno, egresado)
+ * Consume: GET /api/postulaciones/mis (paginado, filtro por estado server-side,
+ * `conteoPorEstado` global para el resumen).
  *
- * Ruta: /mis-postulaciones
- * Roles: alumno, egresado
+ * - El resumen por estado funciona como filtro; el estado vive en la URL para
+ *   que el Inicio pueda enlazar directo (p. ej. ?estado=entrevista).
+ * - Cada postulación: oferta, empresa, estado, fechas y aviso si la oferta ya
+ *   no está publicada (pausada/cerrada: el proceso puede seguir igual).
+ * - "Chatear con el reclutador" solo cuando el estado lo habilita
+ *   (preseleccionado, entrevista, contratado) y la oferta tiene responsable:
+ *   es quien realmente puede chatear con el candidato (reglas de chat).
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { postulacionService } from '../../services/postulacion.service';
 import Paginacion from '../../components/Paginacion/Paginacion';
-import { LISTA_ESTADOS_POSTULACION, ESTADOS_HABILITAN_CHAT, getEstadoInfo, normalizarEstado } from '../../constants/postulacionEstados';
+import PageHeader from '../../components/ui/PageHeader';
+import EmptyState from '../../components/ui/EmptyState';
+import Icon from '../../components/ui/Icon';
+import {
+  ESTADOS_HABILITAN_CHAT, LISTA_ESTADOS_POSTULACION, getEstadoInfo, normalizarEstado,
+} from '../../constants/postulacionEstados';
+import { formatFecha, modalidadLabel } from '../../utils/ofertaPresentacion';
 import styles from './MisPostulacionesPage.module.css';
 
-function formatFecha(dateStr) {
-  if (!dateStr) return null;
-  return new Date(dateStr).toLocaleDateString('es-AR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-  });
-}
+const ESTADOS_VALIDOS = LISTA_ESTADOS_POSTULACION.map((e) => e.estado);
 
-function formatFechaHora(dateStr) {
-  if (!dateStr) return null;
-  return new Date(dateStr).toLocaleDateString('es-AR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
-}
-
-/* ── Componente principal ────────────────────────────────────────────────────── */
 export default function MisPostulacionesPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const estadoUrl = searchParams.get('estado') ?? '';
+  const filtroEstado = ESTADOS_VALIDOS.includes(estadoUrl) ? estadoUrl : '';
+
   const [postulaciones, setPostulaciones] = useState([]);
-  const [loading, setLoading]             = useState(true);
-  const [filtroEstado, setFiltroEstado]   = useState('');
-  const [successMsg]                      = useState('');
-  const [pagination, setPagination]       = useState(null);
-  const [conteoPorEstado, setConteoPorEstado] = useState({});
+  const [pagination, setPagination] = useState(null);
+  const [conteoPorEstado, setConteoPorEstado] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const cargar = useCallback((pagina = 1) => {
     const params = { page: pagina, limit: 20 };
@@ -51,150 +48,141 @@ export default function MisPostulacionesPage() {
         setPostulaciones(data.data ?? []);
         setPagination(data.pagination ?? null);
         setConteoPorEstado(data.conteoPorEstado ?? {});
+        setError('');
       })
+      .catch(() => setError('No se pudieron cargar tus postulaciones.'))
       .finally(() => setLoading(false));
   }, [filtroEstado]);
 
   useEffect(() => { cargar(1); }, [cargar]);
 
-  const filtradas = postulaciones; // el filtro por estado ahora es server-side
-  const conteoCanonicos = conteoPorEstado;
-  const totalGlobal = Object.values(conteoPorEstado).reduce((a, b) => a + b, 0);
+  // `loading` se prende en los eventos (no dentro de cargar): cargar corre en
+  // un efecto y no debe setear estado sincrónicamente.
+  const irAPagina = (pagina) => { setLoading(true); cargar(pagina); };
 
-  if (loading && !pagination) {
-    return (
-      <div className="page-container">
-        <h1>Mis Postulaciones</h1>
-        <div className={styles.loadingList}>
-          {[1,2,3].map(i => <div key={i} className={styles.skeletonCard} />)}
-        </div>
-      </div>
-    );
-  }
+  const setFiltro = (estado) => {
+    setLoading(true);
+    const sig = new URLSearchParams(searchParams);
+    if (estado) sig.set('estado', estado); else sig.delete('estado');
+    setSearchParams(sig, { replace: true });
+  };
+
+  const totalGlobal = conteoPorEstado ? Object.values(conteoPorEstado).reduce((a, b) => a + b, 0) : null;
+  const sinPostulaciones = totalGlobal === 0;
 
   return (
     <div className="page-container">
-      <div className="dashboard-header">
-        <h1>Mis Postulaciones</h1>
-        <Link to="/ofertas" className="btn-primary">
-          🔍 Ver más ofertas
-        </Link>
-      </div>
+      <PageHeader
+        title="Mis postulaciones"
+        subtitle="Seguí el estado de cada proceso de selección."
+        actions={!sinPostulaciones && <Link to="/ofertas" className="btn-secondary">Explorar ofertas</Link>}
+      />
 
-      {/* Mensaje de éxito */}
-      {successMsg && (
-        <div className={styles.successBanner}>
-          ✅ {successMsg}
-        </div>
-      )}
+      {error && <p className="error-msg" role="alert">{error}</p>}
 
-      {totalGlobal === 0 ? (
-        <div className={styles.emptyState}>
-          <span className={styles.emptyIcon}>📋</span>
-          <h3>Todavía no te postulaste a ninguna oferta</h3>
-          <p>Explorá las ofertas disponibles y postulate a las que se ajusten a tu perfil.</p>
+      {conteoPorEstado === null ? (
+        loading && (
+          <div className={styles.loadingList} aria-hidden="true">
+            {[1, 2, 3].map((i) => <div key={i} className={styles.skeletonCard} />)}
+          </div>
+        )
+      ) : sinPostulaciones ? (
+        <EmptyState
+          iconName="briefcase"
+          title="Todavía no te postulaste a ninguna oferta."
+          hint="Explorá las ofertas disponibles y postulate a las que se ajusten a tu perfil."
+        >
           <Link to="/ofertas" className="btn-primary">Ver ofertas disponibles</Link>
-        </div>
+        </EmptyState>
       ) : (
         <>
-          {/* ── Resumen visual ───────────────────────────────────────────── */}
-          <div className={styles.resumenGrid}>
-            {LISTA_ESTADOS_POSTULACION.map((e) => (
-              <button
-                key={e.estado}
-                className={`${styles.resumenCard} ${filtroEstado === e.estado ? styles.resumenCardActive : ''}`}
-                style={filtroEstado === e.estado ? { borderColor: e.color, background: e.bg } : {}}
-                onClick={() => setFiltroEstado(filtroEstado === e.estado ? '' : e.estado)}
-              >
-                <span className={styles.resumenIcon}>{e.emoji}</span>
-                <span className={styles.resumenCount} style={filtroEstado === e.estado ? { color: e.color } : {}}>
-                  {conteoCanonicos[e.estado] ?? 0}
-                </span>
-                <span className={styles.resumenLabel}>{e.label}</span>
-              </button>
-            ))}
+          {/* ── Resumen por estado (funciona como filtro) ──────────────────── */}
+          <div className={styles.resumenGrid} role="group" aria-label="Filtrar por estado">
+            {LISTA_ESTADOS_POSTULACION.map((e) => {
+              const activo = filtroEstado === e.estado;
+              return (
+                <button
+                  key={e.estado}
+                  type="button"
+                  className={`${styles.resumenCard} ${styles[`tono_${e.tone}`]} ${activo ? styles.resumenActivo : ''}`}
+                  aria-pressed={activo}
+                  onClick={() => setFiltro(activo ? '' : e.estado)}
+                >
+                  <span className={styles.resumenIcono}><Icon name={e.icon} size={18} /></span>
+                  <span className={styles.resumenCount}>{conteoPorEstado[e.estado] ?? 0}</span>
+                  <span className={styles.resumenLabel}>{e.label}</span>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Indicador de filtro activo */}
           {filtroEstado && (
             <div className={styles.filtroActivo}>
               Mostrando: <strong>{getEstadoInfo(filtroEstado).label}</strong>
-              <button className={styles.limpiarFiltro} onClick={() => setFiltroEstado('')}>
-                ✕ Limpiar filtro
+              <button type="button" className={styles.limpiarFiltro} onClick={() => setFiltro('')}>
+                <Icon name="close" size={14} /> Ver todas
               </button>
             </div>
           )}
 
-          {/* ── Lista de postulaciones ───────────────────────────────────── */}
-          <div className={styles.postulacionesList}>
-            {filtradas.length === 0 ? (
-              <p className={styles.sinResultados}>No hay postulaciones con ese estado.</p>
+          {/* ── Lista ──────────────────────────────────────────────────────── */}
+          <div className={styles.postulacionesList} aria-busy={loading}>
+            {postulaciones.length === 0 && !loading ? (
+              <p className={styles.sinResultados}>No tenés postulaciones en este estado.</p>
             ) : (
-              filtradas.map((p) => {
+              postulaciones.map((p) => {
                 const estado = getEstadoInfo(p.estado);
-
+                const o = p.oferta;
+                const chat = ESTADOS_HABILITAN_CHAT.includes(normalizarEstado(p.estado)) && o?.creadaPorUsuarioId;
                 return (
-                  <div
-                    key={p.id}
-                    className={styles.postulacionCard}
-                    style={{ borderLeftColor: estado.color }}
-                  >
-                    {/* Cabecera: oferta + empresa + estado */}
+                  <article key={p.id} className={`${styles.postulacionCard} ${styles[`borde_${estado.tone}`]}`}>
                     <div className={styles.cardHeader}>
-                      <div>
-                        <h3 className={styles.ofertaTitulo}>
-                          {p.oferta?.titulo ?? 'Oferta eliminada'}
-                        </h3>
+                      <div className={styles.cardTitulos}>
+                        <h2 className={styles.ofertaTitulo}>{o?.titulo ?? 'Oferta eliminada'}</h2>
                         <p className={styles.empresaNombre}>
-                          {p.oferta?.empresa?.razonSocial ?? '—'}
+                          {o?.empresaId
+                            ? <Link to={`/empresa/${o.empresaId}`}>{o.empresa?.razonSocial ?? '—'}</Link>
+                            : (o?.empresa?.razonSocial ?? '—')}
                         </p>
                       </div>
-                      <span
-                        className={styles.estadoBadge}
-                        style={{ background: estado.bg, color: estado.color, border: `1px solid ${estado.color}` }}
-                      >
-                        {estado.emoji} {estado.label}
-                      </span>
+                      <span className={`badge badge-tone-${estado.tone} ${styles.estadoBadge}`}>{estado.label}</span>
                     </div>
 
-                    {/* Fechas y detalles */}
-                    <div className={styles.cardMeta}>
-                      <span>📅 Postulado el {formatFecha(p.fechaPostulacion ?? p.createdAt)}</span>
+                    <ul className={styles.cardMeta}>
+                      <li><Icon name="calendar" size={14} /> Postulado el {formatFecha(p.fechaPostulacion ?? p.createdAt)}</li>
                       {p.ultimaActualizacion && (
-                        <span>🔄 Actualizado: {formatFechaHora(p.ultimaActualizacion)}</span>
+                        <li><Icon name="refresh" size={14} /> Actualizado el {formatFecha(p.ultimaActualizacion)}</li>
                       )}
-                      {p.oferta?.ciudad    && <span>📍 {p.oferta.ciudad}</span>}
-                      {p.oferta?.modalidad && <span>💼 {p.oferta.modalidad}</span>}
-                    </div>
+                      {o?.ciudad && <li><Icon name="mapPin" size={14} /> {o.ciudad}</li>}
+                      {o?.modalidad && <li><Icon name="briefcase" size={14} /> {modalidadLabel(o.modalidad)}</li>}
+                    </ul>
 
-                    {/* Acciones */}
+                    {o && o.estado !== 'activa' && (
+                      <p className={styles.avisoOferta}>
+                        <Icon name="info" size={14} />
+                        {o.estado === 'cerrada'
+                          ? 'La oferta ya no recibe postulaciones; tu proceso puede seguir.'
+                          : 'La oferta está pausada por la empresa.'}
+                      </p>
+                    )}
+
                     <div className={styles.cardActions}>
-                      {p.oferta?.id && (
-                        <Link to={`/ofertas/${p.oferta.id}`} className="btn-small">
-                          Ver oferta
-                        </Link>
+                      {o?.id && (
+                        <Link to={`/ofertas/${o.id}`} className="btn-secondary">Ver oferta</Link>
                       )}
-                      {/* Chat: solo cuando la postulación está en estado activo y hay
-                          un reclutador responsable identificado (creadaPorUsuarioId) —
-                          es quien realmente puede chatear con el candidato, no el
-                          admin_empresa (RBAC-06 / reglas de chat). */}
-                      {ESTADOS_HABILITAN_CHAT.includes(normalizarEstado(p.estado)) && p.oferta?.creadaPorUsuarioId && (
-                        <Link
-                          to={`/chat/${p.oferta.creadaPorUsuarioId}`}
-                          className={styles.btnChat}
-                          title="Chatear con el reclutador de esta empresa"
-                        >
-                          💬 Chatear con reclutador
+                      {chat && (
+                        <Link to={`/chat/${o.creadaPorUsuarioId}`} className="btn-primary" title="Chatear con el reclutador responsable de esta oferta">
+                          <Icon name="message" size={16} /> Chatear con el reclutador
                         </Link>
                       )}
                     </div>
-                  </div>
+                  </article>
                 );
               })
             )}
           </div>
 
-          <Paginacion pagination={pagination} onPageChange={cargar} />
+          <Paginacion pagination={pagination} onPageChange={irAPagina} />
         </>
       )}
     </div>

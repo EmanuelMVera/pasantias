@@ -1,160 +1,98 @@
-/* ── OfertasPage ─────────────────────────────────────────────────────────── */
+/* OfertasPage.module.css — Explorador de ofertas del alumno/egresado. */
 
-/* ── Tabs ────────────────────────────────────────────────────────────────── */
-.tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  border-bottom: 2px solid var(--border);
-  padding-bottom: 0;
-}
+.filtros { margin-bottom: var(--space-5); }
 
-.tab {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  background: none;
-  border: none;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
-  padding: 0.6rem 1.1rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-family: var(--font-primary);
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.tab:hover {
-  color: var(--secondary);
-}
-
-.tabActive {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
-}
-
-.tabCount {
-  background: var(--primary-light);
-  color: var(--primary-dark);
-  border-radius: 20px;
-  padding: 0.05rem 0.45rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.tabActive .tabCount {
-  background: var(--primary);
-  color: #fff;
-}
-
-/* ── Aviso recomendadas ──────────────────────────────────────────────────── */
 .recInfo {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
   border-radius: var(--radius);
-  padding: 0.6rem 1rem;
-  font-size: 0.85rem;
-  color: #92400e;
-  margin-bottom: 1.25rem;
+  background: var(--info-soft);
+  color: var(--info-text);
+  font-size: 0.87rem;
 }
 
-/* ── Resultado count ─────────────────────────────────────────────────────── */
+.recInfo a { color: inherit; font-weight: 700; }
+
 .resultCount {
+  margin: 0 0 var(--space-3);
   font-size: 0.85rem;
   color: var(--text-muted);
-  margin-bottom: 1rem;
 }
 
-/* ── Oferta Card ─────────────────────────────────────────────────────────── */
+/* ── Tarjeta de oferta ────────────────────────────────────────────────────── */
 .card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
-  box-shadow: var(--shadow-card);
-  position: relative;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .card:hover {
-  transform: translateY(-3px);
   border-color: var(--primary);
-  box-shadow: 0 6px 20px rgba(0, 115, 173, 0.15);
+  box-shadow: var(--shadow-card);
 }
 
-.matchPill {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fde68a;
-  border-radius: 20px;
-  padding: 0.1rem 0.55rem;
-  font-size: 0.72rem;
-  font-weight: 700;
+.cardBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-height: 22px;
 }
+
+.match { font-variant-numeric: tabular-nums; }
 
 .cardTitle {
-  font-size: 1rem;
+  margin: var(--space-1) 0 0;
+  font-size: 1.02rem;
   font-weight: 700;
-  color: var(--secondary);
-  padding-right: 5rem; /* evita solapamiento con matchPill */
+  line-height: 1.35;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
 }
 
 .cardEmpresa {
-  color: var(--primary);
-  font-weight: 700;
-  font-size: 0.88rem;
   margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-soft);
 }
+
+.cardEmpresa a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.cardEmpresa a:hover { text-decoration: underline; }
 
 .cardMeta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.cardMeta span {
+  gap: var(--space-1) var(--space-3);
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
   font-size: 0.82rem;
   color: var(--text-muted);
 }
 
-.fechaLimite {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  margin: 0;
-}
-
-/* ── Empty state ─────────────────────────────────────────────────────────── */
-.emptyState {
-  display: flex;
-  flex-direction: column;
+.cardMeta li {
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 3rem 1.5rem;
-  background: var(--bg-card);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
+  gap: 4px;
+}
+
+.cardCta {
+  margin-top: auto;
   text-align: center;
+  text-decoration: none;
 }
 
-.emptyIcon {
-  font-size: 3rem;
-}
-
-.emptyState h3 {
-  font-size: 1.05rem;
-  color: var(--secondary);
-  margin: 0;
-}
-
-/* ── Skeletons ───────────────────────────────────────────────────────────── */
+/* ── Skeletons ────────────────────────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -400px 0; }
   100% { background-position:  400px 0; }
@@ -162,14 +100,18 @@
 
 .skeletonGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
   gap: 1.5rem;
 }
 
 .skeletonCard {
   height: 200px;
-  border-radius: var(--radius);
-  background: linear-gradient(90deg, #e8edf0 25%, #f4f6f8 50%, #e8edf0 75%);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, var(--surface-muted) 25%, var(--surface) 50%, var(--surface-muted) 75%);
   background-size: 400px 100%;
   animation: shimmer 1.4s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonCard { animation: none; }
 }

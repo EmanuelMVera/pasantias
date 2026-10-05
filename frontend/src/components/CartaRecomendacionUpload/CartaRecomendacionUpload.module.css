@@ -1,4 +1,30 @@
 /* Duplicado a propósito de CvUpload.module.css (CSS Modules escopa por archivo). */
+.intro {
+  margin: 0;
+  font-size: 0.87rem;
+  color: var(--text-muted);
+}
+
+.actual {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+}
+
+.linkBoton {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .cvUpload {
   display: flex;
   align-items: center;
@@ -6,8 +32,10 @@
   flex-wrap: wrap;
 }
 
+.cvUpload input[type='file'] { max-width: 100%; }
+
 .cvHint {
   font-size: 0.78rem;
   color: var(--text-muted);
-  margin-top: 0.25rem;
+  margin: 0;
 }

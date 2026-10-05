@@ -1,2 +1,212 @@
-/* Estilos específicos de OfertaDetallePage */
-/* Agregar aquí estilos propios de esta página cuando se necesiten */
+/* OfertaDetallePage.module.css — Detalle de oferta del alumno/egresado. */
+
+/* ── Cabecera ─────────────────────────────────────────────────────────────── */
+.cabecera {
+  margin: var(--space-4) 0 var(--space-5);
+}
+
+.cabeceraBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+h1.titulo {
+  margin: 0;
+  font-size: clamp(1.4rem, 1.1rem + 1.2vw, 1.9rem);
+  line-height: 1.25;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.empresa {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.empresa a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.empresa a:hover { text-decoration: underline; }
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.meta li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.87rem;
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+.tipoDesc {
+  margin: var(--space-3) 0 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+/* ── Grilla contenido + panel ─────────────────────────────────────────────── */
+.grilla {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.contenido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.texto {
+  margin: 0;
+  line-height: 1.7;
+  color: var(--text);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.tagCarrera {
+  background: var(--info-soft);
+  color: var(--info-text);
+}
+
+.lateral {
+  position: sticky;
+  top: calc(var(--chrome-min-h, 64px) + var(--space-4));
+  min-width: 0;
+}
+
+/* ── Panel "Tu postulación" ───────────────────────────────────────────────── */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.form :global(.form-group) { margin: 0; }
+
+.form textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.opcional {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.contador {
+  align-self: flex-end;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.panelTexto {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-soft);
+}
+
+.panelOk,
+.panelAviso {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 0.93rem;
+  font-weight: 600;
+}
+
+.panelOk { color: var(--success-text); }
+.panelAviso { color: var(--text-soft); }
+
+.panelOk :global(svg),
+.panelAviso :global(svg) { flex-shrink: 0; margin-top: 1px; }
+
+.panelDatos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+}
+
+.panelDatos div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.panelDatos dt {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.panelDatos dd {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.panelAcciones {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.panelAcciones a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+}
+
+@media (max-width: 900px) {
+  .grilla { grid-template-columns: minmax(0, 1fr); }
+  /* En una sola columna el panel va primero: postularse no queda al fondo. */
+  .lateral { position: static; order: -1; }
+}

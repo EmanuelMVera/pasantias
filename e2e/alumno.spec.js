@@ -34,4 +34,12 @@ test('alumno: login → ver oferta → postularse → Mis Postulaciones', async 
     await expect(fila).toBeVisible();
     await expect(fila).toContainText(/en revisi[oó]n/i);
   });
+
+  await test.step('5. volver al detalle: ya postulado, sin formulario', async () => {
+    await page.locator('[class*="postulacionCard"]').filter({ hasText: fx.ofertaActiva.titulo }).first()
+      .getByRole('link', { name: /ver oferta/i }).click();
+    await expect(page).toHaveURL(/\/ofertas\/\d+$/);
+    await expect(page.getByText(/ya te postulaste/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /enviar postulación/i })).toHaveCount(0);
+  });
 });

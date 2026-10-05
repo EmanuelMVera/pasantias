@@ -1,5 +1,7 @@
 const crypto = require('crypto');
-const { Perfil, Usuario, Archivo } = require('../models');
+const {
+  Perfil, Usuario, Archivo, EmpresaUsuario, Postulacion, Oferta,
+} = require('../models');
 const HttpError = require('../utils/httpError');
 const { EXT_POR_MIME, firmaCoincide, sanitizarNombreOriginal } = require('../utils/archivoNombre');
 const { procesarSubidaImagen, establecerUrlExterna } = require('../services/archivoImagen.service');
@@ -171,6 +173,33 @@ const uploadFoto = async (req, res) => {
   return res.json({ success: true, message: 'Foto de perfil actualizada.', fotoPerfil: urlPublica, archivoId });
 };
 
+/**
+ * ¿Quién ve un perfil PRIVADO? El propio alumno (su vista previa), el admin del
+ * sistema (moderación) y los integrantes activos de una empresa a cuyas ofertas
+ * se postuló: postularse es compartir el perfil con esa empresa, así que la
+ * privacidad no puede dejar al reclutador sin ver a su propio candidato.
+ */
+async function puedeVerPerfilPrivado(solicitante, alumnoId) {
+  if (!solicitante) return false;
+  if (solicitante.rol === 'admin' || solicitante.id === alumnoId) return true;
+  if (solicitante.rol !== 'empresa') return false;
+
+  const membresias = await EmpresaUsuario.findAll({
+    where: { usuarioId: solicitante.id, activo: true },
+    attributes: ['empresaId'],
+  });
+  if (membresias.length === 0) return false;
+
+  const postulaciones = await Postulacion.count({
+    where: { usuarioId: alumnoId },
+    include: [{
+      model: Oferta, as: 'oferta', attributes: [], required: true,
+      where: { empresaId: membresias.map((m) => m.empresaId) },
+    }],
+  });
+  return postulaciones > 0;
+}
+
 const getPerfilPublico = async (req, res) => {
   const usuario = await Usuario.findOne({
     where: { id: req.params.id, activo: true },
@@ -191,9 +220,9 @@ const getPerfilPublico = async (req, res) => {
     ],
   });
 
-  // visibilidadPerfil es BOOLEAN: false → privado. El admin del sistema puede
-  // ver cualquier perfil (moderación); el resto respeta la preferencia.
-  if (perfil && perfil.visibilidadPerfil === false && req.usuario?.rol !== 'admin') {
+  // visibilidadPerfil es BOOLEAN: false → privado. Un perfil privado no aparece
+  // para cualquiera, pero sí para quien lo necesita (puedeVerPerfilPrivado).
+  if (perfil && perfil.visibilidadPerfil === false && !(await puedeVerPerfilPrivado(req.usuario, usuario.id))) {
     const err = new HttpError(403, 'Este perfil es privado.');
     err.code = 'PERFIL_PRIVADO';
     throw err;

@@ -2469,7 +2469,7 @@
       },
       "DashboardAlumno": {
         "type": "object",
-        "description": "Métricas personales, ofertas recomendadas y % de completitud del perfil.",
+        "description": "Métricas personales, ofertas recomendadas, % de completitud del perfil y `cvCargado` (sin CV no se puede postular).",
         "additionalProperties": true
       },
       "EquipoMiembro": {
@@ -3386,7 +3386,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Respeta `visibilidadPerfil`. Cualquier usuario autenticado.",
+        "description": "Cualquier usuario autenticado. Un perfil privado (`visibilidadPerfil=false`) responde 403 `PERFIL_PRIVADO`, salvo para el propio alumno, el admin del sistema y los integrantes activos de una empresa a cuyas ofertas se postuló.",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -5050,13 +5050,21 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Público. Incrementa el contador de vistas. 404 si no está `activa` y con moderación resuelta (`aprobada`/`auto_aprobada`).",
+        "description": "Público (sesión opcional). Incrementa el contador de vistas. 404 si no está `activa` y con moderación resuelta (`aprobada`/`auto_aprobada`), salvo para el alumno/egresado que ya se postuló: él sigue viendo la oferta pausada o cerrada. Con sesión de alumno/egresado agrega `miPostulacion` (`{ id, estado, fechaPostulacion }` o `null`) y `cvCargado` (sin CV la postulación se rechaza con `CV_REQUERIDO`).",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
           }
         ],
-        "security": []
+        "security": [
+          {},
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [

@@ -1,71 +1,54 @@
 /**
- * OfertasPage.jsx — Explorador de ofertas disponibles para el alumno/egresado.
+ * OfertasPage.jsx — Explorador de ofertas del alumno/egresado.
  *
- * Funcionalidades:
- * - Búsqueda y filtros (título, área, modalidad, ciudad)
- * - Grid de tarjetas de ofertas
- * - Tab "Ver recomendadas" que consume GET /api/ofertas/recomendadas
- *
- * Ruta: /ofertas
- * Roles: alumno, egresado
+ * Ruta: /ofertas (roles alumno, egresado)
+ * - Pestaña "Todas": GET /api/ofertas con filtros (título, área, modalidad,
+ *   tipo de puesto, ciudad), aplicados con "Buscar" — no en cada tecla.
+ * - Pestaña "Recomendadas": GET /api/ofertas/recomendadas, lazy (solo al entrar),
+ *   ordenadas por compatibilidad con el perfil.
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { ofertaService } from '../../services/oferta.service';
 import Paginacion from '../../components/Paginacion/Paginacion';
+import PageHeader from '../../components/ui/PageHeader';
+import Tabs, { TabPanel } from '../../components/ui/Tabs';
+import EmptyState from '../../components/ui/EmptyState';
+import Icon from '../../components/ui/Icon';
+import { MODALIDAD_LABEL, TIPO_PUESTO, formatFecha, modalidadLabel, puestoBadge } from '../../utils/ofertaPresentacion';
 import styles from './OfertasPage.module.css';
 
 const FILTROS_VACIOS = { q: '', area: '', modalidad: '', ciudad: '', tipoPuesto: '' };
 const LIMITE = 12;
 
-const TIPO_PUESTO_LABEL = { pasante: '🎓 Pasante', trainee: '🌱 Trainee', junior: '💼 Junior' };
-
-// Tarjeta individual de oferta
 function OfertaCard({ oferta }) {
-  // Muestra tipoPuesto si existe (oferta nueva), si no fallback a nivelExperiencia legacy
-  const puestoBadge = oferta.tipoPuesto
-    ? TIPO_PUESTO_LABEL[oferta.tipoPuesto] ?? oferta.tipoPuesto
-    : oferta.nivelExperiencia?.replace(/_/g, ' ');
-
+  const badge = puestoBadge(oferta);
   return (
-    <div className={styles.card}>
-      {oferta.matchScore != null && (
-        <span className={styles.matchPill}>⭐ {oferta.matchScore}% match</span>
-      )}
-      <h3 className={styles.cardTitle}>{oferta.titulo}</h3>
-      <p className={styles.cardEmpresa}>
-        {oferta.empresaId ? (
-          <Link
-            to={`/empresa/${oferta.empresaId}`}
-            style={{ color: 'inherit', textDecoration: 'none' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {oferta.empresa?.razonSocial}
-          </Link>
-        ) : (
-          oferta.empresa?.razonSocial
+    <article className={styles.card}>
+      <div className={styles.cardBadges}>
+        {badge && <span className={`badge badge-tone-${badge.tone}`}>{badge.label}</span>}
+        {oferta.matchScore != null && (
+          <span className={`badge badge-tone-blue ${styles.match}`}>{oferta.matchScore}% compatible</span>
         )}
-      </p>
-      <div className={styles.cardMeta}>
-        {oferta.ciudad     && <span>📍 {oferta.ciudad}</span>}
-        {oferta.modalidad  && <span>💼 {oferta.modalidad}</span>}
-        {oferta.remuneracion && <span>💰 {oferta.remuneracion}</span>}
       </div>
-      {puestoBadge && (
-        <span className={`badge badge-puesto badge-${oferta.tipoPuesto ?? 'legacy'}`}>
-          {puestoBadge}
-        </span>
-      )}
-      {oferta.fechaLimite && (
-        <p className={styles.fechaLimite}>
-          📅 Cierre: {new Date(oferta.fechaLimite).toLocaleDateString('es-AR')}
+      <h3 className={styles.cardTitle}>{oferta.titulo}</h3>
+      {oferta.empresa?.razonSocial && (
+        <p className={styles.cardEmpresa}>
+          {oferta.empresaId
+            ? <Link to={`/empresa/${oferta.empresaId}`}>{oferta.empresa.razonSocial}</Link>
+            : oferta.empresa.razonSocial}
         </p>
       )}
-      <Link to={`/ofertas/${oferta.id}`} className="btn-secondary" style={{ marginTop: 'auto' }}>
-        Ver detalle →
+      <ul className={styles.cardMeta}>
+        {oferta.ciudad && <li><Icon name="mapPin" size={14} /> {oferta.ciudad}</li>}
+        {oferta.modalidad && <li><Icon name="briefcase" size={14} /> {modalidadLabel(oferta.modalidad)}</li>}
+        {oferta.fechaLimite && <li><Icon name="clock" size={14} /> Cierra el {formatFecha(oferta.fechaLimite)}</li>}
+      </ul>
+      <Link to={`/ofertas/${oferta.id}`} className={`btn-secondary ${styles.cardCta}`} aria-label={`Ver detalle: ${oferta.titulo}`}>
+        Ver detalle
       </Link>
-    </div>
+    </article>
   );
 }
 
@@ -80,8 +63,7 @@ export default function OfertasPage() {
   const [pagTodas, setPagTodas]     = useState(null);
   const [pagRec, setPagRec]         = useState(null);
 
-  // Carga todas las ofertas (con filtros). `filtrosArg` explícito para poder
-  // limpiar sin esperar al re-render del state.
+  // `filtrosArg` explícito para poder limpiar sin esperar al re-render del state.
   const cargarOfertas = useCallback(async (pagina = 1, filtrosArg = filtros) => {
     setLoading(true);
     try {
@@ -96,25 +78,22 @@ export default function OfertasPage() {
     }
   }, [filtros]);
 
-  // Carga ofertas recomendadas (lazy: solo al entrar a la tab)
   const cargarRecomendadas = useCallback(async (pagina = 1) => {
     setLoadingRec(true);
     try {
       const { data } = await ofertaService.getRecomendadas({ page: pagina, limit: LIMITE });
       setRecomendadas(data.data ?? []);
       setPagRec(data.pagination ?? null);
-      setRecCargadas(true);
     } catch {
       setRecomendadas([]);
       setPagRec(null);
-      setRecCargadas(true);
     } finally {
+      setRecCargadas(true);
       setLoadingRec(false);
     }
   }, []);
 
-  // Solo carga inicial: los cambios de filtro se aplican con el botón Buscar
-  // (handleBuscar), no en cada tecla — por eso no depende de cargarOfertas.
+  // Solo carga inicial: los cambios de filtro se aplican con el botón Buscar.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { cargarOfertas(1); }, []);
 
@@ -124,132 +103,99 @@ export default function OfertasPage() {
     setFiltros(FILTROS_VACIOS);
     cargarOfertas(1, FILTROS_VACIOS);
   };
+  const hayFiltros = Object.values(filtros).some(Boolean);
 
-  const handleTabRecomendadas = () => {
-    setModo('recomendadas');
-    if (!recCargadas) cargarRecomendadas(1);
+  const cambiarModo = (m) => {
+    setModo(m);
+    if (m === 'recomendadas' && !recCargadas) cargarRecomendadas(1);
   };
 
-  const listaActual = modo === 'recomendadas' ? recomendadas : ofertas;
-  const cargandoActual = modo === 'recomendadas' ? loadingRec : loading;
-  const pagActual = modo === 'recomendadas' ? pagRec : pagTodas;
-  const onPageActual = modo === 'recomendadas' ? cargarRecomendadas : cargarOfertas;
+  const esRec = modo === 'recomendadas';
+  const lista = esRec ? recomendadas : ofertas;
+  const cargando = esRec ? (loadingRec || !recCargadas) : loading;
+  const pag = esRec ? pagRec : pagTodas;
+  const total = pag?.total ?? lista.length;
 
   return (
     <div className="page-container">
+      <PageHeader
+        title="Ofertas disponibles"
+        subtitle="Pasantías y primeros empleos publicados por empresas aprobadas por el instituto."
+      />
 
-      {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="dashboard-header">
-        <h1>Ofertas Disponibles</h1>
-        <Link to="/dashboard" className="btn-secondary">← Dashboard</Link>
-      </div>
+      <Tabs
+        idPrefix="ofertas"
+        ariaLabel="Ofertas"
+        value={modo}
+        onChange={cambiarModo}
+        tabs={[
+          { key: 'todas', label: 'Todas', icon: 'briefcase', count: !loading && pagTodas ? pagTodas.total : undefined },
+          { key: 'recomendadas', label: 'Recomendadas para vos', icon: 'trophy', count: recCargadas && pagRec ? pagRec.total : undefined },
+        ]}
+      />
 
-      {/* ── Tabs ───────────────────────────────────────────────────────── */}
-      <div className={styles.tabs}>
-        <button
-          className={`${styles.tab} ${modo === 'todas' ? styles.tabActive : ''}`}
-          onClick={() => setModo('todas')}
-        >
-          🏢 Todas las ofertas
-          {!loading && pagTodas && <span className={styles.tabCount}>{pagTodas.total}</span>}
-        </button>
-        <button
-          className={`${styles.tab} ${modo === 'recomendadas' ? styles.tabActive : ''}`}
-          onClick={handleTabRecomendadas}
-        >
-          ⭐ Recomendadas para vos
-          {recCargadas && pagRec && <span className={styles.tabCount}>{pagRec.total}</span>}
-        </button>
-      </div>
+      <TabPanel idPrefix="ofertas" tabKey={modo}>
+        {!esRec && (
+          <form onSubmit={handleBuscar} className={`filtros-form ${styles.filtros}`} role="search" aria-label="Filtrar ofertas">
+            <input name="q" placeholder="Buscar por título" aria-label="Buscar por título" value={filtros.q} onChange={handleFiltro} />
+            <input name="area" placeholder="Área" aria-label="Área" value={filtros.area} onChange={handleFiltro} />
+            <select name="modalidad" aria-label="Modalidad" value={filtros.modalidad} onChange={handleFiltro}>
+              <option value="">Toda modalidad</option>
+              {Object.entries(MODALIDAD_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+            <select name="tipoPuesto" aria-label="Tipo de puesto" value={filtros.tipoPuesto} onChange={handleFiltro}>
+              <option value="">Todo tipo de puesto</option>
+              {Object.entries(TIPO_PUESTO).map(([v, t]) => <option key={v} value={v}>{t.label}</option>)}
+            </select>
+            <input name="ciudad" placeholder="Ciudad" aria-label="Ciudad" value={filtros.ciudad} onChange={handleFiltro} />
+            <button type="submit" className="btn-primary">Buscar</button>
+            {hayFiltros && (
+              <button type="button" className="btn-secondary" onClick={handleLimpiar}>Limpiar</button>
+            )}
+          </form>
+        )}
 
-      {/* ── Filtros (solo en modo "todas") ─────────────────────────────── */}
-      {modo === 'todas' && (
-        <form onSubmit={handleBuscar} className="filtros-form">
-          <input
-            name="q"
-            placeholder="🔍 Buscar por título..."
-            value={filtros.q}
-            onChange={handleFiltro}
-          />
-          <input
-            name="area"
-            placeholder="Área"
-            value={filtros.area}
-            onChange={handleFiltro}
-          />
-          <select name="modalidad" value={filtros.modalidad} onChange={handleFiltro}>
-            <option value="">Toda modalidad</option>
-            <option value="presencial">Presencial</option>
-            <option value="remoto">Remoto</option>
-            <option value="hibrido">Híbrido</option>
-          </select>
-          <select name="tipoPuesto" value={filtros.tipoPuesto} onChange={handleFiltro}>
-            <option value="">Tipo de puesto</option>
-            <option value="pasante">🎓 Pasante</option>
-            <option value="trainee">🌱 Trainee</option>
-            <option value="junior">💼 Junior</option>
-          </select>
-          <input
-            name="ciudad"
-            placeholder="Ciudad"
-            value={filtros.ciudad}
-            onChange={handleFiltro}
-          />
-          <button type="submit" className="btn-primary">Buscar</button>
-          {(filtros.q || filtros.area || filtros.modalidad || filtros.ciudad || filtros.tipoPuesto) && (
-            <button type="button" className="btn-secondary" onClick={handleLimpiar}>
-              Limpiar
-            </button>
-          )}
-        </form>
-      )}
-
-      {/* ── Aviso recomendadas ──────────────────────────────────────────── */}
-      {modo === 'recomendadas' && recCargadas && (
-        <div className={styles.recInfo}>
-          ⭐ Las ofertas se ordenan por compatibilidad con tu perfil.
-          ¿Pocas recomendaciones?{' '}
-          <Link to="/perfil">Completá tu perfil</Link> para mejorar los resultados.
-        </div>
-      )}
-
-      {/* ── Resultados ─────────────────────────────────────────────────── */}
-      {cargandoActual ? (
-        <div className={styles.skeletonGrid}>
-          {[1,2,3,4,5,6].map(i => <div key={i} className={styles.skeletonCard} />)}
-        </div>
-      ) : listaActual.length === 0 ? (
-        <div className={styles.emptyState}>
-          <span className={styles.emptyIcon}>
-            {modo === 'recomendadas' ? '🎯' : '🔍'}
-          </span>
-          <h3>
-            {modo === 'recomendadas'
-              ? 'Completá tu perfil para recibir recomendaciones'
-              : 'No hay ofertas con esos filtros'}
-          </h3>
-          {modo === 'recomendadas' ? (
-            <Link to="/perfil" className="btn-primary">Completar perfil</Link>
-          ) : (
-            <button className="btn-secondary" onClick={handleLimpiar}>
-              Ver todas las ofertas
-            </button>
-          )}
-        </div>
-      ) : (
-        <>
-          <p className={styles.resultCount}>
-            {(pagActual?.total ?? listaActual.length)} oferta{(pagActual?.total ?? listaActual.length) !== 1 ? 's' : ''}
-            {modo === 'recomendadas' ? ' recomendadas' : ' encontradas'}
+        {esRec && recCargadas && lista.length > 0 && (
+          <p className={styles.recInfo}>
+            Ordenadas por compatibilidad con tu perfil.{' '}
+            <Link to="/perfil">Completá tu perfil</Link> para mejorar los resultados.
           </p>
-          <div className="ofertas-grid">
-            {listaActual.map((oferta) => (
-              <OfertaCard key={oferta.id} oferta={oferta} />
-            ))}
+        )}
+
+        {cargando ? (
+          <div className={styles.skeletonGrid} aria-hidden="true">
+            {[1, 2, 3, 4, 5, 6].map((i) => <div key={i} className={styles.skeletonCard} />)}
           </div>
-          <Paginacion pagination={pagActual} onPageChange={onPageActual} />
-        </>
-      )}
+        ) : lista.length === 0 ? (
+          esRec ? (
+            <EmptyState
+              iconName="user"
+              title="Todavía no tenemos recomendaciones para vos."
+              hint="Cargá tu área de interés, habilidades y ubicación en el perfil."
+            >
+              <Link to="/perfil" className="btn-primary">Completar perfil</Link>
+            </EmptyState>
+          ) : (
+            <EmptyState
+              iconName="search"
+              title={hayFiltros ? 'No hay ofertas con esos filtros.' : 'No hay ofertas publicadas por ahora.'}
+              hint={hayFiltros ? 'Probá con otros filtros.' : 'Volvé a revisar en unos días.'}
+            >
+              {hayFiltros && <button type="button" className="btn-secondary" onClick={handleLimpiar}>Ver todas las ofertas</button>}
+            </EmptyState>
+          )
+        ) : (
+          <>
+            <p className={styles.resultCount}>
+              {total} oferta{total !== 1 ? 's' : ''}{esRec ? ' recomendada' : ' encontrada'}{total !== 1 ? 's' : ''}
+            </p>
+            <div className="ofertas-grid">
+              {lista.map((oferta) => <OfertaCard key={oferta.id} oferta={oferta} />)}
+            </div>
+            <Paginacion pagination={pag} onPageChange={esRec ? cargarRecomendadas : cargarOfertas} />
+          </>
+        )}
+      </TabPanel>
     </div>
   );
 }

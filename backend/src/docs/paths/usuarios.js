@@ -57,7 +57,7 @@ module.exports = {
   '/api/users/{id}/perfil': {
     get: operation({
       tag: T, id: 'usuariosGetPerfilPublico', summary: 'Perfil público de otro usuario',
-      description: 'Respeta `visibilidadPerfil`. Cualquier usuario autenticado.',
+      description: 'Cualquier usuario autenticado. Un perfil privado (`visibilidadPerfil=false`) responde 403 `PERFIL_PRIVADO`, salvo para el propio alumno, el admin del sistema y los integrantes activos de una empresa a cuyas ofertas se postuló.',
       params: ['id'],
       responses: { 200: ok('Perfil') },
       errors: ['401', '403', '404'],

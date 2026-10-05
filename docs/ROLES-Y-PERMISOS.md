@@ -72,7 +72,7 @@ es autoridad de permisos).
 | Ver mi usuario (`GET /api/auth/me`), cambiar mi contraseña | — | ✅ | ✅ | ✅ | ✅ |
 | Ver mi perfil académico (`GET /api/users/perfil`) | — | ✅ | ✅ | ✅ | ✅ |
 | Editar mi perfil académico, subir CV / carta / foto | — | — | ✅ | — | — |
-| Ver perfil público de otro usuario / de una empresa | — | ✅ | ✅ | ✅ | ✅ |
+| Ver perfil público de otro usuario / de una empresa | — | ✅ | ✅¹⁰ | ✅¹⁰ | ✅¹⁰ |
 | Ver la ficha de un reclutador (`GET /api/empresas/reclutadores/:id/perfil`) | — | ✅ | ✅ con relación⁵ | ✅ misma empresa | ✅ misma empresa |
 | Mi perfil: ver / editar nombre, apellido, teléfono y ubicación; subir foto (`/api/empresas/reclutadores/mi-perfil[/foto]`) | — | — | — | — (403) | ✅ solo el propio⁹ |
 
@@ -80,7 +80,7 @@ es autoridad de permisos).
 
 | Acción | público | admin | alumno / egresado | admin_empresa | reclutador |
 |---|:--:|:--:|:--:|:--:|:--:|
-| Ver listado y detalle de ofertas (activas + moderadas) | 🌐 | 🌐 | 🌐 | 🌐 | 🌐 |
+| Ver listado y detalle de ofertas (activas + moderadas) | 🌐 | 🌐 | 🌐¹¹ | 🌐 | 🌐 |
 | Ver ofertas recomendadas para mi perfil | — | — | ✅ | — | — |
 | Crear una oferta (`POST /api/ofertas`) | — | — | — | — | ✅ |
 | Editar el contenido de una oferta (`PUT /api/ofertas/:id`) | — | — | — | — | ✅¹ |
@@ -225,6 +225,13 @@ una de sus ofertas.
   Email, rol, empresa, estado y contraseña no se editan ahí (la contraseña vive en
   Seguridad). La foto se sube como imagen validada (JPG/PNG/WEBP, 2 MB, magic bytes)
   y se guarda en `Usuario.fotoPerfil`: los reclutadores no tienen Perfil académico.
+- ¹⁰ **Perfil privado** (`visibilidadPerfil=false`): responde 403 `PERFIL_PRIVADO`
+  salvo para el propio alumno (vista previa), el admin del sistema y los integrantes
+  activos de una empresa a cuyas ofertas se postuló — postularse es compartir el
+  perfil con esa empresa.
+- ¹¹ Con sesión de alumno/egresado el detalle (`GET /api/ofertas/:id`) agrega
+  `miPostulacion` y `cvCargado`, y quien ya se postuló sigue viendo la oferta aunque
+  esté pausada o cerrada (para el resto es 404).
 - ⁸ `GET /api/empresas/equipo` sigue respondiendo al reclutador (lectura de la
   nómina, sin datos de gestión); todas las acciones de equipo (`solicitudes`,
   `solicitar`, `recuperacion`, `PATCH`/`DELETE` de miembros) son solo `admin_empresa`.

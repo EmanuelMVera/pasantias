@@ -1,218 +1,209 @@
-/* ── MisPostulacionesPage ────────────────────────────────────────────────── */
+/* MisPostulacionesPage.module.css — Postulaciones del alumno/egresado. */
 
-/* Resumen de estados (tabs clickeables) */
+/* ── Resumen por estado (filtro) ──────────────────────────────────────────── */
 .resumenGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 
 .resumenCard {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.9rem 0.75rem;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.3rem;
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s, transform 0.15s;
-  box-shadow: var(--shadow-card);
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
   font-family: var(--font-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.resumenCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 14px rgba(0, 115, 173, 0.12);
+.resumenCard:hover { border-color: var(--primary); }
+
+.resumenCard:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
-.resumenCardActive {
-  border-width: 2px;
-}
-
-.resumenIcon {
-  font-size: 1.4rem;
+.resumenIcono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-bottom: var(--space-1);
+  border-radius: 50%;
 }
 
 .resumenCount {
-  font-size: 1.6rem;
+  font-family: var(--font-numeric, var(--font-primary));
+  font-size: 1.45rem;
   font-weight: 800;
-  color: var(--secondary);
-  line-height: 1;
+  line-height: 1.1;
+  color: var(--text-strong);
 }
 
 .resumenLabel {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  text-align: center;
-  line-height: 1.3;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-soft);
 }
 
-/* Indicador filtro activo */
+.tono_gray .resumenIcono { background: var(--neutral-soft); color: var(--neutral-text); }
+.tono_blue .resumenIcono { background: var(--info-soft); color: var(--info-text); }
+.tono_violet .resumenIcono { background: var(--violet-soft); color: var(--violet-text); }
+.tono_green .resumenIcono { background: var(--success-soft); color: var(--success-text); }
+.tono_red .resumenIcono { background: var(--danger-soft); color: var(--danger-text); }
+
+.resumenActivo {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary) inset;
+  background: var(--primary-light);
+}
+
 .filtroActivo {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-4);
   font-size: 0.88rem;
-  color: var(--text-muted);
-  margin-bottom: 1rem;
+  color: var(--text-soft);
 }
 
 .limpiarFiltro {
-  background: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 var(--space-3);
   border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 0.1rem 0.6rem;
-  font-size: 0.78rem;
-  cursor: pointer;
-  color: var(--text-muted);
+  border-radius: 999px;
+  background: var(--surface);
   font-family: var(--font-primary);
-  transition: border-color 0.15s, color 0.15s;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  cursor: pointer;
 }
 
-.limpiarFiltro:hover {
-  border-color: var(--danger);
-  color: var(--danger);
-}
+.limpiarFiltro:hover { border-color: var(--primary); color: var(--primary); }
 
-/* ── Tarjetas de postulación ─────────────────────────────────────────────── */
+/* ── Lista ────────────────────────────────────────────────────────────────── */
 .postulacionesList {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--space-3);
 }
+
+.postulacionesList[aria-busy='true'] { opacity: 0.6; }
 
 .postulacionCard {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--primary);
-  border-radius: var(--radius);
-  padding: 1.25rem 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  transition: box-shadow 0.2s, transform 0.15s;
-  box-shadow: var(--shadow-card);
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
 }
 
-.postulacionCard:hover {
-  box-shadow: 0 4px 18px rgba(0, 115, 173, 0.12);
-  transform: translateX(2px);
-}
+.borde_gray { border-left-color: var(--neutral-text); }
+.borde_blue { border-left-color: var(--info-text); }
+.borde_violet { border-left-color: var(--violet-text); }
+.borde_green { border-left-color: var(--success); }
+.borde_red { border-left-color: var(--danger); }
 
 .cardHeader {
   display: flex;
-  justify-content: space-between;
   align-items: flex-start;
-  gap: 1rem;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 
-.ofertaTitulo {
+.cardTitulos { min-width: 0; }
+
+h2.ofertaTitulo {
+  margin: 0;
   font-size: 1rem;
   font-weight: 700;
-  color: var(--secondary);
-  margin: 0 0 0.2rem;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
 }
 
 .empresaNombre {
-  color: var(--primary);
+  margin: 2px 0 0;
   font-size: 0.88rem;
-  font-weight: 700;
-  margin: 0;
+  font-weight: 600;
+  color: var(--text-soft);
 }
 
-.estadoBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.3rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  white-space: nowrap;
-  flex-shrink: 0;
+.empresaNombre a {
+  color: var(--primary);
+  text-decoration: none;
 }
 
-/* Fechas y metadatos */
+.empresaNombre a:hover { text-decoration: underline; }
+
+.estadoBadge { flex-shrink: 0; }
+
 .cardMeta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.cardMeta span {
-  font-size: 0.82rem;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.83rem;
   color: var(--text-muted);
 }
 
-/* Acciones */
-.cardActions {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-/* Botón chat con reclutador */
-.btnChat {
+.cardMeta li {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  background: linear-gradient(135deg, #0073AD, #58ACFA);
-  color: #fff;
-  font-family: var(--font-primary);
-  font-size: 0.82rem;
-  font-weight: 700;
-  padding: 0.35rem 0.9rem;
-  border-radius: var(--radius);
-  text-decoration: none;
-  transition: opacity 0.15s, transform 0.15s;
-  box-shadow: 0 2px 8px rgba(0,115,173,0.25);
+  gap: 4px;
 }
 
-.btnChat:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-/* ── Empty state ─────────────────────────────────────────────────────────── */
-.emptyState {
+.avisoOferta {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.75rem;
-  padding: 3rem 1.5rem;
-  background: var(--bg-card);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-  text-align: center;
-}
-
-.emptyIcon {
-  font-size: 3rem;
-}
-
-.emptyState h3 {
-  font-size: 1.1rem;
-  color: var(--secondary);
+  gap: 6px;
   margin: 0;
+  font-size: 0.83rem;
+  color: var(--warning-text);
 }
 
-.emptyState p {
-  color: var(--text-muted);
-  font-size: 0.92rem;
-  max-width: 380px;
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cardActions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
 }
 
 .sinResultados {
-  color: var(--text-muted);
+  margin: 0;
+  padding: var(--space-5);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
   text-align: center;
-  padding: 2rem;
+  color: var(--text-muted);
 }
 
-/* ── Skeletons ───────────────────────────────────────────────────────────── */
+/* ── Skeleton ─────────────────────────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -400px 0; }
   100% { background-position:  400px 0; }
@@ -221,129 +212,28 @@
 .loadingList {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--space-3);
 }
 
 .skeletonCard {
   height: 120px;
-  border-radius: var(--radius);
-  background: linear-gradient(90deg, #e8edf0 25%, #f4f6f8 50%, #e8edf0 75%);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, var(--surface-muted) 25%, var(--surface) 50%, var(--surface-muted) 75%);
   background-size: 400px 100%;
   animation: shimmer 1.4s infinite;
 }
 
-/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .skeletonCard { animation: none; }
+}
+
+@media (max-width: 900px) {
+  .resumenGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 @media (max-width: 640px) {
-  .resumenGrid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  .cardHeader {
-    flex-direction: column;
-  }
-  .postulacionCard {
-    padding: 1rem;
-  }
+  .resumenGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+  .postulacionCard { padding: var(--space-4); }
+  .cardHeader { flex-direction: column; }
+  .cardActions a { min-height: 44px; }
 }
-
-/* ── Banner de éxito ─────────────────────────────────────────────────────── */
-.successBanner {
-  background: #eafaf1;
-  border: 1px solid #a9dfbf;
-  color: #1e8449;
-  border-radius: var(--radius);
-  padding: 0.75rem 1.25rem;
-  font-weight: 600;
-  font-size: 0.9rem;
-  margin-bottom: 1.25rem;
-  animation: fadeIn 0.3s ease;
-}
-@keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
-
-/* ── Modal ───────────────────────────────────────────────────────────────── */
-.modalOverlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(3px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-}
-
-.modal {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) * 1.5);
-  width: 100%;
-  max-width: 520px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
-  animation: slideUp 0.22s ease;
-}
-@keyframes slideUp {
-  from { transform: translateY(18px); opacity: 0; }
-  to   { transform: translateY(0);    opacity: 1; }
-}
-
-.modalHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 1.5rem 1.5rem 0;
-  gap: 1rem;
-}
-
-.modalHeader h2 {
-  font-size: 1.1rem;
-  margin: 0 0 0.25rem;
-}
-
-.modalSubtitle {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  margin: 0;
-}
-
-.modalClose {
-  background: none;
-  border: none;
-  font-size: 1.1rem;
-  cursor: pointer;
-  color: var(--text-muted);
-  padding: 0.1rem 0.3rem;
-  transition: color 0.15s;
-  flex-shrink: 0;
-}
-.modalClose:hover { color: var(--text-primary); }
-
-.modalBody {
-  padding: 1.25rem 1.5rem 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.opcional {
-  font-weight: 400;
-  color: var(--text-muted);
-  font-size: 0.82rem;
-}
-
-.charCount {
-  display: block;
-  text-align: right;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-top: 0.2rem;
-}
-
-.modalFooter {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.6rem;
-  margin-top: 0.5rem;
-}
-

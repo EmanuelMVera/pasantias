@@ -1,6 +1,6 @@
 'use strict';
 
-const { Oferta, Empresa } = require('../models');
+const { Oferta, Empresa, Postulacion, Perfil } = require('../models');
 const { Op } = require('sequelize');
 const ofertaService   = require('../services/oferta.service');
 const empresaService  = require('../services/empresa.service');
@@ -60,15 +60,54 @@ exports.getOfertasRecomendadas = async (req, res) => {
 
 // ── Detalle de oferta ─────────────────────────────────────────────────────────
 
+// Pública. Con sesión de alumno/egresado (optionalToken) agrega su situación:
+//   - miPostulacion: { id, estado, fechaPostulacion } o null → el detalle no
+//     vuelve a ofrecer el formulario a quien ya se postuló;
+//   - cvCargado: sin CV el backend rechaza la postulación (CV_REQUERIDO), así
+//     que el detalle lo avisa antes.
+// Una oferta que dejó de estar publicada (pausada, cerrada) sigue visible SOLO
+// para quien se postuló: es el contexto de su postulación ("Ver oferta" desde
+// Mis postulaciones). Para el resto responde el mismo 404.
 exports.getOfertaById = async (req, res) => {
-  const oferta = await Oferta.findOne({
-    where: { id: req.params.id, ...ofertaService.whereOfertaVisible() },
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
+  }
+
+  const oferta = await Oferta.findByPk(id, {
     include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'logo', 'rubro', 'ciudad'] }],
   });
-  if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
 
-  await oferta.increment('vistas');
-  return res.json({ success: true, data: oferta });
+  const esCandidato = ['alumno', 'egresado'].includes(req.usuario?.rol);
+  const [miPostulacion, perfil] = oferta && esCandidato
+    ? await Promise.all([
+      Postulacion.findOne({
+        where: { usuarioId: req.usuario.id, ofertaId: id },
+        attributes: ['id', 'estado', 'fechaPostulacion', 'createdAt'],
+      }),
+      Perfil.findOne({ where: { usuarioId: req.usuario.id }, attributes: ['cvPath'] }),
+    ])
+    : [null, null];
+
+  const visible = oferta && ofertaService.esOfertaVisible(oferta);
+  if (!oferta || (!visible && !miPostulacion)) {
+    return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
+  }
+
+  if (visible) await oferta.increment('vistas');
+
+  const data = oferta.toJSON();
+  if (esCandidato) {
+    data.miPostulacion = miPostulacion
+      ? {
+        id: miPostulacion.id,
+        estado: miPostulacion.estado,
+        fechaPostulacion: miPostulacion.fechaPostulacion ?? miPostulacion.createdAt,
+      }
+      : null;
+    data.cvCargado = Boolean(perfil?.cvPath);
+  }
+  return res.json({ success: true, data });
 };
 
 // ── Crear oferta ──────────────────────────────────────────────────────────────

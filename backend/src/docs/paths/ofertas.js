@@ -38,8 +38,8 @@ module.exports = {
   '/api/ofertas/{id}': {
     get: operation({
       tag: T, id: 'ofertasGet', summary: 'Detalle de una oferta',
-      description: 'Público. Incrementa el contador de vistas. 404 si no está `activa` y con moderación resuelta (`aprobada`/`auto_aprobada`).',
-      security: [], params: ['id'],
+      description: 'Público (sesión opcional). Incrementa el contador de vistas. 404 si no está `activa` y con moderación resuelta (`aprobada`/`auto_aprobada`), salvo para el alumno/egresado que ya se postuló: él sigue viendo la oferta pausada o cerrada. Con sesión de alumno/egresado agrega `miPostulacion` (`{ id, estado, fechaPostulacion }` o `null`) y `cvCargado` (sin CV la postulación se rechaza con `CV_REQUERIDO`).',
+      security: [{}, { cookieAuth: [] }, { bearerAuth: [] }], params: ['id'],
       responses: { 200: ok('Oferta') },
       errors: ['404'],
     }),

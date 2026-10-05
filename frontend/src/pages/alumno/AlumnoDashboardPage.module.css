@@ -1,375 +1,196 @@
-/* ── AlumnoDashboardPage ─────────────────────────────────────────────────── */
+/* AlumnoDashboardPage.module.css — Inicio del alumno/egresado. */
 
-/* Header */
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 2rem;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
+.error { margin-bottom: var(--space-4); }
 
-.greeting {
-  font-size: 1.8rem;
-  font-weight: 800;
-  color: var(--secondary);
-  margin: 0 0 0.2rem;
-}
-
-.subtitle {
-  color: var(--text-muted);
-  font-size: 0.92rem;
-  text-transform: capitalize;
-}
-
-.headerActions {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-/* ── Metrics Grid ────────────────────────────────────────────────────────── */
-.metricsGrid {
+.kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
 }
 
-.metricLink {
-  text-decoration: none;
-  display: block;
+.columnas {
+  display: grid;
+  grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+  gap: var(--space-5);
+  align-items: start;
 }
 
-.metricCard {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-top: 4px solid var(--primary);
-  border-radius: var(--radius);
-  padding: 1.25rem 1rem;
+.columna {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.4rem;
-  text-align: center;
-  transition: transform 0.2s, box-shadow 0.2s;
-  box-shadow: var(--shadow-card);
-}
-
-.metricLink:hover .metricCard {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(0, 115, 173, 0.15);
-}
-
-.metricIcon {
-  font-size: 1.6rem;
-}
-
-.metricValue {
-  font-size: 2rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.metricLabel {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-
-/* ── Profile Progress ────────────────────────────────────────────────────── */
-.perfilProgress {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1rem 1.25rem;
-  margin-bottom: 1.5rem;
-  box-shadow: var(--shadow-card);
-}
-
-.perfilProgressHeader {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--secondary);
-  margin-bottom: 0.6rem;
-}
-
-.progressBar {
-  height: 8px;
-  background: var(--bg-card2);
-  border-radius: 10px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-}
-
-.progressFill {
-  height: 100%;
-  border-radius: 10px;
-  transition: width 0.6s ease;
-}
-
-.perfilCTA {
-  display: inline-block;
-  margin-top: 0.6rem;
-  font-size: 0.83rem;
-  color: var(--primary);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.perfilCTA:hover {
-  text-decoration: underline;
-}
-
-/* ── Notification Banner ─────────────────────────────────────────────────── */
-.notifBanner {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-left: 4px solid #f59e0b;
-  border-radius: var(--radius);
-  padding: 0.75rem 1rem;
-  font-size: 0.9rem;
-  color: #92400e;
-  margin-bottom: 1.5rem;
-}
-
-/* ── Error Banner ────────────────────────────────────────────────────────── */
-.errorBanner {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-left: 4px solid #ef4444;
-  border-radius: var(--radius);
-  padding: 0.75rem 1rem;
-  font-size: 0.88rem;
-  color: #7f1d1d;
-  margin-bottom: 1.5rem;
-}
-
-.errorBanner code {
-  background: #fee2e2;
-  padding: 0.1rem 0.4rem;
-  border-radius: 4px;
-  font-size: 0.83rem;
-}
-
-/* ── Sections ────────────────────────────────────────────────────────────── */
-.section {
-  margin-bottom: 2.5rem;
-}
-
-.sectionHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.sectionTitle {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--secondary);
-  margin: 0 0 1rem;
-}
-
-.sectionHeader .sectionTitle {
-  margin: 0;
-}
-
-.seeAllLink {
-  font-size: 0.85rem;
-  color: var(--primary);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.seeAllLink:hover {
-  text-decoration: underline;
-}
-
-/* ── Recommended Offers ──────────────────────────────────────────────────── */
-.recList {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.recCard {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1rem 1.25rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
-  box-shadow: var(--shadow-card);
-}
-
-.recCard:hover {
-  border-color: var(--primary);
-  box-shadow: 0 4px 14px rgba(0, 115, 173, 0.12);
-  transform: translateX(3px);
-}
-
-.recCardBody {
-  flex: 1;
+  gap: var(--space-5);
   min-width: 0;
 }
 
-.recTitle {
+/* ── Próximos pasos ───────────────────────────────────────────────────────── */
+.pasos,
+.ofertas {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.paso,
+.oferta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.paso:first-child,
+.oferta:first-child { border-top: 0; padding-top: 0; }
+.paso:last-child,
+.oferta:last-child { padding-bottom: 0; }
+
+.pasoIcono,
+.alDiaIcono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.tono_red { background: var(--danger-soft); color: var(--danger-text); }
+.tono_orange { background: var(--warning-soft); color: var(--warning-text); }
+.tono_violet { background: var(--violet-soft); color: var(--violet-text); }
+.tono_blue { background: var(--info-soft); color: var(--info-text); }
+
+.pasoInfo,
+.ofertaInfo {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.pasoTexto {
+  font-size: 0.93rem;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.pasoContexto,
+.ofertaEmpresa {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+
+.pasoCta,
+.ofertaCta {
+  flex-shrink: 0;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.alDia {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--success-text);
+}
+
+.alDiaIcono { background: var(--success-soft); }
+
+/* ── Mi perfil ────────────────────────────────────────────────────────────── */
+.progresoCabecera {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+  font-size: 0.9rem;
+  color: var(--text-soft);
+}
+
+.progresoCabecera strong { color: var(--text-strong); }
+
+.barra {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+
+.barraRelleno {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.barraBaja { background: var(--danger); }
+.barraMedia { background: var(--warning); }
+.barraAlta { background: var(--success); }
+
+.perfilAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.perfilAcciones :global(.btn-secondary) { text-decoration: none; }
+
+.linkSecundario {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.linkSecundario:hover { text-decoration: underline; }
+
+/* ── Ofertas para vos ─────────────────────────────────────────────────────── */
+.ofertaTitulo {
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--secondary);
-  margin: 0 0 0.2rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--text-strong);
+  text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
-.recEmpresa {
-  color: var(--primary);
-  font-size: 0.85rem;
-  font-weight: 700;
-  margin: 0 0 0.4rem;
-}
+.ofertaTitulo:hover { color: var(--primary); }
 
-.recMeta {
+.ofertaMeta {
   display: flex;
-  gap: 0.75rem;
   flex-wrap: wrap;
-}
-
-.recMeta span {
-  font-size: 0.8rem;
+  gap: var(--space-1) var(--space-3);
+  margin-top: 2px;
+  font-size: 0.82rem;
   color: var(--text-muted);
 }
 
-.matchBadge {
-  display: inline-block;
-  margin-top: 0.4rem;
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fde68a;
-  border-radius: 20px;
-  padding: 0.1rem 0.6rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-/* ── Empty State ─────────────────────────────────────────────────────────── */
-.emptyRec {
-  display: flex;
-  flex-direction: column;
+.ofertaMeta span {
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 2rem;
-  background: var(--bg-card);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-  text-align: center;
-  color: var(--text-muted);
+  gap: 4px;
 }
 
-.emptyIcon {
-  font-size: 2.5rem;
+@media (max-width: 1100px) {
+  .columnas { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* ── Quick Access Grid ───────────────────────────────────────────────────── */
-.quickGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 1rem;
+@media (max-width: 900px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
 }
 
-.quickCard {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.25rem 1rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--secondary);
-  text-decoration: none;
-  text-align: center;
-  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
-  box-shadow: var(--shadow-card);
-}
-
-.quickCard:hover {
-  border-color: var(--primary);
-  box-shadow: 0 4px 14px rgba(0, 115, 173, 0.15);
-  transform: translateY(-2px);
-  color: var(--primary);
-  text-decoration: none;
-}
-
-.quickIcon {
-  font-size: 1.8rem;
-}
-
-/* ── Skeletons ───────────────────────────────────────────────────────────── */
-@keyframes shimmer {
-  0%   { background-position: -400px 0; }
-  100% { background-position:  400px 0; }
-}
-
-.skeletonGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.skeletonCard, .skeletonRec {
-  border-radius: var(--radius);
-  background: linear-gradient(90deg, #e8edf0 25%, #f4f6f8 50%, #e8edf0 75%);
-  background-size: 400px 100%;
-  animation: shimmer 1.4s infinite;
-}
-
-.skeletonCard {
-  height: 120px;
-}
-
-.skeletonList {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.skeletonRec {
-  height: 72px;
-}
-
-/* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .header {
-    flex-direction: column;
-  }
-  .greeting {
-    font-size: 1.4rem;
-  }
-  .metricsGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .quickGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .recCard {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+  .paso,
+  .oferta { flex-wrap: wrap; }
+  .pasoInfo,
+  .ofertaInfo { flex-basis: calc(100% - 52px); }
+  .pasoCta { margin-left: 52px; min-height: 44px; display: inline-flex; align-items: center; }
+  .ofertaInfo { flex-basis: 100%; }
+  .ofertaCta { min-height: 44px; display: inline-flex; align-items: center; }
 }

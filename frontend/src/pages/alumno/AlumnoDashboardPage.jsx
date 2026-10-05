@@ -1,235 +1,234 @@
 /**
- * AlumnoDashboardPage.jsx — Panel principal del alumno/egresado.
+ * AlumnoDashboardPage.jsx — Inicio del alumno/egresado.
  *
- * Consume GET /api/students/dashboard para mostrar:
- * - Métricas de postulaciones (total, en revisión, entrevistas, contrataciones)
- * - Porcentaje de perfil completado
- * - Notificaciones recientes no leídas
- * - Ofertas recomendadas (GET /api/ofertas/recomendadas)
+ * Ruta: /dashboard (roles alumno, egresado)
+ * Consume: GET /api/students/dashboard → métricas de sus postulaciones,
+ * notificaciones sin leer, % de perfil, `cvCargado` y hasta 5 ofertas
+ * recomendadas (ya excluye las ofertas a las que se postuló).
  *
- * Ruta: /dashboard
- * Roles: alumno, egresado
+ * Responde "¿qué hago ahora?":
+ *   - 4 KPIs de sus postulaciones (cada uno filtra Mis postulaciones);
+ *   - Próximos pasos: pendientes reales con su acción (CV faltante, entrevistas,
+ *     preselecciones, notificaciones, perfil incompleto). Si no hay nada:
+ *     "Todo al día por ahora";
+ *   - Mi perfil: % completado;
+ *   - Ofertas para vos: las recomendadas.
+ *
+ * Sin accesos rápidos: duplicaban la barra de navegación.
  */
 
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { ofertaService } from '../../services/oferta.service';
 import { studentService } from '../../services/student.service';
+import PageHeader from '../../components/ui/PageHeader';
+import StatCard from '../../components/ui/StatCard';
+import Card from '../../components/ui/Card';
+import EmptyState from '../../components/ui/EmptyState';
+import Icon from '../../components/ui/Icon';
+import { modalidadLabel } from '../../utils/ofertaPresentacion';
 import styles from './AlumnoDashboardPage.module.css';
 
-// ── Tarjeta de métrica ────────────────────────────────────────────────────────
-function MetricCard({ icon, label, value, color, to }) {
-  const content = (
-    <div className={styles.metricCard} style={{ borderTopColor: color }}>
-      <span className={styles.metricIcon}>{icon}</span>
-      <span className={styles.metricValue} style={{ color }}>{value ?? '—'}</span>
-      <span className={styles.metricLabel}>{label}</span>
-    </div>
-  );
-  return to ? <Link to={to} className={styles.metricLink}>{content}</Link> : content;
+const plural = (n, uno, muchos) => `${n} ${n === 1 ? uno : muchos}`;
+
+/** Pendientes del alumno, en orden de importancia. Solo datos reales. */
+function proximosPasos(d) {
+  const pasos = [];
+  if (d.cvCargado === false) {
+    pasos.push({
+      key: 'cv', icon: 'file', tone: 'red',
+      texto: 'Subí tu CV', contexto: 'Lo necesitás para poder postularte a una oferta.',
+      to: '/perfil#cv', cta: 'Subir CV',
+    });
+  }
+  if (d.entrevistas > 0) {
+    pasos.push({
+      key: 'entrevista', icon: 'calendar', tone: 'violet',
+      texto: d.entrevistas === 1 ? 'Tenés 1 postulación en entrevista' : `Tenés ${d.entrevistas} postulaciones en entrevista`,
+      contexto: 'Revisá el chat con el reclutador para coordinar.',
+      to: '/mis-postulaciones?estado=entrevista', cta: 'Ver entrevistas',
+    });
+  }
+  if (d.preseleccionados > 0) {
+    pasos.push({
+      key: 'preseleccion', icon: 'check', tone: 'blue',
+      texto: d.preseleccionados === 1 ? 'Quedaste preseleccionado en 1 oferta' : `Quedaste preseleccionado en ${d.preseleccionados} ofertas`,
+      contexto: 'El reclutador ya puede escribirte por chat.',
+      to: '/mis-postulaciones?estado=preseleccionado', cta: 'Ver postulaciones',
+    });
+  }
+  if (d.notificacionesNoLeidas > 0) {
+    pasos.push({
+      key: 'notif', icon: 'bell', tone: 'orange',
+      texto: plural(d.notificacionesNoLeidas, 'notificación sin leer', 'notificaciones sin leer'),
+      contexto: 'Novedades de tus postulaciones y de la plataforma.',
+      to: '/notificaciones', cta: 'Ver notificaciones',
+    });
+  }
+  if (d.perfilCompleto < 80) {
+    pasos.push({
+      key: 'perfil', icon: 'user', tone: 'orange',
+      texto: `Tu perfil está al ${d.perfilCompleto}%`,
+      contexto: 'Un perfil completo mejora tus recomendaciones y lo que ven las empresas.',
+      to: '/perfil', cta: 'Completar perfil',
+    });
+  }
+  return pasos;
 }
 
-// ── Barra de progreso de perfil ───────────────────────────────────────────────
-function PerfilProgress({ pct }) {
-  const color = pct < 40 ? '#ef4444' : pct < 75 ? '#f59e0b' : '#10b981';
-  return (
-    <div className={styles.perfilProgress}>
-      <div className={styles.perfilProgressHeader}>
-        <span>Perfil completado</span>
-        <span style={{ color, fontWeight: 700 }}>{pct}%</span>
-      </div>
-      <div className={styles.progressBar}>
-        <div
-          className={styles.progressFill}
-          style={{ width: `${pct}%`, background: color }}
-        />
-      </div>
-      {pct < 80 && (
-        <Link to="/perfil" className={styles.perfilCTA}>
-          ✏️ Completar perfil para mejorar recomendaciones →
-        </Link>
-      )}
-    </div>
-  );
+function tonoProgreso(pct) {
+  if (pct < 40) return styles.barraBaja;
+  if (pct < 75) return styles.barraMedia;
+  return styles.barraAlta;
 }
 
-// ── Tarjeta de oferta recomendada ─────────────────────────────────────────────
-function OfertaRecomendadaCard({ oferta }) {
-  return (
-    <div className={styles.recCard}>
-      <div className={styles.recCardBody}>
-        <h4 className={styles.recTitle}>{oferta.titulo}</h4>
-        <p className={styles.recEmpresa}>{oferta.empresa?.razonSocial}</p>
-        <div className={styles.recMeta}>
-          <span>📍 {oferta.ciudad}</span>
-          <span>💼 {oferta.modalidad}</span>
-          {oferta.remuneracion && <span>💰 {oferta.remuneracion}</span>}
-        </div>
-        {oferta.matchScore != null && (
-          <div className={styles.matchBadge}>
-            ⭐ {oferta.matchScore}% de compatibilidad
-          </div>
-        )}
-      </div>
-      <Link to={`/ofertas/${oferta.id}`} className="btn-small">
-        Ver →
-      </Link>
-    </div>
-  );
-}
-
-// ── Componente principal ──────────────────────────────────────────────────────
 export default function AlumnoDashboardPage() {
   const { usuario } = useAuth();
+  const navigate = useNavigate();
+  const [panel, setPanel] = useState(null);
+  const [error, setError] = useState('');
 
-  const [stats, setStats]           = useState(null);
-  const [recomendadas, setRecomendadas] = useState([]);
-  const [loadingStats, setLoadingStats] = useState(true);
-  const [loadingRec, setLoadingRec]   = useState(true);
-  const [errorStats, setErrorStats]   = useState(false);
-
-  // Carga métricas del dashboard
   useEffect(() => {
+    let vigente = true;
     studentService.getDashboard()
-      .then(({ data }) => setStats(data.data ?? data))
-      .catch(() => setErrorStats(true))
-      .finally(() => setLoadingStats(false));
+      .then(({ data }) => { if (vigente) setPanel(data.data ?? {}); })
+      .catch((err) => { if (vigente) setError(err.response?.data?.message ?? 'No se pudo cargar tu inicio.'); });
+    return () => { vigente = false; };
   }, []);
 
-  // Carga ofertas recomendadas
-  useEffect(() => {
-    ofertaService.getRecomendadas()
-      .then(({ data }) => setRecomendadas(data.data ?? []))
-      .catch(() => setRecomendadas([]))
-      .finally(() => setLoadingRec(false));
-  }, []);
-
-  // Métricas con fallback si el endpoint no existe aún
-  const metricas = {
-    total:        stats?.totalPostulaciones ?? stats?.total ?? 0,
-    enRevision:   stats?.enRevision   ?? 0,
-    entrevistas:  stats?.entrevistas  ?? 0,
-    contratados:  stats?.contrataciones  ?? 0,
-    perfilPct:    stats?.perfilCompleto ?? stats?.perfilCompletado ?? stats?.perfilPct ?? 0,
-    notifs:       stats?.notificacionesNoLeidas ?? stats?.notificacionesSinLeer ?? 0,
+  const cargando = !panel && !error;
+  const d = {
+    total: panel?.totalPostulaciones ?? 0,
+    enRevision: panel?.enRevision ?? 0,
+    preseleccionados: panel?.preseleccionados ?? 0,
+    entrevistas: panel?.entrevistas ?? 0,
+    contrataciones: panel?.contrataciones ?? 0,
+    notificacionesNoLeidas: panel?.notificacionesNoLeidas ?? 0,
+    perfilCompleto: panel?.perfilCompleto ?? 0,
+    cvCargado: panel?.cvCargado,
   };
-
+  const pasos = panel ? proximosPasos(d) : [];
+  const recomendadas = panel?.ofertasRecomendadas ?? [];
+  const rolLabel = usuario?.rol === 'egresado' ? 'Egresado' : 'Alumno';
 
   return (
     <div className="page-container">
+      <PageHeader
+        title={`Hola, ${usuario?.nombre ?? ''}`}
+        subtitle={`${rolLabel} · Seguí tus postulaciones y encontrá nuevas oportunidades.`}
+      />
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.greeting}>
-            ¡Hola, {usuario?.nombre}! 👋
-          </h1>
-          <p className={styles.subtitle}>
-            {usuario?.rol === 'egresado' ? 'Egresado' : 'Alumno'} ·{' '}
-            {new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
-          </p>
-        </div>
-        <div className={styles.headerActions}>
-          <Link to="/ofertas" className="btn-primary">
-            🔍 Ver ofertas
-          </Link>
-        </div>
-      </div>
+      {error && <p className={`error-msg ${styles.error}`} role="alert">{error}</p>}
 
-      {/* ── Métricas ───────────────────────────────────────────────────────── */}
-      {loadingStats ? (
-        <div className={styles.skeletonGrid}>
-          {[1,2,3,4].map(i => <div key={i} className={styles.skeletonCard} />)}
-        </div>
-      ) : errorStats ? (
-        <div className={styles.errorBanner}>
-          ⚠️ No se pudieron cargar las estadísticas. El endpoint <code>/api/students/dashboard</code> puede no estar disponible aún.
-        </div>
-      ) : (
-        <div className={styles.metricsGrid}>
-          <MetricCard
-            icon="📋" label="Postulaciones" value={metricas.total}
-            color="var(--primary)" to="/mis-postulaciones"
-          />
-          <MetricCard
-            icon="🔍" label="En revisión" value={metricas.enRevision}
-            color="#f59e0b" to="/mis-postulaciones"
-          />
-          <MetricCard
-            icon="🗓️" label="Entrevistas" value={metricas.entrevistas}
-            color="#8b5cf6" to="/mis-postulaciones"
-          />
-          <MetricCard
-            icon="🎉" label="Contrataciones" value={metricas.contratados}
-            color="#10b981" to="/mis-postulaciones"
-          />
-        </div>
-      )}
-
-      {/* ── Progreso de perfil ─────────────────────────────────────────────── */}
-      {!loadingStats && !errorStats && (
-        <PerfilProgress pct={metricas.perfilPct} />
-      )}
-
-      {/* ── Notificaciones pendientes ──────────────────────────────────────── */}
-      {metricas.notifs > 0 && (
-        <div className={styles.notifBanner}>
-          🔔 Tenés <strong>{metricas.notifs}</strong> notificacion{metricas.notifs !== 1 ? 'es' : ''} sin leer.
-        </div>
-      )}
-
-      {/* ── Ofertas recomendadas ───────────────────────────────────────────── */}
-      <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>⭐ Ofertas recomendadas para vos</h2>
-          <Link to="/ofertas" className={styles.seeAllLink}>
-            Ver todas las ofertas →
-          </Link>
-        </div>
-
-        {loadingRec ? (
-          <div className={styles.skeletonList}>
-            {[1,2,3].map(i => <div key={i} className={styles.skeletonRec} />)}
-          </div>
-        ) : recomendadas.length === 0 ? (
-          <div className={styles.emptyRec}>
-            <span className={styles.emptyIcon}>🎯</span>
-            <p>Completá tu perfil para recibir recomendaciones personalizadas.</p>
-            <Link to="/perfil" className="btn-primary">Completar perfil</Link>
-          </div>
-        ) : (
-          <div className={styles.recList}>
-            {recomendadas.slice(0, 5).map((o) => (
-              <OfertaRecomendadaCard key={o.id} oferta={o} />
-            ))}
-          </div>
-        )}
+      {/* ── KPIs de mis postulaciones ─────────────────────────────────────── */}
+      <section className={styles.kpis} aria-label="Mis postulaciones">
+        <StatCard
+          loading={cargando} iconName="briefcase" tone="blue" label="Postulaciones" value={d.total}
+          onClick={() => navigate('/mis-postulaciones')} actionHint="Ver todas"
+        />
+        <StatCard
+          loading={cargando} iconName="inbox" tone="orange" label="En revisión" value={d.enRevision}
+          onClick={() => navigate('/mis-postulaciones?estado=en_revision')} actionHint="Ver"
+        />
+        <StatCard
+          loading={cargando} iconName="calendar" tone="violet" label="Entrevistas" value={d.entrevistas}
+          onClick={() => navigate('/mis-postulaciones?estado=entrevista')} actionHint="Ver"
+        />
+        <StatCard
+          loading={cargando} iconName="checkCircle" tone="green" label="Contrataciones" value={d.contrataciones}
+          onClick={() => navigate('/mis-postulaciones?estado=contratado')} actionHint="Ver"
+        />
       </section>
 
-      {/* ── Accesos rápidos ────────────────────────────────────────────────── */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>⚡ Accesos rápidos</h2>
-        <div className={styles.quickGrid}>
-          <Link to="/ofertas" className={styles.quickCard}>
-            <span className={styles.quickIcon}>🏢</span>
-            <span>Explorar Ofertas</span>
-          </Link>
-          <Link to="/mis-postulaciones" className={styles.quickCard}>
-            <span className={styles.quickIcon}>📋</span>
-            <span>Mis Postulaciones</span>
-          </Link>
-          <Link to="/perfil" className={styles.quickCard}>
-            <span className={styles.quickIcon}>👤</span>
-            <span>Editar Perfil</span>
-          </Link>
-          <Link to="/chat" className={styles.quickCard}>
-            <span className={styles.quickIcon}>💬</span>
-            <span>Mensajes</span>
-          </Link>
-        </div>
-      </section>
+      {panel && (
+        <div className={styles.columnas}>
+          <div className={styles.columna}>
+            {/* ── Próximos pasos ─────────────────────────────────────────── */}
+            <Card as="section" titleId="sec-pasos" title="Próximos pasos">
+              {pasos.length === 0 ? (
+                <p className={styles.alDia}>
+                  <span className={styles.alDiaIcono}><Icon name="checkCircle" size={22} /></span>
+                  Todo al día por ahora.
+                </p>
+              ) : (
+                <ul className={styles.pasos}>
+                  {pasos.map((p) => (
+                    <li key={p.key} className={styles.paso}>
+                      <span className={`${styles.pasoIcono} ${styles[`tono_${p.tone}`]}`}>
+                        <Icon name={p.icon} size={20} />
+                      </span>
+                      <div className={styles.pasoInfo}>
+                        <span className={styles.pasoTexto}>{p.texto}</span>
+                        <span className={styles.pasoContexto}>{p.contexto}</span>
+                      </div>
+                      <Link to={p.to} className={`btn-secondary ${styles.pasoCta}`}>{p.cta}</Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
 
+            {/* ── Mi perfil ──────────────────────────────────────────────── */}
+            <Card as="section" titleId="sec-perfil" title="Mi perfil">
+              <div className={styles.progresoCabecera}>
+                <span>Perfil completado</span>
+                <strong>{d.perfilCompleto}%</strong>
+              </div>
+              <div
+                className={styles.barra}
+                role="progressbar"
+                aria-valuenow={d.perfilCompleto}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Perfil completado"
+              >
+                <div className={`${styles.barraRelleno} ${tonoProgreso(d.perfilCompleto)}`} style={{ width: `${d.perfilCompleto}%` }} />
+              </div>
+              <div className={styles.perfilAcciones}>
+                <Link to="/perfil" className="btn-secondary">Editar perfil</Link>
+                {usuario?.id && <Link to={`/perfil/${usuario.id}`} className={styles.linkSecundario}>Ver cómo me ven</Link>}
+              </div>
+            </Card>
+          </div>
+
+          {/* ── Ofertas para vos ───────────────────────────────────────────── */}
+          <Card
+            as="section"
+            titleId="sec-ofertas"
+            title="Ofertas para vos"
+            subtitle="Según tu área de interés, habilidades y ubicación."
+            actions={<Link to="/ofertas" className={styles.linkSecundario}>Ver todas</Link>}
+          >
+            {recomendadas.length === 0 ? (
+              <EmptyState
+                iconName="search"
+                title="No hay recomendaciones nuevas."
+                hint="Explorá todas las ofertas publicadas o completá tu perfil para recibir sugerencias."
+              >
+                <Link to="/ofertas" className="btn-primary">Explorar ofertas</Link>
+              </EmptyState>
+            ) : (
+              <ul className={styles.ofertas}>
+                {recomendadas.map((o) => (
+                  <li key={o.id} className={styles.oferta}>
+                    <div className={styles.ofertaInfo}>
+                      <Link to={`/ofertas/${o.id}`} className={styles.ofertaTitulo}>{o.titulo}</Link>
+                      <span className={styles.ofertaEmpresa}>{o.empresa?.razonSocial}</span>
+                      <span className={styles.ofertaMeta}>
+                        {o.ciudad && <span><Icon name="mapPin" size={14} /> {o.ciudad}</span>}
+                        {o.modalidad && <span><Icon name="briefcase" size={14} /> {modalidadLabel(o.modalidad)}</span>}
+                      </span>
+                    </div>
+                    <Link to={`/ofertas/${o.id}`} className={`btn-secondary ${styles.ofertaCta}`} aria-label={`Ver oferta: ${o.titulo}`}>
+                      Ver oferta
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

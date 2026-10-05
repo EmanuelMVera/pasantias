@@ -48,12 +48,14 @@ export default function Navbar() {
 
   if (!usuario) return null;
 
-  /* ── Links según rol ─────────────────────────────────────────────────── */
+  // Ofertas sin `end`: el detalle (/ofertas/:id) también la marca activa.
+  //  en Ofertas: el detalle (/ofertas/:id) también la marca activa.
+  // Mi perfil sí es exacto: /perfil/:id es el perfil público de cualquiera.
   const linksAlumnoEgresado = [
     { to: '/dashboard', label: 'Inicio' },
-    { to: '/ofertas', label: 'Ofertas' },
-    { to: '/mis-postulaciones', label: 'Mis Postulaciones' },
-    { to: '/perfil', label: 'Mi Perfil' },
+    { to: '/ofertas', label: 'Ofertas', end: false },
+    { to: '/mis-postulaciones', label: 'Mis postulaciones' },
+    { to: '/perfil', label: 'Mi perfil' },
   ];
 
   // Caso borde: un usuario empresa cuyo rol interno no se pudo resolver (sin
@@ -85,7 +87,7 @@ export default function Navbar() {
             <NavLink
               key={l.to}
               to={l.to}
-              end
+              end={l.end ?? true}
               className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
             >
               {l.label}
@@ -148,7 +150,7 @@ export default function Navbar() {
             <NavLink
               key={l.to}
               to={l.to}
-              end
+              end={l.end ?? true}
               className={({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`}
               onClick={() => setMobileOpen(false)}
             >

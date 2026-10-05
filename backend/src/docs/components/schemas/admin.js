@@ -259,7 +259,7 @@ module.exports = {
 
   DashboardAlumno: {
     type: 'object',
-    description: 'Métricas personales, ofertas recomendadas y % de completitud del perfil.',
+    description: 'Métricas personales, ofertas recomendadas, % de completitud del perfil y `cvCargado` (sin CV no se puede postular).',
     additionalProperties: true,
   },
 

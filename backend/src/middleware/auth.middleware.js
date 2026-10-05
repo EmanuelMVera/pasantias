@@ -110,4 +110,36 @@ const authorizeRoles = (...roles) => {
   };
 };
 
-module.exports = { verifyToken, authorizeRoles };
+/**
+ * Middleware: sesión OPCIONAL para rutas públicas que enriquecen la respuesta
+ * cuando hay un usuario logueado (p. ej. el detalle de una oferta le muestra al
+ * alumno su postulación). Nunca rechaza: sin token, o con uno inválido/expirado
+ * o de un usuario inactivo, sigue como visitante anónimo (req.usuario undefined).
+ * No actualiza ultimoAcceso: no es una acción autenticada del usuario.
+ */
+const optionalToken = async (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = parseCookies(req).token || (authHeader && authHeader.split(' ')[1]);
+  if (!token) return next();
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, config.jwt.secret);
+  } catch {
+    return next();
+  }
+
+  try {
+    const usuario = await Usuario.findByPk(decoded.id, {
+      attributes: { exclude: ['password', 'tokenReset', 'tokenResetExpira'] },
+    });
+    if (usuario && usuario.activo && (decoded.tokenVersion ?? 0) === usuario.tokenVersion) {
+      req.usuario = usuario;
+    }
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { verifyToken, optionalToken, authorizeRoles };

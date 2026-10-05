@@ -2,7 +2,7 @@
 const request = require('supertest');
 const app = require('../src/app');
 const { Oferta, ActivityLog } = require('../src/models');
-const { crearEmpresaConAdmin, crearOferta, agregarReclutador, crearAlumno } = require('./helpers/factories');
+const { crearEmpresaConAdmin, crearOferta, agregarReclutador, crearAlumno, crearPostulacion } = require('./helpers/factories');
 const { limpiarUsuarios, cerrarConexion } = require('./helpers/cleanup');
 const { loginYObtenerToken } = require('./helpers/factories');
 
@@ -400,6 +400,78 @@ describe('OFERTA', () => {
       const ids = res.body.data.ofertasRecomendadas.map((o) => o.id);
       expect(ids).not.toContain(pendiente.id);
       expect(ids).toContain(aprobada.id);
+    });
+  });
+
+  describe('Detalle de oferta con sesión de alumno (miPostulacion / cvCargado)', () => {
+    test('sin sesión no expone miPostulacion ni cvCargado', async () => {
+      const { empresa } = await crearEmpresaConAdmin();
+      const oferta = await crearOferta(empresa);
+
+      const res = await request(app).get(`/api/ofertas/${oferta.id}`);
+      expect(res.status).toBe(200);
+      expect(res.body.data).not.toHaveProperty('miPostulacion');
+      expect(res.body.data).not.toHaveProperty('cvCargado');
+    });
+
+    test('alumno sin postulación: miPostulacion null y cvCargado según su perfil', async () => {
+      const { usuario: alumno, passwordPlana } = await crearAlumno({ perfil: { cvPath: null } });
+      idsUsuarios.push(alumno.id);
+      const { empresa } = await crearEmpresaConAdmin();
+      const oferta = await crearOferta(empresa);
+
+      const token = await loginYObtenerToken(alumno.email, passwordPlana);
+      const res = await request(app).get(`/api/ofertas/${oferta.id}`).set('Authorization', `Bearer ${token}`);
+      expect(res.status).toBe(200);
+      expect(res.body.data.miPostulacion).toBeNull();
+      expect(res.body.data.cvCargado).toBe(false);
+    });
+
+    test('alumno ya postulado: miPostulacion con su estado', async () => {
+      const { usuario: alumno, passwordPlana } = await crearAlumno();
+      idsUsuarios.push(alumno.id);
+      const { empresa } = await crearEmpresaConAdmin();
+      const oferta = await crearOferta(empresa);
+      const post = await crearPostulacion(alumno, oferta, { estado: 'entrevista' });
+
+      const token = await loginYObtenerToken(alumno.email, passwordPlana);
+      const res = await request(app).get(`/api/ofertas/${oferta.id}`).set('Authorization', `Bearer ${token}`);
+      expect(res.status).toBe(200);
+      expect(res.body.data.miPostulacion).toMatchObject({ id: post.id, estado: 'entrevista' });
+      expect(res.body.data.cvCargado).toBe(true);
+    });
+
+    test('una oferta cerrada sigue visible para quien se postuló, y es 404 para el resto', async () => {
+      const { usuario: postulado, passwordPlana } = await crearAlumno();
+      const { usuario: otro } = await crearAlumno();
+      idsUsuarios.push(postulado.id, otro.id);
+      const { empresa } = await crearEmpresaConAdmin();
+      const oferta = await crearOferta(empresa, { estado: 'cerrada' });
+      await crearPostulacion(postulado, oferta, { estado: 'rechazado' });
+
+      const tokenPostulado = await loginYObtenerToken(postulado.email, passwordPlana);
+      const tokenOtro = await loginYObtenerToken(otro.email, passwordPlana);
+
+      const propio = await request(app).get(`/api/ofertas/${oferta.id}`).set('Authorization', `Bearer ${tokenPostulado}`);
+      expect(propio.status).toBe(200);
+      expect(propio.body.data.miPostulacion.estado).toBe('rechazado');
+
+      const ajeno = await request(app).get(`/api/ofertas/${oferta.id}`).set('Authorization', `Bearer ${tokenOtro}`);
+      expect(ajeno.status).toBe(404);
+      const anonimo = await request(app).get(`/api/ofertas/${oferta.id}`);
+      expect(anonimo.status).toBe(404);
+    });
+
+    test('un token inválido no rompe el detalle público (sesión opcional)', async () => {
+      const { empresa } = await crearEmpresaConAdmin();
+      const oferta = await crearOferta(empresa);
+      const res = await request(app).get(`/api/ofertas/${oferta.id}`).set('Authorization', 'Bearer no-es-un-jwt');
+      expect(res.status).toBe(200);
+    });
+
+    test('un id no numérico responde 404 (no 500)', async () => {
+      const res = await request(app).get('/api/ofertas/abc');
+      expect(res.status).toBe(404);
     });
   });
 });

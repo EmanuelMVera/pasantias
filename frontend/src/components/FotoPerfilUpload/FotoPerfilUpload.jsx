@@ -7,7 +7,7 @@ import { useAuth } from '../../hooks/useAuth';
  * SEC-03: la foto se sube como imagen validada (JPG/PNG/WEBP, ≤ 2 MB).
  *
  * `fotoInicial`: URL de la foto actual (para la vista previa).
- * `onMensaje(texto)`: feedback en la página (que lo muestra y limpia).
+ * `onMensaje(texto, tono)`: feedback en la página ('success' | 'error').
  * `onFotoActualizada(url)`: la página actualiza `form.fotoPerfil` (cuenta para
  * el % de completitud).
  */
@@ -20,7 +20,7 @@ export default function FotoPerfilUpload({ fotoInicial, onMensaje, onFotoActuali
   const handleFotoChange = (e) => {
     const file = e.target.files?.[0] || null;
     if (file && file.size > 2 * 1024 * 1024) {
-      onMensaje('❌ La imagen no puede superar los 2 MB.');
+      onMensaje('La imagen no puede superar los 2 MB.', 'error');
       e.target.value = '';
       return;
     }
@@ -38,18 +38,17 @@ export default function FotoPerfilUpload({ fotoInicial, onMensaje, onFotoActuali
       onFotoActualizada(data.fotoPerfil);
       actualizarUsuario({ fotoPerfil: data.fotoPerfil });
       setFotoFile(null);
-      onMensaje('✅ Foto de perfil actualizada.');
+      onMensaje('Foto de perfil actualizada.', 'success');
     } catch (err) {
-      onMensaje(`❌ Error al subir la foto.${err?.response?.data?.message ? ' ' + err.response.data.message : ''}`);
+      onMensaje(err?.response?.data?.message || 'No se pudo subir la foto.', 'error');
     } finally {
       setSubiendoFoto(false);
-      setTimeout(() => onMensaje(''), 4000);
     }
   };
 
   return (
     <div className="form-group">
-      <label>Foto de perfil</label>
+      <label htmlFor="foto-file">Foto de perfil</label>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         {fotoPreview && (
           <img
@@ -63,7 +62,7 @@ export default function FotoPerfilUpload({ fotoInicial, onMensaje, onFotoActuali
             }}
           />
         )}
-        <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleFotoChange} />
+        <input id="foto-file" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleFotoChange} style={{ maxWidth: '100%' }} />
         <button
           type="button"
           className="btn-secondary"
