@@ -7,6 +7,9 @@
  *
  * - El resumen por estado funciona como filtro; el estado vive en la URL para
  *   que el Inicio pueda enlazar directo (p. ej. ?estado=entrevista).
+ * - ?grupo=en_proceso (KPI "En proceso" del Inicio): en revisión +
+ *   preseleccionado. Es una agrupación de presentación — los estados reales
+ *   de la BD no cambian; el backend filtra con GET /mis?grupo=en_proceso.
  * - Cada postulación: oferta, empresa, estado, fechas y aviso si la oferta ya
  *   no está publicada (pausada/cerrada: el proceso puede seguir igual).
  * - "Chatear con el reclutador" solo cuando el estado lo habilita
@@ -29,10 +32,18 @@ import styles from './MisPostulacionesPage.module.css';
 
 const ESTADOS_VALIDOS = LISTA_ESTADOS_POSTULACION.map((e) => e.estado);
 
+/** Agrupaciones de presentación (espejo de postulacion.service::GRUPOS_ESTADO). */
+const GRUPOS = {
+  en_proceso: { label: 'En proceso', detalle: 'en revisión y preseleccionado', estados: ['en_revision', 'preseleccionado'] },
+};
+
 export default function MisPostulacionesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const estadoUrl = searchParams.get('estado') ?? '';
-  const filtroEstado = ESTADOS_VALIDOS.includes(estadoUrl) ? estadoUrl : '';
+  const grupoUrl = searchParams.get('grupo') ?? '';
+  const filtroGrupo = GRUPOS[grupoUrl] ? grupoUrl : '';
+  // El grupo gana sobre el estado (igual que en el backend).
+  const filtroEstado = !filtroGrupo && ESTADOS_VALIDOS.includes(estadoUrl) ? estadoUrl : '';
 
   const [postulaciones, setPostulaciones] = useState([]);
   const [pagination, setPagination] = useState(null);
@@ -42,7 +53,8 @@ export default function MisPostulacionesPage() {
 
   const cargar = useCallback((pagina = 1) => {
     const params = { page: pagina, limit: 20 };
-    if (filtroEstado) params.estado = filtroEstado;
+    if (filtroGrupo) params.grupo = filtroGrupo;
+    else if (filtroEstado) params.estado = filtroEstado;
     postulacionService.getMias(params)
       .then(({ data }) => {
         setPostulaciones(data.data ?? []);
@@ -52,7 +64,7 @@ export default function MisPostulacionesPage() {
       })
       .catch(() => setError('No se pudieron cargar tus postulaciones.'))
       .finally(() => setLoading(false));
-  }, [filtroEstado]);
+  }, [filtroEstado, filtroGrupo]);
 
   useEffect(() => { cargar(1); }, [cargar]);
 
@@ -63,6 +75,7 @@ export default function MisPostulacionesPage() {
   const setFiltro = (estado) => {
     setLoading(true);
     const sig = new URLSearchParams(searchParams);
+    sig.delete('grupo');
     if (estado) sig.set('estado', estado); else sig.delete('estado');
     setSearchParams(sig, { replace: true });
   };
@@ -99,7 +112,7 @@ export default function MisPostulacionesPage() {
           {/* ── Resumen por estado (funciona como filtro) ──────────────────── */}
           <div className={styles.resumenGrid} role="group" aria-label="Filtrar por estado">
             {LISTA_ESTADOS_POSTULACION.map((e) => {
-              const activo = filtroEstado === e.estado;
+              const activo = filtroEstado === e.estado || Boolean(filtroGrupo && GRUPOS[filtroGrupo].estados.includes(e.estado));
               return (
                 <button
                   key={e.estado}
@@ -115,6 +128,15 @@ export default function MisPostulacionesPage() {
               );
             })}
           </div>
+
+          {filtroGrupo && (
+            <div className={styles.filtroActivo}>
+              Mostrando: <strong>{GRUPOS[filtroGrupo].label}</strong> ({GRUPOS[filtroGrupo].detalle})
+              <button type="button" className={styles.limpiarFiltro} onClick={() => setFiltro('')}>
+                <Icon name="close" size={14} /> Ver todas
+              </button>
+            </div>
+          )}
 
           {filtroEstado && (
             <div className={styles.filtroActivo}>

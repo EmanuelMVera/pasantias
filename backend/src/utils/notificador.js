@@ -48,9 +48,9 @@ async function crearNotificacion(datos) {
   const notif = await Notificacion.create(payload);
 
   // 2. Enviar email de forma asíncrona (fire-and-forget — no bloquea la respuesta)
-  _enviarEmailNotificacion(payload).catch((err) =>
-    logger.error({ err }, 'notificacion_email_fallo')
-  );
+  // (_enviarEmailNotificacion nunca lanza: atrapa sus propios errores de BD y
+  // enviarEmail no lanza por contrato.)
+  void _enviarEmailNotificacion(payload);
 
   return notif;
 }

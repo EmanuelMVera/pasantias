@@ -2,8 +2,21 @@
 
 const { validarCampos } = require('./common.validator');
 
+// Datos INSTITUCIONALES: los administra el instituto (importación CSV o admin
+// del sistema). El alumno no los puede cambiar desde su perfil: si llegan en
+// el request se rechaza con 400 (no se ignoran en silencio).
+const CAMPOS_INSTITUCIONALES = {
+  carrera: 'carrera',
+  anioEgreso: 'año de egreso',
+  legajo: 'legajo',
+  rol: 'condición (alumno/egresado)',
+  nombre: 'nombre',
+  apellido: 'apellido',
+  email: 'email',
+};
+
 const CAMPOS_PERFIL_VALIDOS = [
-  'carrera', 'anioEgreso', 'descripcion', 'habilidades', 'idiomas',
+  'descripcion', 'habilidades', 'idiomas',
   'certificaciones', 'linkedin', 'github', 'portfolio', 'redesSociales',
   'fotoPerfil', 'areaInteres', 'disponibilidad', 'preferenciasLaborales',
   'salarioPretendido', 'visibilidadPerfil', 'experienciaLaboral', 'proyectos',
@@ -11,7 +24,6 @@ const CAMPOS_PERFIL_VALIDOS = [
 ];
 
 const DISPONIBILIDADES = ['inmediata', '1_mes', '3_meses', 'no_disponible'];
-const ANIO_EGRESO_MIN = 1970;
 
 /**
  * Reglas del perfil del alumno/egresado. Los límites siguen las columnas del
@@ -24,9 +36,6 @@ const ANIO_EGRESO_MIN = 1970;
  */
 function reglasPerfil() {
   return {
-    carrera:               { tipo: 'texto', label: 'La carrera', max: 150 },
-    // Dinámico: alumnos que todavía no egresaron pueden indicar el año previsto.
-    anioEgreso:            { tipo: 'entero', label: 'El año de egreso', min: ANIO_EGRESO_MIN, max: new Date().getFullYear() + 6 },
     descripcion:           { tipo: 'texto', label: 'La descripción', max: 2000 },
     areaInteres:           { tipo: 'texto', label: 'El área de interés', max: 150 },
     linkedin:              { tipo: 'url', label: 'LinkedIn' },
@@ -61,6 +70,11 @@ function reglasPerfil() {
  * @returns {{ error: string|null, datos?: object }}
  */
 function validateUpdatePerfil(body) {
+  const institucional = Object.keys(CAMPOS_INSTITUCIONALES).find((k) => body[k] !== undefined);
+  if (institucional) {
+    return { error: `El campo ${CAMPOS_INSTITUCIONALES[institucional]} es administrado por el instituto.` };
+  }
+
   const camposRecibidos = Object.keys(body).filter((k) => CAMPOS_PERFIL_VALIDOS.includes(k));
   if (camposRecibidos.length === 0) return { error: 'No se enviaron campos válidos para actualizar.' };
 
@@ -72,4 +86,4 @@ function validateUpdatePerfil(body) {
   return validarCampos(entrada, reglasPerfil(), { parcial: true });
 }
 
-module.exports = { validateUpdatePerfil, DISPONIBILIDADES };
+module.exports = { validateUpdatePerfil, DISPONIBILIDADES, CAMPOS_INSTITUCIONALES };

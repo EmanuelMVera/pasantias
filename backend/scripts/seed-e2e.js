@@ -19,6 +19,7 @@
 
 require('dotenv').config();
 const path = require('path');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { execFileSync } = require('child_process');
 const { Client } = require('pg');
@@ -67,8 +68,31 @@ function migrar() {
 async function sembrar() {
   // require DESPUÉS de migrar: el singleton de sequelize toma DB_NAME=..._e2e.
   const {
-    Usuario, Perfil, Empresa, EmpresaUsuario, Oferta, Postulacion, SolicitudEmpresa, sequelize,
+    Usuario, Perfil, Empresa, EmpresaUsuario, Oferta, Postulacion, SolicitudEmpresa, Archivo, sequelize,
   } = require('../src/models');
+  const storageLocal = require('../src/services/storage').get('local');
+
+  // CV real del alumno E2E: la fuente de verdad del CV es un Archivo
+  // registrado con sus bytes en el almacenamiento (perfil.service::tieneCv),
+  // no un cvPath suelto. Se guarda con el mismo adapter local que usa la app
+  // (el backend E2E corre con STORAGE_BACKEND=local), así el CV también se
+  // puede descargar.
+  const PDF_E2E = Buffer.from('%PDF-1.4\n% CV de prueba E2E\n%%EOF\n');
+  async function crearCvE2E(usuario) {
+    const key = `/uploads/cv_e2e_${crypto.randomUUID()}.pdf`;
+    await storageLocal.putObject({ key, body: PDF_E2E, contentType: 'application/pdf', area: 'private' });
+    const archivo = await Archivo.create({
+      usuarioPropietarioId: usuario.id,
+      tipo: 'cv',
+      nombreOriginal: 'cv-e2e.pdf',
+      claveAlmacenamiento: key,
+      mimeType: 'application/pdf',
+      tamanioBytes: PDF_E2E.length,
+      hashSha256: crypto.createHash('sha256').update(PDF_E2E).digest('hex'),
+      backend: 'local',
+    });
+    return { cvPath: key, cvArchivoId: archivo.id };
+  }
 
   const hash = await bcrypt.hash(fx.password, 4);
   const base = { password: hash, activo: true, habilitado: true };
@@ -77,10 +101,10 @@ async function sembrar() {
   const admin = await Usuario.create({ ...base, rol: 'admin', nombre: fx.admin.nombre, apellido: fx.admin.apellido, email: fx.admin.email });
 
   const alumno = await Usuario.create({ ...base, rol: 'alumno', nombre: fx.alumno.nombre, apellido: fx.alumno.apellido, email: fx.alumno.email });
-  await Perfil.create({ usuarioId: alumno.id, carrera: 'Tecnicatura en Programación', cvPath: '/uploads/cv/e2e-alumno.pdf' });
+  await Perfil.create({ usuarioId: alumno.id, carrera: 'Tecnicatura Superior en Programación', ...(await crearCvE2E(alumno)) });
 
   const alumno2 = await Usuario.create({ ...base, rol: 'alumno', nombre: fx.alumno2.nombre, apellido: fx.alumno2.apellido, email: fx.alumno2.email });
-  await Perfil.create({ usuarioId: alumno2.id, carrera: 'Tecnicatura en Programación', cvPath: '/uploads/cv/e2e-alumno2.pdf' });
+  await Perfil.create({ usuarioId: alumno2.id, carrera: 'Tecnicatura Superior en Programación', ...(await crearCvE2E(alumno2)) });
 
   const uAdminEmpresa = await Usuario.create({ ...base, rol: 'empresa', nombre: fx.adminEmpresa.nombre, apellido: fx.adminEmpresa.apellido, email: fx.adminEmpresa.email });
   const uReclutador   = await Usuario.create({ ...base, rol: 'empresa', nombre: fx.reclutador.nombre, apellido: fx.reclutador.apellido, email: fx.reclutador.email });

@@ -79,6 +79,10 @@
     {
       "name": "demo",
       "description": "Estado público del escenario de presentación"
+    },
+    {
+      "name": "catalogos",
+      "description": "Catálogos institucionales de solo lectura (carreras)"
     }
   ],
   "externalDocs": {
@@ -597,16 +601,9 @@
       },
       "PerfilUpdate": {
         "type": "object",
-        "description": "Se envía al menos uno de estos campos. `telefono` y `ubicacion` también se aceptan y se persisten en el `Usuario`.",
+        "description": "Se envía al menos uno de estos campos. `telefono` y `ubicacion` también se aceptan y se persisten en el `Usuario`. Los datos institucionales (carrera, anioEgreso, legajo, rol, nombre, apellido, email) se rechazan con 400.",
         "minProperties": 1,
         "properties": {
-          "carrera": {
-            "type": "string",
-            "maxLength": 150
-          },
-          "anioEgreso": {
-            "type": "integer"
-          },
           "descripcion": {
             "type": "string"
           },
@@ -641,10 +638,6 @@
             "maxLength": 255
           },
           "redesSociales": {},
-          "fotoPerfil": {
-            "type": "string",
-            "maxLength": 255
-          },
           "areaInteres": {
             "type": "string",
             "maxLength": 150
@@ -3083,14 +3076,15 @@
           "500": {
             "$ref": "#/components/responses/Error500"
           }
-        }
+        },
+        "description": "Incluye los datos institucionales de solo lectura (nombre, apellido, email, rol, legajo, carrera, anioEgreso), `cvCargado` (hay un Archivo de CV real, no solo un cvPath legacy), `perfilCompleto` (% sobre campos que el alumno puede completar) y `datosInstitucionalesFaltantes`."
       },
       "put": {
         "tags": [
           "usuarios"
         ],
         "operationId": "usuariosUpdatePerfil",
-        "summary": "Actualizar mi perfil académico",
+        "summary": "Actualizar mi perfil profesional",
         "responses": {
           "200": {
             "description": "OK",
@@ -3133,7 +3127,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "**Roles:** alumno · egresado",
+        "description": "Solo datos personales/profesionales. Los institucionales (carrera, anioEgreso, legajo, rol, nombre, apellido, email) responden 400 \"El campo … es administrado por el instituto.\": se cambian por importación CSV o desde el admin.\n\n**Roles:** alumno · egresado",
         "parameters": [
           {
             "$ref": "#/components/parameters/csrfHeader"
@@ -3440,7 +3434,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Métricas personales, ofertas recomendadas y % de completitud del perfil.\n\n**Roles:** alumno · egresado"
+        "description": "Métricas personales (incluye `enProceso` = en revisión + preseleccionado), ofertas recomendadas, % de completitud del perfil y `cvCargado`.\n\n**Roles:** alumno · egresado"
       }
     },
     "/api/ofertas/recomendadas": {
@@ -5360,7 +5354,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "**Roles:** alumno · egresado",
+        "description": "`?estado=` filtra por un estado real. `?grupo=en_proceso` (gana sobre `estado`) agrupa en_revision + preseleccionado: es una agrupación de presentación del KPI \"En proceso\", no un estado de la BD. Grupo desconocido → 400.\n\n**Roles:** alumno · egresado",
         "parameters": [
           {
             "$ref": "#/components/parameters/pageParam"
@@ -5370,6 +5364,18 @@
           },
           {
             "$ref": "#/components/parameters/estadoQuery"
+          },
+          {
+            "name": "grupo",
+            "in": "query",
+            "required": false,
+            "description": "Agrupación de estados de presentación.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en_proceso"
+              ]
+            }
           }
         ]
       }
@@ -8590,6 +8596,53 @@
           }
         },
         "description": "Público, sin autenticación. Refleja el estado real de la base (vía `escenarioExiste()`) — nunca afirma que las cuentas demo existen si el seed de presentación no corrió.",
+        "security": []
+      }
+    },
+    "/api/catalogos/carreras": {
+      "get": {
+        "tags": [
+          "catalogos"
+        ],
+        "operationId": "catalogosCarreras",
+        "summary": "Catálogo institucional de carreras",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        },
+        "description": "Público, sin autenticación (lo usa el formulario público de solicitud de empresa). Fuente única (`backend/src/data/catalogos.json`): contra esta lista se validan `carrerasDestinatarias` de las ofertas, `carrerasInteres` de la solicitud de empresa y la columna `carrera` de la importación CSV.",
         "security": []
       }
     }

@@ -1,8 +1,15 @@
 /**
  * perfil.model.js — Modelo Sequelize para la tabla "perfiles".
  *
- * Almacena la información académica y profesional del alumno, egresado o profesor.
- * Se crea automáticamente al registrar un usuario con rol 'alumno', 'egresado' o 'profesor'.
+ * Información académica y profesional de un ALUMNO o EGRESADO (los únicos
+ * roles con perfil; 1:1 con usuarios). Se crea al dar de alta al usuario
+ * (importación CSV o admin del sistema).
+ *
+ * Dos tipos de datos:
+ *   - INSTITUCIONALES (legajo, carrera, anioEgreso; y en usuarios: nombre,
+ *     apellido, email, rol): los administra el instituto. El alumno los ve en
+ *     solo lectura y PUT /api/users/perfil los rechaza (user.validator.js).
+ *   - PERSONALES / PROFESIONALES: el resto, los edita el alumno.
  *
  * El perfil es visible por las empresas cuando un alumno se postula a una oferta.
  *
@@ -49,10 +56,11 @@ module.exports = (sequelize) => {
 
     // ── Datos académicos ──────────────────────────────────────────────────────
 
-    // Carrera que estudia o estudió el alumno (ej: "Tecnicatura en Programación")
+    // Carrera que estudia o estudió (institucional). Valor del catálogo único
+    // de carreras (backend/src/data/catalogos.json), validado en la importación.
     carrera: { type: DataTypes.STRING(150), allowNull: true },
 
-    // Año en que el alumno se graduó (nulo si aún está cursando)
+    // Año de egreso (institucional; nulo si aún está cursando)
     anioEgreso: { type: DataTypes.INTEGER, allowNull: true },
 
     // Descripción personal/profesional redactada por el alumno
@@ -90,6 +98,7 @@ module.exports = (sequelize) => {
     // pero ya NO es una URL descargable directamente desde SEC-01: /uploads
     // dejó de servir estos archivos). El acceso real es vía cvArchivoId +
     // GET /api/archivos/:id, que valida propietario/admin/empresa legitimada.
+    // NO es fuente de verdad: "tiene CV" = cvArchivoId (perfil.service::tieneCv).
     cvPath: { type: DataTypes.STRING(255), allowNull: true },
 
     // Ídem para la carta de recomendación.
@@ -128,8 +137,9 @@ module.exports = (sequelize) => {
     // Pretensión salarial expresada como texto libre (ej: "$200.000/mes", "A convenir")
     salarioPretendido: { type: DataTypes.STRING(100), allowNull: true },
 
-    // Controla si el perfil es visible para las empresas que buscan candidatos
-    // false = oculto (solo el propio usuario y el admin lo ven)
+    // true = público para usuarios autenticados. false = privado: solo lo ven
+    // el propio alumno, el admin del sistema y los integrantes activos de una
+    // empresa a cuyas ofertas se postuló (user.controller::puedeVerPerfilPrivado).
     visibilidadPerfil: { type: DataTypes.BOOLEAN, defaultValue: true },
 
     // ── Experiencia y proyectos ───────────────────────────────────────────────

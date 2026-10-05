@@ -150,6 +150,9 @@ const RAZON_SOCIAL = 'S.H.I.E.L.D.';
 // conviviendo con S.H.I.E.L.D. después de un reset sobre una base vieja.
 const LEGACY_PRESENTACION = {
   razonesSociales: ['Delta Innovación IT'],
+  // CUIT anterior de la empresa demo (sin dígito verificador válido): el reset
+  // lo reconoce para no dejar una S.H.I.E.L.D. duplicada.
+  cuits: ['30712345689'],
   emails: [
     'lucia.ferrari@demo.invalid',
     ...Array.from({ length: 10 }, (_, i) => `candidato${String(i + 1).padStart(2, '0')}@demo.invalid`),
@@ -162,7 +165,10 @@ const HISTORIA_PRINCIPAL = {
   ofertaTitulo: 'Pasante en Desarrollo Frontend (React)',
   cadena: ['en_revision', 'preseleccionado', 'entrevista', 'contratado'],
 };
-const EMPRESA_CUIT = '30712345689';
+// CUIT ficticio pero FORMALMENTE válido (dígito verificador AFIP, mismo
+// validador que el formulario). Prefijo 30-9999…: AFIP no emite esa serie, así
+// que no coincide con ninguna empresa real.
+const EMPRESA_CUIT = '30999999995';
 const SOLICITUD_EMPRESA_EMAIL = 'registro@nubecode.demo';
 
 // Pool de candidatos SINTÉTICOS (autocontenido, ver comentario de cabecera).
@@ -179,14 +185,14 @@ const SOLICITUD_EMPRESA_EMAIL = 'registro@nubecode.demo';
 // profesionalmente con las ofertas a las que se postula.
 const CANDIDATOS_SINTETICOS = [
   { n: 1,  nombre: 'Kate',    apellido: 'Bishop',   email: 'kate.bishop@demo.invalid',    rol: 'alumno',   carrera: 'Tecnicatura Superior en Programación',         ciudad: 'Avellaneda',      area: 'Desarrollo Web',             habilidades: ['JavaScript', 'React', 'Testing', 'Documentación técnica'] },
-  { n: 2,  nombre: 'Miles',   apellido: 'Morales',  email: 'miles.morales@demo.invalid',  rol: 'alumno',   carrera: 'Tecnicatura Superior en Análisis de Sistemas', ciudad: 'Quilmes',         area: 'Desarrollo Web',             habilidades: ['JavaScript', 'React', 'CSS', 'Testing'] },
-  { n: 3,  nombre: 'America', apellido: 'Chavez',   email: 'america.chavez@demo.invalid', rol: 'alumno',   carrera: 'Tecnicatura Superior en Redes',                ciudad: 'Lanús',           area: 'Redes y Telecomunicaciones', habilidades: ['TCP/IP', 'Linux', 'Soporte técnico'] },
+  { n: 2,  nombre: 'Miles',   apellido: 'Morales',  email: 'miles.morales@demo.invalid',  rol: 'alumno',   carrera: 'Tecnicatura Superior en Programación', ciudad: 'Quilmes',         area: 'Desarrollo Web',             habilidades: ['JavaScript', 'React', 'CSS', 'Testing'] },
+  { n: 3,  nombre: 'America', apellido: 'Chavez',   email: 'america.chavez@demo.invalid', rol: 'alumno',   carrera: 'Tecnicatura en Redes y Telecomunicaciones',    ciudad: 'Lanús',           area: 'Redes y Telecomunicaciones', habilidades: ['TCP/IP', 'Linux', 'Soporte técnico'] },
   { n: 4,  nombre: 'Riri',    apellido: 'Williams', email: 'riri.williams@demo.invalid',  rol: 'alumno',   carrera: 'Tecnicatura Superior en Programación',         ciudad: 'Avellaneda',      area: 'Programación',               habilidades: ['Node.js', 'Express', 'SQL', 'APIs REST'] },
-  { n: 5,  nombre: 'Shuri',   apellido: '',         email: 'shuri@demo.invalid',          rol: 'alumno',   carrera: 'Tecnicatura Superior en Análisis de Sistemas', ciudad: 'Lomas de Zamora', area: 'Programación',               habilidades: ['Python', 'SQL', 'Node.js', 'PostgreSQL'] },
+  { n: 5,  nombre: 'Shuri',   apellido: '',         email: 'shuri@demo.invalid',          rol: 'alumno',   carrera: 'Tecnicatura Superior en Programación', ciudad: 'Lomas de Zamora', area: 'Programación',               habilidades: ['Python', 'SQL', 'Node.js', 'PostgreSQL'] },
   { n: 6,  nombre: 'Cassie',  apellido: 'Lang',     email: 'cassie.lang@demo.invalid',    rol: 'alumno',   carrera: 'Tecnicatura Superior en Programación',         ciudad: 'Lanús',           area: 'Programación',               habilidades: ['Testing', 'JavaScript', 'Node.js', 'Automatización'] },
-  { n: 7,  nombre: 'Billy',   apellido: 'Maximoff', email: 'billy.maximoff@demo.invalid', rol: 'alumno',   carrera: 'Tecnicatura Superior en Redes',                ciudad: 'Banfield',        area: 'Programación',               habilidades: ['Testing', 'Linux', 'Soporte técnico'] },
-  { n: 8,  nombre: 'Harley',  apellido: 'Keener',   email: 'harley.keener@demo.invalid',  rol: 'egresado', carrera: 'Tecnicatura Superior en Análisis de Sistemas', ciudad: 'Quilmes',         area: 'Programación',               habilidades: ['Testing', 'JavaScript', 'Playwright', 'Git'] },
-  { n: 9,  nombre: 'Tommy',   apellido: 'Maximoff', email: 'tommy.maximoff@demo.invalid', rol: 'alumno',   carrera: 'Tecnicatura Superior en Redes',                ciudad: 'Berazategui',     area: 'Redes y Telecomunicaciones', habilidades: ['TCP/IP', 'Routing', 'Soporte técnico'] },
+  { n: 7,  nombre: 'Billy',   apellido: 'Maximoff', email: 'billy.maximoff@demo.invalid', rol: 'alumno',   carrera: 'Tecnicatura en Redes y Telecomunicaciones',    ciudad: 'Banfield',        area: 'Programación',               habilidades: ['Testing', 'Linux', 'Soporte técnico'] },
+  { n: 8,  nombre: 'Harley',  apellido: 'Keener',   email: 'harley.keener@demo.invalid',  rol: 'egresado', carrera: 'Tecnicatura Superior en Programación', ciudad: 'Quilmes',         area: 'Programación',               habilidades: ['Testing', 'JavaScript', 'Playwright', 'Git'] },
+  { n: 9,  nombre: 'Tommy',   apellido: 'Maximoff', email: 'tommy.maximoff@demo.invalid', rol: 'alumno',   carrera: 'Tecnicatura en Redes y Telecomunicaciones',    ciudad: 'Berazategui',     area: 'Redes y Telecomunicaciones', habilidades: ['TCP/IP', 'Routing', 'Soporte técnico'] },
   { n: 10, nombre: 'Kamala',  apellido: 'Khan',     email: 'kamala.khan@demo.invalid',    rol: 'egresado', carrera: 'Tecnicatura Superior en Programación',         ciudad: 'Wilde',           area: 'Desarrollo Web',             habilidades: ['Figma', 'UX Research', 'Prototipado', 'CSS'] },
 ];
 const CANDIDATO_EMAILS = CANDIDATOS_SINTETICOS.map((c) => c.email);
@@ -276,7 +282,7 @@ async function limpiar(transaction) {
     // ficticio del seed (único): nunca una homónima creada a mano.
     where: {
       razonSocial: { [Op.in]: [RAZON_SOCIAL, ...LEGACY_PRESENTACION.razonesSociales] },
-      cuit: EMPRESA_CUIT,
+      cuit: { [Op.in]: [EMPRESA_CUIT, ...LEGACY_PRESENTACION.cuits] },
     },
     attributes: ['id'],
     paranoid: false,
@@ -509,8 +515,8 @@ async function sembrar(transaction) {
 
   const carrerasIT = [
     'Tecnicatura Superior en Programación',
-    'Tecnicatura Superior en Análisis de Sistemas',
-    'Tecnicatura Superior en Redes',
+    'Tecnicatura Superior en Programación',
+    'Tecnicatura en Redes y Telecomunicaciones',
   ];
 
   const ofertaDefs = [
@@ -934,7 +940,7 @@ async function sembrar(transaction) {
 
   await SolicitudEmpresa.create({
     razonSocial: 'NubeCode SRL',
-    cuit: '30-71555222-7',
+    cuit: '30999999987', // ficticio, dígito verificador válido
     rubro: 'Software',
     direccion: 'Belgrano 1240',
     ciudad: 'Lomas de Zamora',

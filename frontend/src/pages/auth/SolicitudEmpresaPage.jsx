@@ -18,24 +18,9 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { solicitudEmpresaService } from '../../services/solicitudEmpresa.service';
 import Brand from '../../components/Brand/Brand';
+import { useCarreras } from '../../hooks/useCarreras';
 import { esCuitValido, esEmailValido, esTelefonoValido, esUrlValida, primerError } from '../../utils/validacion';
 import styles from './SolicitudEmpresaPage.module.css';
-
-// ── Lista de carreras disponibles ─────────────────────────────────────────────
-const CARRERAS = [
-  'Análisis de Sistemas',
-  'Diseño Industrial',
-  'Enfermería',
-  'Radiología',
-  'Higiene y Seguridad',
-  'Tecnicatura en Programación',
-  'Administración de Empresas',
-  'Contabilidad',
-  'Marketing y Publicidad',
-  'Diseño Gráfico',
-  'Laboratorio',
-  'Fisioterapia',
-];
 
 const INITIAL_FORM = {
   // A — Empresa
@@ -61,6 +46,8 @@ const INITIAL_FORM = {
 export default function SolicitudEmpresaPage() {
   const [form, setForm]           = useState(INITIAL_FORM);
   const [carreras, setCarreras]   = useState([]);
+  // Catálogo institucional único (GET /api/catalogos/carreras).
+  const { carreras: catalogoCarreras, error: errorCatalogo } = useCarreras();
   const [reclutadores, setReclutadores] = useState([{ nombre: '', apellido: '', email: '' }]);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
@@ -392,8 +379,9 @@ export default function SolicitudEmpresaPage() {
             <p className={styles.sectionHint}>
               Seleccioná las carreras cuyos estudiantes o egresados te interesan contratar:
             </p>
+            {errorCatalogo && <p className={styles.sectionHint} role="alert">{errorCatalogo}</p>}
             <div className={styles.checkGrid}>
-              {CARRERAS.map(carrera => {
+              {catalogoCarreras.map(carrera => {
                 const checked = carreras.includes(carrera);
                 return (
                   <label

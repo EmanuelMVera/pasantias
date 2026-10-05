@@ -12,10 +12,12 @@ module.exports = {
   '/api/users/perfil': {
     get: operation({
       tag: T, id: 'usuariosGetPerfil', summary: 'Mi perfil (usuario + perfil académico)',
+      description: 'Incluye los datos institucionales de solo lectura (nombre, apellido, email, rol, legajo, carrera, anioEgreso), `cvCargado` (hay un Archivo de CV real, no solo un cvPath legacy), `perfilCompleto` (% sobre campos que el alumno puede completar) y `datosInstitucionalesFaltantes`.',
       responses: { 200: ok('Perfil') }, errors: ['401'],
     }),
     put: operation({
-      tag: T, id: 'usuariosUpdatePerfil', summary: 'Actualizar mi perfil académico',
+      tag: T, id: 'usuariosUpdatePerfil', summary: 'Actualizar mi perfil profesional',
+      description: 'Solo datos personales/profesionales. Los institucionales (carrera, anioEgreso, legajo, rol, nombre, apellido, email) responden 400 "El campo … es administrado por el instituto.": se cambian por importación CSV o desde el admin.',
       roles: ['alumno', 'egresado'], csrf: true, body: 'PerfilUpdate',
       responses: { 200: ok('Perfil') }, errors: ['400', '401', '403', '403csrf'],
     }),

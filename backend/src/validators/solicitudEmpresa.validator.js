@@ -1,6 +1,7 @@
 'use strict';
 
 const { validarCampos } = require('./common.validator');
+const { CARRERAS } = require('../services/catalogo.service');
 
 const RECLUTADORES_MAX = 10;
 
@@ -19,9 +20,8 @@ const REGLAS_SOLICITUD = {
   responsableEmail:    { tipo: 'email', label: 'El email del responsable', requerido: true },
   responsableTelefono: { tipo: 'telefono', label: 'El teléfono del responsable' },
   responsableCargo:    { tipo: 'texto', label: 'El cargo del responsable', max: 100 },
-  // Las carreras del formulario público no coinciden con el catálogo del
-  // instituto (catalogos.json): por ahora lista de textos acotada.
-  carrerasInteres:     { tipo: 'lista', label: 'Carreras de interés', maxItems: 30, maxItem: 150 },
+  // Mismo catálogo institucional que las ofertas (catalogo.service).
+  carrerasInteres:     { tipo: 'lista', label: 'Carreras de interés', maxItems: CARRERAS.length, valores: CARRERAS },
   descripcion:         { tipo: 'texto', label: 'La descripción', max: 2000 },
   puestos:             { tipo: 'texto', label: 'Los puestos de interés', max: 2000 },
 };

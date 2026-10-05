@@ -25,10 +25,12 @@ const {
   ejecutarSeedInstitucional,
   limpiarSoloInstitucional,
   DOMINIO,
+  CUIT_PREFIJO,
   EMPRESAS_COUNT,
   ALUMNOS_COUNT,
 } = require('../src/utils/seedInstitucional');
 const { cerrarConexion } = require('./helpers/cleanup');
+const { esCuitValido } = require('../src/validators/common.validator');
 
 const BACKEND_DIR = path.join(__dirname, '..');
 
@@ -50,7 +52,7 @@ describe('seedInstitucional — dataset institucional amplio (Fase 1.5)', () => 
     expect(r.alumnos).toBeLessThanOrEqual(100);
 
     const empresaUsuarios = await EmpresaUsuario.findAll({
-      include: [{ model: Empresa, as: 'empresa', attributes: ['cuit'], where: { cuit: { [Op.like]: '307000000%' } } }],
+      include: [{ model: Empresa, as: 'empresa', attributes: ['cuit'], where: { cuit: { [Op.like]: `${CUIT_PREFIJO}%` } } }],
       attributes: ['empresaId', 'rolInterno'],
     });
     const porEmpresa = {};
@@ -67,15 +69,16 @@ describe('seedInstitucional — dataset institucional amplio (Fase 1.5)', () => 
     }
   });
 
-  test('identidad corporativa: cada empresa tiene razonSocial + logo (URL https), CUIT único', async () => {
+  test('identidad corporativa: cada empresa tiene razonSocial + logo (URL https), CUIT único y formalmente válido', async () => {
     await ejecutarSeedInstitucional({ verbose: false });
-    const empresas = await Empresa.findAll({ where: { cuit: { [Op.like]: '307000000%' } }, attributes: ['razonSocial', 'logo', 'cuit'] });
+    const empresas = await Empresa.findAll({ where: { cuit: { [Op.like]: `${CUIT_PREFIJO}%` } }, attributes: ['razonSocial', 'logo', 'cuit'] });
     expect(empresas).toHaveLength(EMPRESAS_COUNT);
     const cuits = new Set();
     for (const e of empresas) {
       expect(e.razonSocial).toBeTruthy();
       expect(e.logo).toMatch(/^https:\/\//);
       expect(cuits.has(e.cuit)).toBe(false);
+      expect(esCuitValido(e.cuit)).toBe(true);
       cuits.add(e.cuit);
     }
   });
@@ -83,7 +86,7 @@ describe('seedInstitucional — dataset institucional amplio (Fase 1.5)', () => 
   test('nivel de confianza determinístico: 15 estándar + 5 de confianza, siempre las mismas empresas', async () => {
     await ejecutarSeedInstitucional({ verbose: false });
     const leer = async () => (await Empresa.findAll({
-      where: { cuit: { [Op.like]: '307000000%' } }, attributes: ['cuit', 'nivelConfianza'], order: [['cuit', 'ASC']],
+      where: { cuit: { [Op.like]: `${CUIT_PREFIJO}%` } }, attributes: ['cuit', 'nivelConfianza'], order: [['cuit', 'ASC']],
     })).map((e) => `${e.cuit}:${e.nivelConfianza}`);
 
     const primera = await leer();
@@ -96,7 +99,7 @@ describe('seedInstitucional — dataset institucional amplio (Fase 1.5)', () => 
 
   test('moderación coherente: las empresas de confianza publican en automático; las estándar pasan por moderación', async () => {
     const r = await ejecutarSeedInstitucional({ verbose: false });
-    const empresas = await Empresa.findAll({ where: { cuit: { [Op.like]: '307000000%' } }, attributes: ['id', 'nivelConfianza'] });
+    const empresas = await Empresa.findAll({ where: { cuit: { [Op.like]: `${CUIT_PREFIJO}%` } }, attributes: ['id', 'nivelConfianza'] });
     const confiables = new Set(empresas.filter((e) => e.nivelConfianza === 'confiable').map((e) => e.id));
     const ofertas = await Oferta.findAll({
       where: { empresaId: { [Op.in]: empresas.map((e) => e.id) } }, attributes: ['empresaId', 'estadoModeracion'],
@@ -131,7 +134,7 @@ describe('seedInstitucional — dataset institucional amplio (Fase 1.5)', () => 
 
   test('casos especiales acotados: 2 reclutadores suspendidos, 3 solicitudes pendientes, algunos usuarios sin último acceso', async () => {
     await ejecutarSeedInstitucional({ verbose: false });
-    const empresas = await Empresa.findAll({ where: { cuit: { [Op.like]: '307000000%' } }, attributes: ['id', 'nivelConfianza'] });
+    const empresas = await Empresa.findAll({ where: { cuit: { [Op.like]: `${CUIT_PREFIJO}%` } }, attributes: ['id', 'nivelConfianza'] });
     const empresaIds = empresas.map((e) => e.id);
 
     const membresias = await EmpresaUsuario.findAll({ where: { empresaId: { [Op.in]: empresaIds } }, attributes: ['empresaId', 'usuarioId', 'rolInterno', 'activo'] });
@@ -181,7 +184,7 @@ describe('seedInstitucional — dataset institucional amplio (Fase 1.5)', () => 
 
   test('ninguna oferta institucional tiene como responsable a un admin_empresa', async () => {
     await ejecutarSeedInstitucional({ verbose: false });
-    const empresas = await Empresa.findAll({ where: { cuit: { [Op.like]: '307000000%' } }, attributes: ['id'] });
+    const empresas = await Empresa.findAll({ where: { cuit: { [Op.like]: `${CUIT_PREFIJO}%` } }, attributes: ['id'] });
     const empresaIds = empresas.map((e) => e.id);
     const ofertas = await Oferta.findAll({ where: { empresaId: { [Op.in]: empresaIds } }, attributes: ['creadaPorUsuarioId'] });
     expect(ofertas.length).toBeGreaterThan(0);

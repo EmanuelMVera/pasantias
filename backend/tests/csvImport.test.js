@@ -78,7 +78,7 @@ describe('IMPORTACIÓN CSV — alumnos/egresados', () => {
       HEADER,
       filaAlumno({ legajo: `DR-A-${suf}`, email: `dr-a-${suf}@test.local` }),
       filaAlumno({ legajo: `DR-B-${suf}`, email: `dr-b-${suf}@test.local` }),
-      `DR-C-${suf},Egresada,Test,dr-c-${suf}@test.local,egresado,Sistemas,2022,,`,
+      `DR-C-${suf},Egresada,Test,dr-c-${suf}@test.local,egresado,Tecnicatura en Redes y Telecomunicaciones,2022,,`,
     ].join('\n');
 
     const antes = await Usuario.count();

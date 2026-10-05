@@ -236,7 +236,7 @@ async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip, requestId, l
 
   // Fire-and-forget: el resultado (éxito o fallo) lo registra el mailer.
   // Va al responsable y al contacto institucional (antes solo al segundo).
-  enviarEmail({
+  void enviarEmail({
     to: [...new Set([solicitud.responsableEmail, solicitud.email].filter(Boolean))],
     tipo: 'rechazo_solicitud_empresa',
     log,

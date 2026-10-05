@@ -139,7 +139,7 @@ exports.forgotPassword = async (req, res) => {
   // resultado SÍ se registra: un fallo queda como ERROR con el requestId —
   // nunca el token ni el link (enviarEmail no loguea cuerpos).
   const log = req.log || logger;
-  authService.enviarEmailReset(email, token, { log }).then((r) => {
+  void authService.enviarEmailReset(email, token, { log }).then((r) => {
     if (!r.ok && r.errorCode !== 'EMAIL_NO_CONFIGURADO') {
       log.error({ usuarioId: usuario.id, errorCode: r.errorCode, categoria: r.categoria }, 'recupero_password_email_fallo');
     }

@@ -109,6 +109,50 @@ h2.sectionTitle {
   margin-top: var(--space-1);
 }
 
+/* ── Datos institucionales (solo lectura) ─────────────────────────────────── */
+.institucional {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: var(--space-3) var(--space-5);
+  margin: 0;
+}
+
+.institucional dt {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.institucional dd {
+  margin: 2px 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.sinDato {
+  font-weight: 400;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.avisoInstitucional {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--warning-soft);
+  color: var(--warning-text);
+  font-size: 0.87rem;
+}
+
+.avisoInstitucional :global(svg) { flex-shrink: 0; margin-top: 2px; }
+
 .guardar {
   display: flex;
   flex-wrap: wrap;

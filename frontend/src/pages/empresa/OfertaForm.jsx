@@ -27,22 +27,8 @@ import PageHeader from '../../components/ui/PageHeader';
 import Card from '../../components/ui/Card';
 import Icon from '../../components/ui/Icon';
 import { esEnteroEnRango, primerError } from '../../utils/validacion';
+import { useCarreras } from '../../hooks/useCarreras';
 import styles from './CrearOfertaPage.module.css';
-
-// Carreras del instituto (lista canónica de catalogos.json)
-const CARRERAS_INSTITUTO = [
-  'Tecnicatura Superior en Programación',
-  'Tecnicatura en Redes y Telecomunicaciones',
-  'Tecnicatura en Ciberseguridad',
-  'Tecnicatura en Electrónica',
-  'Tecnicatura en Automatización y Control',
-  'Tecnicatura en Mecánica',
-  'Tecnicatura en Administración',
-  'Tecnicatura en Contabilidad',
-  'Tecnicatura en Logística',
-  'Tecnicatura en Marketing',
-  'Tecnicatura en Diseño Industrial',
-];
 
 const TIPO_PUESTO_CONFIG = {
   pasante: {
@@ -95,6 +81,8 @@ export default function OfertaForm({
 }) {
   const [form, setForm] = useState(initialForm);
   const [carrerasDestinatarias, setCarrerasDestinatarias] = useState(initialCarreras);
+  // Catálogo institucional único (GET /api/catalogos/carreras); el backend valida contra el mismo.
+  const { carreras: catalogoCarreras, error: errorCatalogo } = useCarreras();
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState('');
 
@@ -154,7 +142,12 @@ export default function OfertaForm({
 
     setLoading(true);
     try {
-      await onSubmit({ ...form, carrerasDestinatarias });
+      // Una oferta vieja puede traer carreras que ya no están en el catálogo:
+      // se descartan (el backend solo acepta valores del catálogo).
+      const carrerasValidas = catalogoCarreras.length
+        ? carrerasDestinatarias.filter((c) => catalogoCarreras.includes(c))
+        : carrerasDestinatarias;
+      await onSubmit({ ...form, carrerasDestinatarias: carrerasValidas });
     } catch (err) {
       setError(err.response?.data?.message || 'Error al guardar la oferta.');
     } finally {
@@ -335,8 +328,9 @@ export default function OfertaForm({
                   (opcional — a qué carreras está orientada la oferta)
                 </span>
               </span>
+              {errorCatalogo && <p className="error-msg" role="alert">{errorCatalogo}</p>}
               <div className={styles.chips}>
-                {CARRERAS_INSTITUTO.map(carrera => {
+                {catalogoCarreras.map(carrera => {
                   const activa = carrerasDestinatarias.includes(carrera);
                   return (
                     <label

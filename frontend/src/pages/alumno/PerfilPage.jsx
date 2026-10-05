@@ -4,9 +4,12 @@
  * Ruta: /perfil (roles alumno, egresado). Ancla #cv → sección del CV (la usan
  * el Inicio y el detalle de oferta cuando falta el CV).
  *
- * Secciones:
- * 1. Datos académicos y de contacto → carrera, año egreso, descripción, área
- *    de interés, teléfono, ubicación
+ * Datos INSTITUCIONALES (solo lectura; los administra el instituto por
+ * importación CSV o el admin): nombre, apellido, email, legajo, condición,
+ * carrera, año de egreso. El backend rechaza cambiarlos desde acá.
+ *
+ * Secciones editables:
+ * 1. Presentación y contacto → descripción, área de interés, teléfono, ubicación
  * 2. Redes y portfolio → linkedin, github, portfolio, otras redes, foto
  * 3. Experiencia → habilidades, idiomas, experiencia laboral, proyectos,
  *    certificaciones
@@ -14,8 +17,10 @@
  *    visibilidad del perfil
  * 5. CV y 6. Carta de recomendación → subidas propias (no pasan por "Guardar")
  *
- * El % y la lista de "Te falta" usan los MISMOS 15 campos que el backend
- * (perfil.service.js::calcularCompletitud), así coinciden con el Inicio.
+ * El % y la lista de "Te falta" usan los MISMOS 14 campos que el backend
+ * (perfil.service.js::CAMPOS_COMPLETITUD): solo lo que el alumno puede
+ * completar. Si falta un dato institucional se muestra un aviso aparte.
+ * El CV cuenta solo si hay un Archivo real (cvArchivoId), no un cvPath suelto.
  *
  * Visibilidad (booleano en el backend): público, o privado → solo lo ven el
  * propio alumno, el admin y las empresas a cuyas ofertas se postuló.
@@ -33,7 +38,7 @@ import FotoPerfilUpload from '../../components/FotoPerfilUpload/FotoPerfilUpload
 import TagsInput from '../../components/TagsInput/TagsInput';
 import CvUpload from '../../components/CvUpload/CvUpload';
 import CartaRecomendacionUpload from '../../components/CartaRecomendacionUpload/CartaRecomendacionUpload';
-import { esEnteroEnRango, esTelefonoValido, esUrlValida, primerError } from '../../utils/validacion';
+import { esTelefonoValido, esUrlValida, primerError } from '../../utils/validacion';
 import styles from './PerfilPage.module.css';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -62,16 +67,24 @@ function tagTextToArray(text) {
   return text.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
-/** Los 15 campos de completitud del backend, con su nombre para "Te falta". */
+/** Campos editables que se envían al guardar (los institucionales nunca). */
+const CAMPOS_EDITABLES = [
+  'descripcion', 'areaInteres', 'linkedin', 'github', 'portfolio', 'redesSociales',
+  'disponibilidad', 'experienciaLaboral', 'proyectos', 'salarioPretendido',
+  'preferenciasLaborales', 'visibilidadPerfil', 'telefono', 'ubicacion',
+];
+
+const CONDICION = { alumno: 'Alumno', egresado: 'Egresado' };
+
+/** Los 14 campos de completitud del backend, con su nombre para "Te falta". */
 function camposCompletitud(form, perfil) {
   return [
-    { label: 'Carrera', ok: !!form.carrera },
     { label: 'Descripción', ok: !!form.descripcion },
     { label: 'Habilidades', ok: tagTextToArray(form.habilidadesTexto).length > 0 },
     { label: 'Idiomas', ok: tagTextToArray(form.idiomasTexto).length > 0 },
     { label: 'LinkedIn', ok: !!form.linkedin },
     { label: 'GitHub', ok: !!form.github },
-    { label: 'CV', ok: !!perfil?.cvPath },
+    { label: 'CV', ok: !!perfil?.cvArchivoId },
     { label: 'Área de interés', ok: !!form.areaInteres },
     { label: 'Disponibilidad', ok: !!form.disponibilidad },
     { label: 'Foto', ok: !!form.fotoPerfil },
@@ -110,8 +123,6 @@ export default function PerfilPage() {
   const [guardando, setGuardando] = useState(false);
 
   const [form, setForm] = useState({
-    carrera:               '',
-    anioEgreso:            '',
     descripcion:           '',
     areaInteres:           '',
     linkedin:              '',
@@ -141,7 +152,8 @@ export default function PerfilPage() {
         setPerfil(d);
         setForm((prev) => ({
           ...prev,
-          ...d,
+          ...Object.fromEntries(CAMPOS_EDITABLES.map((c) => [c, d[c] ?? prev[c]])),
+          fotoPerfil: d.fotoPerfil || '',
           certificaciones: certToText(d.certificaciones),
           // visibilidadPerfil: boolean en el backend, el select usa string
           visibilidadPerfil: d.visibilidadPerfil === false ? 'privada' : 'publica',
@@ -173,9 +185,7 @@ export default function PerfilPage() {
   const handleGuardar = async (e) => {
     e.preventDefault();
     // Mismas reglas que backend/src/validators/user.validator.js (que valida igual).
-    const anioMax = new Date().getFullYear() + 6;
     const errorFormato = primerError([
-      [form.anioEgreso, (v) => esEnteroEnRango(v, 1970, anioMax), `El año de egreso debe ser un número entre 1970 y ${anioMax}.`],
       [form.linkedin, esUrlValida, 'LinkedIn debe ser una dirección completa (ej. https://linkedin.com/in/tu-perfil).'],
       [form.github, esUrlValida, 'GitHub debe ser una dirección completa (ej. https://github.com/tu-usuario).'],
       [form.portfolio, esUrlValida, 'El portfolio debe ser una dirección completa (ej. https://mi-portfolio.com).'],
@@ -187,16 +197,15 @@ export default function PerfilPage() {
     }
     setGuardando(true);
     try {
+      // Solo campos editables: los institucionales (carrera, año de egreso,
+      // legajo, nombre, email…) el backend los rechaza con 400. La foto, el CV
+      // y la carta van por sus propios endpoints de subida.
       const payload = {
-        ...form,
+        ...Object.fromEntries(CAMPOS_EDITABLES.map((c) => [c, form[c]])),
         certificaciones: textToCert(form.certificaciones),
         habilidades: tagTextToArray(form.habilidadesTexto),
         idiomas: tagTextToArray(form.idiomasTexto),
       };
-      delete payload.habilidadesTexto;
-      delete payload.idiomasTexto;
-      // SEC-03: la foto se sube por su propio endpoint, no por acá.
-      delete payload.fotoPerfil;
 
       const { data } = await userService.updatePerfil(payload);
       setPerfil(data.data);
@@ -213,6 +222,16 @@ export default function PerfilPage() {
   const campos = camposCompletitud(form, perfil);
   const pct = Math.round((campos.filter((c) => c.ok).length / campos.length) * 100);
   const faltan = campos.filter((c) => !c.ok);
+  const faltanInstitucionales = perfil?.datosInstitucionalesFaltantes ?? [];
+  const datosInstitucionales = [
+    ['Nombre', [perfil?.nombre, perfil?.apellido].filter(Boolean).join(' ')],
+    ['Email', perfil?.email],
+    ['Legajo', perfil?.legajo],
+    ['Condición', CONDICION[perfil?.rol] ?? perfil?.rol],
+    ['Carrera', perfil?.carrera],
+    // El año de egreso solo tiene sentido para egresados.
+    ...(perfil?.rol === 'egresado' || perfil?.anioEgreso ? [['Año de egreso', perfil?.anioEgreso]] : []),
+  ];
 
   return (
     <div className="page-container">
@@ -251,22 +270,34 @@ export default function PerfilPage() {
         )}
       </section>
 
+      {/* ── Datos institucionales (solo lectura) ─────────────────────────── */}
+      <section className={styles.formSection} aria-labelledby="sec-institucional">
+        <h2 id="sec-institucional" className={styles.sectionTitle}>
+          <span className={styles.sectionIcon}><Icon name="graduation" size={18} /></span>
+          Datos institucionales
+        </h2>
+        <p className={styles.ayuda}>Los registra el instituto. Si algo no es correcto, contactá a la institución.</p>
+        <dl className={styles.institucional}>
+          {datosInstitucionales.map(([etiqueta, valor]) => (
+            <div key={etiqueta}>
+              <dt>{etiqueta}</dt>
+              <dd>{valor || <span className={styles.sinDato}>Sin registrar</span>}</dd>
+            </div>
+          ))}
+        </dl>
+        {faltanInstitucionales.length > 0 && (
+          <p className={styles.avisoInstitucional} role="note">
+            <Icon name="info" size={16} />
+            Falta información académica registrada por el instituto ({faltanInstitucionales.join(', ')}).
+            Contactá a la institución para actualizarla.
+          </p>
+        )}
+      </section>
+
       <form onSubmit={handleGuardar}>
 
-        {/* ── 1. Datos académicos y de contacto ──────────────────────────── */}
-        <FormSection title="Datos académicos y de contacto" icon="graduation">
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="pf-carrera">Carrera</label>
-              <input id="pf-carrera" name="carrera" value={form.carrera || ''} onChange={handleChange}
-                placeholder="Ej: Tecnicatura en Desarrollo de Software" />
-            </div>
-            <div className="form-group">
-              <label htmlFor="pf-anioEgreso">Año de egreso</label>
-              <input type="number" id="pf-anioEgreso" name="anioEgreso" value={form.anioEgreso || ''}
-                onChange={handleChange} placeholder="2026" min="1970" max={new Date().getFullYear() + 6} />
-            </div>
-          </div>
+        {/* ── 1. Presentación y contacto ─────────────────────────────────── */}
+        <FormSection title="Presentación y contacto" icon="user">
           <div className="form-group">
             <label htmlFor="pf-descripcion">Descripción / resumen profesional</label>
             <textarea id="pf-descripcion" name="descripcion" value={form.descripcion || ''} onChange={handleChange}

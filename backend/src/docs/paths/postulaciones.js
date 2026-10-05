@@ -17,8 +17,12 @@ module.exports = {
   '/api/postulaciones/mis': {
     get: operation({
       tag: T, id: 'postulacionesMias', summary: 'Mis postulaciones',
+      description: '`?estado=` filtra por un estado real. `?grupo=en_proceso` (gana sobre `estado`) agrupa en_revision + preseleccionado: es una agrupación de presentación del KPI "En proceso", no un estado de la BD. Grupo desconocido → 400.',
       roles: ['alumno', 'egresado'],
-      query: ['pageParam', 'limitParam', REF.param('estadoQuery')],
+      query: ['pageParam', 'limitParam', REF.param('estadoQuery'), {
+        name: 'grupo', in: 'query', required: false,
+        description: 'Agrupación de estados de presentación.', schema: { type: 'string', enum: ['en_proceso'] },
+      }],
       responses: {
         200: paginated('Postulacion', {
           extraProps: { conteoPorEstado: { type: 'object', additionalProperties: { type: 'integer' } } },

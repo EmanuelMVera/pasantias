@@ -24,7 +24,7 @@ const {
 const { ejecutarShowcaseReset } = require('../src/utils/showcaseReset');
 const { diagnosticarShowcase, formatearInforme } = require('../src/utils/showcaseStatus');
 const { limpiarEscenarioPresentacion, EMP_ADMIN, ALUMNO, RAZON_SOCIAL } = require('../src/utils/seedPresentacion');
-const { limpiarSoloInstitucional, DOMINIO } = require('../src/utils/seedInstitucional');
+const { limpiarSoloInstitucional, DOMINIO, CUIT_PREFIJO } = require('../src/utils/seedInstitucional');
 const { LEGACY_EMAILS_EMPRESA, LEGACY_ALUMNOS, LEGACY_RAZONES_SOCIALES } = require('../src/utils/seedLegacy');
 const { crearAdmin, crearAlumno, crearEmpresaConAdmin, loginYObtenerToken } = require('./helpers/factories');
 const { limpiarUsuarios, cerrarConexion } = require('./helpers/cleanup');
@@ -87,6 +87,11 @@ describe('showcase — reset y status', () => {
     expect(i).toMatchObject({ empresas: 20, estandar: 15, confiables: 5, adminsIndebidos: 0 });
     expect(i.ofertasAutoAprobadas).toBeGreaterThan(0);
     expect(i.postulaciones).toBeGreaterThan(100);
+
+    // CUIT ficticios pero formalmente válidos (validación matemática, sin AFIP).
+    const checks = [...r.status.presentacion.checks, ...r.status.institucional.checks];
+    expect(checks.find((c) => /CUIT demo formalmente válido/.test(c.texto)).ok).toBe(true);
+    expect(checks.find((c) => /CUIT formalmente válido: 20\/20/.test(c.texto)).ok).toBe(true);
   });
 
   test('reset: idempotente — dos corridas seguidas dejan los mismos conteos en toda la base', async () => {
@@ -220,7 +225,7 @@ describe('showcase — reset y status', () => {
 
   test('status: detecta las incoherencias clave del dataset institucional', async () => {
     await ejecutarShowcaseReset({ verbose: false });
-    const estandar = await Empresa.findOne({ where: { cuit: { [Op.like]: '307000000%' }, nivelConfianza: 'estandar' } });
+    const estandar = await Empresa.findOne({ where: { cuit: { [Op.like]: `${CUIT_PREFIJO}%` }, nivelConfianza: 'estandar' } });
     const oferta = await Oferta.findOne({ where: { empresaId: estandar.id } });
     const adminEmpresa = await EmpresaUsuario.findOne({ where: { empresaId: estandar.id, rolInterno: 'admin_empresa' } });
 

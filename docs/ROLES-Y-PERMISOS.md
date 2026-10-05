@@ -71,7 +71,9 @@ es autoridad de permisos).
 | Login / logout / forgot-reset password | 🌐 | 🌐 | 🌐 | 🌐 | 🌐 |
 | Ver mi usuario (`GET /api/auth/me`), cambiar mi contraseña | — | ✅ | ✅ | ✅ | ✅ |
 | Ver mi perfil académico (`GET /api/users/perfil`) | — | ✅ | ✅ | ✅ | ✅ |
-| Editar mi perfil académico, subir CV / carta / foto | — | — | ✅ | — | — |
+| Editar mi perfil profesional, subir CV / carta / foto | — | — | ✅¹² | — | — |
+| Cambiar datos institucionales del alumno (carrera, año de egreso, legajo, nombre, email, rol) | — | ✅ (admin / importación CSV) | — (400) | — | — |
+| Consultar el catálogo de carreras (`GET /api/catalogos/carreras`) | 🌐 | 🌐 | 🌐 | 🌐 | 🌐 |
 | Ver perfil público de otro usuario / de una empresa | — | ✅ | ✅¹⁰ | ✅¹⁰ | ✅¹⁰ |
 | Ver la ficha de un reclutador (`GET /api/empresas/reclutadores/:id/perfil`) | — | ✅ | ✅ con relación⁵ | ✅ misma empresa | ✅ misma empresa |
 | Mi perfil: ver / editar nombre, apellido, teléfono y ubicación; subir foto (`/api/empresas/reclutadores/mi-perfil[/foto]`) | — | — | — | — (403) | ✅ solo el propio⁹ |
@@ -232,6 +234,11 @@ una de sus ofertas.
 - ¹¹ Con sesión de alumno/egresado el detalle (`GET /api/ofertas/:id`) agrega
   `miPostulacion` y `cvCargado`, y quien ya se postuló sigue viendo la oferta aunque
   esté pausada o cerrada (para el resto es 404).
+- ¹² **Datos institucionales del alumno** (nombre, apellido, email, rol, legajo, carrera,
+  año de egreso): los administra el instituto (importación CSV o admin del sistema). El
+  alumno los ve en solo lectura y `PUT /api/users/perfil` los rechaza con 400 ("El campo …
+  es administrado por el instituto"). Para postularse se exige un CV real (Archivo
+  registrado, `cvArchivoId`), no un `cvPath` legacy suelto.
 - ⁸ `GET /api/empresas/equipo` sigue respondiendo al reclutador (lectura de la
   nómina, sin datos de gestión); todas las acciones de equipo (`solicitudes`,
   `solicitar`, `recuperacion`, `PATCH`/`DELETE` de miembros) son solo `admin_empresa`.

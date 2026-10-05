@@ -1,35 +1,38 @@
 #!/usr/bin/env node
 /**
- * email-test.js — envía UN email de prueba real (uso manual).
+ * email-test.js — envía UN email de prueba real por el proveedor configurado.
  *
  *   npm run email:test -- destinatario@dominio.com
  *
- * El destinatario va por argumento: nunca se guarda en el repo. Usa el mismo
- * camino que la app (enviarEmail), así que también prueba EMAIL_FROM y la
- * entrega real (verify solo prueba la autenticación). No imprime secretos.
+ * Un comando = un email a UN destinatario (se rechaza más de un argumento). El
+ * destinatario va por argumento: nunca se guarda en el repo. Usa el mismo
+ * camino que la app (enviarEmail), así prueba también el remitente y la
+ * entrega real (email:verify solo prueba credenciales). No imprime secretos.
  * Sin endpoint HTTP: solo se puede correr con acceso al entorno.
  */
 
 'use strict';
 
 require('dotenv').config({ quiet: true });
-const { enviarEmail, verificarSmtp, resumenConfigSmtp } = require('../src/utils/mailer');
+const { config } = require('../src/config/env');
+const { enviarEmail, verificarEmail, resumenConfigEmail } = require('../src/utils/mailer');
 const { esEmailValido, normalizarEmail } = require('../src/validators/common.validator');
 
 async function main() {
-  const destino = normalizarEmail(process.argv[2] || '');
-  if (!esEmailValido(destino)) {
-    console.error('Uso: npm run email:test -- destinatario@dominio.com');
+  const args = process.argv.slice(2);
+  const destino = normalizarEmail(args[0] || '');
+  if (args.length !== 1 || !esEmailValido(destino)) {
+    console.error('Uso: npm run email:test -- destinatario@dominio.com   (un único destinatario)');
     return 2;
   }
 
-  const smtp = resumenConfigSmtp();
-  console.log(`SMTP ${smtp.host}:${smtp.port} (secure=${smtp.secure}) como ${smtp.user}, from ${smtp.from || '(vacío)'}`);
+  const resumen = resumenConfigEmail();
+  console.log(`Proveedor: ${config.email.provider}${resumen.sender ? ` · sender ${resumen.sender}` : ''}${resumen.host ? ` · ${resumen.host}:${resumen.port}` : ''}`);
 
-  const v = await verificarSmtp();
+  const v = await verificarEmail();
   if (!v.ok) {
-    console.log(`verify falló (${v.errorCode}${v.responseCode ? ` ${v.responseCode}` : ''}): ${v.detalle}`);
-    console.log('Corré `npm run email:verify` para ver el diagnóstico completo.');
+    console.log(`La verificación falló (${v.errorCode}${v.status ? ` HTTP ${v.status}` : ''}): ${v.detalle || ''}`);
+    console.log('Corré `npm run email:verify` para ver el diagnóstico completo. No se envió nada.');
     return 1;
   }
 
@@ -37,7 +40,8 @@ async function main() {
     to: destino,
     tipo: 'prueba_manual',
     subject: 'Prueba de correo – SisPasantías',
-    html: `<p>Este es un email de prueba de SisPasantías enviado el ${new Date().toISOString()}.</p>
+    html: `<p>Este es un email de prueba de SisPasantías enviado el ${new Date().toISOString()}
+      por el proveedor <strong>${config.email.provider}</strong>.</p>
       <p>Si lo recibiste, el envío desde este entorno funciona.</p>`,
   });
   if (r.ok) {

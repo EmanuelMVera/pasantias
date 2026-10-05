@@ -1,9 +1,11 @@
 'use strict';
 
 const { Postulacion, Oferta, Usuario, Perfil, Empresa, Archivo, PostulacionHistorialEstado } = require('../models');
+const { Op } = require('sequelize');
 const { crearNotificacion } = require('../utils/notificador');
 const postulacionService = require('../services/postulacion.service');
 const empresaService     = require('../services/empresa.service');
+const perfilService      = require('../services/perfil.service');
 const { parsePagination, buildPagination, groupCount } = require('../utils/pagination');
 const { registrarAuditoria } = require('../utils/auditLog');
 
@@ -72,10 +74,18 @@ exports.postular = async (req, res) => {
 exports.getMisPostulaciones = async (req, res) => {
   const usuarioId = req.usuario.id;
   const { page, limit, offset } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
-  const { estado } = req.query;
+  const { estado, grupo } = req.query;
 
   const where = { usuarioId };
-  if (estado) where.estado = estado;
+  // ?grupo=en_proceso → en_revision + preseleccionado (agrupación de
+  // presentación; los estados reales no cambian). Gana sobre ?estado.
+  if (grupo !== undefined) {
+    const estados = postulacionService.GRUPOS_ESTADO[grupo];
+    if (!estados) return res.status(400).json({ success: false, message: 'Grupo de estados inválido.' });
+    where.estado = { [Op.in]: estados };
+  } else if (estado) {
+    where.estado = estado;
+  }
 
   const [{ count, rows }, conteoPorEstado] = await Promise.all([
     Postulacion.findAndCountAll({
@@ -160,8 +170,9 @@ exports.getPostulacionesByOferta = async (req, res) => {
       // Estados a los que se puede pasar desde el actual (flujo guiado). Vacío
       // para quien solo supervisa.
       transicionesPermitidas: puedeGestionar ? postulacionService.transicionesDesde(plain.estado) : [],
-      cvDisponible: !!perfil?.cvPath,
-      cvUrl:        perfil?.cvPath || null,
+      // CV real = Archivo registrado; se descarga por GET /api/archivos/:cvArchivoId.
+      // (Antes también se exponía `cvUrl` = clave interna de almacenamiento.)
+      cvDisponible: perfilService.tieneCv(perfil),
       compatibilidadOferta: postulacionService.calcularCompatibilidad(perfil, oferta),
       historialAcademico: perfil ? {
         carrera:       perfil.carrera,

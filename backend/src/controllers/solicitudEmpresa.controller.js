@@ -69,7 +69,7 @@ async function crearSolicitud(req, res) {
     // Confirmación de recepción al responsable (sin credenciales: la cuenta se
     // crea recién al aprobar). Fire-and-forget: el mailer registra el
     // resultado; un fallo de SMTP no invalida la solicitud ya guardada.
-    solicitudEmpresaService.enviarConfirmacionSolicitud(solicitud, { log: req.log });
+    void solicitudEmpresaService.enviarConfirmacionSolicitud(solicitud, { log: req.log });
 
     return res.status(201).json({
       success: true,

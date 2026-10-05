@@ -7,7 +7,7 @@ const { buildPagination } = require('../utils/pagination');
 const logger = require('../utils/logger');
 
 const TIPOS_PUESTO_VALIDOS = ['pasante', 'trainee', 'junior'];
-const CARRERAS_VALIDAS = require('../data/catalogos.json').carreras;
+const { CARRERAS: CARRERAS_VALIDAS } = require('./catalogo.service');
 
 // ── Visibilidad para alumnos/egresados (RBAC-04) ────────────────────────────
 // Única fuente de verdad de "¿esta oferta se puede mostrar a un candidato?":

@@ -20,7 +20,7 @@ const { config, validateEnv } = require('./config/env');
 const app = require('./app');       // Importa la aplicación Express ya configurada
 const { sequelize } = require('./models'); // Importa la instancia de Sequelize
 const logger = require('./utils/logger');
-const { verificarSmtpAlArrancar } = require('./utils/mailer');
+const { verificarEmailAlArrancar } = require('./utils/mailer');
 const { seedPresentacionSiFalta } = require('./utils/seedPresentacion');
 
 // Si está activado (por defecto: solo en desarrollo), al arrancar se verifica
@@ -47,11 +47,12 @@ async function startServer() {
     await sequelize.authenticate();
     logger.info('Conexión a PostgreSQL establecida');
 
-    // Diagnóstico SMTP (transporter.verify(), sin enviar nada). Falla el
-    // arranque solo si la autenticación es inválida y EMAIL_REQUIRED=true;
+    // Diagnóstico del proveedor de email (SMTP verify / Brevo GET /account),
+    // sin enviar nada. Falla el arranque solo si la config es definitivamente
+    // inválida y EMAIL_REQUIRED=true;
     // un problema de red queda como error crítico en el log (ver mailer.js).
     if (!config.isTest) {
-      await verificarSmtpAlArrancar(logger);
+      await verificarEmailAlArrancar(logger);
     }
 
     // Escenario de demo: carga las semillas de presentación si faltan.

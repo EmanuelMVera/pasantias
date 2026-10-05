@@ -4,6 +4,7 @@ const { Oferta, Empresa, Postulacion, Perfil } = require('../models');
 const { Op } = require('sequelize');
 const ofertaService   = require('../services/oferta.service');
 const empresaService  = require('../services/empresa.service');
+const perfilService   = require('../services/perfil.service');
 const { parsePagination, buildPagination } = require('../utils/pagination');
 const { registrarAuditoria } = require('../utils/auditLog');
 const { validarOferta } = require('../validators/oferta.validator');
@@ -86,7 +87,7 @@ exports.getOfertaById = async (req, res) => {
         where: { usuarioId: req.usuario.id, ofertaId: id },
         attributes: ['id', 'estado', 'fechaPostulacion', 'createdAt'],
       }),
-      Perfil.findOne({ where: { usuarioId: req.usuario.id }, attributes: ['cvPath'] }),
+      Perfil.findOne({ where: { usuarioId: req.usuario.id }, attributes: ['cvArchivoId'] }),
     ])
     : [null, null];
 
@@ -106,7 +107,7 @@ exports.getOfertaById = async (req, res) => {
         fechaPostulacion: miPostulacion.fechaPostulacion ?? miPostulacion.createdAt,
       }
       : null;
-    data.cvCargado = Boolean(perfil?.cvPath);
+    data.cvCargado = perfilService.tieneCv(perfil);
   }
   return res.json({ success: true, data });
 };

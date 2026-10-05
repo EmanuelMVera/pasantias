@@ -15,7 +15,7 @@
  */
 
 const { validarCampos } = require('./common.validator');
-const CARRERAS_VALIDAS = require('../data/catalogos.json').carreras;
+const { CARRERAS: CARRERAS_VALIDAS } = require('../services/catalogo.service');
 
 const MODALIDADES = ['presencial', 'remoto', 'hibrido'];
 const MODALIDADES_EXTENDIDAS = ['tiempo_completo', 'medio_tiempo', 'pasantia', 'freelance'];

@@ -1,195 +1,151 @@
 /**
- * mailer.js — Helper centralizado de envío de emails del sistema.
+ * mailer.js — FACHADA de envío de emails del sistema.
  *
- * Variables de entorno (ver config/env.js):
- *   EMAIL_HOST / EMAIL_PORT / EMAIL_SECURE — servidor SMTP (Gmail: smtp.gmail.com,
- *     587, secure=false → STARTTLS; o 465 con secure=true → TLS implícito)
- *   EMAIL_USER / EMAIL_PASS — credenciales (en Gmail: App Password, no la
- *     contraseña de la cuenta)
- *   EMAIL_FROM — remitente ("SisPasantías" <cuenta@dominio>)
+ * Todos los flujos (recuperación, solicitudes de empresa, aprobaciones,
+ * reclutadores, importación CSV, notificaciones) llaman a `enviarEmail()` y
+ * no saben qué transporte hay detrás. El transporte lo elige EMAIL_PROVIDER:
+ *
+ *   brevo    → Brevo Transactional Email API por HTTPS (producción en Render:
+ *              Render Free bloquea el SMTP saliente). BREVO_API_KEY,
+ *              BREVO_SENDER_EMAIL, BREVO_SENDER_NAME.
+ *   smtp     → Nodemailer (desarrollo local / hosting con SMTP). EMAIL_HOST,
+ *              EMAIL_PORT, EMAIL_SECURE, EMAIL_USER, EMAIL_PASS, EMAIL_FROM.
+ *   disabled → no se envía nada; se registra en el log (default si no se define).
+ *
+ * Proveedores: backend/src/services/email/providers/{brevo,smtp}.provider.js.
  *
  * ── Contrato de enviarEmail ─────────────────────────────────────────────────
  *   enviarEmail(...) NUNCA lanza. Devuelve:
  *     { ok: true,  messageId }
  *     { ok: false, errorCode, categoria }   categoria: 'config' | 'auth' | 'red' | 'envio'
  *   y deja SIEMPRE un log (email_enviado / email_envio_fallo / email_dev_no_enviado)
- *   con el `tipo` del email y el requestId si se pasa `log` (req.log).
+ *   con el proveedor, el `tipo` del email y el requestId si se pasa `log` (req.log).
  *
- *   Así cada caller decide: los flujos críticos (aprobación con credenciales,
- *   recuperación desde Equipo) miran `ok` y lo informan; los avisos
- *   fire-and-forget simplemente no hacen `await`. Antes el helper se tragaba
- *   el error y los `.catch()` de los callers nunca se ejecutaban: un fallo de
- *   SMTP era invisible para todos.
+ *   Los flujos críticos (aprobación con credenciales, recuperación desde Equipo)
+ *   miran `ok` y lo informan; los avisos fire-and-forget hacen `void enviarEmail(...)`.
+ *   Nunca `.catch()`: no hay nada que atrapar.
  *
- * Nunca se loguea: la contraseña SMTP, el cuerpo del email (puede llevar
+ * Nunca se loguea: API key, contraseña SMTP, el cuerpo del email (puede llevar
  * credenciales o links con token) ni el destinatario completo (se redacta).
  */
 
 'use strict';
 
-const nodemailer = require('nodemailer');
 const logger = require('./logger');
 const { config } = require('../config/env');
+const { redactarEmail, normalizarDestinatarios } = require('../services/email/comun');
 
-// Timeouts acotados: sin ellos nodemailer espera hasta 2 minutos una conexión
-// que nunca llega (p. ej. si el proveedor bloquea el puerto SMTP saliente),
-// y un request que hace `await` queda colgado.
-const TIMEOUTS = {
-  connectionTimeout: 10_000,
-  greetingTimeout: 10_000,
-  socketTimeout: 20_000,
+// Carga perezosa: con EMAIL_PROVIDER=brevo nunca se requiere Nodemailer.
+const PROVEEDORES = {
+  brevo: () => require('../services/email/providers/brevo.provider'),
+  smtp: () => require('../services/email/providers/smtp.provider'),
 };
 
-let _transporter = null;
-
-function getTransporter() {
-  if (_transporter) return _transporter;
-  _transporter = nodemailer.createTransport({
-    host:   config.email.host,
-    port:   config.email.port,
-    // EMAIL_SECURE=true → TLS implícito (puerto 465). Default false → STARTTLS
-    // (puerto 587, Gmail).
-    secure: config.email.secure,
-    auth: {
-      user: config.email.user,
-      pass: config.email.pass,
-    },
-    ...TIMEOUTS,
-  });
-  return _transporter;
+/** Proveedor activo, o null si está deshabilitado o sin su configuración. */
+function proveedorActivo() {
+  const cargar = PROVEEDORES[config.email.provider];
+  return cargar && config.email.configured ? cargar() : null;
 }
 
-/** Solo para tests: fuerza a recrear el transporter con la config actual. */
-function _resetTransporter() {
-  _transporter = null;
-}
-
-/** "juan.perez@gmail.com" → "ju***@gmail.com" (para logs). */
-function redactarEmail(email) {
-  if (typeof email !== 'string' || !email.includes('@')) return '[sin email]';
-  const [local, dominio] = email.split('@');
-  return `${local.slice(0, 2)}***@${dominio}`;
-}
-
-const CODIGOS_RED = new Set([
-  'ECONNECTION', 'ETIMEDOUT', 'ESOCKET', 'EDNS', 'ECONNREFUSED', 'ECONNRESET',
-  'ENOTFOUND', 'EHOSTUNREACH', 'ENETUNREACH', 'EAI_AGAIN',
-]);
+const NO_CONFIGURADO = { ok: false, errorCode: 'EMAIL_NO_CONFIGURADO', categoria: 'config' };
 
 /**
- * Resume un error de nodemailer sin datos sensibles: código, código de
- * respuesta SMTP, comando y la primera línea de la respuesta del servidor
- * (p. ej. "535-5.7.8 Username and Password not accepted"). Nunca incluye la
- * contraseña (nodemailer no la pone en el error) ni el cuerpo del mensaje.
- */
-function describirErrorSmtp(err) {
-  const code = err?.code || 'EUNKNOWN';
-  const categoria = code === 'EAUTH' || err?.responseCode === 535 || err?.responseCode === 534
-    ? 'auth'
-    : CODIGOS_RED.has(code) ? 'red' : 'envio';
-  const respuesta = typeof err?.response === 'string' ? err.response.split('\n')[0].slice(0, 200) : undefined;
-  return {
-    errorCode: code,
-    categoria,
-    responseCode: err?.responseCode,
-    command: err?.command,
-    detalle: respuesta || String(err?.message || '').split('\n')[0].slice(0, 200),
-  };
-}
-
-/**
- * Envía un email. Nunca lanza (ver contrato arriba).
+ * Envía un email por el proveedor configurado. Nunca lanza (ver contrato arriba).
  *
  * @param {{ to: string|string[], subject: string, html: string, tipo?: string, log?: object }} opts
- *   - tipo: etiqueta para los logs ('recupero', 'aprobacion_empresa'…)
+ *   - tipo: etiqueta para los logs ('recupero_password', 'aprobacion_empresa_credenciales'…)
  *   - log:  logger del request (req.log) para que el log lleve el requestId
  * @returns {Promise<{ ok: true, messageId: string } | { ok: false, errorCode: string, categoria: string }>}
  */
 async function enviarEmail({ to, subject, html, tipo = 'generico', log }) {
   const l = log || logger;
-  const destinatarios = (Array.isArray(to) ? to : [to]).map(redactarEmail);
+  const destinatarios = normalizarDestinatarios(to).map(redactarEmail);
+  const proveedor = proveedorActivo();
 
-  if (!config.email.configured) {
-    l.info({ tipo, destinatarios }, 'email_dev_no_enviado');
-    return { ok: false, errorCode: 'EMAIL_NO_CONFIGURADO', categoria: 'config' };
+  if (!proveedor) {
+    l.info({ provider: config.email.provider, tipo, destinatarios }, 'email_dev_no_enviado');
+    return NO_CONFIGURADO;
   }
 
-  try {
-    const info = await getTransporter().sendMail({ from: config.email.from, to, subject, html });
-    l.info({ tipo, destinatarios, messageId: info?.messageId }, 'email_enviado');
-    return { ok: true, messageId: info?.messageId };
-  } catch (err) {
-    const desc = describirErrorSmtp(err);
-    l.error({ tipo, destinatarios, smtp: desc }, 'email_envio_fallo');
-    return { ok: false, errorCode: desc.errorCode, categoria: desc.categoria };
+  const r = await proveedor.send({ to, subject, html }, config.email);
+  if (r.ok) {
+    l.info({ provider: config.email.provider, tipo, destinatarios, messageId: r.messageId }, 'email_enviado');
+    return { ok: true, messageId: r.messageId };
   }
+  const { ok: _ok, ...error } = r;
+  l.error({ provider: config.email.provider, tipo, destinatarios, error }, 'email_envio_fallo');
+  return { ok: false, errorCode: r.errorCode, categoria: r.categoria };
 }
 
-/** Datos no sensibles de la config SMTP, para logs y el script de diagnóstico. */
-function resumenConfigSmtp() {
-  return {
-    host: config.email.host,
-    port: config.email.port,
-    secure: config.email.secure,
-    user: redactarEmail(config.email.user),
-    // El remitente suele ser la misma cuenta: se redacta la dirección.
-    from: (config.email.from || '').replace(/[^\s<>"]+@[^\s<>"]+/, (dir) => redactarEmail(dir)),
-  };
+/** Datos NO sensibles de la config de email (logs, email:verify). */
+function resumenConfigEmail() {
+  const proveedor = PROVEEDORES[config.email.provider];
+  return proveedor
+    ? { ...proveedor().resumen(config.email), configurado: config.email.configured }
+    : { provider: config.email.provider, configurado: false };
 }
 
 /**
- * Verifica conexión + autenticación SMTP (transporter.verify()) SIN enviar
- * ningún email. Nunca lanza.
- *
- * @returns {Promise<{ ok: true } | { ok: false, errorCode, categoria, responseCode?, command?, detalle }>}
+ * Verifica el proveedor SIN enviar ningún email:
+ *   smtp  → transporter.verify() (conexión + TLS + autenticación);
+ *   brevo → GET /v3/account (la API responde y la API key es válida).
+ * Nunca lanza.
  */
-async function verificarSmtp() {
+async function verificarEmail() {
+  if (!PROVEEDORES[config.email.provider]) {
+    return { ...NO_CONFIGURADO, detalle: 'EMAIL_PROVIDER no definido o "disabled": no se envían emails.' };
+  }
   if (!config.email.configured) {
-    return { ok: false, errorCode: 'EMAIL_NO_CONFIGURADO', categoria: 'config', detalle: 'Faltan EMAIL_USER y/o EMAIL_PASS.' };
+    return {
+      ...NO_CONFIGURADO,
+      detalle: config.email.provider === 'brevo'
+        ? 'Faltan BREVO_API_KEY y/o BREVO_SENDER_EMAIL.'
+        : 'Faltan EMAIL_USER y/o EMAIL_PASS.',
+    };
   }
-  try {
-    await getTransporter().verify();
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, ...describirErrorSmtp(err) };
-  }
+  return proveedorActivo().verify(config.email);
 }
 
 /**
- * Diagnóstico SMTP al arrancar el servidor (server.js). Sin enviar emails.
+ * Diagnóstico del proveedor al arrancar el servidor (server.js). Sin enviar emails.
  *
- * Política (decisión documentada en docs/DEPLOYMENT.md):
- *   - sin config: solo info (si EMAIL_REQUIRED=true en producción, validateEnv
+ * Política (documentada en docs/DEPLOYMENT.md §4.1):
+ *   - disabled: solo info (si EMAIL_REQUIRED=true en producción, validateEnv
  *     ya abortó antes);
- *   - verify OK → `email_smtp_verificado`;
- *   - AUTENTICACIÓN inválida (EAUTH / 535) y EMAIL_REQUIRED=true → LANZA: el
- *     arranque falla con un mensaje claro. Es un error definitivo de config
- *     (App Password mal cargada o revocada) que ningún reintento arregla, y
- *     Render mantiene el deploy anterior en vez de publicar uno sin correo;
- *   - red / timeout / otro → `email_smtp_verificacion_fallo` (nivel error,
- *     critico=true) y el servicio sigue: puede ser transitorio, y tumbar la
- *     API entera por eso haría más daño. Sin reintentos en bucle.
+ *   - falta la config del proveedor y EMAIL_REQUIRED=true → LANZA;
+ *   - verificación OK → `email_provider_verificado` { provider };
+ *   - credenciales inválidas (SMTP EAUTH/535, Brevo 401/403) y
+ *     EMAIL_REQUIRED=true → LANZA: error definitivo de config que ningún
+ *     reintento arregla (Render conserva el deploy anterior);
+ *   - red / timeout / 5xx / otro → `email_provider_verificacion_fallo`
+ *     (error, critico=true) y el servicio sigue: puede ser transitorio. Sin
+ *     reintentos en bucle.
  *
  * @param {object} log  logger
  * @returns {Promise<{ ok: boolean, resultado?: object }>}
  */
-async function verificarSmtpAlArrancar(log = logger) {
-  if (!config.email.configured) {
-    log.info('email_no_configurado: los emails se registran en el log en lugar de enviarse');
+async function verificarEmailAlArrancar(log = logger) {
+  const provider = config.email.provider;
+  if (!PROVEEDORES[provider]) {
+    log.info({ provider }, 'email_deshabilitado: los emails se registran en el log en lugar de enviarse');
     return { ok: false };
   }
-  const resultado = await verificarSmtp();
-  const contexto = { smtp: resumenConfigSmtp() };
+  const contexto = { email: resumenConfigEmail() };
+  const resultado = await verificarEmail();
   if (resultado.ok) {
-    log.info(contexto, 'email_smtp_verificado');
+    log.info({ provider, ...contexto }, 'email_provider_verificado');
     return { ok: true };
   }
   const { ok: _ok, ...error } = resultado;
-  log.error({ ...contexto, error, critico: true }, 'email_smtp_verificacion_fallo');
-  if (resultado.categoria === 'auth' && config.email.required) {
+  log.error({ provider, ...contexto, error, critico: true }, 'email_provider_verificacion_fallo');
+  const definitivo = resultado.categoria === 'auth' || resultado.categoria === 'config';
+  if (definitivo && config.email.required) {
     throw new Error(
-      `SMTP rechazó la autenticación (${resultado.errorCode}${resultado.responseCode ? ` ${resultado.responseCode}` : ''}: `
-      + `${resultado.detalle}). Revisá EMAIL_USER / EMAIL_PASS (en Gmail: una App Password vigente). `
+      `El proveedor de email (${provider}) no es utilizable: ${resultado.errorCode}`
+      + `${resultado.detalle ? ` (${resultado.detalle})` : ''}. `
+      + (provider === 'brevo'
+        ? 'Revisá BREVO_API_KEY / BREVO_SENDER_EMAIL. '
+        : 'Revisá EMAIL_USER / EMAIL_PASS (en Gmail: una App Password vigente). ')
       + 'EMAIL_REQUIRED=true impide arrancar sin correo.',
     );
   }
@@ -263,12 +219,10 @@ function htmlNotificacion({ titulo, mensaje, enlace }) {
 
 module.exports = {
   enviarEmail,
-  verificarSmtp,
-  verificarSmtpAlArrancar,
-  resumenConfigSmtp,
-  describirErrorSmtp,
+  verificarEmail,
+  verificarEmailAlArrancar,
+  resumenConfigEmail,
   redactarEmail,
   escapeHtml,
   htmlNotificacion,
-  _resetTransporter,
 };

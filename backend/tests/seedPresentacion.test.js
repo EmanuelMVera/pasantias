@@ -35,6 +35,7 @@ const {
 } = require('../src/utils/seedPresentacion');
 const { puedeEnviarMensaje, puedeVerConversacion } = require('../src/services/chatPermission.service');
 const { crearAdmin, loginYObtenerToken } = require('./helpers/factories');
+const { esCuitValido } = require('../src/validators/common.validator');
 const { limpiarUsuarios, cerrarConexion } = require('./helpers/cleanup');
 
 
@@ -482,6 +483,20 @@ describe('seedPresentacion — escenario dirigido (3 cuentas públicas)', () => 
     expect(await Usuario.count({ where: { email: LEGACY_PRESENTACION.emails }, paranoid: false })).toBe(0);
     expect(await Empresa.findByPk(homonima.id)).not.toBeNull();
     await homonima.destroy({ force: true });
+  });
+
+  test('CUIT de la demo formalmente válido; una S.H.I.E.L.D. con el CUIT viejo se limpia (sin duplicados)', async () => {
+    expect(esCuitValido(EMPRESA_CUIT)).toBe(true);
+    await ejecutarSeedPresentacion({ verbose: false });
+    // Base vieja: la empresa demo todavía con el CUIT anterior (sin dígito verificador válido).
+    const [cuitViejo] = LEGACY_PRESENTACION.cuits;
+    await Empresa.update({ cuit: cuitViejo }, { where: { razonSocial: RAZON_SOCIAL, cuit: EMPRESA_CUIT } });
+
+    await ejecutarSeedPresentacion({ verbose: false });
+
+    expect(await Empresa.count({ where: { razonSocial: RAZON_SOCIAL }, paranoid: false })).toBe(1);
+    expect(await Empresa.count({ where: { cuit: cuitViejo }, paranoid: false })).toBe(0);
+    expect(await Empresa.count({ where: { razonSocial: RAZON_SOCIAL, cuit: EMPRESA_CUIT } })).toBe(1);
   });
 
   test('idempotente: correr el seed dos veces no duplica los candidatos sintéticos ni las postulaciones', async () => {

@@ -55,10 +55,30 @@ async function crearAlumno(overrides = {}) {
     rol: 'alumno', activo: true, habilitado: true,
     ...overrides.usuario,
   });
+  // CV: la fuente de verdad es un Archivo registrado (perfil.service::tieneCv),
+  // no el string legacy cvPath. Por defecto el alumno tiene uno (lo exige
+  // postularse); `perfil: { cvArchivoId: null }` o `cvPath: null` → sin CV.
+  // Solo la fila: los tests de descarga usan crearArchivoCV (con bytes en disco).
+  const pideSinCv = overrides.perfil
+    && (('cvArchivoId' in overrides.perfil && !overrides.perfil.cvArchivoId)
+      || ('cvPath' in overrides.perfil && !overrides.perfil.cvPath));
+  let cvArchivoId = null;
+  if (!pideSinCv) {
+    const archivo = await Archivo.create({
+      usuarioPropietarioId: usuario.id,
+      tipo: 'cv',
+      nombreOriginal: 'cv-test.pdf',
+      claveAlmacenamiento: `cv_test_${suf}.pdf`,
+      mimeType: 'application/pdf',
+      tamanioBytes: 28,
+      backend: 'local',
+    });
+    cvArchivoId = archivo.id;
+  }
   await Perfil.create({
     usuarioId: usuario.id,
-    // Requerido por postulacionService.validarPostulacion antes de postularse.
-    cvPath: `/uploads/cv_test_${suf}.pdf`,
+    cvPath: cvArchivoId ? `cv_test_${suf}.pdf` : null,
+    cvArchivoId,
     ...overrides.perfil,
   });
   return { usuario, passwordPlana: PASSWORD_PLANA };

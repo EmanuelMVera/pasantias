@@ -2,9 +2,10 @@
 const modelToSchema = require('../../modelToSchema');
 const { Perfil } = require('../../../models');
 
+// Sin carrera/anioEgreso/legajo: son institucionales (400 si se envían).
 const CAMPOS_EDITABLES = [
-  'carrera', 'anioEgreso', 'descripcion', 'habilidades', 'idiomas', 'certificaciones',
-  'linkedin', 'github', 'portfolio', 'redesSociales', 'fotoPerfil', 'areaInteres',
+  'descripcion', 'habilidades', 'idiomas', 'certificaciones',
+  'linkedin', 'github', 'portfolio', 'redesSociales', 'areaInteres',
   'disponibilidad', 'preferenciasLaborales', 'salarioPretendido', 'visibilidadPerfil',
   'experienciaLaboral', 'proyectos',
 ];
@@ -17,7 +18,8 @@ module.exports = {
     type: 'object',
     description:
       'Se envía al menos uno de estos campos. `telefono` y `ubicacion` también se ' +
-      'aceptan y se persisten en el `Usuario`.',
+      'aceptan y se persisten en el `Usuario`. Los datos institucionales (carrera, anioEgreso, ' +
+      'legajo, rol, nombre, apellido, email) se rechazan con 400.',
     minProperties: 1,
     properties: {
       ...Object.fromEntries(

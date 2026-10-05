@@ -2,6 +2,7 @@
 
 const { Postulacion, Oferta, Empresa, Perfil, Notificacion } = require('../models');
 const HttpError = require('../utils/httpError');
+const { tieneCv } = require('./perfil.service');
 
 /**
  * Ejecuta todas las validaciones previas a crear una postulación.
@@ -10,7 +11,9 @@ const HttpError = require('../utils/httpError');
  */
 async function validarPostulacion(usuarioId, ofertaId) {
   const perfil = await Perfil.findOne({ where: { usuarioId } });
-  if (!perfil || !perfil.cvPath) {
+  // Fuente de verdad del CV: el Archivo registrado (perfil.service::tieneCv),
+  // no el string legacy cvPath.
+  if (!tieneCv(perfil)) {
     const err = new HttpError(400, 'Debés subir tu CV antes de postularte. Completá tu perfil primero.');
     err.code = 'CV_REQUERIDO';
     throw err;
@@ -87,6 +90,14 @@ const transicionesDesde = (estado) => TRANSICIONES_POSTULACION[estado] || [];
 const NOTA_INTERNA_MAX = 2000;
 
 /**
+ * Agrupaciones de estados para filtrar desde la vista del candidato
+ * (GET /api/postulaciones/mis?grupo=...). No son estados de la BD.
+ */
+const GRUPOS_ESTADO = {
+  en_proceso: ['en_revision', 'preseleccionado'],
+};
+
+/**
  * Postulación para la EMPRESA (reclutador / admin_empresa): incluye la nota
  * interna y aliases de retrocompatibilidad con el frontend.
  */
@@ -138,6 +149,9 @@ async function obtenerMetricasAlumno(usuarioId) {
 
   return {
     totalPostulaciones,
+    // "En proceso" (vista del candidato) = en revisión + preseleccionado. Es
+    // solo una agrupación de presentación: no existe un estado en_proceso.
+    enProceso: enRevision + preseleccionados,
     enRevision,
     preseleccionados,
     entrevistas,
@@ -156,4 +170,5 @@ module.exports = {
   transicionesDesde,
   NOTA_INTERNA_MAX,
   obtenerMetricasAlumno,
+  GRUPOS_ESTADO,
 };

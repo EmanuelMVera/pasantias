@@ -153,7 +153,7 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId, lo
 
   // Aviso a los admin_empresa activos (fire-and-forget: el mailer registra el resultado).
   admins.forEach((admin) => {
-    enviarEmail({
+    void enviarEmail({
       to: admin.email,
       tipo: 'aviso_reclutador_aprobado',
       log,
@@ -216,7 +216,7 @@ async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip, requestId, l
 
   // Fire-and-forget: el mailer registra el resultado de cada envío.
   admins.forEach((admin) => {
-    enviarEmail({
+    void enviarEmail({
       to: admin.email,
       tipo: 'aviso_reclutador_rechazado',
       log,

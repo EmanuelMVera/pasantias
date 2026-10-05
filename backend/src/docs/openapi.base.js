@@ -67,6 +67,7 @@ module.exports = {
     { name: 'admin', description: 'Panel de administración del instituto (rol admin)' },
     { name: 'archivos', description: 'Descarga autenticada de archivos privados' },
     { name: 'demo', description: 'Estado público del escenario de presentación' },
+    { name: 'catalogos', description: 'Catálogos institucionales de solo lectura (carreras)' },
   ],
   externalDocs: {
     description: 'Roles y matriz de permisos',

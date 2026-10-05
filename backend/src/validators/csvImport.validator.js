@@ -11,6 +11,7 @@
  */
 
 const { esEmailValido } = require('./common.validator');
+const { esCarreraValida } = require('../services/catalogo.service');
 const { normalizarLegajo } = require('../utils/legajo');
 
 const COLUMNAS = ['legajo', 'nombre', 'apellido', 'email', 'rol', 'carrera', 'anioEgreso', 'telefono', 'ubicacion'];
@@ -47,7 +48,13 @@ function validarFilaCsv(filaCruda, regexLegajo) {
   const rol = String(filaCruda.rol || '').trim().toLowerCase();
   if (!ROLES_VALIDOS.includes(rol)) errores.push(`rol debe ser "alumno" o "egresado" (recibido: "${filaCruda.rol || ''}").`);
 
+  // Carrera: debe existir en el catálogo institucional (catalogo.service). Un
+  // typo o una carrera nueva no se crean solas: el dry-run lo informa y hay que
+  // sumarla primero a catalogos.json.
   const carrera = String(filaCruda.carrera || '').trim() || null;
+  if (carrera && !esCarreraValida(carrera)) {
+    errores.push(`carrera "${carrera}" no pertenece al catálogo institucional de carreras.`);
+  }
 
   const anioEgresoCrudo = String(filaCruda.anioEgreso ?? '').trim();
   let anioEgreso = null;

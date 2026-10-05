@@ -12,8 +12,9 @@
  * logs sin secretos.
  */
 
-// Antes de requerir src/* (tests/setup/env.js vacía EMAIL_USER/PASS; acá los
-// volvemos a poner para este archivo).
+// Antes de requerir src/* (tests/setup/env.js deshabilita el email; acá se
+// elige el proveedor SMTP con credenciales falsas para este archivo).
+process.env.EMAIL_PROVIDER = 'smtp';
 process.env.EMAIL_USER = 'smtp-login@sispasantias.edu';
 process.env.EMAIL_PASS = 'smtp-pass-super-secreta';
 process.env.EMAIL_FROM = '"SisPasantías" <noreply@sispasantias.edu>';
@@ -125,7 +126,7 @@ describe('email — mailer y flujos', () => {
     const r = await mailerSinConfig.enviarEmail({ to: 'x@example.com', subject: 's', html: 'x' });
     expect(r).toMatchObject({ ok: false, errorCode: 'EMAIL_NO_CONFIGURADO' });
     expect(mockSendMail).not.toHaveBeenCalled();
-    expect(await mailerSinConfig.verificarSmtp()).toMatchObject({ ok: false, categoria: 'config' });
+    expect(await mailerSinConfig.verificarEmail()).toMatchObject({ ok: false, categoria: 'config' });
   });
 
   test('advertencias de config: EMAIL_FROM incoherente y App Password con formato raro, sin exponer la contraseña', () => {
@@ -148,8 +149,8 @@ describe('email — mailer y flujos', () => {
 
   // ── verify al arrancar ──────────────────────────────────────────────────
 
-  test('verificarSmtp OK → { ok: true }, sin enviar ningún email', async () => {
-    expect(await mailer.verificarSmtp()).toEqual({ ok: true });
+  test('verificarEmail (smtp) OK → { ok: true }, sin enviar ningún email', async () => {
+    expect(await mailer.verificarEmail()).toEqual({ ok: true });
     expect(mockSendMail).not.toHaveBeenCalled();
   });
 
@@ -163,8 +164,8 @@ describe('email — mailer y flujos', () => {
     delete process.env.EMAIL_REQUIRED;
     const log = { info: jest.fn(), error: jest.fn() };
 
-    await expect(mailerRequerido.verificarSmtpAlArrancar(log)).rejects.toThrow(/SMTP rechazó la autenticación \(EAUTH 535/);
-    expect(log.error).toHaveBeenCalledWith(expect.objectContaining({ critico: true }), 'email_smtp_verificacion_fallo');
+    await expect(mailerRequerido.verificarEmailAlArrancar(log)).rejects.toThrow(/proveedor de email \(smtp\) no es utilizable: EAUTH/);
+    expect(log.error).toHaveBeenCalledWith(expect.objectContaining({ critico: true }), 'email_provider_verificacion_fallo');
     expect(JSON.stringify(log.error.mock.calls)).not.toContain(SECRETO);
   });
 
@@ -178,19 +179,20 @@ describe('email — mailer y flujos', () => {
     delete process.env.EMAIL_REQUIRED;
     const log = { info: jest.fn(), error: jest.fn() };
 
-    await expect(mailerRequerido.verificarSmtpAlArrancar(log)).resolves.toMatchObject({ ok: false });
+    await expect(mailerRequerido.verificarEmailAlArrancar(log)).resolves.toMatchObject({ ok: false });
     expect(log.error).toHaveBeenCalledWith(
       expect.objectContaining({ error: expect.objectContaining({ categoria: 'red' }) }),
-      'email_smtp_verificacion_fallo',
+      'email_provider_verificacion_fallo',
     );
   });
 
-  test('verify OK al arrancar → log email_smtp_verificado con usuario redactado', async () => {
+  test('verify OK al arrancar → log email_provider_verificado con usuario redactado', async () => {
     const log = { info: jest.fn(), error: jest.fn() };
-    await expect(mailer.verificarSmtpAlArrancar(log)).resolves.toEqual({ ok: true });
+    await expect(mailer.verificarEmailAlArrancar(log)).resolves.toEqual({ ok: true });
     const [contexto, msg] = log.info.mock.calls[0];
-    expect(msg).toBe('email_smtp_verificado');
-    expect(contexto.smtp).toMatchObject({ host: expect.any(String), port: 465, secure: true, user: 'sm***@sispasantias.edu' });
+    expect(msg).toBe('email_provider_verificado');
+    expect(contexto.provider).toBe('smtp');
+    expect(contexto.email).toMatchObject({ host: expect.any(String), port: 465, secure: true, user: 'sm***@sispasantias.edu' });
     expect(JSON.stringify(contexto)).not.toContain(SECRETO);
   });
 

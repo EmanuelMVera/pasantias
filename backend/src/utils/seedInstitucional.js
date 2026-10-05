@@ -82,6 +82,7 @@ const {
   SolicitudReclutador,
 } = require('../models');
 const { areas, habilidadesPorArea, carreras, rubroACarreras } = require('../data/catalogos.json');
+const { digitoVerificadorCuit } = require('../validators/common.validator');
 
 // ── Namespace y escala ───────────────────────────────────────────────────────
 
@@ -91,7 +92,12 @@ const ALUMNOS_COUNT = 80;
 const reclutadoresPorEmpresa = (i) => (i % 3) + 1; // 1..3, determinístico
 
 // Prefijo de CUIT del namespace: identifica a las empresas institucionales.
-const CUIT_PREFIJO = '307000000';
+// 30-99990xxx-D: serie que AFIP no emite (no choca con empresas reales) y
+// cada CUIT tiene dígito verificador válido (ver cuitEmpresa).
+const CUIT_PREFIJO = '3099990';
+// Prefijo anterior (CUIT sin dígito verificador válido): la limpieza lo sigue
+// reconociendo para que un reset no deje empresas viejas duplicadas.
+const CUIT_PREFIJO_LEGACY = '307000000';
 
 // Nivel de confianza determinístico: 1 de cada 4 empresas es de confianza
 // (i = 3, 7, 11, 15, 19 → 5 confiables y 15 estándar). Nunca aleatorio.
@@ -138,7 +144,17 @@ const LOGO_COLORES = ['1e3a5f', '5f1e3a', '3a5f1e', '5f3a1e', '1e5f3a', '3a1e5f'
 
 const nombreCompleto = (idx) => `${NOMBRES[idx % NOMBRES.length]} ${APELLIDOS[(idx * 7) % APELLIDOS.length]}`;
 const razonSocial = (i) => `${EMPRESA_PREFIJOS[i]} ${EMPRESA_SUFIJOS[i % EMPRESA_SUFIJOS.length]}`;
-const cuitEmpresa = (i) => String(30700000000 + i); // 11 dígitos, único, determinístico
+// i-ésimo CUIT del namespace con dígito verificador válido: CUIT_PREFIJO +
+// número de 3 dígitos + DV, salteando los números cuyo DV no existe (resto 10).
+// Determinístico y único.
+function cuitEmpresa(i) {
+  let encontrados = -1;
+  for (let n = 1; ; n++) {
+    const base = `${CUIT_PREFIJO}${String(n).padStart(3, '0')}`;
+    const dv = digitoVerificadorCuit(base);
+    if (dv !== null && ++encontrados === i) return `${base}${dv}`;
+  }
+}
 const logoUrl = (nombre, i) =>
   `https://ui-avatars.com/api/?name=${encodeURIComponent(nombre)}&background=${LOGO_COLORES[i % LOGO_COLORES.length]}&color=fff&size=150&bold=true&format=png`;
 
@@ -165,7 +181,12 @@ async function limpiarInstitucional(transaction) {
   const userIds = usuarios.map((u) => u.id);
 
   const empresas = await Empresa.findAll({
-    where: { cuit: { [Op.like]: `${CUIT_PREFIJO}%` } },
+    where: {
+      [Op.or]: [
+        { cuit: { [Op.like]: `${CUIT_PREFIJO}%` } },
+        { cuit: { [Op.like]: `${CUIT_PREFIJO_LEGACY}%` } },
+      ],
+    },
     attributes: ['id'],
     paranoid: false,
     transaction,
@@ -638,6 +659,8 @@ module.exports = {
   limpiarSoloInstitucional,
   DOMINIO,
   CUIT_PREFIJO,
+  CUIT_PREFIJO_LEGACY,
+  cuitEmpresa,
   EMPRESAS_COUNT,
   ALUMNOS_COUNT,
 };

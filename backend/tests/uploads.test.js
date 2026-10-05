@@ -137,11 +137,11 @@ describe('SEC-03 — Subida de imágenes', () => {
     const res = await request(app)
       .put('/api/users/perfil')
       .set('Authorization', `Bearer ${token}`)
-      .send({ carrera: 'Sistemas', fotoPerfil: 'javascript:alert(1)' });
+      .send({ descripcion: 'Sobre mí', fotoPerfil: 'javascript:alert(1)' });
 
     expect(res.status).toBe(200);
-    const perfil = await Perfil.findOne({ where: { usuarioId: usuario.id }, attributes: ['fotoPerfil', 'carrera'] });
-    expect(perfil.carrera).toBe('Sistemas');
+    const perfil = await Perfil.findOne({ where: { usuarioId: usuario.id }, attributes: ['fotoPerfil', 'descripcion'] });
+    expect(perfil.descripcion).toBe('Sobre mí');
     expect(perfil.fotoPerfil).not.toBe('javascript:alert(1)');
   });
 

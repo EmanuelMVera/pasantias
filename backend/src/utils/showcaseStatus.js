@@ -45,6 +45,7 @@ const {
   RAZON_SOCIAL, LOGIN_EMAILS, CANDIDATO_EMAILS, OUR_EMAILS, HISTORIA_PRINCIPAL,
 } = require('./seedPresentacion');
 const { DOMINIO, CUIT_PREFIJO } = require('./seedInstitucional');
+const { esCuitValido } = require('../validators/common.validator');
 const { formatearPostulacionAlumno } = require('../services/postulacion.service');
 
 // Lo que el escenario de presentación tiene que tener (ver seedPresentacion.js).
@@ -142,6 +143,8 @@ const nombreDe = (u) => `${u.nombre} ${u.apellido ?? ''}`.trim();
  */
 async function revisarElenco({ check, empresa, membresias, usuarios }) {
   check(Boolean(empresa), `Empresa demo: ${RAZON_SOCIAL}`);
+  // Solo validación matemática (dígito verificador), sin consultar a AFIP.
+  check(esCuitValido(EMPRESA_CUIT), `CUIT demo formalmente válido (${EMPRESA_CUIT})`);
   const persona = (cuenta) => usuarios.find((u) => u.email === cuenta.email
     && u.nombre === cuenta.nombre && u.apellido === cuenta.apellido);
   const miembro = (cuenta, rolInterno) => {
@@ -407,7 +410,7 @@ async function diagnosticarInstitucional() {
   const userIds = usuarios.map((u) => u.id);
 
   const empresas = await Empresa.findAll({
-    where: { cuit: { [Op.like]: `${CUIT_PREFIJO}%` } }, attributes: ['id', 'nivelConfianza'], raw: true,
+    where: { cuit: { [Op.like]: `${CUIT_PREFIJO}%` } }, attributes: ['id', 'nivelConfianza', 'cuit'], raw: true,
   });
   const empresaIds = empresas.map((x) => x.id);
   const confiables = new Set(empresas.filter((x) => x.nivelConfianza === 'confiable').map((x) => x.id));
@@ -470,6 +473,8 @@ async function diagnosticarInstitucional() {
   };
 
   check(empresas.length > 0, `Empresas: ${empresas.length}`);
+  const cuitsInvalidos = empresas.filter((x) => !esCuitValido(x.cuit)).length;
+  check(cuitsInvalidos === 0, `Empresas institucionales con CUIT formalmente válido: ${empresas.length - cuitsInvalidos}/${empresas.length}`);
   check(sinNivel === 0 && datos.estandar > 0, `Estándar: ${datos.estandar}`);
   check(confiables.size > 0, `Confiables: ${confiables.size}`);
   check(datos.reclutadores > 0, `Reclutadores: ${datos.reclutadores} (suspendidos: ${datos.reclutadoresSuspendidos})`);

@@ -70,8 +70,10 @@ module.exports = defineConfig({
         CLIENT_URL: 'http://localhost:5173',
         // Nunca enviar emails reales desde el E2E (el .env del dev puede tener
         // credenciales SMTP): vacías → el mailer solo registra en el log.
+        EMAIL_PROVIDER: 'disabled',
         EMAIL_USER: '',
         EMAIL_PASS: '',
+        BREVO_API_KEY: '',
       },
     },
     {

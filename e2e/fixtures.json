@@ -9,5 +9,5 @@
   "ofertaActiva":    { "titulo": "Pasantía Backend E2E" },
   "ofertaPendiente": { "titulo": "Pasantía Data E2E (pendiente)" },
   "ofertaHistorica": { "titulo": "Pasantía Soporte E2E (histórica)" },
-  "solicitud":       { "razonSocial": "Nuevos Horizontes SRL", "cuit": "30222222227" }
+  "solicitud":       { "razonSocial": "Nuevos Horizontes SRL", "cuit": "30222222229" }
 }

@@ -110,7 +110,11 @@ function deepFreeze(obj) {
   return Object.freeze(obj);
 }
 
-// ── Advertencias de email (no bloquean el arranque) ──────────────────────────
+// ── Email ────────────────────────────────────────────────────────────────────
+
+const PROVEEDORES_EMAIL = ['brevo', 'smtp', 'disabled'];
+
+// ── Advertencias de email SMTP (no bloquean el arranque) ─────────────────────
 
 /** "juan@gmail.com" → "ju***@gmail.com". */
 function redactarEmailConfig(email) {
@@ -121,7 +125,7 @@ function redactarEmailConfig(email) {
 
 /**
  * Señales de una config SMTP que probablemente no funcione. Solo advierte —
- * la prueba real es `verificarSmtp()` al arrancar / `npm run email:verify`.
+ * la prueba real es `verificarEmailAlArrancar()` / `npm run email:verify`.
  * NUNCA incluye el valor de EMAIL_PASS (a lo sumo, si tiene el formato
  * esperado) y el usuario va redactado.
  */
@@ -187,9 +191,23 @@ function loadConfig(raw = process.env) {
     dbSsl = isProd || urlPideSsl || pgSslMode;
   }
 
+  // Email: proveedor EXPLÍCITO (EMAIL_PROVIDER = brevo | smtp | disabled). Sin
+  // detección mágica por variables presentes: si no está, es 'disabled'.
+  const emailProviderRaw = String(raw.EMAIL_PROVIDER || '').trim().toLowerCase();
+  const emailProvider = emailProviderRaw || 'disabled';
   const emailUser = raw.EMAIL_USER || '';
   const emailPass = raw.EMAIL_PASS || '';
-  warnings.push(...advertenciasEmail({
+  const brevo = {
+    apiKey: String(raw.BREVO_API_KEY || '').trim(),
+    senderEmail: String(raw.BREVO_SENDER_EMAIL || '').trim().toLowerCase(),
+    senderName: String(raw.BREVO_SENDER_NAME || '').trim() || 'SisPasantías',
+  };
+  if (emailProvider === 'brevo' && brevo.senderEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(brevo.senderEmail)) {
+    warnings.push('BREVO_SENDER_EMAIL no tiene formato de email.');
+  }
+  // Las advertencias SMTP solo aplican si el proveedor elegido es smtp (en
+  // Render con Brevo no tiene sentido avisar que falta EMAIL_USER).
+  if (emailProvider === 'smtp') warnings.push(...advertenciasEmail({
     host: raw.EMAIL_HOST || 'smtp.gmail.com',
     port: toIntOrNull(raw.EMAIL_PORT) ?? 587,
     secure: raw.EMAIL_SECURE === 'true',
@@ -197,6 +215,11 @@ function loadConfig(raw = process.env) {
     pass: emailPass,
     from: raw.EMAIL_FROM || '',
   }));
+  const emailConfigurado = emailProvider === 'smtp'
+    ? Boolean(emailUser && emailPass)
+    : emailProvider === 'brevo'
+      ? Boolean(brevo.apiKey && brevo.senderEmail)
+      : false;
 
   const config = {
     nodeEnv,
@@ -261,14 +284,22 @@ function loadConfig(raw = process.env) {
     },
 
     email: {
-      host: raw.EMAIL_HOST || 'smtp.gmail.com',
-      port: raw.EMAIL_PORT != null && String(raw.EMAIL_PORT).trim() !== '' ? Number(raw.EMAIL_PORT) : 587,
-      secure: raw.EMAIL_SECURE === 'true',
-      user: emailUser,
-      pass: emailPass,
-      from: raw.EMAIL_FROM || (emailUser ? `"SisPasantías" <${emailUser}>` : ''),
+      // 'brevo' | 'smtp' | 'disabled' (valor inválido → error en validateConfig)
+      provider: emailProvider,
+      // EMAIL_REQUIRED=true: la config del proveedor ELEGIDO debe existir y ser
+      // válida (no implica SMTP).
       required: raw.EMAIL_REQUIRED === 'true',
-      configured: Boolean(emailUser && emailPass),
+      // ¿El proveedor elegido tiene su configuración mínima?
+      configured: emailConfigurado,
+      smtp: {
+        host: raw.EMAIL_HOST || 'smtp.gmail.com',
+        port: raw.EMAIL_PORT != null && String(raw.EMAIL_PORT).trim() !== '' ? Number(raw.EMAIL_PORT) : 587,
+        secure: raw.EMAIL_SECURE === 'true',
+        user: emailUser,
+        pass: emailPass,
+        from: raw.EMAIL_FROM || (emailUser ? `"SisPasantías" <${emailUser}>` : ''),
+      },
+      brevo,
     },
 
     logLevel: raw.LOG_LEVEL || undefined,
@@ -348,8 +379,14 @@ function validateConfig(c) {
       errors.push('EMAIL_PORT debe ser un entero entre 1 y 65535.');
     }
   }
-  if (c.email.required && !c.email.configured) {
-    errors.push('EMAIL_REQUIRED=true pero faltan EMAIL_USER y/o EMAIL_PASS.');
+  if (!PROVEEDORES_EMAIL.includes(c.email.provider)) {
+    errors.push(`EMAIL_PROVIDER debe ser "brevo", "smtp" o "disabled" (recibido: "${c.email.provider}").`);
+  } else if (c.email.required && !c.email.configured) {
+    errors.push({
+      brevo: 'EMAIL_REQUIRED=true con EMAIL_PROVIDER=brevo pero faltan BREVO_API_KEY y/o BREVO_SENDER_EMAIL.',
+      smtp: 'EMAIL_REQUIRED=true con EMAIL_PROVIDER=smtp pero faltan EMAIL_USER y/o EMAIL_PASS.',
+      disabled: 'EMAIL_REQUIRED=true pero EMAIL_PROVIDER no está definido o es "disabled" (usar "brevo" o "smtp").',
+    }[c.email.provider]);
   }
   if (!Number.isInteger(c.csvImport.maxBytes) || c.csvImport.maxBytes < 1) {
     errors.push('CSV_IMPORT_MAX_BYTES debe ser un entero >= 1.');
@@ -435,6 +472,7 @@ module.exports = {
   duracionAMs,
   // exportados para tests
   advertenciasEmail,
+  PROVEEDORES_EMAIL,
   normalizeUrl,
   parseOrigins,
   resolveTrustProxy,

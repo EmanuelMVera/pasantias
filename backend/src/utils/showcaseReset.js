@@ -22,7 +22,7 @@
  *     lucia.ferrari@demo.invalid y candidato01..10@demo.invalid — así un reset
  *     sobre una base vieja no deja Delta y S.H.I.E.L.D. a la vez.
  *   - Institucional: usuarios `@institucional.invalid` y empresas con CUIT
- *     `307000000NN`.
+ *     `3099990NNND` (y las del prefijo anterior `307000000NN`).
  *   - seedDemo: la lista exacta de 50 emails `.demo`, 20 alumnos
  *     `3700000N@itbeltran.com.ar` (email + nombre + apellido) y 20 razones
  *     sociales (solo si todos sus miembros son de esa lista).

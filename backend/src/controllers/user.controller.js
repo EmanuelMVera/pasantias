@@ -7,6 +7,7 @@ const { EXT_POR_MIME, firmaCoincide, sanitizarNombreOriginal } = require('../uti
 const { procesarSubidaImagen, establecerUrlExterna } = require('../services/archivoImagen.service');
 const storage = require('../services/storage');
 const logger = require('../utils/logger');
+const perfilService = require('../services/perfil.service');
 
 /**
  * SEC-02: verifica que el CONTENIDO del archivo coincida con el mimetype que
@@ -54,21 +55,44 @@ async function registrarArchivo(req, tipo, buffer) {
   }
 }
 
-const getPerfil = async (req, res) => {
-  const perfil = await Perfil.findOne({ where: { usuarioId: req.usuario.id } });
-  const usuario = await Usuario.findByPk(req.usuario.id, {
-    attributes: ['telefono', 'ubicacion'],
-  });
+/**
+ * Perfil propio + datos de la cuenta. Además de las columnas del perfil
+ * devuelve los datos INSTITUCIONALES de solo lectura (nombre, apellido, email,
+ * rol, legajo, carrera, anioEgreso) y lo que el frontend necesita para no
+ * recalcular reglas: cvCargado (Archivo real, no cvPath), perfilCompleto (%)
+ * y datosInstitucionalesFaltantes (aviso, no pendiente del alumno).
+ */
+async function armarPerfilPropio(usuarioId) {
+  const [perfil, usuario] = await Promise.all([
+    Perfil.findOne({ where: { usuarioId } }),
+    Usuario.findByPk(usuarioId, { attributes: ['nombre', 'apellido', 'email', 'rol', 'telefono', 'ubicacion'] }),
+  ]);
   const datos = perfil ? perfil.toJSON() : {};
-  datos.telefono = usuario?.telefono || null;
-  datos.ubicacion = usuario?.ubicacion || null;
-  return res.json({ success: true, data: datos });
+  return {
+    ...datos,
+    nombre: usuario?.nombre ?? null,
+    apellido: usuario?.apellido ?? null,
+    email: usuario?.email ?? null,
+    rol: usuario?.rol ?? null,
+    telefono: usuario?.telefono || null,
+    ubicacion: usuario?.ubicacion || null,
+    cvCargado: perfilService.tieneCv(perfil),
+    perfilCompleto: perfilService.calcularCompletitud(perfil, usuario),
+    datosInstitucionalesFaltantes: ['alumno', 'egresado'].includes(usuario?.rol)
+      ? perfilService.datosInstitucionalesFaltantes(perfil, usuario)
+      : [],
+  };
+}
+
+const getPerfil = async (req, res) => {
+  return res.json({ success: true, data: await armarPerfilPropio(req.usuario.id) });
 };
 
 const updatePerfil = async (req, res) => {
   // validateUpdatePerfil (user.validator.js) ya validó y normalizó cada campo
-  // reconocido: listas como arrays, anioEgreso entero, visibilidad booleana,
-  // vacíos como null. Acá solo se reparte entre Perfil y Usuario.
+  // reconocido (listas como arrays, visibilidad booleana, vacíos como null) y
+  // rechazó con 400 los datos institucionales (carrera, año de egreso, legajo,
+  // nombre, apellido, email, rol). Acá solo se reparte entre Perfil y Usuario.
   const body = { ...req.body };
 
   // redesSociales: texto validado → JSONB { texto }
@@ -87,8 +111,9 @@ const updatePerfil = async (req, res) => {
   // SEC-03: `fotoPerfil` ya NO se acepta por texto libre — se sube por
   // POST /api/users/perfil/foto (multipart, validado). Las URLs externas
   // cargadas antes de SEC-03 quedan hasta que se reemplacen por una subida.
+  // Sin carrera/anioEgreso: son institucionales (solo admin / importación CSV).
   const camposPermitidos = [
-    'carrera', 'anioEgreso', 'descripcion', 'habilidades', 'idiomas',
+    'descripcion', 'habilidades', 'idiomas',
     'certificaciones', 'linkedin', 'github', 'portfolio', 'redesSociales',
     'areaInteres', 'disponibilidad', 'preferenciasLaborales',
     'salarioPretendido', 'visibilidadPerfil', 'experienciaLaboral', 'proyectos',
@@ -99,15 +124,7 @@ const updatePerfil = async (req, res) => {
 
   await Perfil.update(datosLimpios, { where: { usuarioId: req.usuario.id } });
 
-  const perfil = await Perfil.findOne({ where: { usuarioId: req.usuario.id } });
-  const usuarioActualizado = await Usuario.findByPk(req.usuario.id, {
-    attributes: ['telefono', 'ubicacion'],
-  });
-  const datos = perfil ? perfil.toJSON() : {};
-  datos.telefono = usuarioActualizado?.telefono || null;
-  datos.ubicacion = usuarioActualizado?.ubicacion || null;
-
-  return res.json({ success: true, data: datos });
+  return res.json({ success: true, data: await armarPerfilPropio(req.usuario.id) });
 };
 
 const uploadCv = async (req, res) => {

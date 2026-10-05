@@ -177,8 +177,7 @@ describe('Validación de formularios contra la API', () => {
 
   // ── Perfil del alumno ─────────────────────────────────────────────────────
   test.each([
-    [{ anioEgreso: 'dos mil' }, /año de egreso debe ser un número entero/],
-    [{ anioEgreso: 1800 }, /año de egreso debe ser un número entero/],
+    [{ anioEgreso: 2027 }, /año de egreso es administrado por el instituto/],
     [{ linkedin: 'mi linkedin' }, /LinkedIn debe ser una URL válida/],
     [{ telefono: 'hola' }, /teléfono no es válido/],
     [{ disponibilidad: 'cuando pueda' }, /disponibilidad no es válido/i],
@@ -193,7 +192,6 @@ describe('Validación de formularios contra la API', () => {
 
   test('perfil válido: normaliza año, listas, teléfono y visibilidad', async () => {
     const res = await auth(request(app).put('/api/users/perfil'), tokenAlumno).send({
-      anioEgreso: '2027',
       habilidades: 'React, SQL, React',
       certificaciones: 'AWS\nScrum',
       telefono: '+54 11 1234-5678',
@@ -203,7 +201,6 @@ describe('Validación de formularios contra la API', () => {
     });
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({
-      anioEgreso: 2027,
       habilidades: ['React', 'SQL'],
       certificaciones: ['AWS', 'Scrum'],
       telefono: '+54 11 1234-5678',

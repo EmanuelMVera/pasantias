@@ -144,6 +144,35 @@ async function analizarCsv(buffer) {
  * claro: genera un password aleatorio inutilizable (nadie lo conoce) y un
  * token de activación de un solo uso reutilizando auth.service.js.
  */
+/**
+ * Emails de activación de una importación, de a UNO (no cientos de requests
+ * en paralelo contra el proveedor: Brevo limita la tasa y el cupo diario).
+ * Nunca lanza: enviarEmail registra cada fallo y al final queda un resumen.
+ * El link lleva el token de activación: nunca se loguea.
+ */
+async function enviarEmailsActivacion(creados, { requestId } = {}) {
+  let enviados = 0;
+  let fallidos = 0;
+  for (const c of creados) {
+    const r = await enviarEmail({
+      to: c.email,
+      tipo: 'activacion_csv',
+      subject: 'Activá tu cuenta – SisPasantías',
+      html: htmlNotificacion({
+        titulo: 'Activá tu cuenta',
+        mensaje: `Hola ${c.nombre}, se creó una cuenta para vos en SisPasantías. Hacé clic en el botón para elegir tu contraseña y activarla. El link expira en 7 días.`,
+        enlace: `/reset-password/${c.token}`,
+      }),
+    });
+    if (r.ok) enviados += 1;
+    else if (r.errorCode !== 'EMAIL_NO_CONFIGURADO') fallidos += 1;
+  }
+  const resumen = { requestId, total: creados.length, enviados, fallidos };
+  if (fallidos > 0) logger.error(resumen, 'activacion_csv_emails_con_fallos');
+  else logger.info(resumen, 'activacion_csv_emails_resumen');
+  return resumen;
+}
+
 async function confirmarImportacion(buffer, { actorUsuarioId, ip, requestId }) {
   const analisis = await analizarCsv(buffer);
   const filasValidas = analisis.filas.filter((f) => f.ok);
@@ -185,19 +214,9 @@ async function confirmarImportacion(buffer, { actorUsuarioId, ip, requestId }) {
     }
   });
 
-  // Fuera de la transacción: email de activación (fire-and-forget, mismo
-  // criterio que solicitudEmpresa.service.js::aprobarSolicitud) + auditoría.
-  creados.forEach((c) => {
-    enviarEmail({
-      to: c.email,
-      subject: 'Activá tu cuenta – SisPasantías',
-      html: htmlNotificacion({
-        titulo: 'Activá tu cuenta',
-        mensaje: `Hola ${c.nombre}, se creó una cuenta para vos en SisPasantías. Hacé clic en el botón para elegir tu contraseña y activarla. El link expira en 7 días.`,
-        enlace: `/reset-password/${c.token}`,
-      }),
-    }).catch((e) => logger.error({ err: e, email: c.email }, 'email_activacion_csv_fallo'));
-  });
+  // Fuera de la transacción: emails de activación en segundo plano (no
+  // bloquean la respuesta ni revierten la importación si el proveedor falla).
+  void enviarEmailsActivacion(creados, { requestId });
 
   await registrarAuditoria({
     usuarioId: actorUsuarioId,
@@ -225,8 +244,10 @@ async function confirmarImportacion(buffer, { actorUsuarioId, ip, requestId }) {
 function generarPlantillaCsv() {
   const header = COLUMNAS.join(',');
   const ejemploAlumno = 'TSP-2025-0001,Juana,Pérez,juana.perez@ejemplo.com,alumno,Tecnicatura Superior en Programación,,11-5555-0001,Avellaneda';
-  const ejemploEgresado = 'TSP-2020-0099,Carlos,Gómez,carlos.gomez@ejemplo.com,egresado,Tecnicatura Superior en Análisis de Sistemas,2021,11-5555-0002,Lanús';
+  const ejemploEgresado = 'TSP-2020-0099,Carlos,Gómez,carlos.gomez@ejemplo.com,egresado,Tecnicatura en Redes y Telecomunicaciones,2021,11-5555-0002,Lanús';
   return `${header}\n${ejemploAlumno}\n${ejemploEgresado}\n`;
 }
 
-module.exports = { multerCsv, parsearCsv, analizarCsv, confirmarImportacion, generarPlantillaCsv };
+module.exports = {
+  multerCsv, parsearCsv, analizarCsv, confirmarImportacion, generarPlantillaCsv, enviarEmailsActivacion,
+};

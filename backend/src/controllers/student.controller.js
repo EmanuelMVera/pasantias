@@ -22,6 +22,6 @@ exports.getDashboard = async (req, res) => {
     success: true,
     // cvCargado: sin CV no se puede postular (CV_REQUERIDO) — el inicio lo
     // muestra como primer paso pendiente.
-    data: { ...metricas, ofertasRecomendadas, perfilCompleto, cvCargado: Boolean(perfil?.cvPath) },
+    data: { ...metricas, ofertasRecomendadas, perfilCompleto, cvCargado: perfilService.tieneCv(perfil) },
   });
 };

@@ -7,7 +7,9 @@
  * recomendadas (ya excluye las ofertas a las que se postuló).
  *
  * Responde "¿qué hago ahora?":
- *   - 4 KPIs de sus postulaciones (cada uno filtra Mis postulaciones);
+ *   - 4 KPIs desde el punto de vista del candidato (cada uno filtra Mis
+ *     postulaciones): Postulaciones · En proceso (en revisión + preseleccionado,
+ *     agrupación de presentación: ?grupo=en_proceso) · Entrevistas · Contratado;
  *   - Próximos pasos: pendientes reales con su acción (CV faltante, entrevistas,
  *     preselecciones, notificaciones, perfil incompleto). Si no hay nada:
  *     "Todo al día por ahora";
@@ -99,7 +101,7 @@ export default function AlumnoDashboardPage() {
   const cargando = !panel && !error;
   const d = {
     total: panel?.totalPostulaciones ?? 0,
-    enRevision: panel?.enRevision ?? 0,
+    enProceso: panel?.enProceso ?? ((panel?.enRevision ?? 0) + (panel?.preseleccionados ?? 0)),
     preseleccionados: panel?.preseleccionados ?? 0,
     entrevistas: panel?.entrevistas ?? 0,
     contrataciones: panel?.contrataciones ?? 0,
@@ -127,15 +129,15 @@ export default function AlumnoDashboardPage() {
           onClick={() => navigate('/mis-postulaciones')} actionHint="Ver todas"
         />
         <StatCard
-          loading={cargando} iconName="inbox" tone="orange" label="En revisión" value={d.enRevision}
-          onClick={() => navigate('/mis-postulaciones?estado=en_revision')} actionHint="Ver"
+          loading={cargando} iconName="inbox" tone="orange" label="En proceso" value={d.enProceso}
+          onClick={() => navigate('/mis-postulaciones?grupo=en_proceso')} actionHint="Ver"
         />
         <StatCard
           loading={cargando} iconName="calendar" tone="violet" label="Entrevistas" value={d.entrevistas}
           onClick={() => navigate('/mis-postulaciones?estado=entrevista')} actionHint="Ver"
         />
         <StatCard
-          loading={cargando} iconName="checkCircle" tone="green" label="Contrataciones" value={d.contrataciones}
+          loading={cargando} iconName="checkCircle" tone="green" label="Contratado" value={d.contrataciones}
           onClick={() => navigate('/mis-postulaciones?estado=contratado')} actionHint="Ver"
         />
       </section>

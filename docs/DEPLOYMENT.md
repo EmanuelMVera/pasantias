@@ -479,13 +479,17 @@ Leyenda: **S** = secreta · **R** = requerida en producción · **O** = opcional
 | `S3_FORCE_PATH_STYLE` | Render | O | `false` | `true` solo si el proveedor lo requiere. | |
 | `S3_PUBLIC_BASE_URL` | Render | R si `s3` | `https://cdn.tudominio.edu` o `https://pub-xxxx.r2.dev` | Dominio público del bucket público. Sin barra final. | |
 | `S3_KEY_PREFIX` | Render | O | `sispasantias` | Namespace de las keys. | |
-| `EMAIL_HOST` | Render | O | `smtp.gmail.com` | Servidor SMTP. | |
-| `EMAIL_PORT` | Render | O | `587` | 587 = STARTTLS, 465 = TLS implícito. | |
-| `EMAIL_SECURE` | Render | O | `false` | `true` para el puerto 465. | |
-| `EMAIL_USER` | Render | O | `noreply@tudominio.edu` | Usuario SMTP. Sin esto, la API arranca igual (no manda emails). | S |
-| `EMAIL_PASS` | Render | O | *(App Password de Gmail)* | Con Gmail: **contraseña de aplicación**, no la del correo. | S |
-| `EMAIL_FROM` | Render | O | `"SisPasantías" <noreply@tudominio.edu>` | Remitente. Default: `"SisPasantías" <EMAIL_USER>`. | |
-| `EMAIL_REQUIRED` | Render | O | `false` | `true` = la API aborta si falta el SMTP **o si el servidor SMTP rechaza las credenciales** al arrancar (ver §4.1). | |
+| `EMAIL_PROVIDER` | Render | R | `brevo` | Proveedor de email: `brevo` (producción: API HTTPS), `smtp` (local) o `disabled`. Sin definir = `disabled` (no se envía nada). Ver §4.1. | |
+| `EMAIL_REQUIRED` | Render | R | `true` | `true` = la config del proveedor elegido debe existir y ser válida: la API no arranca si faltan sus variables o si el proveedor rechaza las credenciales (no implica SMTP). | |
+| `BREVO_API_KEY` | Render | R si `EMAIL_PROVIDER=brevo` | *(API key de Brevo)* | Brevo → SMTP & API → API Keys. Nunca al frontend ni a los logs. | S |
+| `BREVO_SENDER_EMAIL` | Render | R si `EMAIL_PROVIDER=brevo` | `notificaciones@tudominio.edu` | Remitente **creado y verificado** en Brevo (Senders). Puede ser una Gmail verificada para la demo. | |
+| `BREVO_SENDER_NAME` | Render | O | `SisPasantías` | Nombre visible del remitente. | |
+| `EMAIL_HOST` | local | solo `smtp` | `smtp.gmail.com` | Servidor SMTP. | |
+| `EMAIL_PORT` | local | solo `smtp` | `587` | 587 = STARTTLS, 465 = TLS implícito. | |
+| `EMAIL_SECURE` | local | solo `smtp` | `false` | `true` para el puerto 465. | |
+| `EMAIL_USER` | local | solo `smtp` | `cuenta@gmail.com` | Usuario SMTP. | S |
+| `EMAIL_PASS` | local | solo `smtp` | *(App Password de Gmail)* | Con Gmail: **contraseña de aplicación**, no la del correo. | S |
+| `EMAIL_FROM` | local | solo `smtp` | `"SisPasantías" <cuenta@gmail.com>` | Remitente SMTP. Default: `"SisPasantías" <EMAIL_USER>`. Con Brevo no se usa. | |
 | `SEED_ADMIN_EMAIL` | Render | R (solo primer deploy) | `admin@tudominio.edu` | Email del admin primario. | |
 | `SEED_ADMIN_PASSWORD` | Render | R (solo primer deploy) | *(fuerte, ≥8 chars)* | Contraseña del admin primario. Cambiarla tras el primer login. | S |
 | `SEED_SECOND_ADMIN_EMAIL` | Render | O | `compañero@tudominio.edu` | Email del segundo admin (opcional). Vacío = no se crea ninguno. | |
@@ -500,37 +504,49 @@ Leyenda: **S** = secreta · **R** = requerida en producción · **O** = opcional
 | `CSV_IMPORT_MAX_ROWS` | Render | O | `2000` | Filas máx. por archivo CSV de importación. | |
 | `VITE_API_URL` | Vercel | R | `/api` | Con el proxy same-origin. Dev: `http://localhost:5000/api`. | |
 
-### 4.1 Correo (SMTP): diagnóstico y política
+### 4.1 Correo: proveedor, diagnóstico y política
 
-**Al arrancar**, si hay `EMAIL_USER`/`EMAIL_PASS`, el backend ejecuta `transporter.verify()`
-(conexión + STARTTLS/TLS + autenticación, **sin enviar ningún email**) y deja en el log:
+**Producción (Render) usa Brevo por API HTTPS.** Desde el 26/09/2025 los web services
+**gratuitos** de Render bloquean el tráfico saliente a los puertos SMTP 25, 465 y 587
+([changelog de Render](https://render.com/changelog/free-web-services-will-no-longer-allow-outbound-traffic-to-smtp-ports)),
+así que Gmail SMTP no funciona ahí. SMTP queda como alternativa para desarrollo local o
+un hosting que lo permita.
+
+| `EMAIL_PROVIDER` | Transporte | Variables |
+|---|---|---|
+| `brevo` | `POST https://api.brevo.com/v3/smtp/email` (header `api-key`) | `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME` |
+| `smtp` | Nodemailer (`transporter.sendMail`) | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM` |
+| `disabled` (o sin definir) | ninguno: se registra en el log | — |
+
+El proveedor es **explícito** (no se deduce de qué variables existan). Con `brevo` no se
+exigen ni se advierten las variables SMTP, y Nodemailer ni se inicializa.
+
+**Arquitectura:** todos los flujos llaman a `enviarEmail()` (`backend/src/utils/mailer.js`,
+la fachada), que delega en `backend/src/services/email/providers/{brevo,smtp}.provider.js`.
+Los templates HTML están en el código (no en el dashboard de Brevo).
+
+**Al arrancar** el backend verifica el proveedor **sin enviar ningún email**:
+`brevo` → `GET https://api.brevo.com/v3/account`; `smtp` → `transporter.verify()`.
 
 | Log | Qué significa | ¿Arranca? |
 |---|---|---|
-| `email_smtp_verificado` | Gmail aceptó la conexión y las credenciales. | Sí |
-| `email_smtp_verificacion_fallo` con `categoria: "auth"` (EAUTH / 535) | Credenciales rechazadas: App Password mal cargada, revocada, o se usó la contraseña normal. | **No**, si `EMAIL_REQUIRED=true` (Render conserva el deploy anterior). Sí, si es `false`. |
-| `email_smtp_verificacion_fallo` con `categoria: "red"` (ETIMEDOUT / ECONNECTION…) | No hay conexión con el servidor SMTP: red, caída del proveedor, o **el hosting bloquea el SMTP saliente**. | Sí (error crítico en el log): puede ser transitorio y tumbar la API entera haría más daño. Sin reintentos en bucle. |
+| `email_provider_verificado` `{ provider }` | El proveedor responde y acepta las credenciales. | Sí |
+| `email_provider_verificacion_fallo` con `categoria: "auth"` (Brevo 401/403, SMTP EAUTH/535) o `"config"` (faltan variables) | API key inválida/revocada, remitente faltante, App Password inválida. | **No**, si `EMAIL_REQUIRED=true` (Render conserva el deploy anterior). Sí, si es `false`. |
+| `email_provider_verificacion_fallo` con `categoria: "red"` (timeout, DNS, 5xx) | Problema transitorio de red o del proveedor. | Sí (error crítico en el log): no se tumba la API por algo transitorio. Sin reintentos en bucle. |
 
-El log incluye host, puerto, `secure`, usuario redactado (`ce***@gmail.com`) y la respuesta
-del servidor (p. ej. `535-5.7.8 Username and Password not accepted`). **Nunca** la contraseña.
+Los logs incluyen el proveedor, el tipo de email, el destinatario **redactado**
+(`ju***@gmail.com`), el `messageId` y el código de error / HTTP status. **Nunca** la API
+key, la contraseña SMTP, tokens, contraseñas generadas ni el cuerpo del email.
 
-> ⚠️ **Render Free bloquea el SMTP saliente.** Desde el 26/09/2025 los web services
-> **gratuitos** de Render no pueden abrir conexiones a los puertos 25, 465 ni 587
-> ([changelog de Render](https://render.com/changelog/free-web-services-will-no-longer-allow-outbound-traffic-to-smtp-ports)).
-> Con `smtp.gmail.com:587` eso se ve como `email_smtp_verificacion_fallo` con
-> `categoria: "red"` (timeout) aunque las credenciales sean correctas. Opciones: pasar el
-> servicio a una instancia paga (habilita 465/587), o usar un proveedor de email por API
-> HTTPS (Resend, Brevo, SendGrid, Postmark…) — el envío está centralizado en
-> `backend/src/utils/mailer.js`, así que cambiar de transporte toca un solo archivo.
-
-**Comandos de diagnóstico** (desde `backend/`, con el entorno cargado — local con `.env`, o el
-Shell del servicio en Render, que está disponible en instancias pagas):
+**Comandos de diagnóstico** (desde `backend/`, con el entorno cargado — `.env` local, o el
+Shell del servicio en Render):
 
 ```bash
-npm run email:verify                          # config sin secretos + transporter.verify(); NO envía nada.
-                                              # exit 0 = autenticó · != 0 = falló (con código y pista)
-npm run email:test -- destinatario@dominio.com  # envía UN email de prueba real (uso manual; el
-                                              # destinatario va por argumento, nunca al repo)
+npm run email:verify                            # proveedor + sender redactado + "API key: configurada";
+                                                # verifica SIN enviar (Brevo: GET /v3/account).
+                                                # exit 0 = OK · != 0 = falló (con código y pista)
+npm run email:test -- destinatario@dominio.com  # envía UN email de prueba real por el proveedor
+                                                # configurado (un único destinatario por comando)
 ```
 
 No hay endpoint HTTP de prueba de email (a propósito).
@@ -539,17 +555,24 @@ No hay endpoint HTTP de prueba de email (a propósito).
 `{ ok: false, errorCode, categoria }` y siempre loguea `email_enviado` / `email_envio_fallo`):
 
 - **Recuperación de contraseña**: respuesta pública idéntica exista o no la cuenta (y sin
-  esperar al SMTP); si el envío falla queda `recupero_password_email_fallo` (ERROR, con
-  requestId). Nunca se loguea el token ni el link.
+  esperar al proveedor); si el envío falla queda `recupero_password_email_fallo` (ERROR,
+  con requestId). Nunca se loguea el token ni el link.
 - **Solicitud de empresa**: email "Recibimos tu solicitud" al responsable (con copia al
   contacto institucional), sin credenciales.
-- **Aprobación de empresa / reclutador**: la cuenta se crea igual aunque falle el email
-  (no se revierte por una caída de Gmail); la respuesta trae `emailCredencialesEnviado` y el
-  admin ve un aviso. El usuario entra con "Olvidé mi contraseña" cuando el correo funcione
-  (el admin_empresa también puede mandar la recuperación a un reclutador desde Equipo).
-- Las advertencias de config (`EMAIL_FROM` distinto de `EMAIL_USER`, `EMAIL_PASS` que no
-  tiene formato de App Password, puerto/secure incoherentes) salen como `warn` al arrancar
-  y en `email:verify`.
+- **Aprobación de empresa / reclutador**: la cuenta se crea igual aunque falle el email; la
+  respuesta trae `emailCredencialesEnviado` y el admin ve un aviso. El usuario entra con
+  "Olvidé mi contraseña" cuando el correo funcione.
+- **Importación CSV**: los emails de activación salen de a uno, en segundo plano, y al
+  final queda un resumen (`activacion_csv_emails_resumen` / `..._con_fallos`).
+
+**Brevo con un remitente Gmail (demo):** Brevo permite usar como sender una dirección
+Gmail **verificada**, pero como no hay un dominio propio autenticado (DKIM/DMARC), Brevo
+puede mostrar o reescribir el remitente con un dominio propio de Brevo y algunos correos
+pueden caer en spam. **No es un bug de SisPasantías.** Con dominio propio: autenticar el
+dominio en Brevo (DKIM + DMARC) y usar un remitente como `notificaciones@dominio.edu`.
+El plan gratuito de Brevo tiene un **cupo diario** de envíos (ver tu cuenta): alcanza para
+la demo, pero una importación CSV grande puede agotarlo (los envíos que falten quedan
+registrados en el log; el alumno puede usar "Olvidé mi contraseña").
 
 ---
 
@@ -615,7 +638,8 @@ Detalle del runner y reglas de migraciones nuevas: `backend/migrations/README.md
 | `JWT_SECRET` | Generar uno nuevo, actualizar en Render, redeploy. | Invalida **todas** las sesiones activas (todos re-login). |
 | `SEED_ADMIN_PASSWORD` | Cambiar la contraseña del admin desde la app (`/cambiar-password`). La variable solo se usa en el primer seed. | La sesión del admin se cierra (`tokenVersion++`). |
 | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Crear un token R2 nuevo, actualizar en Render, redeploy, revocar el viejo. | Sin downtime si se hace en ese orden. |
-| SMTP (`EMAIL_PASS`) | Generar una App Password nueva, actualizar, redeploy, revocar la vieja. | — |
+| `BREVO_API_KEY` | Crear una API key nueva en Brevo, actualizar en Render, redeploy, `npm run email:verify`, recién entonces borrar la vieja en Brevo. | Sin corte si se hace en ese orden. |
+| SMTP (`EMAIL_PASS`, solo local) | Generar una App Password nueva, actualizar, revocar la vieja. | — |
 | `DATABASE_URL` | Rotar la contraseña del rol en Neon, actualizar en Render, redeploy. | Breve corte de conexiones durante el redeploy. |
 
 > El `.env` local de desarrollo tiene secretos reales (incluida una App Password de
@@ -733,9 +757,8 @@ si esa respuesta ya no trae la cuenta vieja, cualquier UI que siga mostrándola 
   instancias requiere un store compartido (Redis).
 - **Plan free de Render:** el servicio hace *spin-down* tras inactividad → la primera
   request luego de dormir tarda unos segundos.
-- **Gmail SMTP** tiene límites de envío bajos. Para volumen real, migrar a un proveedor
-  transaccional (solo cambian `EMAIL_HOST` / `EMAIL_PORT` / `EMAIL_SECURE` / credenciales
-  / `EMAIL_FROM`).
+- **Email:** el plan gratuito de Brevo tiene un cupo diario de envíos; sin dominio propio
+  autenticado, el remitente puede mostrarse con un dominio de Brevo (ver §4.1).
 - El backend `s3` se probó contra el AWS SDK **mockeado** (`backend/tests/storage.test.js`),
   no contra un bucket R2 real.
 - **Frontend sin suite de tests automatizada** (solo Playwright E2E, con su propio seed

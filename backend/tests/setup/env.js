@@ -20,8 +20,11 @@ process.env.NODE_ENV = 'test';
 // para el entorno `test` de Sequelize CLI.
 process.env.DB_NAME = process.env.DB_NAME_TEST || `${process.env.DB_NAME}_test`;
 
-// mailer.js solo manda un email real si EMAIL_USER está seteado — lo
-// vaciamos para que cualquier flujo que notifique por email (login,
-// aprobar solicitud, postularse) caiga siempre en el modo "solo console.log".
+// Nunca un email real desde la suite: proveedor deshabilitado y sin
+// credenciales (aunque el .env del dev tenga Brevo o SMTP). Los tests de email
+// (email.test.js, emailBrevo.test.js) setean su propio proveedor y lo mockean.
+process.env.EMAIL_PROVIDER = 'disabled';
 process.env.EMAIL_USER = '';
 process.env.EMAIL_PASS = '';
+process.env.BREVO_API_KEY = '';
+process.env.BREVO_SENDER_EMAIL = '';

@@ -5,7 +5,7 @@ module.exports = {
   '/api/students/dashboard': {
     get: operation({
       tag: 'alumno', id: 'alumnoDashboard', summary: 'Panel del alumno / egresado',
-      description: 'Métricas personales, ofertas recomendadas y % de completitud del perfil.',
+      description: 'Métricas personales (incluye `enProceso` = en revisión + preseleccionado), ofertas recomendadas, % de completitud del perfil y `cvCargado`.',
       roles: ['alumno', 'egresado'],
       responses: { 200: ok('DashboardAlumno') },
       errors: ['401', '403'],

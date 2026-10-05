@@ -1,179 +1,168 @@
-# Documentación funcional del proyecto
+# Documentación funcional — SisPasantías
 
-## 1. Descripción general del sistema
-Este es un sistema web para gestionar pasantías laborales. Sirve para conectar a estudiantes y egresados con empresas que ofrecen oportunidades de trabajo o prácticas profesionales.
+Portal institucional de empleo del Instituto Tecnológico Beltrán: conecta a
+**alumnos y egresados** con **empresas aprobadas por el instituto** para
+pasantías y primeros empleos. Este documento describe el sistema **tal como
+funciona hoy**: quién lo usa, qué puede hacer cada perfil y cuál es el flujo
+principal. El detalle de permisos por endpoint está en
+[docs/ROLES-Y-PERMISOS.md](docs/ROLES-Y-PERMISOS.md); el despliegue, en
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-El objetivo principal es facilitar el proceso de búsqueda y aplicación a empleos, especialmente para jóvenes que están terminando sus estudios o recién graduados.
+---
 
-Los usuarios principales son:
-- Estudiantes y egresados que buscan oportunidades laborales
-- Empresas que necesitan contratar personal
-- Administradores que supervisan el sistema
+## 1. Idea general
 
-## 2. Cómo está compuesto el proyecto
-El proyecto tiene dos partes principales: frontend y backend.
+- El **instituto** controla quién participa: da de alta a sus alumnos/egresados
+  (importación CSV), aprueba a las empresas y revisa las ofertas antes de
+  publicarlas.
+- Las **empresas** tienen dos perfiles internos con responsabilidades separadas:
+  quien **gobierna** la cuenta (administrador de empresa) y quien **opera** el
+  reclutamiento (reclutador).
+- Los **candidatos** buscan ofertas, se postulan con su CV y siguen cada proceso.
+- Todo pasa por reglas del backend (no solo por lo que muestra la pantalla):
+  permisos, transiciones de estado, visibilidad de datos y validación de
+  formularios.
 
-El frontend es la parte visible del sistema, la interfaz web que ven los usuarios. Está hecho con React, una herramienta para crear páginas web interactivas.
+## 2. Perfiles
 
-El backend es la parte invisible, el "motor" que maneja la lógica y los datos. Está hecho con Node.js y Express, programas que permiten crear servidores web.
+### 2.1 Administrador del Sistema (instituto)
 
-Estas dos partes se conectan a través de una API (interfaz de programación de aplicaciones), que es como un puente que permite que el frontend pida información al backend.
+- **Objetivo:** gobernar la plataforma — quién entra, qué se publica y qué pasó.
+- **Navegación (barra lateral):** Panel (indicadores y pendientes) ·
+  Solicitudes · Empresas · Ofertas · Usuarios · Importar · Auditoría. Las
+  notificaciones y la cuenta están en la barra superior.
+- **Puede:**
+  - importar alumnos/egresados por CSV (con previsualización: errores por fila,
+    carrera validada contra el catálogo institucional) y gestionar usuarios;
+  - aprobar o rechazar solicitudes de empresas y de reclutadores (al aprobar,
+    el sistema crea las cuentas y envía las credenciales por email);
+  - marcar empresas como **de confianza** (sus ofertas se publican sin
+    moderación previa);
+  - moderar ofertas (aprobar, rechazar, pausar);
+  - consultar la auditoría (quién hizo qué y cuándo) y exportar estadísticas.
+- **No hace:** no publica ofertas ni gestiona candidatos de una empresa.
 
-Los datos se guardan en una base de datos PostgreSQL, que es un sistema para almacenar información de forma organizada.
+### 2.2 Administrador de Empresa
 
-## 3. Flujo general del sistema
-El sistema funciona de la siguiente manera:
+- **Objetivo:** gobernar la cuenta de su empresa y supervisar el reclutamiento.
+- **Navegación (barra lateral):** Resumen · Ofertas · Candidatos · Equipo ·
+  Mi empresa. En la barra superior: mensajes del equipo, notificaciones y el
+  menú de cuenta (Seguridad de mi cuenta).
+- **Puede:**
+  - ver el estado de todas las ofertas y candidatos de la empresa;
+  - pausar, reactivar o cerrar ofertas, y **asignar o cambiar el reclutador
+    responsable** de una oferta;
+  - administrar el equipo: solicitar el alta de reclutadores (los aprueba el
+    instituto, o se crean al instante si la empresa es de confianza),
+    suspenderlos y enviarles la recuperación de acceso;
+  - editar los datos públicos de la empresa (descripción, rubro, sitio web,
+    contacto, logo).
+- **No hace:** no crea ni edita el contenido de las ofertas, no mueve
+  candidatos en el proceso y no chatea con candidatos (eso es operación del
+  reclutador).
 
-1. Un usuario abre la página web en su navegador
-2. El frontend muestra la interfaz según el tipo de usuario (estudiante, empresa o administrador)
-3. Cuando el usuario hace algo (como ver ofertas o aplicar a un trabajo), el frontend envía una solicitud al backend
-4. El backend recibe la solicitud y hace lo necesario:
-   - Verifica que el usuario tenga permisos
-   - Consulta o modifica datos en la base de datos si es necesario
-   - Envía una respuesta de vuelta
-5. El frontend recibe la respuesta y actualiza lo que se muestra en la pantalla
+### 2.3 Reclutador
 
-Por ejemplo, cuando un estudiante aplica a una oferta de trabajo:
-- El estudiante hace clic en "Aplicar" en la página de detalles de la oferta
-- El frontend envía los datos de la aplicación al backend
-- El backend crea un registro de la postulación en la base de datos
-- El backend envía una notificación automática a la empresa
-- El frontend muestra un mensaje de confirmación al estudiante
+- **Objetivo:** operar el día a día del reclutamiento de **sus** ofertas.
+- **Navegación (barra horizontal):** Inicio ("qué tengo que gestionar hoy") ·
+  Mis ofertas · Candidatos · botón **Nueva oferta**. En el menú de usuario:
+  Mi perfil · Ver empresa · Seguridad de mi cuenta.
+- **Puede:**
+  - crear ofertas y editar las que tiene a cargo (si la empresa no es de
+    confianza, cada oferta nueva queda pendiente de moderación; editar una
+    rechazada la reenvía a revisión);
+  - gestionar el proceso de selección de sus ofertas con el **flujo guiado**:
+    En revisión → Preseleccionado → Entrevista → Contratado, o No
+    seleccionado (también puede retroceder un paso para corregir);
+  - dejar notas internas (el candidato nunca las ve) y descargar el CV;
+  - chatear con candidatos cuando el estado lo habilita (preseleccionado,
+    entrevista o contratado);
+  - editar sus datos personales (Mi perfil).
+- **No hace:** no ve ofertas ni candidatos de otros reclutadores, no
+  administra el equipo ni los datos de la empresa.
 
-## 4. Requerimientos funcionales
-Los requerimientos funcionales describen qué debe hacer el sistema. Basados en las funciones reales implementadas:
+### 2.4 Alumno / Egresado
 
-1. El sistema debe permitir a los usuarios registrarse con diferentes roles (estudiante, egresado, empresa, administrador)
-2. El sistema debe permitir iniciar sesión con email y contraseña
-3. El sistema debe permitir recuperar la contraseña olvidada mediante email
-4. El sistema debe mostrar ofertas de trabajo disponibles con filtros por área, ciudad y modalidad
-5. El sistema debe permitir a los estudiantes ver los detalles completos de una oferta de trabajo
-6. El sistema debe permitir a los estudiantes aplicar a ofertas de trabajo con una carta de presentación opcional
-7. El sistema debe permitir a los estudiantes ver el estado de sus postulaciones
-8. El sistema debe permitir a los estudiantes subir y actualizar su currículum vitae
-9. El sistema debe permitir a los estudiantes editar su perfil profesional
-10. El sistema debe permitir a las empresas crear nuevas ofertas de trabajo
-11. El sistema debe permitir a las empresas ver todas sus ofertas publicadas
-12. El sistema debe permitir a las empresas ver los postulantes a sus ofertas
-13. El sistema debe permitir a las empresas cambiar el estado de las postulaciones (preseleccionado, entrevista, etc.)
-14. El sistema debe permitir a los administradores aprobar o rechazar empresas nuevas
-15. El sistema debe permitir a los administradores moderar ofertas de trabajo antes de publicarlas
-16. El sistema debe mostrar estadísticas del sistema a los administradores
-17. El sistema debe enviar notificaciones automáticas cuando cambian los estados de las postulaciones
-18. El sistema debe validar que no se puedan hacer postulaciones duplicadas a la misma oferta
+- **Objetivo:** encontrar oportunidades, postularse y seguir sus procesos.
+- **Navegación (barra superior):** Inicio · Ofertas · Mis postulaciones ·
+  Mi perfil, más Chat y Notificaciones.
+- **Inicio:** indicadores desde su punto de vista — *Postulaciones*, *En
+  proceso* (en revisión + preseleccionado), *Entrevistas*, *Contratado* —,
+  próximos pasos reales (subir el CV, entrevistas, preselecciones,
+  notificaciones, perfil incompleto) y ofertas recomendadas.
+- **Puede:**
+  - buscar ofertas (filtros y recomendadas por perfil) y postularse con una
+    carta de presentación opcional — **requiere tener un CV cargado**;
+  - seguir cada postulación y chatear con el reclutador responsable cuando el
+    estado lo habilita;
+  - completar su perfil profesional: presentación, contacto, redes,
+    habilidades, idiomas, experiencia, proyectos, certificaciones,
+    preferencias, visibilidad, foto, CV y carta de recomendación.
+- **Datos institucionales (solo lectura):** nombre, apellido, email, legajo,
+  condición (alumno/egresado), carrera y año de egreso los registra el
+  instituto; el alumno los ve pero no puede cambiarlos (si falta alguno, la
+  pantalla le indica contactar a la institución). El porcentaje de perfil
+  completo solo cuenta lo que el alumno puede completar.
+- **Visibilidad:** su perfil puede ser público o privado. Un perfil privado
+  solo lo ven el propio alumno, el administrador del sistema y las empresas a
+  cuyas ofertas se postuló.
 
-## 5. Requerimientos no funcionales
-Los requerimientos no funcionales describen cómo debe funcionar el sistema, no qué debe hacer:
+### 2.5 Público (sin sesión)
 
-1. El sistema debe ser fácil de usar, con una interfaz clara y navegación intuitiva
-2. El sistema debe ser seguro, usando autenticación con tokens JWT que expiran en 7 días
-3. El sistema debe responder rápidamente a las acciones del usuario
-4. El sistema debe validar los datos de entrada para evitar errores
-5. El sistema debe manejar errores de forma amigable, mostrando mensajes claros al usuario
-6. El sistema debe ser compatible con navegadores web modernos
-7. El sistema debe organizar el código de forma clara y mantenible
-8. El sistema debe proteger la información sensible con encriptación de contraseñas
-9. El sistema debe permitir subir archivos de currículum de hasta 5MB
-10. El sistema debe funcionar tanto en desarrollo como en producción
+Página de inicio, ingreso, recuperación de contraseña y **formulario de
+registro de empresa** (queda como solicitud pendiente; el responsable recibe
+un email de confirmación y, si se aprueba, otro con sus datos de acceso).
 
-## 6. Casos de uso
+## 3. Flujo principal
 
-### Caso de uso 1: Aplicar a una oferta de trabajo
-- **Actor principal**: Estudiante o egresado
-- **Descripción**: Un estudiante encuentra una oferta interesante y decide aplicar
-- **Precondición**: El estudiante debe estar registrado y tener sesión iniciada
-- **Flujo principal**:
-  1. El estudiante navega a la página de ofertas
-  2. Filtra las ofertas según sus preferencias
-  3. Hace clic en una oferta para ver los detalles
-  4. Lee la descripción completa y decide aplicar
-  5. Opcionalmente escribe una carta de presentación
-  6. Hace clic en "Aplicar"
-  7. El sistema confirma que la aplicación fue enviada
-- **Resultado esperado**: La postulación queda registrada y la empresa recibe una notificación
+```
+Empresa solicita registro ─▶ Instituto aprueba ─▶ Admin de empresa suma reclutadores
+        ─▶ Reclutador crea la oferta ─▶ Instituto la modera (o se publica sola si la empresa es de confianza)
+        ─▶ Alumno se postula con su CV ─▶ Reclutador avanza el proceso (revisión → preselección → entrevista)
+        ─▶ Chat reclutador ↔ candidato ─▶ Contratación (o "No seleccionado")
+```
 
-### Caso de uso 2: Crear una oferta de trabajo
-- **Actor principal**: Empresa
-- **Descripción**: Una empresa quiere publicar una nueva oportunidad laboral
-- **Precondición**: La empresa debe estar registrada, aprobada por el administrador y tener sesión iniciada
-- **Flujo principal**:
-  1. La empresa va al panel principal
-  2. Hace clic en "Crear nueva oferta"
-  3. Completa el formulario con título, descripción, requisitos, etc.
-  4. Selecciona la modalidad de trabajo y ubicación
-  5. Establece la fecha límite de aplicación
-  6. Hace clic en "Publicar"
-  7. El sistema guarda la oferta como pendiente de moderación
-- **Resultado esperado**: La oferta queda guardada y espera aprobación del administrador
+En cada paso el sistema envía las notificaciones correspondientes (en la app y
+por email) y deja registro en la auditoría.
 
-### Caso de uso 3: Moderar ofertas pendientes
-- **Actor principal**: Administrador
-- **Descripción**: Un administrador revisa ofertas nuevas antes de publicarlas
-- **Precondición**: El administrador debe tener sesión iniciada
-- **Flujo principal**:
-  1. El administrador va al panel de administración
-  2. Ve la lista de ofertas pendientes
-  3. Revisa el contenido de cada oferta
-  4. Decide aprobar o rechazar cada una
-  5. Hace clic en el botón correspondiente
-  6. El sistema actualiza el estado de la oferta
-- **Resultado esperado**: Las ofertas aprobadas se vuelven visibles para los estudiantes
+## 4. Datos de presentación (demo)
 
-### Caso de uso 4: Gestionar postulaciones
-- **Actor principal**: Empresa
-- **Descripción**: Una empresa revisa los candidatos que aplicaron a sus ofertas
-- **Precondición**: La empresa debe tener ofertas publicadas y postulaciones
-- **Flujo principal**:
-  1. La empresa va al panel principal
-  2. Ve la lista de sus ofertas con número de postulantes
-  3. Hace clic en "Ver postulantes" de una oferta
-  4. Revisa la información de cada candidato
-  5. Descarga currículums si están disponibles
-  6. Cambia el estado de las postulaciones según corresponda
-  7. El sistema notifica automáticamente a los candidatos
-- **Resultado esperado**: Los candidatos reciben actualizaciones sobre su postulación
+Para la exposición existe un escenario cargado con nombres ficticios del
+universo Marvel. **Son solo datos de demostración**: el resto del sistema no
+tiene nada temático.
 
-## 7. Módulos o secciones principales del sistema
+- **Empresa:** S.H.I.E.L.D. (CUIT ficticio formalmente válido).
+- **Nick Fury** — administrador de empresa (`empresa@demo.com`).
+- **Tony Stark** — reclutador (`reclutador@demo.com`); Thor Odinson y Steve
+  Rogers son otros reclutadores del equipo.
+- **Peter Parker** — alumno (`alumno@demo.com`).
+- **Historia principal:** Tony publica *Pasante en Desarrollo Frontend
+  (React)* → el instituto la aprueba → Peter se postula → Tony lo preselecciona,
+  lo entrevista y chatean → Peter queda **contratado**.
 
-### Autenticación
-Esta sección maneja el registro, inicio de sesión y recuperación de contraseñas. Incluye validación de usuarios y control de acceso según roles.
+Las cuentas de la demo aparecen en la pantalla de ingreso del entorno de
+demostración; se cargan y verifican con los comandos de `docs/DEPLOYMENT.md`
+(sección de datos de demostración).
 
-### Gestión de ofertas de trabajo
-Permite crear, ver y moderar ofertas laborales. Incluye filtros de búsqueda y detalles completos de cada oferta.
+## 5. Reglas transversales
 
-### Gestión de postulaciones
-Maneja el proceso de aplicación a ofertas, seguimiento de estados y comunicación entre estudiantes y empresas.
+- **Catálogo único de carreras:** una sola lista institucional
+  (`backend/src/data/catalogos.json`, expuesta en `GET /api/catalogos/carreras`)
+  alimenta las ofertas, el registro de empresas y la importación CSV.
+- **Validación:** el backend valida todo lo que se guarda (emails, CUIT con
+  dígito verificador, teléfonos, URLs, fechas, números y listas cerradas),
+  aunque el frontend ya lo haya chequeado.
+- **Email:** todos los correos (recuperación, solicitudes, aprobaciones,
+  activación de cuentas importadas) pasan por un único servicio; en
+  producción se envían por la API de Brevo.
+- **Seguridad:** sesión en cookie HttpOnly, contraseñas con hash, recuperación
+  de contraseña sin revelar si una cuenta existe, y archivos privados (CV,
+  cartas) que solo descargan las personas autorizadas.
 
-### Perfiles de usuario
-Permite a estudiantes y empresas gestionar su información personal y profesional, incluyendo subida de currículums.
+## 6. Tecnologías
 
-### Panel de administración
-Ofrece herramientas para administradores para aprobar empresas, moderar contenido y ver estadísticas del sistema.
-
-### Notificaciones
-Sistema automático que informa a los usuarios sobre cambios en sus postulaciones o nuevas oportunidades.
-
-## 8. Tecnologías usadas y por qué
-- **React**: Para crear la interfaz web interactiva. Facilita actualizar la pantalla sin recargar la página completa.
-- **Node.js y Express**: Para crear el servidor backend. Manejan las solicitudes del frontend y la lógica del negocio.
-- **PostgreSQL**: Base de datos para guardar toda la información. Es confiable y maneja bien relaciones complejas entre datos.
-- **Sequelize**: Herramienta que simplifica trabajar con la base de datos desde el código.
-- **JWT**: Para autenticación segura. Crea "tokens" que verifican la identidad del usuario sin guardar contraseñas.
-- **Axios**: Para enviar solicitudes entre frontend y backend. Hace más fácil comunicar las dos partes.
-- **Vite**: Para desarrollo rápido. Permite ver cambios en el código inmediatamente sin reiniciar el servidor.
-
-## 9. Resumen
-"Este proyecto es un sistema web para conectar estudiantes con empresas para pasantías. Tiene dos partes principales: la interfaz que ven los usuarios, hecha con React, y el servidor que maneja los datos, hecho con Node.js.
-
-Los estudiantes pueden buscar ofertas de trabajo, aplicar con su currículum y seguir el estado de sus postulaciones. Las empresas pueden publicar ofertas y revisar candidatos. Los administradores aprueban empresas nuevas y moderan las ofertas antes de publicarlas.
-
-Usamos una base de datos PostgreSQL para guardar toda la información, y el sistema incluye autenticación segura con tokens. Todo está organizado en módulos claros: autenticación, ofertas, postulaciones, perfiles y administración.
-
-El flujo básico es: el estudiante ve ofertas, aplica, la empresa revisa postulantes, cambia estados, y el sistema notifica automáticamente. Es como un LinkedIn simplificado pero específico para pasantías."
-
-## 10. Conclusión
-Este sistema es una plataforma completa para gestionar el proceso de pasantías entre estudiantes del Instituto Tecnológico Beltrán y empresas locales. Está organizado en frontend y backend para separar claramente la interfaz de usuario de la lógica de datos.
-
-La estructura tiene sentido porque permite que diferentes tipos de usuarios (estudiantes, empresas, administradores) tengan experiencias personalizadas mientras comparten la misma base de datos. Las tecnologías elegidas son modernas y apropiadas para un sistema web escalable y seguro.
-
-El proyecto demuestra cómo se puede crear una aplicación web completa que resuelve un problema real en el mundo laboral de los estudiantes.
+- **Frontend:** React + Vite.
+- **Backend:** Node.js + Express, Sequelize sobre PostgreSQL.
+- **Archivos:** almacenamiento local en desarrollo, Cloudflare R2 en producción.
+- **Despliegue:** Vercel (frontend), Render (backend), Neon (base de datos),
+  Brevo (email).
