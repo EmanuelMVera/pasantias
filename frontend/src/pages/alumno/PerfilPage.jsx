@@ -33,6 +33,7 @@ import FotoPerfilUpload from '../../components/FotoPerfilUpload/FotoPerfilUpload
 import TagsInput from '../../components/TagsInput/TagsInput';
 import CvUpload from '../../components/CvUpload/CvUpload';
 import CartaRecomendacionUpload from '../../components/CartaRecomendacionUpload/CartaRecomendacionUpload';
+import { esEnteroEnRango, esTelefonoValido, esUrlValida, primerError } from '../../utils/validacion';
 import styles from './PerfilPage.module.css';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -171,6 +172,19 @@ export default function PerfilPage() {
 
   const handleGuardar = async (e) => {
     e.preventDefault();
+    // Mismas reglas que backend/src/validators/user.validator.js (que valida igual).
+    const anioMax = new Date().getFullYear() + 6;
+    const errorFormato = primerError([
+      [form.anioEgreso, (v) => esEnteroEnRango(v, 1970, anioMax), `El año de egreso debe ser un número entre 1970 y ${anioMax}.`],
+      [form.linkedin, esUrlValida, 'LinkedIn debe ser una dirección completa (ej. https://linkedin.com/in/tu-perfil).'],
+      [form.github, esUrlValida, 'GitHub debe ser una dirección completa (ej. https://github.com/tu-usuario).'],
+      [form.portfolio, esUrlValida, 'El portfolio debe ser una dirección completa (ej. https://mi-portfolio.com).'],
+      [form.telefono, esTelefonoValido, 'El teléfono no es válido (solo números, espacios, +, paréntesis y guiones).'],
+    ]);
+    if (errorFormato) {
+      showToast(errorFormato, 'error');
+      return;
+    }
     setGuardando(true);
     try {
       const payload = {
@@ -250,7 +264,7 @@ export default function PerfilPage() {
             <div className="form-group">
               <label htmlFor="pf-anioEgreso">Año de egreso</label>
               <input type="number" id="pf-anioEgreso" name="anioEgreso" value={form.anioEgreso || ''}
-                onChange={handleChange} placeholder="2026" min="1990" max="2035" />
+                onChange={handleChange} placeholder="2026" min="1970" max={new Date().getFullYear() + 6} />
             </div>
           </div>
           <div className="form-group">

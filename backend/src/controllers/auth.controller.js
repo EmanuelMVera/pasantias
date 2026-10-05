@@ -21,6 +21,7 @@ const { esPasswordValida, MENSAJE_PASSWORD_CORTA } = require('../utils/password'
 const { config } = require('../config/env');
 const { registrarAuditoria } = require('../utils/auditLog');
 const logger = require('../utils/logger');
+const { normalizarEmail, esEmailValido } = require('../validators/common.validator');
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 /**
@@ -31,8 +32,15 @@ const logger = require('../utils/logger');
  * sesión persistente; cualquier otro valor → sesión corta (fail-safe).
  */
 exports.login = async (req, res) => {
-  const { email, password } = req.body;
+  const { password } = req.body;
+  // Los emails se guardan en minúsculas (usuario.model.js): se busca igual.
+  const email = normalizarEmail(req.body.email);
   const remember = req.body?.remember === true || req.body?.remember === 'true';
+  // Solo presencia y tipo: no se impone el mínimo de 8 en el login (hay
+  // contraseñas previas a esa regla que tienen que seguir funcionando).
+  if (typeof email !== 'string' || !email || typeof password !== 'string' || !password) {
+    throw new HttpError(400, 'Ingresá tu email y tu contraseña.');
+  }
 
   const usuario = await Usuario.findOne({ where: { email } });
   // Mismo mensaje para "no existe" y "password incorrecta" (más abajo) —
@@ -102,15 +110,18 @@ exports.logout = async (req, res) => {
  * En modo desarrollo (sin EMAIL_USER) devuelve el token en la respuesta.
  */
 exports.forgotPassword = async (req, res) => {
-  const { email } = req.body;
+  // Los emails se guardan trim + minúsculas: sin normalizar, " Juan@Mail.com"
+  // no encontraba la cuenta y el pedido se perdía en silencio.
+  const email = normalizarEmail(req.body.email);
   if (!email) throw new HttpError(400, 'Ingresá tu email.');
+  if (!esEmailValido(email)) throw new HttpError(400, 'Ingresá un email válido.');
 
   const usuario = await Usuario.findOne({ where: { email } });
 
-  // Respuesta genérica (200, no un error) para no revelar si el email
-  // existe — la ambigüedad es intencional, no se convierte en un throw.
+  // Respuesta genérica e IDÉNTICA para un email registrado y uno que no (antes
+  // eran dos textos distintos: el mensaje revelaba si la cuenta existía).
   if (!usuario) {
-    return res.json({ success: true, message: 'Si el email está registrado, recibirás las instrucciones.' });
+    return res.json({ success: true, message: MENSAJE_RECUPERO });
   }
 
   const token = authService.generarTokenReset();
@@ -123,7 +134,16 @@ exports.forgotPassword = async (req, res) => {
     tokenResetUsadoEn: null,
   });
 
-  await authService.enviarEmailReset(email, token);
+  // Sin await: la respuesta no espera al SMTP, así un email registrado no
+  // tarda más que uno inexistente (tampoco se revela por tiempo). El
+  // resultado SÍ se registra: un fallo queda como ERROR con el requestId —
+  // nunca el token ni el link (enviarEmail no loguea cuerpos).
+  const log = req.log || logger;
+  authService.enviarEmailReset(email, token, { log }).then((r) => {
+    if (!r.ok && r.errorCode !== 'EMAIL_NO_CONFIGURADO') {
+      log.error({ usuarioId: usuario.id, errorCode: r.errorCode, categoria: r.categoria }, 'recupero_password_email_fallo');
+    }
+  });
 
   // Solo FUERA de producción, y sin SMTP configurado, se expone el token para
   // facilitar pruebas locales. En producción NUNCA se devuelve ni se loguea
@@ -140,8 +160,10 @@ exports.forgotPassword = async (req, res) => {
     });
   }
 
-  return res.json({ success: true, message: 'Te enviamos un email con las instrucciones.' });
+  return res.json({ success: true, message: MENSAJE_RECUPERO });
 };
+
+const MENSAJE_RECUPERO = 'Si el email está registrado, vas a recibir un correo con las instrucciones para restablecer tu contraseña.';
 
 // ── Restablecer contraseña ────────────────────────────────────────────────────
 /**

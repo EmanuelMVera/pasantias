@@ -132,11 +132,14 @@ export default function EquipoPage() {
   const pendientes    = solicitudes.filter((s) => s.estado === 'pendiente');
 
   const handleAltaEnviada = (nueva) => {
+    const sinEmail = nueva.estado === 'aprobado' && nueva.emailCredencialesEnviado === false;
     showToast(
-      nueva.estado === 'aprobado'
-        ? `${nueva.nombre} ya puede acceder al sistema: le enviamos las credenciales por email.`
-        : 'Solicitud enviada. El administrador del instituto la revisará pronto.',
-      'success',
+      nueva.estado !== 'aprobado'
+        ? 'Solicitud enviada. El administrador del instituto la revisará pronto.'
+        : sinEmail
+          ? `${nueva.nombre} ya tiene cuenta, pero no se pudo enviar el email con sus credenciales. Enviale la recuperación de acceso desde su ficha.`
+          : `${nueva.nombre} ya puede acceder al sistema: le enviamos las credenciales por email.`,
+      sinEmail ? 'error' : 'success',
     );
     cargar(); // empresa confiable: aparece el nuevo miembro; estándar: la solicitud pendiente
     if (nueva.estado !== 'aprobado') setTab('solicitudes');

@@ -34,6 +34,7 @@ import Paginacion from '../../components/Paginacion/Paginacion';
 import { BrandMark } from '../../components/Brand/Brand';
 import UsuarioFormModal from '../../components/UsuarioFormModal/UsuarioFormModal';
 import styles from './AdminUsuariosPage.module.css';
+import { esEmailValido, esTelefonoValido, primerError } from '../../utils/validacion';
 
 /* Roles disponibles en el sistema */
 const ROLES = ['alumno', 'egresado', 'empresa', 'admin'];
@@ -79,6 +80,14 @@ const formatUltimoAcceso = (u) => (
 );
 
 /* Estado inicial del formulario (crear/editar) */
+/** Formato de email/teléfono antes de enviar (el backend valida igual). */
+function errorFormUsuario(form) {
+  if (!esEmailValido(form.email)) return 'El email no tiene un formato válido.';
+  return primerError([
+    [form.telefono, esTelefonoValido, 'El teléfono no es válido (solo números, espacios, +, paréntesis y guiones).'],
+  ]);
+}
+
 const FORM_VACIO = {
   nombre: '', apellido: '', email: '',
   password: '', rol: 'alumno',
@@ -176,6 +185,8 @@ export default function AdminUsuariosPage() {
   /* ── Crear usuario ────────────────────────────────────────────────── */
   const handleCrear = async (e) => {
     e.preventDefault();
+    const errorFormato = errorFormUsuario(form);
+    if (errorFormato) { setFormError(errorFormato); return; }
     setFormLoading(true);
     setFormError('');
     try {
@@ -193,6 +204,8 @@ export default function AdminUsuariosPage() {
   /* ── Editar usuario ───────────────────────────────────────────────── */
   const handleEditar = async (e) => {
     e.preventDefault();
+    const errorFormato = errorFormUsuario(form);
+    if (errorFormato) { setFormError(errorFormato); return; }
     setFormLoading(true);
     setFormError('');
     try {

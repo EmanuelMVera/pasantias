@@ -19,6 +19,8 @@ const { Usuario, Perfil, Empresa, EmpresaUsuario, Oferta, Postulacion, Solicitud
 // resolverRutaSegura exige que el archivo exista de verdad en disco.
 const UPLOADS_ROOT = path.join(__dirname, '../../uploads');
 
+const { digitoVerificadorCuit } = require('../../src/validators/common.validator');
+
 const PASSWORD_PLANA = 'Test1234!';
 
 function sufijo() {
@@ -29,6 +31,19 @@ function cuitUnico() {
   // 11 dígitos exactos (chk_empresas_cuit_formato), generados al azar —
   // no hace falta que sea un CUIT "real", solo pasar el CHECK + ser único.
   return Array.from({ length: 11 }, () => Math.floor(Math.random() * 10)).join('');
+}
+
+/**
+ * CUIT con dígito verificador válido (prefijo 30, persona jurídica). Lo
+ * necesitan los tests que pasan por la API pública (POST /api/solicitudes-empresa
+ * valida el CUIT completo); los que insertan directo en el modelo usan cuitUnico().
+ */
+function cuitValido() {
+  for (;;) {
+    const base = `30${Array.from({ length: 8 }, () => Math.floor(Math.random() * 10)).join('')}`;
+    const dv = digitoVerificadorCuit(base);
+    if (dv !== null) return `${base}${dv}`;
+  }
 }
 
 async function crearAlumno(overrides = {}) {
@@ -174,6 +189,7 @@ async function loginYObtenerToken(email, passwordPlana = PASSWORD_PLANA) {
 
 module.exports = {
   PASSWORD_PLANA,
+  cuitValido,
   crearAlumno,
   crearAdmin,
   crearEmpresaConAdmin,

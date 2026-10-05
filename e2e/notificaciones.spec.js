@@ -1,6 +1,6 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
-const { login, fx } = require('./helpers');
+const { login, fx, cuitValido } = require('./helpers');
 
 /**
  * Notificaciones del admin del sistema:
@@ -16,7 +16,7 @@ async function crearSolicitudEmpresa(request, razonSocial) {
   const res = await request.post(`${API}/solicitudes-empresa`, {
     data: {
       razonSocial,
-      cuit: suf.slice(-11).padStart(11, '3'),
+      cuit: cuitValido(),
       rubro: 'Software',
       email: `contacto-${suf}@e2e.test`,
       responsableNombre: 'Responsable',

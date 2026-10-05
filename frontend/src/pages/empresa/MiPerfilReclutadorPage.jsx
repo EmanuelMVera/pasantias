@@ -25,6 +25,7 @@ import Card from '../../components/ui/Card';
 import Toast from '../../components/ui/Toast';
 import Icon from '../../components/ui/Icon';
 import Avatar from '../../components/Avatar/Avatar';
+import { esTelefonoValido } from '../../utils/validacion';
 import styles from './MiPerfilReclutadorPage.module.css';
 
 const TIPOS_IMAGEN = ['image/png', 'image/jpeg', 'image/webp'];
@@ -70,6 +71,10 @@ export default function MiPerfilReclutadorPage() {
     e.preventDefault();
     if (!form.nombre.trim() || !form.apellido.trim()) {
       setErrorForm('El nombre y el apellido no pueden quedar vacíos.');
+      return;
+    }
+    if (form.telefono.trim() && !esTelefonoValido(form.telefono)) {
+      setErrorForm('El teléfono no es válido (solo números, espacios, +, paréntesis y guiones).');
       return;
     }
     setGuardando(true);

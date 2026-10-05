@@ -277,7 +277,7 @@ exports.enviarRecuperacionMiembro = async (req, res) => {
   const empresa = await _resolverEmpresa(req);
   if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
 
-  const { email, usuarioId } = await equipoService.solicitarRecuperacionAcceso(empresa, req.params.id);
+  const { email, usuarioId } = await equipoService.solicitarRecuperacionAcceso(empresa, req.params.id, { log: req.log });
 
   // Auditoría: nunca se registra password ni token, solo a quién se le envió.
   registrarAuditoria({
@@ -312,17 +312,25 @@ exports.solicitarReclutador = async (req, res) => {
   if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
 
   const solicitud = await equipoService.solicitarReclutador(empresa, req.body, {
-    actorUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id,
+    actorUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id, log: req.log,
   });
 
   // RBAC-05: si la empresa es de confianza, solicitarReclutador ya creó la
   // cuenta en el mismo request — el mensaje refleja el resultado real
-  // (solicitud.estado), no asume el flujo de aprobación manual.
-  const mensaje = solicitud.estado === 'aprobado'
-    ? 'Reclutador agregado automáticamente (empresa de confianza). Le enviamos las credenciales por email.'
-    : 'Solicitud enviada correctamente. El administrador la revisará pronto.';
+  // (solicitud.estado y si el email con credenciales salió), no asume nada.
+  let mensaje = 'Solicitud enviada correctamente. El administrador la revisará pronto.';
+  if (solicitud.estado === 'aprobado') {
+    mensaje = solicitud.emailCredencialesEnviado
+      ? 'Reclutador agregado automáticamente (empresa de confianza). Le enviamos las credenciales por email.'
+      : 'Reclutador agregado automáticamente (empresa de confianza), pero no se pudo enviar el email con sus credenciales. Enviale la recuperación de acceso desde Equipo.';
+  }
 
-  return res.status(201).json({ success: true, message: mensaje, data: solicitud });
+  // emailCredencialesEnviado no es columna: se agrega explícito a la respuesta.
+  return res.status(201).json({
+    success: true,
+    message: mensaje,
+    data: { ...solicitud.toJSON(), emailCredencialesEnviado: solicitud.emailCredencialesEnviado },
+  });
 };
 
 exports.getMisSolicitudesReclutador = async (req, res) => {

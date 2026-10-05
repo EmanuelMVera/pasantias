@@ -60,7 +60,7 @@ const router = require('express').Router();
 const { verifyToken } = require('../middleware/auth.middleware');
 const { verifyEmpresaMember, authorizeEmpresaRoles } = require('../middleware/empresa.middleware');
 const validate = require('../middleware/validate.middleware');
-const { validateUpdateEmpresa, validateMiPerfilReclutador } = require('../validators/empresa.validator');
+const { validateUpdateEmpresa, validateMiPerfilReclutador, validateSolicitarReclutador } = require('../validators/empresa.validator');
 const asyncHandler = require('../utils/asyncHandler');
 const { uploadLimiter } = require('../middleware/rateLimit');
 const { multerImagen } = require('../services/archivoImagen.service');
@@ -132,7 +132,7 @@ router.get('/equipo/solicitudes', ...soloAdmin, asyncHandler(ctrl.getMisSolicitu
 
 // POST /api/empresas/equipo/solicitar — Envía solicitud de alta al admin (solo admin_empresa)
 // El admin es quien crea el usuario al aprobar. La empresa NO crea usuarios directamente.
-router.post('/equipo/solicitar', ...soloAdmin, asyncHandler(ctrl.solicitarReclutador));
+router.post('/equipo/solicitar', ...soloAdmin, validate(validateSolicitarReclutador), asyncHandler(ctrl.solicitarReclutador));
 
 // POST /api/empresas/equipo/:id/recuperacion — Envía email de recuperación de acceso
 // a un miembro (solo admin_empresa). El admin nunca elige ni ve la contraseña — el

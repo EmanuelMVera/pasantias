@@ -2859,7 +2859,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Responde siempre 200 con un mensaje genérico (no revela si el email existe). CSRF exento.",
+        "description": "Responde siempre 200 con el MISMO mensaje genérico, exista o no la cuenta (no revela si el email existe; el email se normaliza a minúsculas). El envío no se espera (tampoco revela por tiempo); un fallo de SMTP queda en el log del servidor. 400 si el email falta o no tiene formato válido. CSRF exento.",
         "security": [],
         "requestBody": {
           "required": true,
@@ -4607,7 +4607,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Manda un email al miembro para que fije su contraseña. El admin_empresa nunca ve ni elige la contraseña.\n\n**Roles:** empresa/admin_empresa",
+        "description": "Manda un email al miembro para que fije su contraseña. El admin_empresa nunca ve ni elige la contraseña. 503 `EMAIL_NO_ENVIADO` si el servidor de correo rechazó o no respondió.\n\n**Roles:** empresa/admin_empresa",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -5740,7 +5740,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Endpoint **público** (sin auth, CSRF exento). La revisa un admin del instituto.",
+        "description": "Endpoint **público** (sin auth, CSRF exento). La revisa un admin del instituto. Valida formatos (CUIT con dígito verificador, emails, teléfonos, sitio web) y envía un email de recepción al responsable (con copia al contacto institucional), sin credenciales.",
         "security": [],
         "requestBody": {
           "required": true,
@@ -8016,7 +8016,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Crea `Usuario` (rol empresa) + `Empresa` (aprobada) + `EmpresaUsuario` (admin_empresa).\n\n**Roles:** admin",
+        "description": "Crea `Usuario` (rol empresa) + `Empresa` (aprobada) + `EmpresaUsuario` (admin_empresa) y envía las credenciales por email. `data.emailCredencialesEnviado` informa si el email salió: si es `false` la empresa queda aprobada igual y el responsable entra con \"Olvidé mi contraseña\" (el mensaje lo explica).\n\n**Roles:** admin",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -8244,7 +8244,7 @@
             "$ref": "#/components/responses/Error500"
           }
         },
-        "description": "Crea `Usuario` (rol empresa) + `EmpresaUsuario` (reclutador).\n\n**Roles:** admin",
+        "description": "Crea `Usuario` (rol empresa) + `EmpresaUsuario` (reclutador) y le envía las credenciales por email. `data.emailCredencialesEnviado` informa si el email salió.\n\n**Roles:** admin",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"

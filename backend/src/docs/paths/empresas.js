@@ -233,7 +233,7 @@ module.exports = {
   '/api/empresas/equipo/{id}/recuperacion': {
     post: operation({
       tag: T, id: 'empresasEquipoRecuperacion', summary: 'Enviar recuperación de acceso a un miembro',
-      description: 'Manda un email al miembro para que fije su contraseña. El admin_empresa nunca ve ni elige la contraseña.',
+      description: 'Manda un email al miembro para que fije su contraseña. El admin_empresa nunca ve ni elige la contraseña. 503 `EMAIL_NO_ENVIADO` si el servidor de correo rechazó o no respondió.',
       roles: R_ADMIN, csrf: true, params: ['id'],
       responses: { 200: message() },
       errors: ['401', '403', '403csrf', '404', '404empresa'],

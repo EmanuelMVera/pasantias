@@ -50,7 +50,7 @@ exports.enviarMensaje = async (req, res) => {
   const { ok, motivo } = await chatPermissionService.puedeEnviarMensaje(emisorId, Number(receptorId));
   if (!ok) return res.status(403).json({ success: false, message: motivo });
 
-  if (!mensaje || mensaje.trim().length === 0) {
+  if (typeof mensaje !== 'string' || mensaje.trim().length === 0) {
     return res.status(400).json({ success: false, message: 'El mensaje no puede estar vacío.' });
   }
   if (mensaje.length > 2000) {

@@ -18,6 +18,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { solicitudEmpresaService } from '../../services/solicitudEmpresa.service';
 import Brand from '../../components/Brand/Brand';
+import { esCuitValido, esEmailValido, esTelefonoValido, esUrlValida, primerError } from '../../utils/validacion';
 import styles from './SolicitudEmpresaPage.module.css';
 
 // ── Lista de carreras disponibles ─────────────────────────────────────────────
@@ -110,12 +111,30 @@ export default function SolicitudEmpresaPage() {
       return;
     }
 
+    // Formatos (mismas reglas que el backend, que valida igual)
+    const errorFormato = primerError([
+      [form.cuit, esCuitValido, 'El CUIT no es válido: deben ser 11 dígitos (ej. 30-12345678-9) con dígito verificador correcto.'],
+      [form.email, esEmailValido, 'El email de contacto institucional no tiene un formato válido.'],
+      [form.responsableEmail, esEmailValido, 'El email del responsable no tiene un formato válido.'],
+      [form.sitioWeb, esUrlValida, 'El sitio web debe ser una dirección completa (ej. https://www.empresa.com).'],
+      [form.telefono, esTelefonoValido, 'El teléfono institucional no es válido (solo números, espacios, +, paréntesis y guiones).'],
+      [form.responsableTelefono, esTelefonoValido, 'El teléfono del responsable no es válido (solo números, espacios, +, paréntesis y guiones).'],
+    ]);
+    if (errorFormato) {
+      setError(errorFormato);
+      return;
+    }
+
     // Validar reclutadores: si alguno tiene dato, los 3 campos son requeridos
     for (let i = 0; i < reclutadores.length; i++) {
       const r = reclutadores[i];
       const tieneAlgo = r.nombre.trim() || r.apellido.trim() || r.email.trim();
       if (tieneAlgo && (!r.nombre.trim() || !r.apellido.trim() || !r.email.trim())) {
         setError(`El reclutador #${i + 1} requiere nombre, apellido y email completos.`);
+        return;
+      }
+      if (tieneAlgo && !esEmailValido(r.email)) {
+        setError(`El email del reclutador #${i + 1} no tiene un formato válido.`);
         return;
       }
     }
@@ -149,8 +168,8 @@ export default function SolicitudEmpresaPage() {
           <h2 className={styles.successTitle}>¡Solicitud enviada!</h2>
           <p className={styles.successMsg}>
             Tu solicitud fue enviada correctamente.<br />
-            <strong>Será evaluada por el instituto</strong> y nos contactaremos al
-            email del responsable con la resolución.
+            <strong>Será evaluada por el instituto</strong>. Vas a recibir un email de
+            confirmación y vamos a escribirte al email del responsable con la resolución.
           </p>
           <Link to="/" className={styles.successBtn}>
             Volver al inicio

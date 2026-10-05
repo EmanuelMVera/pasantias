@@ -40,13 +40,24 @@ const compararPassword = (plain, hash) => bcrypt.compare(plain, hash);
 
 const generarTokenReset = () => crypto.randomBytes(32).toString('hex');
 
-const enviarEmailReset = async (email, token) => {
+/**
+ * Envía el link de recuperación. Devuelve el resultado de enviarEmail
+ * ({ ok, messageId } | { ok: false, errorCode, categoria }) — nunca lanza.
+ * El link lleva el token en claro: no se loguea (enviarEmail no loguea cuerpos).
+ *
+ * @param {string} email
+ * @param {string} token
+ * @param {{ log?: object, tipo?: string }} [opts] log = req.log (requestId)
+ */
+const enviarEmailReset = (email, token, { log, tipo = 'recupero_password' } = {}) => {
   // config.urls.client ya viene normalizada (sin barra final) y con default de
   // desarrollo — así el link nunca queda `undefined/reset-password/...`.
   const resetUrl = `${config.urls.client}/reset-password/${token}`;
-  await enviarEmail({
+  return enviarEmail({
     to: email,
-    subject: 'Recupero de contraseña',
+    tipo,
+    log,
+    subject: 'Recupero de contraseña – SisPasantías',
     html: `
       <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto">
         <h2 style="color:#6366f1">Recupero de contraseña</h2>

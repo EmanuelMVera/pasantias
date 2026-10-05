@@ -258,19 +258,26 @@ exports.getSolicitudesEmpresa = async (req, res) => {
   return res.json({ success: true, data: rows, pagination, conteoPorEstado, total: pagination.total });
 };
 
+// El mensaje refleja si el email con credenciales salió de verdad. Si falló,
+// la empresa queda aprobada igual y el responsable entra con "Olvidé mi
+// contraseña" cuando el correo funcione (no se reenvía la contraseña).
 exports.aprobarSolicitudEmpresa = async (req, res) => {
   const resultado = await solicitudEmpresaService.aprobarSolicitud(
     req.params.id,
-    { adminUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id }
+    { adminUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id, log: req.log }
   );
+  const base = `Empresa "${resultado.razonSocial}" aprobada: se creó la cuenta del responsable.`;
   return res.json({
     success: true,
-    message: `Solicitud aprobada. Empresa "${resultado.razonSocial}" y usuario creados. Credenciales enviadas a ${resultado.email}.`,
+    message: resultado.emailCredencialesEnviado
+      ? `${base} Credenciales enviadas a ${resultado.email}.`
+      : `${base} No se pudo enviar el email con las credenciales a ${resultado.email}: el responsable puede ingresar con "Olvidé mi contraseña" cuando el correo esté operativo.`,
     data: {
       empresaId:              resultado.empresaId,
       usuarioId:              resultado.usuarioId,
       email:                  resultado.email,
       reclutadoresPendientes: resultado.reclutadoresPendientes,
+      emailCredencialesEnviado: resultado.emailCredencialesEnviado,
       ...(process.env.NODE_ENV !== 'production' && { passwordGenerada: resultado.passwordGenerada }),
     },
   });
@@ -279,10 +286,10 @@ exports.aprobarSolicitudEmpresa = async (req, res) => {
 exports.rechazarSolicitudEmpresa = async (req, res) => {
   await solicitudEmpresaService.rechazarSolicitud(
     req.params.id,
-    { adminUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id },
+    { adminUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id, log: req.log },
     req.body.motivo
   );
-  return res.json({ success: true, message: 'Solicitud rechazada. Notificación enviada por email.' });
+  return res.json({ success: true, message: 'Solicitud rechazada. Se le notifica a la empresa por email.' });
 };
 
 // ── Solicitudes de reclutadores (v1.7) ────────────────────────────────────────
@@ -310,14 +317,17 @@ exports.getSolicitudesReclutador = async (req, res) => {
 exports.aprobarSolicitudReclutador = async (req, res) => {
   const resultado = await solicitudReclutadorService.aprobarSolicitud(
     req.params.id,
-    { adminUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id }
+    { adminUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id, log: req.log }
   );
   return res.json({
     success: true,
-    message: `Reclutador aprobado. Cuenta creada para ${resultado.email}.`,
+    message: resultado.emailCredencialesEnviado
+      ? `Reclutador aprobado. Cuenta creada y credenciales enviadas a ${resultado.email}.`
+      : `Reclutador aprobado. Cuenta creada para ${resultado.email}, pero no se pudo enviar el email con las credenciales: puede ingresar con "Olvidé mi contraseña" o su administrador de empresa puede enviarle la recuperación desde Equipo.`,
     data: {
       usuarioId: resultado.usuarioId,
       email:     resultado.email,
+      emailCredencialesEnviado: resultado.emailCredencialesEnviado,
       ...(process.env.NODE_ENV !== 'production' && { passwordGenerada: resultado.passwordGenerada }),
     },
   });
@@ -326,7 +336,7 @@ exports.aprobarSolicitudReclutador = async (req, res) => {
 exports.rechazarSolicitudReclutador = async (req, res) => {
   await solicitudReclutadorService.rechazarSolicitud(
     req.params.id,
-    { adminUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id },
+    { adminUsuarioId: req.usuario.id, ip: req.ip, requestId: req.id, log: req.log },
     req.body.motivo
   );
   return res.json({ success: true, message: 'Solicitud rechazada. Notificación enviada a la empresa.' });

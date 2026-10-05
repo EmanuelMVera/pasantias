@@ -28,6 +28,7 @@ import Card from '../../components/ui/Card';
 import Icon from '../../components/ui/Icon';
 import Toast from '../../components/ui/Toast';
 import styles from './MiEmpresaPage.module.css';
+import { esTelefonoValido } from '../../utils/validacion';
 
 const ESTADO = {
   aprobada:  { label: 'Aprobada', tone: 'green' },
@@ -114,6 +115,10 @@ export default function MiEmpresaPage() {
     const urlNorm = normalizeUrl(form.sitioWeb);
     if (form.sitioWeb.trim() && urlNorm === null) {
       setError('El sitio web no parece una URL válida. Ej: www.empresa.com o https://empresa.com');
+      return;
+    }
+    if (form.telefono.trim() && !esTelefonoValido(form.telefono)) {
+      setError('El teléfono no es válido (solo números, espacios, +, paréntesis y guiones).');
       return;
     }
 

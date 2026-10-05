@@ -24,6 +24,8 @@
     "db:backfill:archivos": "node src/utils/backfillArchivos.js",
     "logs:archivar": "node src/utils/archivarActivityLogs.js",
     "e2e:seed": "node scripts/seed-e2e.js",
+    "email:verify": "node scripts/email-verify.js",
+    "email:test": "node scripts/email-test.js",
     "docs:openapi": "node scripts/generate-openapi.js",
     "docs:check": "node scripts/generate-openapi.js && git diff --exit-code openapi.json",
     "test": "jest --runInBand"

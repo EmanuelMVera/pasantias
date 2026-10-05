@@ -12,7 +12,7 @@ const path = require('path');
 const zlib = require('zlib');
 const request = require('supertest');
 const app = require('../src/app');
-const { ActivityLog, sequelize } = require('../src/models');
+const { ActivityLog, Oferta, sequelize } = require('../src/models');
 const { registrarAuditoria, redactar } = require('../src/utils/auditLog');
 const { archivar, ARCHIVE_DIR } = require('../src/utils/archivarActivityLogs');
 const { crearAlumno, loginYObtenerToken } = require('./helpers/factories');
@@ -74,9 +74,13 @@ describe('OPS-01 — Observabilidad', () => {
   });
 
   test('un 500 responde con requestId y sin stack/mensaje interno', async () => {
-    // id no numérico → Postgres "invalid input syntax for integer" → error no manejado
-    const res = await request(app).get('/api/ofertas/no-es-un-numero');
+    // Error no manejado simulado (antes se provocaba con /api/ofertas/no-es-un-numero,
+    // pero ese caso ahora se valida y responde 404).
+    const spy = jest.spyOn(Oferta, 'findAndCountAll').mockRejectedValueOnce(new Error('detalle interno SQL'));
+    const res = await request(app).get('/api/ofertas');
+    spy.mockRestore();
     expect(res.status).toBe(500);
+    expect(JSON.stringify(res.body)).not.toContain('detalle interno SQL');
     expect(res.body).toEqual({
       success: false,
       message: 'Error interno del servidor.',

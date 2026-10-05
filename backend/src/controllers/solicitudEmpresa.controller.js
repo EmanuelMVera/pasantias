@@ -2,6 +2,7 @@
 
 const { SolicitudEmpresa } = require('../models');
 const { notificarAdminsSistema } = require('../utils/notificador');
+const solicitudEmpresaService = require('../services/solicitudEmpresa.service');
 
 /**
  * POST /api/solicitudes-empresa
@@ -64,6 +65,11 @@ async function crearSolicitud(req, res) {
       accionURL: '/admin/solicitudes',
       logKey: 'notif_admin_solicitud_empresa_fallo',
     });
+
+    // Confirmación de recepción al responsable (sin credenciales: la cuenta se
+    // crea recién al aprobar). Fire-and-forget: el mailer registra el
+    // resultado; un fallo de SMTP no invalida la solicitud ya guardada.
+    solicitudEmpresaService.enviarConfirmacionSolicitud(solicitud, { log: req.log });
 
     return res.status(201).json({
       success: true,

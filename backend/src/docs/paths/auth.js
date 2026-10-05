@@ -50,7 +50,7 @@ module.exports = {
   '/api/auth/forgot-password': {
     post: operation({
       tag: T, id: 'authForgotPassword', summary: 'Solicitar recuperación de contraseña',
-      description: 'Responde siempre 200 con un mensaje genérico (no revela si el email existe). CSRF exento.',
+      description: 'Responde siempre 200 con el MISMO mensaje genérico, exista o no la cuenta (no revela si el email existe; el email se normaliza a minúsculas). El envío no se espera (tampoco revela por tiempo); un fallo de SMTP queda en el log del servidor. 400 si el email falta o no tiene formato válido. CSRF exento.',
       security: [],
       body: { type: 'object', required: ['email'], properties: { email: { type: 'string', format: 'email' } } },
       responses: { 200: named('ForgotPasswordResponse') },

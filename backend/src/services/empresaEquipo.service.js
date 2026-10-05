@@ -35,7 +35,7 @@ async function listarEquipo(empresa) {
  * ni conoce la contraseña — solo el reclutador la establece, siguiendo el
  * link del email hasta /reset-password/:token (EST-10).
  */
-async function solicitarRecuperacionAcceso(empresa, miembroId) {
+async function solicitarRecuperacionAcceso(empresa, miembroId, ctx = {}) {
   const miembro = await EmpresaUsuario.findOne({
     where: { id: miembroId, empresaId: empresa.id },
     include: [{ model: Usuario, as: 'usuario' }],
@@ -55,7 +55,17 @@ async function solicitarRecuperacionAcceso(empresa, miembroId) {
     tokenResetUsadoEn: null,
   });
 
-  await authService.enviarEmailReset(miembro.usuario.email, token);
+  // Acá quien pide el envío es el admin_empresa (no hay riesgo de
+  // enumeración): si el SMTP falla se le informa, para que no crea que el
+  // reclutador ya tiene el link. Sin SMTP configurado (desarrollo) sigue OK.
+  const envio = await authService.enviarEmailReset(miembro.usuario.email, token, {
+    log: ctx.log, tipo: 'recupero_desde_equipo',
+  });
+  if (!envio.ok && envio.errorCode !== 'EMAIL_NO_CONFIGURADO') {
+    const err = new HttpError(503, 'No se pudo enviar el email de recuperación. Probá de nuevo en unos minutos.');
+    err.code = 'EMAIL_NO_ENVIADO';
+    throw err;
+  }
 
   return { email: miembro.usuario.email, usuarioId: miembro.usuario.id };
 }
@@ -180,8 +190,12 @@ async function solicitarReclutador(empresa, { nombre, apellido, email }, ctx = {
       detalle:   { email: solicitud.email, empresaId: empresa.id, razonSocial: empresa.razonSocial },
     });
 
-    solicitudReclutadorService.enviarEmailCredencialesReclutador(solicitud, passwordPlano)
-      .catch((e) => logger.error({ err: e }, 'email_reclutador_auto_aprobado_fallo'));
+    // Se espera el resultado para que el mensaje al admin_empresa sea honesto
+    // (el controller lo lee de `emailCredencialesEnviado`, no persistido).
+    const envio = await solicitudReclutadorService.enviarEmailCredencialesReclutador(solicitud, passwordPlano, {
+      log: ctx.log, tipo: 'credenciales_reclutador_auto',
+    });
+    solicitud.emailCredencialesEnviado = envio.ok;
 
     notificarAdminsReclutadorAutoAprobado(solicitud, empresa); // fire-and-forget
   } else {

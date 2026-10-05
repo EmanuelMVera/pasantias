@@ -485,7 +485,7 @@ Leyenda: **S** = secreta · **R** = requerida en producción · **O** = opcional
 | `EMAIL_USER` | Render | O | `noreply@tudominio.edu` | Usuario SMTP. Sin esto, la API arranca igual (no manda emails). | S |
 | `EMAIL_PASS` | Render | O | *(App Password de Gmail)* | Con Gmail: **contraseña de aplicación**, no la del correo. | S |
 | `EMAIL_FROM` | Render | O | `"SisPasantías" <noreply@tudominio.edu>` | Remitente. Default: `"SisPasantías" <EMAIL_USER>`. | |
-| `EMAIL_REQUIRED` | Render | O | `false` | `true` = la API aborta si falta el SMTP. | |
+| `EMAIL_REQUIRED` | Render | O | `false` | `true` = la API aborta si falta el SMTP **o si el servidor SMTP rechaza las credenciales** al arrancar (ver §4.1). | |
 | `SEED_ADMIN_EMAIL` | Render | R (solo primer deploy) | `admin@tudominio.edu` | Email del admin primario. | |
 | `SEED_ADMIN_PASSWORD` | Render | R (solo primer deploy) | *(fuerte, ≥8 chars)* | Contraseña del admin primario. Cambiarla tras el primer login. | S |
 | `SEED_SECOND_ADMIN_EMAIL` | Render | O | `compañero@tudominio.edu` | Email del segundo admin (opcional). Vacío = no se crea ninguno. | |
@@ -499,6 +499,57 @@ Leyenda: **S** = secreta · **R** = requerida en producción · **O** = opcional
 | `CSV_IMPORT_MAX_BYTES` | Render | O | `2097152` | Tamaño máx. del CSV de importación de alumnos/egresados (bytes). Default 2 MB. | |
 | `CSV_IMPORT_MAX_ROWS` | Render | O | `2000` | Filas máx. por archivo CSV de importación. | |
 | `VITE_API_URL` | Vercel | R | `/api` | Con el proxy same-origin. Dev: `http://localhost:5000/api`. | |
+
+### 4.1 Correo (SMTP): diagnóstico y política
+
+**Al arrancar**, si hay `EMAIL_USER`/`EMAIL_PASS`, el backend ejecuta `transporter.verify()`
+(conexión + STARTTLS/TLS + autenticación, **sin enviar ningún email**) y deja en el log:
+
+| Log | Qué significa | ¿Arranca? |
+|---|---|---|
+| `email_smtp_verificado` | Gmail aceptó la conexión y las credenciales. | Sí |
+| `email_smtp_verificacion_fallo` con `categoria: "auth"` (EAUTH / 535) | Credenciales rechazadas: App Password mal cargada, revocada, o se usó la contraseña normal. | **No**, si `EMAIL_REQUIRED=true` (Render conserva el deploy anterior). Sí, si es `false`. |
+| `email_smtp_verificacion_fallo` con `categoria: "red"` (ETIMEDOUT / ECONNECTION…) | No hay conexión con el servidor SMTP: red, caída del proveedor, o **el hosting bloquea el SMTP saliente**. | Sí (error crítico en el log): puede ser transitorio y tumbar la API entera haría más daño. Sin reintentos en bucle. |
+
+El log incluye host, puerto, `secure`, usuario redactado (`ce***@gmail.com`) y la respuesta
+del servidor (p. ej. `535-5.7.8 Username and Password not accepted`). **Nunca** la contraseña.
+
+> ⚠️ **Render Free bloquea el SMTP saliente.** Desde el 26/09/2025 los web services
+> **gratuitos** de Render no pueden abrir conexiones a los puertos 25, 465 ni 587
+> ([changelog de Render](https://render.com/changelog/free-web-services-will-no-longer-allow-outbound-traffic-to-smtp-ports)).
+> Con `smtp.gmail.com:587` eso se ve como `email_smtp_verificacion_fallo` con
+> `categoria: "red"` (timeout) aunque las credenciales sean correctas. Opciones: pasar el
+> servicio a una instancia paga (habilita 465/587), o usar un proveedor de email por API
+> HTTPS (Resend, Brevo, SendGrid, Postmark…) — el envío está centralizado en
+> `backend/src/utils/mailer.js`, así que cambiar de transporte toca un solo archivo.
+
+**Comandos de diagnóstico** (desde `backend/`, con el entorno cargado — local con `.env`, o el
+Shell del servicio en Render, que está disponible en instancias pagas):
+
+```bash
+npm run email:verify                          # config sin secretos + transporter.verify(); NO envía nada.
+                                              # exit 0 = autenticó · != 0 = falló (con código y pista)
+npm run email:test -- destinatario@dominio.com  # envía UN email de prueba real (uso manual; el
+                                              # destinatario va por argumento, nunca al repo)
+```
+
+No hay endpoint HTTP de prueba de email (a propósito).
+
+**Contrato en el código** (`enviarEmail` nunca lanza; devuelve `{ ok, messageId }` o
+`{ ok: false, errorCode, categoria }` y siempre loguea `email_enviado` / `email_envio_fallo`):
+
+- **Recuperación de contraseña**: respuesta pública idéntica exista o no la cuenta (y sin
+  esperar al SMTP); si el envío falla queda `recupero_password_email_fallo` (ERROR, con
+  requestId). Nunca se loguea el token ni el link.
+- **Solicitud de empresa**: email "Recibimos tu solicitud" al responsable (con copia al
+  contacto institucional), sin credenciales.
+- **Aprobación de empresa / reclutador**: la cuenta se crea igual aunque falle el email
+  (no se revierte por una caída de Gmail); la respuesta trae `emailCredencialesEnviado` y el
+  admin ve un aviso. El usuario entra con "Olvidé mi contraseña" cuando el correo funcione
+  (el admin_empresa también puede mandar la recuperación a un reclutador desde Equipo).
+- Las advertencias de config (`EMAIL_FROM` distinto de `EMAIL_USER`, `EMAIL_PASS` que no
+  tiene formato de App Password, puerto/secure incoherentes) salen como `warn` al arrancar
+  y en `email:verify`.
 
 ---
 

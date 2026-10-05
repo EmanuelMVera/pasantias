@@ -199,7 +199,7 @@ module.exports = {
   },
   '/api/admin/solicitudes-empresa/{id}/aprobar': {
     patch: adminOp({ id: 'adminSolicitudEmpresaAprobar', summary: 'Aprobar una solicitud de empresa',
-      description: 'Crea `Usuario` (rol empresa) + `Empresa` (aprobada) + `EmpresaUsuario` (admin_empresa).',
+      description: 'Crea `Usuario` (rol empresa) + `Empresa` (aprobada) + `EmpresaUsuario` (admin_empresa) y envía las credenciales por email. `data.emailCredencialesEnviado` informa si el email salió: si es `false` la empresa queda aprobada igual y el responsable entra con "Olvidé mi contraseña" (el mensaje lo explica).',
       csrf: true, params: ['id'], errors: ['400', '404'],
       responses: {
         200: message({
@@ -235,7 +235,7 @@ module.exports = {
   },
   '/api/admin/solicitudes-reclutador/{id}/aprobar': {
     patch: adminOp({ id: 'adminSolicitudReclutadorAprobar', summary: 'Aprobar una solicitud de reclutador',
-      description: 'Crea `Usuario` (rol empresa) + `EmpresaUsuario` (reclutador).',
+      description: 'Crea `Usuario` (rol empresa) + `EmpresaUsuario` (reclutador) y le envía las credenciales por email. `data.emailCredencialesEnviado` informa si el email salió.',
       csrf: true, params: ['id'], errors: ['400', '404'],
       responses: {
         200: message({

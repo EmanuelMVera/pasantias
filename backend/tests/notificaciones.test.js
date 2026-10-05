@@ -2,7 +2,7 @@
 const request = require('supertest');
 const app = require('../src/app');
 const { Op } = require('sequelize');
-const { crearAlumno, crearAdmin, loginYObtenerToken } = require('./helpers/factories');
+const { crearAlumno, crearAdmin, loginYObtenerToken, cuitValido } = require('./helpers/factories');
 const { limpiarUsuarios, limpiarSolicitudesEmpresa, cerrarConexion } = require('./helpers/cleanup');
 const { Notificacion } = require('../src/models');
 
@@ -137,7 +137,7 @@ describe('NOTIFICACIONES', () => {
     const razonSocial = `NubeCode Test ${suf} SRL`;
     const res = await request(app).post('/api/solicitudes-empresa').send({
       razonSocial,
-      cuit: String(suf).slice(-11).padStart(11, '3'),
+      cuit: cuitValido(),
       rubro: 'Software',
       email: `contacto-${suf}@test.local`,
       responsableNombre: 'Rocío',

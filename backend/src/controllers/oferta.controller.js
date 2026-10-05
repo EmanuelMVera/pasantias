@@ -6,6 +6,7 @@ const ofertaService   = require('../services/oferta.service');
 const empresaService  = require('../services/empresa.service');
 const { parsePagination, buildPagination } = require('../utils/pagination');
 const { registrarAuditoria } = require('../utils/auditLog');
+const { validarOferta } = require('../validators/oferta.validator');
 
 const { TRANSICIONES_ESTADO } = ofertaService;
 
@@ -120,8 +121,11 @@ exports.createOferta = async (req, res) => {
     return res.status(403).json({ success: false, message: 'Tu empresa aún no fue aprobada.' });
   }
 
-  const body = ofertaService.sanitizarCamposOpcionales(req.body);
-  const { error, campos } = ofertaService.validarCamposPuesto(body);
+  // Whitelist validada (oferta.validator.js): solo el contenido editable de la
+  // oferta llega a la BD — nunca estado, vistas, moderación ni responsable.
+  const { error: errorCampos, datos } = validarOferta(req.body);
+  if (errorCampos) return res.status(400).json({ success: false, message: errorCampos });
+  const { error, campos } = ofertaService.validarCamposPuesto(datos);
   if (error) return res.status(400).json({ success: false, message: error });
 
   // RBAC-05: empresas de confianza publican sin moderación previa — la
@@ -132,7 +136,7 @@ exports.createOferta = async (req, res) => {
   const estadoModeracion = esConfiable ? 'auto_aprobada' : 'pendiente';
 
   const oferta = await Oferta.create({
-    ...body, ...campos, empresaId: empresa.id, estadoModeracion, creadaPorUsuarioId: req.usuario.id,
+    ...datos, ...campos, empresaId: empresa.id, estadoModeracion, creadaPorUsuarioId: req.usuario.id,
   });
 
   if (esConfiable) {
@@ -179,18 +183,17 @@ exports.updateOferta = async (req, res) => {
     });
   }
 
-  const body = ofertaService.sanitizarCamposOpcionales(req.body);
-  delete body.estado; // el estado se cambia exclusivamente vía PATCH /:id/estado
-  // Ni la moderación ni el responsable se cambian desde el formulario.
-  delete body.estadoModeracion;
-  delete body.creadaPorUsuarioId;
-  delete body.empresaId;
-  const { error, campos } = ofertaService.validarCamposPuesto(body);
+  // Whitelist validada: el estado se cambia solo vía PATCH /:id/estado, y ni la
+  // moderación ni el responsable ni la empresa se tocan desde el formulario
+  // (validarOferta no los incluye en `datos`).
+  const { error: errorCampos, datos } = validarOferta(req.body, { parcial: true, actual: oferta });
+  if (errorCampos) return res.status(400).json({ success: false, message: errorCampos });
+  const { error, campos } = ofertaService.validarCamposPuesto(datos);
   if (error) return res.status(400).json({ success: false, message: error });
 
   const reenviarARevision = oferta.estadoModeracion === 'rechazada';
   await oferta.update({
-    ...body,
+    ...datos,
     ...campos,
     ...(reenviarARevision ? { estadoModeracion: 'pendiente' } : {}),
   });

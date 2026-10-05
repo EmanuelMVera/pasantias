@@ -7,7 +7,7 @@ const {
   sequelize,
 } = require('../models');
 const HttpError = require('../utils/httpError');
-const { enviarEmail } = require('../utils/mailer');
+const { enviarEmail, escapeHtml } = require('../utils/mailer');
 const { config } = require('../config/env');
 const { crearNotificacion } = require('../utils/notificador');
 const { registrarAuditoria } = require('../utils/auditLog');
@@ -72,20 +72,22 @@ async function crearCuentaReclutadorDesdeSolicitud(solicitud) {
  * mismo template tanto si lo disparó la aprobación manual del admin como
  * el alta automática por política de confianza.
  */
-function enviarEmailCredencialesReclutador(solicitud, passwordPlano) {
+function enviarEmailCredencialesReclutador(solicitud, passwordPlano, { log, tipo = 'credenciales_reclutador' } = {}) {
   const loginUrl = `${config.urls.client}/login`;
   return enviarEmail({
     to: solicitud.email,
-    subject: '✅ Tu cuenta de reclutador fue creada – SisPasantías',
+    tipo,
+    log,
+    subject: 'Tu cuenta de reclutador fue creada – SisPasantías',
     html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
-      <h2 style="color:#0073AD">¡Tu cuenta fue creada! 🎉</h2>
-      <p>Hola, <strong>${solicitud.nombre}</strong>.</p>
-      <p>El equipo de <strong>SisPasantías</strong> activó tu cuenta de reclutador en <strong>${solicitud.empresa?.razonSocial}</strong>.</p>
+      <h2 style="color:#0073AD">¡Tu cuenta fue creada!</h2>
+      <p>Hola, <strong>${escapeHtml(solicitud.nombre)}</strong>.</p>
+      <p>El equipo de <strong>SisPasantías</strong> activó tu cuenta de reclutador en <strong>${escapeHtml(solicitud.empresa?.razonSocial)}</strong>.</p>
       <table style="margin:1rem 0;border-collapse:collapse;width:100%">
-        <tr><td style="padding:8px 12px;background:#f0f6fc;font-weight:600;width:130px">Email</td><td style="padding:8px 12px;background:#e8f4fb">${solicitud.email}</td></tr>
+        <tr><td style="padding:8px 12px;background:#f0f6fc;font-weight:600;width:130px">Email</td><td style="padding:8px 12px;background:#e8f4fb">${escapeHtml(solicitud.email)}</td></tr>
         <tr><td style="padding:8px 12px;background:#f0f6fc;font-weight:600">Contraseña</td><td style="padding:8px 12px;background:#e8f4fb;font-family:monospace;font-size:1.1rem">${passwordPlano}</td></tr>
       </table>
-      <p style="color:#c0392b;font-size:0.88rem">⚠️ Cambiá tu contraseña al ingresar por primera vez.</p>
+      <p style="color:#c0392b;font-size:0.88rem">Cambiá tu contraseña al ingresar por primera vez.</p>
       <a href="${loginUrl}" style="display:inline-block;margin-top:1rem;background:#0073AD;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold">Ingresar al sistema</a>
     </div>`,
   });
@@ -102,7 +104,7 @@ function enviarEmailCredencialesReclutador(solicitud, passwordPlano) {
  *
  * @returns {{ usuarioId, email, passwordGenerada }}
  */
-async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }) {
+async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId, log }) {
   const solicitud = await SolicitudReclutador.findByPk(solicitudId, {
     include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial'] }],
   });
@@ -137,30 +139,47 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }) 
     }).catch((e) => logger.error({ err: e }, 'notif_aprobacion_reclutador_fallo'))
   ));
 
-  // Email al reclutador con credenciales
-  enviarEmailCredencialesReclutador(solicitud, passwordPlano)
-    .catch((e) => logger.error({ err: e }, 'email_reclutador_aprobado_fallo'));
+  // Email al reclutador con credenciales: se espera el resultado para
+  // informarlo al admin. Si falla, la cuenta queda creada igual y el
+  // reclutador entra con "Olvidé mi contraseña" (o su admin_empresa le manda
+  // la recuperación desde Equipo).
+  const envio = await enviarEmailCredencialesReclutador(solicitud, passwordPlano, { log });
+  if (!envio.ok && envio.errorCode !== 'EMAIL_NO_CONFIGURADO') {
+    (log || logger).error(
+      { solicitudId: solicitud.id, usuarioId: nuevoUsuario.id, errorCode: envio.errorCode, categoria: envio.categoria },
+      'aprobacion_reclutador_credenciales_no_enviadas',
+    );
+  }
 
-  // Email a los admin_empresa activos
-  await Promise.all(admins.map((admin) =>
+  // Aviso a los admin_empresa activos (fire-and-forget: el mailer registra el resultado).
+  admins.forEach((admin) => {
     enviarEmail({
       to: admin.email,
-      subject: '✅ Solicitud de reclutador aprobada – SisPasantías',
+      tipo: 'aviso_reclutador_aprobado',
+      log,
+      subject: 'Solicitud de reclutador aprobada – SisPasantías',
       html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
         <h2 style="color:#0073AD">Solicitud aprobada</h2>
-        <p>La solicitud de reclutador para <strong>${solicitud.nombre}</strong> (${solicitud.email}) fue <strong>aprobada</strong>.</p>
-        <p>El reclutador ya puede acceder al sistema con las credenciales enviadas a su email.</p>
+        <p>La solicitud de reclutador para <strong>${escapeHtml(solicitud.nombre)}</strong> (${escapeHtml(solicitud.email)}) fue <strong>aprobada</strong>.</p>
+        <p>${envio.ok
+          ? 'El reclutador ya puede acceder al sistema con las credenciales enviadas a su email.'
+          : 'La cuenta está creada. Si el reclutador no recibió sus credenciales, enviale la recuperación de acceso desde Equipo.'}</p>
       </div>`,
-    }).catch((e) => logger.error({ err: e }, 'email_empresa_aprobado_fallo'))
-  ));
+    });
+  });
 
-  return { usuarioId: nuevoUsuario.id, email: solicitud.email, passwordGenerada: passwordPlano };
+  return {
+    usuarioId: nuevoUsuario.id,
+    email: solicitud.email,
+    passwordGenerada: passwordPlano,
+    emailCredencialesEnviado: envio.ok,
+  };
 }
 
 /**
  * Rechaza una solicitud de reclutador, notifica in-app y por email al propietario.
  */
-async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }, motivo) {
+async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip, requestId, log }, motivo) {
   const solicitud = await SolicitudReclutador.findByPk(solicitudId, {
     include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial'] }],
   });
@@ -195,18 +214,21 @@ async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip, requestId },
     }).catch((e) => logger.error({ err: e }, 'notif_rechazo_reclutador_fallo'))
   ));
 
-  await Promise.all(admins.map((admin) =>
+  // Fire-and-forget: el mailer registra el resultado de cada envío.
+  admins.forEach((admin) => {
     enviarEmail({
       to: admin.email,
-      subject: '❌ Solicitud de reclutador rechazada – SisPasantías',
+      tipo: 'aviso_reclutador_rechazado',
+      log,
+      subject: 'Solicitud de reclutador rechazada – SisPasantías',
       html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
         <h2 style="color:#c0392b">Solicitud rechazada</h2>
-        <p>La solicitud de reclutador para <strong>${solicitud.nombre}</strong> (${solicitud.email}) fue <strong>rechazada</strong>.</p>
-        ${motivo ? `<p><strong>Motivo:</strong> ${motivo}</p>` : ''}
+        <p>La solicitud de reclutador para <strong>${escapeHtml(solicitud.nombre)}</strong> (${escapeHtml(solicitud.email)}) fue <strong>rechazada</strong>.</p>
+        ${motivo ? `<p><strong>Motivo:</strong> ${escapeHtml(motivo)}</p>` : ''}
         <p>Si tenés consultas, contactate con el equipo del instituto.</p>
       </div>`,
-    }).catch((e) => logger.error({ err: e }, 'email_empresa_rechazado_fallo'))
-  ));
+    });
+  });
 }
 
 module.exports = {

@@ -26,6 +26,7 @@ import { useState } from 'react';
 import PageHeader from '../../components/ui/PageHeader';
 import Card from '../../components/ui/Card';
 import Icon from '../../components/ui/Icon';
+import { esEnteroEnRango, primerError } from '../../utils/validacion';
 import styles from './CrearOfertaPage.module.css';
 
 // Carreras del instituto (lista canónica de catalogos.json)
@@ -101,9 +102,11 @@ export default function OfertaForm({
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    // Los números quedan como texto mientras se escribe: Number('') era 0 y
+    // mandaba "0 vacantes" en vez de avisar que el campo está vacío.
     setForm(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : (type === 'number' ? Number(value) : value),
+      [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
@@ -130,6 +133,22 @@ export default function OfertaForm({
 
     if (!form.tipoPuesto) {
       setError('Por favor seleccioná el tipo de puesto (Pasante, Trainee o Junior).');
+      return;
+    }
+    // Mismas reglas que backend/src/validators/oferta.validator.js (que valida igual).
+    if (!esEnteroEnRango(form.cantidadVacantes, 1, 999)) {
+      setError('Cantidad de vacantes debe ser un número entero entre 1 y 999.');
+      return;
+    }
+    const errorFormato = primerError([
+      [form.salario, (v) => esEnteroEnRango(v, 0, 2147483647), 'El salario estimado debe ser un número entero sin puntos ni símbolos (ej. 150000).'],
+    ]);
+    if (errorFormato) {
+      setError(errorFormato);
+      return;
+    }
+    if (form.fechaPublicacion && form.fechaLimite && form.fechaLimite < form.fechaPublicacion) {
+      setError('La fecha límite no puede ser anterior a la fecha de publicación.');
       return;
     }
 
@@ -219,6 +238,7 @@ export default function OfertaForm({
               <div className="form-group">
                 <label htmlFor="modalidadExtendida">Tipo de jornada</label>
                 <select id="modalidadExtendida" name="modalidadExtendida" value={form.modalidadExtendida} onChange={handleChange}>
+                  <option value="">Sin especificar</option>
                   <option value="tiempo_completo">Tiempo completo</option>
                   <option value="medio_tiempo">Medio tiempo</option>
                   <option value="pasantia">Pasantía</option>
@@ -256,7 +276,7 @@ export default function OfertaForm({
                 <label htmlFor="salario">Salario estimado (interno, no se publica)</label>
                 <input
                   id="salario" name="salario" value={form.salario} onChange={handleChange}
-                  placeholder="Ej: 150000"
+                  placeholder="Ej: 150000" inputMode="numeric"
                 />
               </div>
             </div>
@@ -347,7 +367,10 @@ export default function OfertaForm({
             </div>
             <div className="form-group">
               <label htmlFor="fechaLimite">Fecha límite de postulación</label>
-              <input id="fechaLimite" type="date" name="fechaLimite" value={form.fechaLimite} onChange={handleChange} />
+              <input
+                id="fechaLimite" type="date" name="fechaLimite" value={form.fechaLimite} onChange={handleChange}
+                min={form.fechaPublicacion || undefined}
+              />
             </div>
           </div>
         </Card>

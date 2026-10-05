@@ -66,42 +66,20 @@ const getPerfil = async (req, res) => {
 };
 
 const updatePerfil = async (req, res) => {
+  // validateUpdatePerfil (user.validator.js) ya validó y normalizó cada campo
+  // reconocido: listas como arrays, anioEgreso entero, visibilidad booleana,
+  // vacíos como null. Acá solo se reparte entre Perfil y Usuario.
   const body = { ...req.body };
 
-  // PostgreSQL no puede hacer el cast de '' → ARRAY
-  ['habilidades', 'idiomas', 'certificaciones'].forEach((campo) => {
-    if (body[campo] === undefined || body[campo] === null) return;
-    if (typeof body[campo] === 'string') {
-      try {
-        const parsed = JSON.parse(body[campo]);
-        body[campo] = Array.isArray(parsed) ? parsed : [];
-      } catch {
-        body[campo] = body[campo].trim() ? body[campo].split(',').map(s => s.trim()).filter(Boolean) : [];
-      }
-    } else if (!Array.isArray(body[campo])) {
-      body[campo] = [];
-    }
-  });
-
-  // redesSociales viene como string desde el frontend; se guarda como JSONB
+  // redesSociales: texto validado → JSONB { texto }
   if (body.redesSociales !== undefined) {
-    if (typeof body.redesSociales === 'string') {
-      body.redesSociales = body.redesSociales.trim()
-        ? { texto: body.redesSociales.trim() }
-        : null;
-    }
-  }
-
-  if (body.visibilidadPerfil !== undefined) {
-    if (typeof body.visibilidadPerfil === 'string') {
-      body.visibilidadPerfil = body.visibilidadPerfil === 'true' || body.visibilidadPerfil === 'publica';
-    }
+    body.redesSociales = body.redesSociales ? { texto: body.redesSociales } : null;
   }
 
   // telefono/ubicacion pertenecen al modelo Usuario, no a Perfil
   const datosUsuario = {};
-  if (body.telefono !== undefined) datosUsuario.telefono = body.telefono?.trim() || null;
-  if (body.ubicacion !== undefined) datosUsuario.ubicacion = body.ubicacion?.trim() || null;
+  if (body.telefono !== undefined) datosUsuario.telefono = body.telefono || null;
+  if (body.ubicacion !== undefined) datosUsuario.ubicacion = body.ubicacion || null;
   if (Object.keys(datosUsuario).length > 0) {
     await Usuario.update(datosUsuario, { where: { id: req.usuario.id } });
   }

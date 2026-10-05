@@ -68,6 +68,10 @@ module.exports = defineConfig({
         DATABASE_URL: '',
         JWT_SECRET: process.env.JWT_SECRET || 'e2e-secret',
         CLIENT_URL: 'http://localhost:5173',
+        // Nunca enviar emails reales desde el E2E (el .env del dev puede tener
+        // credenciales SMTP): vacías → el mailer solo registra en el log.
+        EMAIL_USER: '',
+        EMAIL_PASS: '',
       },
     },
     {

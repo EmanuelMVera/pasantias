@@ -3,6 +3,7 @@ import { empresaService } from '../../services/empresa.service';
 import Modal from '../Modal/Modal';
 import Icon from '../ui/Icon';
 import styles from './SolicitarReclutadorModal.module.css';
+import { esEmailValido } from '../../utils/validacion';
 
 /* ── Modal: alta de reclutador ───────────────────────────────────────────────
    El texto cambia según el nivel de confianza de la empresa (la decisión real
@@ -18,6 +19,10 @@ export default function SolicitarReclutadorModal({ onClose, onEnviada, esConfiab
     e.preventDefault();
     if (!form.nombre.trim() || !form.apellido.trim() || !form.email.trim()) {
       setError('Nombre, apellido y email son requeridos.');
+      return;
+    }
+    if (!esEmailValido(form.email)) {
+      setError('El email no tiene un formato válido.');
       return;
     }
     setLoading(true);

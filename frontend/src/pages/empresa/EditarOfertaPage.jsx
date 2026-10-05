@@ -23,6 +23,8 @@ import { ofertaService } from '../../services/oferta.service';
 import EmptyState from '../../components/ui/EmptyState';
 import Icon from '../../components/ui/Icon';
 import OfertaForm from './OfertaForm';
+
+const JORNADAS = ['tiempo_completo', 'medio_tiempo', 'pasantia', 'freelance'];
 import styles from './CrearOfertaPage.module.css';
 
 function soloFecha(iso) {
@@ -91,7 +93,9 @@ export default function EditarOfertaPage() {
         requisitos:         oferta.requisitos ?? '',
         area:               oferta.area ?? '',
         modalidad:          oferta.modalidad ?? 'presencial',
-        modalidadExtendida: oferta.modalidadExtendida ?? 'tiempo_completo',
+        // Ofertas viejas pueden tener texto libre acá; el campo ahora es una
+        // lista cerrada (la valida el backend): lo desconocido queda 'Sin especificar'.
+        modalidadExtendida: JORNADAS.includes(oferta.modalidadExtendida) ? oferta.modalidadExtendida : '',
         ciudad:             oferta.ciudad ?? '',
         cantidadVacantes:   oferta.cantidadVacantes ?? 1,
         remuneracion:       oferta.remuneracion ?? '',

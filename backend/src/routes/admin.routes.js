@@ -27,6 +27,8 @@ const { uploadLimiter, exportLimiter } = require('../middleware/rateLimit');
 const asyncHandler = require('../utils/asyncHandler');
 const adminCtrl = require('../controllers/admin.controller');
 const { multerCsv } = require('../services/csvImportacion.service');
+const validate = require('../middleware/validate.middleware');
+const { validateCrearUsuario, validateActualizarUsuario, validateMotivo } = require('../validators/admin.validator');
 
 // Shorthand para no repetir los middlewares en cada ruta
 const soloAdmin = [verifyToken, authorizeRoles('admin')];
@@ -43,15 +45,15 @@ router.get('/estadisticas/export', ...soloAdmin, exportLimiter, asyncHandler(adm
 // ── CRUD de usuarios ───────────────────────────────────────────────────────────
 router.get('/usuarios', ...soloAdmin, asyncHandler(adminCtrl.getUsuarios));
 router.get('/usuarios/:id', ...soloAdmin, asyncHandler(adminCtrl.getUsuarioById));
-router.post('/usuarios', ...soloAdmin, asyncHandler(adminCtrl.crearUsuario));
-router.put('/usuarios/:id', ...soloAdmin, asyncHandler(adminCtrl.actualizarUsuario));
+router.post('/usuarios', ...soloAdmin, validate(validateCrearUsuario), asyncHandler(adminCtrl.crearUsuario));
+router.put('/usuarios/:id', ...soloAdmin, validate(validateActualizarUsuario), asyncHandler(adminCtrl.actualizarUsuario));
 router.delete('/usuarios/:id', ...soloAdmin, asyncHandler(adminCtrl.eliminarUsuario)); // soft delete
 router.patch('/usuarios/:id/toggle', ...soloAdmin, asyncHandler(adminCtrl.toggleUsuario));
 
 // ── Empresas — aprobación directa (distinto de "solicitudes de empresa") ──────
 router.get('/empresas/pendientes', ...soloAdmin, asyncHandler(adminCtrl.getEmpresasPendientes));
 router.patch('/empresas/:id/aprobar', ...soloAdmin, asyncHandler(adminCtrl.aprobarEmpresa));
-router.patch('/empresas/:id/rechazar', ...soloAdmin, asyncHandler(adminCtrl.rechazarEmpresa));
+router.patch('/empresas/:id/rechazar', ...soloAdmin, validate(validateMotivo), asyncHandler(adminCtrl.rechazarEmpresa));
 
 // ── Empresas — listado general + nivel de confianza (RBAC-05) ─────────────────
 router.get('/empresas', ...soloAdmin, asyncHandler(adminCtrl.getEmpresas));
@@ -60,7 +62,7 @@ router.patch('/empresas/:id/confianza', ...soloAdmin, asyncHandler(adminCtrl.cam
 // ── Moderación de ofertas ─────────────────────────────────────────────────────
 router.get('/ofertas/pendientes', ...soloAdmin, asyncHandler(adminCtrl.getOfertasPendientes));
 router.get('/ofertas', ...soloAdmin, asyncHandler(adminCtrl.getOfertas));
-router.patch('/ofertas/:id/moderar', ...soloAdmin, asyncHandler(adminCtrl.moderarOferta));
+router.patch('/ofertas/:id/moderar', ...soloAdmin, validate(validateMotivo), asyncHandler(adminCtrl.moderarOferta));
 
 // ── Logs de auditoría ──────────────────────────────────────────────────────────
 router.get('/logs', ...soloAdmin, asyncHandler(adminCtrl.getLogs));
@@ -69,12 +71,12 @@ router.get('/logs/export', ...soloAdmin, exportLimiter, asyncHandler(adminCtrl.e
 // ── Solicitudes de registro de empresa ────────────────────────────────────────
 router.get('/solicitudes-empresa', ...soloAdmin, asyncHandler(adminCtrl.getSolicitudesEmpresa));
 router.patch('/solicitudes-empresa/:id/aprobar', ...soloAdmin, asyncHandler(adminCtrl.aprobarSolicitudEmpresa));
-router.patch('/solicitudes-empresa/:id/rechazar', ...soloAdmin, asyncHandler(adminCtrl.rechazarSolicitudEmpresa));
+router.patch('/solicitudes-empresa/:id/rechazar', ...soloAdmin, validate(validateMotivo), asyncHandler(adminCtrl.rechazarSolicitudEmpresa));
 
 // ── Solicitudes de reclutadores ────────────────────────────────────────────────
 router.get('/solicitudes-reclutador', ...soloAdmin, asyncHandler(adminCtrl.getSolicitudesReclutador));
 router.patch('/solicitudes-reclutador/:id/aprobar', ...soloAdmin, asyncHandler(adminCtrl.aprobarSolicitudReclutador));
-router.patch('/solicitudes-reclutador/:id/rechazar', ...soloAdmin, asyncHandler(adminCtrl.rechazarSolicitudReclutador));
+router.patch('/solicitudes-reclutador/:id/rechazar', ...soloAdmin, validate(validateMotivo), asyncHandler(adminCtrl.rechazarSolicitudReclutador));
 
 // ── Importación masiva de alumnos/egresados (CSV) ─────────────────────────────
 // Un único endpoint de import + ?dryRun=true (evita duplicar parsing/validación

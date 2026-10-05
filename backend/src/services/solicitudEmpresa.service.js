@@ -7,7 +7,7 @@ const {
   sequelize,
 } = require('../models');
 const HttpError = require('../utils/httpError');
-const { enviarEmail } = require('../utils/mailer');
+const { enviarEmail, escapeHtml } = require('../utils/mailer');
 const { config } = require('../config/env');
 const { registrarAuditoria } = require('../utils/auditLog');
 const logger = require('../utils/logger');
@@ -21,7 +21,7 @@ const logger = require('../utils/logger');
  *
  * @returns {{ empresaId, usuarioId, email, razonSocial, reclutadoresPendientes, passwordGenerada }}
  */
-async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }) {
+async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId, log }) {
   const solicitud = await SolicitudEmpresa.findByPk(solicitudId);
   if (!solicitud) throw new HttpError(404, 'Solicitud no encontrada.');
   if (solicitud.estado !== 'pendiente') {
@@ -123,30 +123,35 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }) 
     detalle:   { razonSocial: solicitud.razonSocial, emailLogin: loginEmail, empresaId: nuevaEmpresa.id, reclutadoresCreados },
   });
 
-  // Email con credenciales — fire-and-forget
+  // Email con credenciales. Se ESPERA el resultado (con timeouts acotados en el
+  // mailer) para informarlo al admin: si falla, la empresa queda aprobada igual
+  // — no se revierte por una caída de Gmail — y el responsable puede entrar con
+  // "Olvidé mi contraseña" en cuanto el correo funcione.
   const loginUrl = `${config.urls.client}/login`;
   const nombreResponsable = solicitud.responsableNombre || solicitud.razonSocial;
-  enviarEmail({
+  const envio = await enviarEmail({
     to: loginEmail,
-    subject: '✅ Tu solicitud fue aprobada – SisPasantías',
+    tipo: 'aprobacion_empresa_credenciales',
+    log,
+    subject: 'Tu solicitud fue aprobada – SisPasantías',
     html: `
       <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
-        <h2 style="color:#0073AD">¡Tu solicitud fue aprobada! 🎉</h2>
-        <p>Hola, <strong>${nombreResponsable}</strong>.</p>
+        <h2 style="color:#0073AD">¡Tu solicitud fue aprobada!</h2>
+        <p>Hola, <strong>${escapeHtml(nombreResponsable)}</strong>.</p>
         <p>El equipo de <strong>SisPasantías</strong> aprobó la solicitud de
-        <strong>${solicitud.razonSocial}</strong>. Ya podés acceder al panel
+        <strong>${escapeHtml(solicitud.razonSocial)}</strong>. Ya podés acceder al panel
         de empresa con las siguientes credenciales:</p>
         <table style="margin:1rem 0;border-collapse:collapse;width:100%">
           <tr>
             <td style="padding:8px 12px;background:#f0f6fc;font-weight:600;width:130px;border-radius:6px 0 0 6px">Email</td>
-            <td style="padding:8px 12px;background:#e8f4fb;border-radius:0 6px 6px 0">${loginEmail}</td>
+            <td style="padding:8px 12px;background:#e8f4fb;border-radius:0 6px 6px 0">${escapeHtml(loginEmail)}</td>
           </tr>
           <tr>
             <td style="padding:8px 12px;background:#f0f6fc;font-weight:600;margin-top:4px;border-radius:6px 0 0 6px">Contraseña</td>
             <td style="padding:8px 12px;background:#e8f4fb;border-radius:0 6px 6px 0;font-family:monospace;font-size:1.1rem;letter-spacing:0.05em">${passwordPlano}</td>
           </tr>
         </table>
-        <p style="color:#c0392b;font-size:0.88rem">⚠️ Por seguridad, te recomendamos cambiar la contraseña al iniciar sesión por primera vez.</p>
+        <p style="color:#c0392b;font-size:0.88rem">Por seguridad, te recomendamos cambiar la contraseña al iniciar sesión por primera vez.</p>
         <a href="${loginUrl}" style="display:inline-block;margin-top:1rem;background:#0073AD;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold">
           Ingresar al sistema
         </a>
@@ -154,7 +159,14 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }) 
         <p style="margin-top:2rem;color:#888;font-size:0.82rem">SisPasantías – Portal Institucional de Empleo</p>
       </div>
     `,
-  }).catch((e) => logger.error({ err: e }, 'email_aprobacion_solicitud_fallo'));
+  });
+
+  if (!envio.ok && envio.errorCode !== 'EMAIL_NO_CONFIGURADO') {
+    (log || logger).error(
+      { solicitudId: solicitud.id, empresaId: nuevaEmpresa.id, errorCode: envio.errorCode, categoria: envio.categoria },
+      'aprobacion_empresa_credenciales_no_enviadas',
+    );
+  }
 
   return {
     empresaId: nuevaEmpresa.id,
@@ -163,13 +175,42 @@ async function aprobarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }) 
     razonSocial: solicitud.razonSocial,
     reclutadoresPendientes: reclutadoresCreados,
     passwordGenerada: passwordPlano,
+    emailCredencialesEnviado: envio.ok,
   };
+}
+
+/**
+ * Email de recepción al crear una solicitud (al responsable, con copia al
+ * contacto institucional si es otro). Sin credenciales: la cuenta recién se
+ * crea al aprobarla. Nunca lanza; devuelve el resultado de enviarEmail.
+ */
+function enviarConfirmacionSolicitud(solicitud, { log } = {}) {
+  const destinatarios = [...new Set([solicitud.responsableEmail, solicitud.email].filter(Boolean))];
+  const nombre = solicitud.responsableNombre || solicitud.razonSocial;
+  return enviarEmail({
+    to: destinatarios,
+    tipo: 'solicitud_empresa_recibida',
+    log,
+    subject: 'Recibimos tu solicitud – SisPasantías',
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
+        <h2 style="color:#0073AD">Recibimos tu solicitud</h2>
+        <p>Hola, <strong>${escapeHtml(nombre)}</strong>.</p>
+        <p>Recibimos la solicitud de registro de <strong>${escapeHtml(solicitud.razonSocial)}</strong>
+        en SisPasantías.</p>
+        <p>Está pendiente de revisión por el instituto. Te vamos a avisar por este medio
+        cuando haya una decisión; si se aprueba, en ese momento vas a recibir los datos
+        de acceso.</p>
+        <p style="margin-top:2rem;color:#888;font-size:0.82rem">SisPasantías – Portal Institucional de Empleo</p>
+      </div>
+    `,
+  });
 }
 
 /**
  * Rechaza una solicitud de empresa y notifica por email.
  */
-async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip, requestId }, motivo) {
+async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip, requestId, log }, motivo) {
   const solicitud = await SolicitudEmpresa.findByPk(solicitudId);
   if (!solicitud) throw new HttpError(404, 'Solicitud no encontrada.');
   if (solicitud.estado !== 'pendiente') {
@@ -193,22 +234,26 @@ async function rechazarSolicitud(solicitudId, { adminUsuarioId, ip, requestId },
     detalle:   { razonSocial: solicitud.razonSocial, email: solicitud.email, motivo },
   });
 
+  // Fire-and-forget: el resultado (éxito o fallo) lo registra el mailer.
+  // Va al responsable y al contacto institucional (antes solo al segundo).
   enviarEmail({
-    to: solicitud.email,
-    subject: '❌ Tu solicitud no fue aprobada – SisPasantías',
+    to: [...new Set([solicitud.responsableEmail, solicitud.email].filter(Boolean))],
+    tipo: 'rechazo_solicitud_empresa',
+    log,
+    subject: 'Tu solicitud no fue aprobada – SisPasantías',
     html: `
       <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
         <h2 style="color:#c0392b">Solicitud no aprobada</h2>
-        <p>Hola, <strong>${solicitud.razonSocial}</strong>.</p>
+        <p>Hola, <strong>${escapeHtml(solicitud.razonSocial)}</strong>.</p>
         <p>Luego de revisar tu solicitud de registro en <strong>SisPasantías</strong>,
         lamentablemente no pudimos aprobarla en esta oportunidad.</p>
-        ${motivo ? `<p><strong>Motivo:</strong> ${motivo}</p>` : ''}
+        ${motivo ? `<p><strong>Motivo:</strong> ${escapeHtml(motivo)}</p>` : ''}
         <p>Si considerás que fue un error o querés más información, podés comunicarte
         directamente con el equipo del instituto.</p>
         <p style="margin-top:2rem;color:#888;font-size:0.82rem">SisPasantías – Portal Institucional de Empleo</p>
       </div>
     `,
-  }).catch((e) => logger.error({ err: e }, 'email_rechazo_solicitud_fallo'));
+  });
 }
 
-module.exports = { aprobarSolicitud, rechazarSolicitud };
+module.exports = { aprobarSolicitud, rechazarSolicitud, enviarConfirmacionSolicitud };

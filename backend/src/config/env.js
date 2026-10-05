@@ -110,6 +110,52 @@ function deepFreeze(obj) {
   return Object.freeze(obj);
 }
 
+// ── Advertencias de email (no bloquean el arranque) ──────────────────────────
+
+/** "juan@gmail.com" → "ju***@gmail.com". */
+function redactarEmailConfig(email) {
+  if (!email || !email.includes('@')) return email ? '***' : '';
+  const [local, dominio] = email.split('@');
+  return `${local.slice(0, 2)}***@${dominio}`;
+}
+
+/**
+ * Señales de una config SMTP que probablemente no funcione. Solo advierte —
+ * la prueba real es `verificarSmtp()` al arrancar / `npm run email:verify`.
+ * NUNCA incluye el valor de EMAIL_PASS (a lo sumo, si tiene el formato
+ * esperado) y el usuario va redactado.
+ */
+function advertenciasEmail({ host, port, secure, user, pass, from }) {
+  const out = [];
+  if (!user || !pass) return out;
+
+  if (port === 465 && !secure) out.push('EMAIL_PORT=465 usa TLS implícito: requiere EMAIL_SECURE=true.');
+  if (port === 587 && secure) out.push('EMAIL_PORT=587 usa STARTTLS: requiere EMAIL_SECURE=false.');
+
+  if (from) {
+    const m = /<([^>]+)>/.exec(from);
+    const direccion = (m ? m[1] : from).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(direccion)) {
+      out.push('EMAIL_FROM no contiene una dirección válida. Formato esperado: "SisPasantías" <cuenta@dominio>.');
+    } else if (user.includes('@') && direccion !== user.trim().toLowerCase()) {
+      out.push(
+        `EMAIL_FROM (${direccion}) no coincide con EMAIL_USER (${redactarEmailConfig(user)}): `
+        + 'Gmail solo lo respeta si es un alias "Enviar como" verificado en esa cuenta; si no, lo reemplaza o rechaza el envío.',
+      );
+    }
+  }
+
+  if (/(^|\.)gmail\.com$/i.test(host || '') || /(^|\.)googlemail\.com$/i.test(host || '')) {
+    if (/\s/.test(pass)) {
+      out.push('EMAIL_PASS contiene espacios (Google muestra la App Password en grupos de 4): cargala sin espacios.');
+    }
+    if (pass.replace(/\s/g, '').length !== 16) {
+      out.push('EMAIL_PASS no tiene el formato de una App Password de Google (16 caracteres). Gmail rechaza la contraseña normal de la cuenta.');
+    }
+  }
+  return out;
+}
+
 // ── loadConfig ───────────────────────────────────────────────────────────────
 
 function loadConfig(raw = process.env) {
@@ -143,6 +189,14 @@ function loadConfig(raw = process.env) {
 
   const emailUser = raw.EMAIL_USER || '';
   const emailPass = raw.EMAIL_PASS || '';
+  warnings.push(...advertenciasEmail({
+    host: raw.EMAIL_HOST || 'smtp.gmail.com',
+    port: toIntOrNull(raw.EMAIL_PORT) ?? 587,
+    secure: raw.EMAIL_SECURE === 'true',
+    user: emailUser,
+    pass: emailPass,
+    from: raw.EMAIL_FROM || '',
+  }));
 
   const config = {
     nodeEnv,
@@ -380,6 +434,7 @@ module.exports = {
   validateEnv,
   duracionAMs,
   // exportados para tests
+  advertenciasEmail,
   normalizeUrl,
   parseOrigins,
   resolveTrustProxy,

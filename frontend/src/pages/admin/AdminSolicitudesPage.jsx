@@ -131,13 +131,15 @@ export default function AdminSolicitudesPage() {
     setError('');
     try {
       const res = await adminService.aprobarSolicitud(solicitud.id);
-      const { data } = res.data;
-      const emailDestino = solicitud.responsableEmail || solicitud.email;
+      const { data, message } = res.data;
+      // El backend informa si el email con credenciales salió de verdad: si
+      // falló, el mensaje explica cómo entra el responsable (no es un éxito pleno).
+      const enviado = data?.emailCredencialesEnviado !== false;
       showToast(
-        `"${solicitud.razonSocial}" aprobada. Credenciales enviadas a ${emailDestino}` +
+        message +
         (data?.passwordGenerada ? ` (pwd dev: ${data.passwordGenerada})` : '') +
         (data?.reclutadoresPendientes ? ` · ${data.reclutadoresPendientes} solicitud(es) de reclutador creadas.` : ''),
-        'success',
+        enviado ? 'success' : 'error',
       );
       cerrarDetalle();
       cargar(pageEmp);
@@ -182,11 +184,11 @@ export default function AdminSolicitudesPage() {
     setError('');
     try {
       const res = await adminService.aprobarSolicitudReclutador(sol.id);
-      const { data } = res.data;
+      const { data, message } = res.data;
+      const enviado = data?.emailCredencialesEnviado !== false;
       showToast(
-        `Reclutador "${sol.nombre}" aprobado. Credenciales enviadas a ${sol.email}` +
-        (data?.passwordGenerada ? ` (pwd dev: ${data.passwordGenerada})` : ''),
-        'success',
+        message + (data?.passwordGenerada ? ` (pwd dev: ${data.passwordGenerada})` : ''),
+        enviado ? 'success' : 'error',
       );
       cerrarRevisionRecl();
       cargarRecl(pageRecl);

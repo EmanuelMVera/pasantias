@@ -7,7 +7,7 @@ module.exports = {
   '/api/solicitudes-empresa': {
     post: operation({
       tag: T, id: 'solicitudesEmpresaCrear', summary: 'Enviar una solicitud de registro de empresa',
-      description: 'Endpoint **público** (sin auth, CSRF exento). La revisa un admin del instituto.',
+      description: 'Endpoint **público** (sin auth, CSRF exento). La revisa un admin del instituto. Valida formatos (CUIT con dígito verificador, emails, teléfonos, sitio web) y envía un email de recepción al responsable (con copia al contacto institucional), sin credenciales.',
       security: [],
       body: 'SolicitudEmpresaCreate',
       responses: {
