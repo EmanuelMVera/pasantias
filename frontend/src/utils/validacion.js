@@ -64,7 +64,10 @@ export function errorCuit(valor) {
   const d = soloDigitos(valor);
   if (!d) return '';
   if (d.length !== 11) return 'El CUIT debe tener 11 dígitos.';
-  return esCuitValido(d) ? '' : 'El dígito verificador del CUIT no es válido.';
+  if (!CUIT_PREFIJOS.includes(d.slice(0, 2))) {
+    return 'El CUIT debe empezar con 20, 23, 24, 27, 30, 33 o 34.';
+  }
+  return esCuitValido(d) ? '' : 'El último dígito (verificador) no corresponde a este CUIT. Revisá que esté bien copiado.';
 }
 
 /** Entero (number o texto de dígitos) dentro de [min, max]. */

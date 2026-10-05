@@ -326,7 +326,14 @@ function validarValor(valor, r, label) {
       return { valor: limpios };
     }
     case 'cuit': {
-      if (!esCuitValido(valor)) return { error: `${label} no es válido: deben ser 11 dígitos con dígito verificador correcto.` };
+      if (!esCuitValido(valor)) {
+        // Mensaje según la causa (los tests buscan el prefijo "no es válido").
+        const d = normalizarCuit(valor);
+        let causa = 'el último dígito (verificador) no corresponde a este CUIT';
+        if (!/^[\d\s-]+$/.test(String(valor).trim()) || d.length !== 11) causa = 'deben ser 11 dígitos';
+        else if (!CUIT_PREFIJOS.includes(d.slice(0, 2))) causa = 'debe empezar con 20, 23, 24, 27, 30, 33 o 34';
+        return { error: `${label} no es válido: ${causa}.` };
+      }
       return { valor: normalizarCuit(valor) };
     }
     default:
